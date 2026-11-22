@@ -111,21 +111,24 @@ class DeleteThenUndoInstrumentedTest {
 
     /**
      * An in-memory database the way the app builds it, main-thread reads still refused. The view
-     * model clears a stored fallback task that isn't in its database, so the app's own is put back.
+     * model clears a stored fallback task that isn't in its database, so the app's own is put back,
+     * and the Last edited times its undos write too.
      */
     private fun withViewModel(block: suspend (AppDatabase, ActiveAutomationViewModel) -> Unit) = runBlocking {
         val fallbackTask = FallbackTaskSettings(context)
         val savedFallbackTaskId = fallbackTask.loadTaskId()
-        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
-        val store = ViewModelStore()
-        try {
-            db.projectDao().insert(ProjectEntity(id = DEFAULT_PROJECT_ID, name = "Default", position = 0))
-            val viewModel = ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
-            block(db, viewModel)
-        } finally {
-            store.clear()
-            db.close()
-            fallbackTask.saveTaskId(savedFallbackTaskId)
+        keepingLibraryEditTimes(context) {
+            val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+            val store = ViewModelStore()
+            try {
+                db.projectDao().insert(ProjectEntity(id = DEFAULT_PROJECT_ID, name = "Default", position = 0))
+                val viewModel = ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
+                block(db, viewModel)
+            } finally {
+                store.clear()
+                db.close()
+                fallbackTask.saveTaskId(savedFallbackTaskId)
+            }
         }
     }
 

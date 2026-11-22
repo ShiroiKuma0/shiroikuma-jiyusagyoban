@@ -24,6 +24,7 @@ import com.opentasker.ui.screens.LibraryEditTimes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
@@ -193,20 +194,20 @@ class OpenTaskerApp_NoHilt : Application() {
     private fun prepareDatabase() {
         if (DatabaseBackupManager.pendingRestoreFile(this).exists()) _startupStage.value = StartupStage.Restoring
         DatabaseBackupManager.discardLeftoverRestoreCandidate(this)
-        // Plugin condition grants name profile positions in the database they were given in, so a
-        // restore that replaces it drops them, on disk before the restore's journal goes.
+        // Plugin condition grants name profile positions in the database they were given in, and the
+        // Last edited times name item ids, which the restored items may reuse. A restore that
+        // replaces the database drops both, on disk before the restore's journal goes.
         val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this) {
-            LocaleConditionGrantStore(this).revokeAllContextGrants().also { cleared ->
+            val grantsCleared = LocaleConditionGrantStore(this).revokeAllContextGrants().also { cleared ->
                 if (!cleared) AppLogger.warn("OpenTasker", "Could not clear the plugin condition grants a restore left; the next start tries again")
             }
+            val timesCleared = runCatching { runBlocking { LibraryEditTimes.clear(this@OpenTaskerApp_NoHilt) } }
+                .onFailure { AppLogger.warn("OpenTasker", "Could not clear the Last edited times a restore left; the next start tries again", it) }
+                .isSuccess
+            grantsCleared && timesCleared
         }
         when (restoreResult) {
             is PendingRestoreApplyResult.Applied -> {
-                // The restored items' ids may match times kept for other items before it.
-                applicationScope.launch {
-                    runCatching { LibraryEditTimes.clear(this@OpenTaskerApp_NoHilt) }
-                        .onFailure { AppLogger.warn("OpenTasker", "Could not clear the Last edited times after a restore", it) }
-                }
                 AppLogger.info(
                     "OpenTasker",
                     "Applied pending database restore to ${restoreResult.databaseFile.name}; " +

@@ -34,29 +34,32 @@ class SnackbarUndoSkipsReviewInstrumentedTest {
         val savedFallbackTaskId = fallbackTask.loadTaskId()
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         val store = ViewModelStore()
-        try {
-            val viewModel = ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
-            val task = Task(id = TASK_ID, name = "Morning focus")
-            db.taskDao().insert(task.toEntity())
+        // The undos date the test's task id in the app's Last edited times.
+        keepingLibraryEditTimes(context) {
+            try {
+                val viewModel = ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
+                val task = Task(id = TASK_ID, name = "Morning focus")
+                db.taskDao().insert(task.toEntity())
 
-            viewModel.deleteTask(task)
-            val deleted = viewModel.nextMessage()
-            viewModel.undo(deleted.action as UiMessageAction.Undo)
-            assertEquals(R.string.ui_message_edit_undone, viewModel.nextMessage().resId)
-            assertEquals("Morning focus", db.taskDao().getById(TASK_ID)?.name)
-            assertNull(viewModel.semanticDiffReview.value)
-            assertTrue(viewModel.highlightedFlowNodeKeys.value.isEmpty())
+                viewModel.deleteTask(task)
+                val deleted = viewModel.nextMessage()
+                viewModel.undo(deleted.action as UiMessageAction.Undo)
+                assertEquals(R.string.ui_message_edit_undone, viewModel.nextMessage().resId)
+                assertEquals("Morning focus", db.taskDao().getById(TASK_ID)?.name)
+                assertNull(viewModel.semanticDiffReview.value)
+                assertTrue(viewModel.highlightedFlowNodeKeys.value.isEmpty())
 
-            // The same delete undone from the task's menu is the review's case.
-            viewModel.deleteTask(task)
-            assertEquals(R.string.ui_message_task_deleted, viewModel.nextMessage().resId)
-            viewModel.undoLastTaskEdit(TASK_ID)
-            assertEquals(R.string.ui_message_edit_undone, viewModel.nextMessage().resId)
-            assertNotNull(viewModel.semanticDiffReview.value)
-        } finally {
-            store.clear()
-            db.close()
-            fallbackTask.saveTaskId(savedFallbackTaskId)
+                // The same delete undone from the task's menu is the review's case.
+                viewModel.deleteTask(task)
+                assertEquals(R.string.ui_message_task_deleted, viewModel.nextMessage().resId)
+                viewModel.undoLastTaskEdit(TASK_ID)
+                assertEquals(R.string.ui_message_edit_undone, viewModel.nextMessage().resId)
+                assertNotNull(viewModel.semanticDiffReview.value)
+            } finally {
+                store.clear()
+                db.close()
+                fallbackTask.saveTaskId(savedFallbackTaskId)
+            }
         }
     }
 

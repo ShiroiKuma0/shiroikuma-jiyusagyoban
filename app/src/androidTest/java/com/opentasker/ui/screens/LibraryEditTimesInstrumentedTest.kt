@@ -9,6 +9,7 @@ import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -45,30 +46,33 @@ class LibraryEditTimesInstrumentedTest {
         // New ids start past this one, far above any real task, so the time can't land on one of them.
         db.taskDao().insert(Task(id = SEED_ID, name = "Seed").toEntity())
         db.taskDao().delete(db.taskDao().getAll().single())
-        val store = ViewModelStore()
-        val viewModel = withContext(Dispatchers.Main) {
-            ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
-        }
-        var id: Long? = null
-        try {
-            withContext(Dispatchers.Main) { viewModel.createTask("Stamp check", 5, CollisionMode.ABORT_NEW) }
-            val created = withTimeout(10_000) {
-                var found: Long? = null
-                while (found == null) {
-                    found = db.taskDao().getAll().firstOrNull { it.name == "Stamp check" }?.id
-                    if (found == null) delay(50)
-                }
-                found
+        // The view model clears a stored fallback task that isn't in its database, so the app's own is put back.
+        val fallbackTask = FallbackTaskSettings(context)
+        val savedFallbackTaskId = fallbackTask.loadTaskId()
+        keepingLibraryEditTimes(context) {
+            val store = ViewModelStore()
+            val viewModel = withContext(Dispatchers.Main) {
+                ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
             }
-            id = created
-            assertTrue(created > SEED_ID)
+            try {
+                withContext(Dispatchers.Main) { viewModel.createTask("Stamp check", 5, CollisionMode.ABORT_NEW) }
+                val created = withTimeout(10_000) {
+                    var found: Long? = null
+                    while (found == null) {
+                        found = db.taskDao().getAll().firstOrNull { it.name == "Stamp check" }?.id
+                        if (found == null) delay(50)
+                    }
+                    found
+                }
+                assertTrue(created > SEED_ID)
 
-            val key = EditHistoryAvailabilityState.key(EditHistoryDao.TYPE_TASK, created)
-            val times = withTimeout(10_000) { LibraryEditTimes.times(context).first { key in it } }
-            assertTrue(times.getValue(key) > 0L)
-        } finally {
-            withContext(Dispatchers.Main) { store.clear() }
-            id?.let { LibraryEditTimes.forget(context, EditHistoryDao.TYPE_TASK, it) }
+                val key = EditHistoryAvailabilityState.key(EditHistoryDao.TYPE_TASK, created)
+                val times = withTimeout(10_000) { LibraryEditTimes.times(context).first { key in it } }
+                assertTrue(times.getValue(key) > 0L)
+            } finally {
+                withContext(Dispatchers.Main) { store.clear() }
+                fallbackTask.saveTaskId(savedFallbackTaskId)
+            }
         }
     }
 

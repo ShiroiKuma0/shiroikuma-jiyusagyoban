@@ -75,7 +75,7 @@ object LibrarySortPreference {
     }
 }
 
-private val Context.libraryEditTimesDataStore by preferencesDataStore(name = "library_edit_times")
+internal val Context.libraryEditTimesDataStore by preferencesDataStore(name = "library_edit_times")
 
 /**
  * When an item was last created, saved, undone or redone in the app, keyed like
