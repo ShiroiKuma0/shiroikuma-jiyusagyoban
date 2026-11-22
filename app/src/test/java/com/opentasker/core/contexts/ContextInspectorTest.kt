@@ -703,6 +703,24 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun anOrRuleIsBlamedOnAContextThatSurelyFailsBelowTheTop() {
+        // Context 3 matches, and the OR under it has context 1 unknown and context 2 off, so the
+        // rule can't hold. Context 2 is the one surely in the way.
+        val rule = ContextExpressionNode.group(
+            ContextBooleanOperator.AND,
+            listOf(
+                ContextExpressionNode.leaf(2),
+                ContextExpressionNode.group(ContextBooleanOperator.OR, listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1))),
+            ),
+        )
+        val checks = listOf(check(0, false).copy(valueUnknown = true), check(1, false), check(2, true))
+
+        assertEquals("reason 2", blockingReason(checks, rule))
+        // Without a rule the same goes: the context that surely fails comes first.
+        assertEquals("reason 2", blockingReason(checks, null))
+    }
+
+    @Test
     fun aRuleThatCantBeEvaluatedNamesNoContext() {
         // The rule points at a third context the profile doesn't have, so no context can fix it.
         val profile = stateProfile(

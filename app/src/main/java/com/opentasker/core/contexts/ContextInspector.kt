@@ -198,14 +198,15 @@ internal fun evaluateChecks(
 /**
  * Why a profile's contexts don't hold, from the context that fails its rule. Without a rule that's
  * the first context that doesn't match, leaving out one whose OR group another member already
- * satisfies. With one, the rule is walked down to a context whose state keeps it from holding, so
+ * satisfies and naming one whose value isn't known yet last. With one, the rule is walked down to a context whose state keeps it from holding, so
  * a context a NOT is happy to see off isn't blamed. Null when nothing can be named, such as a rule
  * that can't be evaluated.
  */
 internal fun blockingReason(checks: List<ContextCheck>, expression: ContextExpressionNode?): String? {
     if (expression == null) {
         val satisfiedGroups = checks.filter { it.effectiveMatched }.mapNotNullTo(HashSet()) { it.spec.orGroup }
-        return checks.firstOrNull { !it.effectiveMatched && it.spec.orGroup !in satisfiedGroups }?.reason
+        return checks.filter { !it.effectiveMatched && it.spec.orGroup !in satisfiedGroups }
+            .minByOrNull { it.valueUnknown }?.reason
     }
     if (!expression.isValidForContextCount(checks.size)) return null
     val values = checks.map { if (it.valueUnknown) null else it.effectiveMatched }
