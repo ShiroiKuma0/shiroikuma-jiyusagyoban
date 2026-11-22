@@ -2984,12 +2984,15 @@ object TaskerXmlImporter {
                 "667" to "Tasker's SQL Query runs a query on a database or a content provider, and OpenTasker has no step that does",
                 "344" to "Tasker's Test App reads an app's details into a variable, and OpenTasker has no step that does",
                 "815" to "Tasker's List Apps reads the installed apps into variables, and OpenTasker has no step that does",
-                "366" to "Tasker's Get Location v2 reads a location fix into variables, and OpenTasker has no step that does. " +
-                    "Location works as a profile condition here",
-                "902" to "Tasker's Get Location reads a location fix into variables, and OpenTasker has no step that does. " +
-                    "Location works as a profile condition here",
+                "366" to "Tasker's Get Location v2 fills its own location variables, and it isn't converted. Add a Get " +
+                    "Location step in its place, which fills %location_lat, %location_lon and the rest, and point the " +
+                    "steps after it at those. Location also works as a profile condition here",
+                "902" to "Tasker's Get Location waits for a new fix, and it isn't converted, so %LOC and %LOCN read the last " +
+                    "fix Android already has. Add a Get Location step in its place for a new one, which fills " +
+                    "%location_lat and %location_lon. Location also works as a profile condition here",
                 "380" to "Tasker's HTTP Response answers a request made to Tasker's own web server, and OpenTasker doesn't run one",
-                "421" to "Tasker's Get Screen Info reads the screen as the assistant app, and OpenTasker can't be the assistant",
+                "421" to "Tasker's Get Screen Info reads what's on screen as the assistant app. OpenTasker can be the assistant " +
+                    "app, but it has no step that reads the screen",
                 "450" to "Tasker's APN Droid drives the APNDroid app, which OpenTasker doesn't talk to",
                 "342" to "Tasker's Test File reads a file's details into a variable, and OpenTasker has no step that does",
                 "400" to "Tasker's Move moves or renames a file, and OpenTasker has no step that does",

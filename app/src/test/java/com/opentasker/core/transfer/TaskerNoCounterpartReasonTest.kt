@@ -115,6 +115,8 @@ class TaskerNoCounterpartReasonTest {
         )
 
         assertTrue(note, "Tasker's Get Location" in note && "profile condition" in note)
+        // There's a Get Location step now, so the note sends people to it rather than saying there's none.
+        assertTrue(note, "Add a Get Location step" in note && "%location_lat" in note && "no step" !in note)
     }
 
     @Test
