@@ -28,8 +28,8 @@ class ScheduledJobDiagnosticsContractTest {
         val screen = ProductionSources.path("com/opentasker/ui/screens/DiagnosticsScreen.kt").readText()
         val export = ProductionSources.path("com/opentasker/core/diagnostics/DiagnosticExport.kt").readText()
 
-        assertTrue("UI must show pending-job history", "pendingScheduledJobs.history" in screen)
-        assertTrue("UI must show aggregate pending time", "pendingScheduledJobs.aggregateStats" in screen)
+        assertTrue("UI must show pending-job history", "pendingScheduledJobs.historyEntries" in screen)
+        assertTrue("UI must show aggregate pending time", "pendingScheduledJobs.statsEntries" in screen)
         assertTrue("export must show pending-job history", "Pending job reason history" in export)
         assertTrue("export must show aggregate pending time", "Pending job duration stats" in export)
     }

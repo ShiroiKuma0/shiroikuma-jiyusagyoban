@@ -615,6 +615,14 @@ class LocalizationSourceTest {
             }
         }
         assertTrue("Separators or jargon in user-visible strings: $offenders", offenders.isEmpty())
+
+        // The other checks above are English words, but a space after a line break shows in any language.
+        val breakThenSpace = Files.list(resRoot).use { dirs ->
+            dirs.filter { isLocaleValuesDirectory(it.fileName.toString()) }.toList()
+        }.flatMap { dir ->
+            Files.list(dir).use { paths -> paths.filter { it.fileName.toString().endsWith(".xml") }.toList() }
+        }.filter { "\\n " in it.readText() }.map { "${it.parent.fileName}/${it.fileName}" }
+        assertTrue("A line break followed by a space in: $breakThenSpace", breakThenSpace.isEmpty())
     }
 
     /**
@@ -624,12 +632,18 @@ class LocalizationSourceTest {
     @Test
     fun diagnosticsScreenDoesNotShowTheReportsEnglish() {
         val screen = sourceRoot.resolve("com/opentasker/ui/screens/DiagnosticsScreen.kt").readText()
-        val reportFields = listOf(
+        val helper = sourceRoot.resolve("com/opentasker/ui/screens/DiagnosticsHealthText.kt").readText()
+        val fields = listOf(
             """\.exactAlarmStatus\b""", """\.standbyConsequence\b""", """\.activeForegroundServiceTypes\b""",
             """\.lastWorkerStopReason\b""", """\.currentReasons\b""", """pendingScheduledJobs\.history\b""",
-            """\.aggregateStats\b""", """signal\.label\b""", """signal\.reason\b""", """\.assessment\b""",
-            """::ageLabel\b""", """correlation\.reason\b""",
-        ).filter { Regex(it).containsMatchIn(screen) }
+            """\.aggregateStats\b""", """\.assessment\b""", """::ageLabel\b""",
+        )
+        // The helper words these itself: a signal's own label and reason only stand in for a key with
+        // no resource (DiagnosticsHealthTextTest maps every key the reader has), and the exit reason
+        // goes through exitReasonText, which maps it back to a resource.
+        val keyedFallbacks = listOf("""signal\.label\b""", """signal\.reason\b""", """correlation\.reason\b""")
+        val reportFields = (fields + keyedFallbacks).filter { Regex(it).containsMatchIn(screen) } +
+            fields.filter { Regex(it).containsMatchIn(helper) }.map { "DiagnosticsHealthText: $it" }
         assertTrue("Diagnostics shows the report's English: $reportFields", reportFields.isEmpty())
     }
 
