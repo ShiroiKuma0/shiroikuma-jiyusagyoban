@@ -8,6 +8,74 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-13.00-28.g70b0571a+034 — 2026-11-22
+
+Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
+the same base as `+030`. Builds `+031` to `+033` were steps on the way and are contained in this one.
+
+### 携帯 — the workspace by command
+
+- **`/projects`**, **`/profiles [filter]`** and **`/tasks [filter]`** in a SIM's Jami group list a relay
+  phone's workspace: every project with its counts, profiles as ● on and ○ off, tasks grouped by
+  project. A filter is a project, a word in the name, or `word @ project`. A long list arrives as
+  several messages; a bare `/tasks` shows only the counts.
+- **`/profile on|off|? name [@ project]`** switches a profile or shows its state, under the same
+  checks as its switch in the app; the answer shows the state before and after, or the refusal.
+- **`/run task [@ project]`** runs a task and answers when it starts and when it has ended, with the
+  error if it failed.
+- **`/version [app]`** answers with the installed builds of 白い熊 自由作業盤, 白い熊 GNU Jami and
+  白い熊 メッセージ, or of any app by its name or package, with the time of its last update.
+- A name that occurs in more than one project is given as `name @ project`, split at the last `@`
+  with the spaces optional; an ambiguous name is refused with the projects it occurs in.
+- New actions behind them: `workspace.list`, `workspace.find`, `workspace.profile`, `package.info`.
+
+### 携帯 — remote updates that say what happened
+
+- **`/install on`** imports a bundle and switches on every profile it carries, reporting each one;
+  a plain `/install` names the profiles that arrived switched off.
+- **An installed app is started again** after its update, and the answer says so.
+- **On a rooted phone another app is installed through root**, with no confirmation. 自由作業盤's own
+  update keeps the ordinary route, which is silent for it.
+- **A confirmation nobody pressed** now answers with what to do: unlock that phone and tap once.
+- **`/install` waits for a file for as long as its bytes keep arriving**, asking Jami for the real
+  state, and resumes an interrupted transfer; a stall says how far it came and why.
+- **A second `/install` for the same file**, sent while the first was still running, is declined.
+- **After an update of Jami itself** the answer goes out as soon as Jami is connected again.
+- **A reply that could not be sent is kept** and delivered on a later round, marked ⏱.
+- **A file that has arrived in full is answered with “📦 … holding a verified copy”**, since the
+  sender's “Sent” mark covers only the message.
+- **Triggers that arrive while a patrol is running are queued**, not dropped: an event read a moment
+  too late used to wait up to five minutes for the next trigger.
+- The bundle for a relay phone carries the whole relay side, so a phone that lacked a task is made
+  whole by one import.
+
+### 携帯 — MMS
+
+- **Pictures sent from the carried phone go out as MMS**: the step that hands a received picture on
+  could never run before.
+- **An MMS part carries its content type and name** in both directions, so a picture shows as a
+  picture and not as a file called `part_0`.
+- **A received MMS arrives as one message**, its text and its pictures together.
+- The setup guide gained the always-connected setup of Jami on a relay phone, and a relay tells Jami
+  to stay awake at every start.
+
+### The black-yellow theme, applied in full
+
+- **Every item has a colour role of its own**, about a hundred of them, each set on the UI page in
+  the section of its item with a reset of its own, and all of them exported with the page. A role
+  follows the foundation colours until it is set apart.
+- **Menus**: every action row is a full-width outlined pill with an icon coloured by what the row
+  does, a › where it opens something and red where it deletes; toggle rows carry the outlined
+  switch; a clear divider separates groups.
+- **The UI page** is a folding accordion with a chip index that jumps on a tap and reorders on a
+  long-press, an icon on every row, dim-gold explanations with a left rule, pills that hug their
+  label, and a Maintenance section with “Reset section order” and “Reset all colours”.
+- **No filled button remains**: the sync buttons of 健康 and 言語島 and the buttons of the progress
+  panel are outlined pills, and a button that deletes is marked one way everywhere.
+- **Pickers and action lists** carry role-coloured icons.
+- **A scene element that sets no colour of its own takes the theme**; the home-screen task widget and
+  the app's notifications are coloured from roles; the window starts black in light mode too.
+
 ## 0.2.96+2026-11-13.00-28.g70b0571a+030 — 2026-11-22
 
 Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
