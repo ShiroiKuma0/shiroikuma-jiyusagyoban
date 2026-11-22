@@ -1179,7 +1179,6 @@ fun registerActionMetadata() {
                     FieldType.TEXT,
                     required = true,
                     hintRes = R.string.catalog_action_settings_read_field_var_hint,
-                    sensitive = false,
                 ),
             )
         )
