@@ -62,6 +62,8 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * The Huawei band's report.
@@ -454,30 +456,20 @@ private fun HuaweiBattery(status: HuaweiStatus?) {
 
 @Composable
 private fun SyncButton(running: Boolean, bound: Boolean, onSync: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                if (running) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.primary,
-            )
-            .clickable(enabled = !running, onClick = onSync)
-            .padding(horizontal = 20.dp, vertical = 11.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+    // The main action of the dashboard: the app's main pill — a thick frame, never filled, and the
+    // same pill dimmed while a sync runs.
+    com.opentasker.ui.components.Button(onClick = onSync, enabled = !running) {
         if (running) {
             CircularProgressIndicator(
                 Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
+                color = role(UiRole.BUTTON_MAIN_LABEL),
             )
         } else {
             Text(
                 if (bound) HuaweiText.syncNow[LocalBandLanguage.current]
                 else HuaweiText.pairFirst[LocalBandLanguage.current],
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
             )
         }
     }

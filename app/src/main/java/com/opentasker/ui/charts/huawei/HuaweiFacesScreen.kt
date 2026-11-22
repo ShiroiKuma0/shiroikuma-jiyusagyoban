@@ -54,6 +54,10 @@ import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.RadioButtonDefaults
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import com.opentasker.ui.components.destructiveButtonColors
 
 /** What the window is doing, so a cell can show it without inventing its own state. */
 data class HuaweiFacesState(
@@ -368,7 +372,7 @@ private fun ConfirmRemoveDialog(label: String, onKeep: () -> Unit, onRemove: () 
             }
         },
         confirmButton = {
-            Button(onClick = onRemove) { Text(HuaweiText.facesRemoveConfirmYes[lang]) }
+            Button(onClick = onRemove, colors = destructiveButtonColors()) { Text(HuaweiText.facesRemoveConfirmYes[lang]) }
         },
         dismissButton = {
             OutlinedButton(onClick = onKeep) { Text(HuaweiText.facesRemoveCancel[lang]) }
@@ -388,10 +392,8 @@ private fun RoomDialog(
         mutableStateOf<HuaweiUploadClient.InstalledFace?>(null)
     }
     AlertDialog(
-        // The app's own dialog frame — 1.5 dp of the theme's primary on a 28 dp corner, exactly as
-        // ImportReviewDialogs and EmojiPickerDialog wear it. Material draws no border of its own, so
-        // a dialog that omits this is a black panel on a black screen (白い熊, 2026-08-28).
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        // No frame of its own: the app's AlertDialog draws the dialog frame for every dialog, from
+        // its own role, and a second one here would be a second colour once that role is set.
         onDismissRequest = { onResolve(null) },
         title = { Text(HuaweiText.facesFullTitle[lang]) },
         text = {
@@ -449,6 +451,10 @@ private fun RoomDialog(
                             RadioButton(
                                 selected = chosen?.assetId == face.assetId,
                                 onClick = { chosen = face },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = role(UiRole.RADIO_ON),
+                                    unselectedColor = role(UiRole.RADIO_OFF),
+                                ),
                             )
                             Text(
                                 label + if (face.showing) " ●" else "",
@@ -560,6 +566,7 @@ private fun BandCard(
                             onClick = { onRemoveBandFace(face) },
                             enabled = !state.bandBusy,
                             shape = RoundedCornerShape(10.dp),
+                            colors = destructiveButtonColors(),
                         ) { Text(HuaweiText.facesDelete[lang]) }
                     }
                 }
@@ -669,6 +676,7 @@ private fun FaceCell(
                 enabled = !bandBusy,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
+                colors = destructiveButtonColors(),
             ) {
                 if (removing) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)

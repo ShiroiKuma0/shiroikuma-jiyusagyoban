@@ -29,15 +29,17 @@ class TaskWidgetConfigPolishSourceTest {
     }
 
     @Test
-    fun homeScreenWidgetUsesBrandedVisualTreatment() {
+    fun homeScreenWidgetIsColouredFromTheRoleTable() {
+        // The fork's widget carries no colour in XML: ground, frame, text and icon come from the
+        // role table and are applied by the provider (白い熊, 2026-11-21: nothing pinned in XML).
         val layout = resRoot.resolve("layout/widget_task.xml").readText()
-        val background = resRoot.resolve("drawable/widget_task_background.xml").readText()
-        val colors = resRoot.resolve("values/colors.xml").readText()
+        val provider = sourceRoot.resolve("com/opentasker/widget/TaskWidgetProvider.kt").readText()
 
-        assertTrue("Widget should use the branded rounded background drawable", layout.contains("@drawable/widget_task_background"))
         assertTrue("Widget should include a visible secondary action cue", layout.contains("@string/widget_tap_to_run"))
-        assertTrue("Widget background should have rounded corners", background.contains("android:radius=\"16dp\""))
-        assertTrue("Widget colors should be centralized in resources", colors.contains("widget_primary"))
+        assertFalse("The widget layout must not pin a colour", Regex("#[0-9A-Fa-f]{6,8}|@color/").containsMatchIn(layout))
+        listOf("WIDGET_GROUND", "WIDGET_FRAME", "WIDGET_TEXT", "WIDGET_ICON").forEach { role ->
+            assertTrue("The provider should colour the widget from UiRole.$role", provider.contains("UiRole.$role"))
+        }
     }
 
     @Test

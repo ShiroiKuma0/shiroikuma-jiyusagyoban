@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +36,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /** One paper tab: [badge] is a count shown after the title in a filled pill (0 = none). */
 data class PaperTab(val id: Long, val title: String, val badge: Int = 0)
@@ -62,8 +63,8 @@ fun PaperTabBar(
     textScale: Float = 1.3f,
     onLongPress: (Long) -> Unit = {},
 ) {
-    val ink = MaterialTheme.colorScheme.primary
-    val paper = MaterialTheme.colorScheme.background
+    val ink = role(UiRole.TAB_INK)
+    val paper = role(UiRole.TAB_GROUND)
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val inactiveHeight = (INACTIVE_HEIGHT_DP * textScale).dp

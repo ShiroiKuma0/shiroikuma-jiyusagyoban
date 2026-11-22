@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
@@ -67,12 +68,16 @@ import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.dialogFrame
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import com.opentasker.ui.components.OutlinedButton
@@ -181,23 +186,32 @@ internal fun ActionPickerDialog(
                                     ),
                                     shape = RoundedCornerShape(14.dp),
                                 ) {
-                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-                                        ) {
-                                            Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                            if (capability.level != CapabilityLevel.Supported) {
-                                                StatusPill(
-                                                    if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
-                                                    if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                                )
+                                    // The category's icon in its role colour leads the row; name,
+                                    // description and reason share the one label edge after it.
+                                    val (categoryIcon, categoryRole) = actionCategoryIcon(category)
+                                    Row(
+                                        Modifier.padding(12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                                    ) {
+                                        RoleIcon(categoryIcon, categoryRole, Modifier.size(20.dp))
+                                        Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                                            ) {
+                                                Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                                if (capability.level != CapabilityLevel.Supported) {
+                                                    StatusPill(
+                                                        if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
+                                                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                    )
+                                                }
                                             }
-                                        }
-                                        Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        if (capability.level != CapabilityLevel.Supported) {
-                                            Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                            Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            if (capability.level != CapabilityLevel.Supported) {
+                                                Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                            }
                                         }
                                     }
                                 }
@@ -295,10 +309,9 @@ internal fun ActionConfigDialog(
     }
 
     AlertDialog(
-        // Yellow edge + more height: this is the full editor, so give it room without being a full page.
-        modifier = Modifier
-            .fillMaxWidth(0.96f)
-            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        // More width: this is the full editor, so give it room without being a full page. The edge
+        // is the dialog frame role, drawn by the app's AlertDialog.
+        modifier = Modifier.fillMaxWidth(0.96f),
         onDismissRequest = onDismiss,
         // Back and Cancel still dismiss in one tap; only a stray tap on the scrim is refused.
         // These forms carry many fields, and discarding them has no undo because nothing was
@@ -564,11 +577,14 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                     onDismissRequest = { editing = false },
                     properties = DialogProperties(usePlatformDefaultWidth = false),
                 ) {
-                    WidgetEditor(
-                        initialJson = value,
-                        onDone = { onChange(it); editing = false },
-                        onCancel = { editing = false },
-                    )
+                    // Full-screen, so the frame is square; the editor paints its own ground.
+                    Box(Modifier.dialogFrame(RectangleShape)) {
+                        WidgetEditor(
+                            initialJson = value,
+                            onDone = { onChange(it); editing = false },
+                            onCancel = { editing = false },
+                        )
+                    }
                 }
             }
         }
@@ -595,7 +611,8 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                 )
                 ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     field.options.forEach { opt ->
-                        DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false })
+                        // The field's options are pure choices: plain rows, no icon column.
+                        DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false }, choice = true)
                     }
                 }
             }
@@ -635,7 +652,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             // Not single-line: short values stay compact but long ones (a font name, a path, a message)
             // wrap and grow so they stay fully editable rather than scrolling inside one hidden line.
             maxLines = 8,
-            // Opt-in folder icon that fills the field from the system directory/file picker.
+            // Opt-in directory icon that fills the field from the system directory/file picker.
             trailingIcon = if (field.pathPicker) {
                 { PathPickerTrailingIcon(onPath = onChange) }
             } else {
@@ -647,7 +664,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
 }
 
 /**
- * A folder icon whose menu opens the system directory or file picker (SAF) and reports the chosen
+ * A directory icon whose menu opens the system directory or file picker (SAF) and reports the chosen
  * item as a plain filesystem path (e.g. /storage/emulated/0/Download/…) — no persistent URI grant is
  * taken because callers only need the path string. Sits in a field's trailing-icon slot.
  */
@@ -667,10 +684,16 @@ private fun PathPickerTrailingIcon(onPath: (String) -> Unit) {
         DropdownMenuItem(
             text = { Text("Pick directory…") },
             onClick = { menu = false; treeLauncher.launch(null) },
+            icon = Icons.Filled.Folder,
+            role = IconRole.VIEW,
+            opens = true,
         )
         DropdownMenuItem(
             text = { Text("Pick file…") },
             onClick = { menu = false; fileLauncher.launch(arrayOf("*/*")) },
+            icon = Icons.Filled.InsertDriveFile,
+            role = IconRole.VIEW,
+            opens = true,
         )
     }
 }

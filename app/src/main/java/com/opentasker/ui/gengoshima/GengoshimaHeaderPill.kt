@@ -1,15 +1,9 @@
 package com.opentasker.ui.gengoshima
 
 import android.app.Activity
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.Text
@@ -17,14 +11,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import com.opentasker.ui.theme.ThemedSwitch
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * A top-right header action of a 言語島 window — 閉じる, 止める — as an outlined pill, the same
@@ -36,49 +32,50 @@ internal fun HeaderPill(label: String, onClick: () -> Unit) {
 }
 
 /**
- * An on/off setting of a 言語島 window as a pill whose state reads at a glance (白い熊, 2026-10-23).
- * All yellow in both states (白い熊 wants no grey). On: a thick border and a solid box holding a
- * heavy black check. Off: a thin border and an empty outlined box. The check, the border's weight
- * and the filled box all differ, so the state reads without any change of colour.
+ * An on/off setting of a 言語島 window: its label and the theme's outlined switch, the whole row the
+ * touch target. It used to be a pill with a filled check box (白い熊, 2026-10-23); the theme allows
+ * nothing filled and keeps one look for every on/off, so the state now reads from the switch — the
+ * dot's side and its brightness — and the name stays so the call sites did not move.
+ *
+ * [choice] is for one entry of a single choice (the island of a word): then the mark is a radio
+ * button, because a mark that says which entry is chosen is not a switch.
  */
 @Composable
-internal fun TogglePill(label: String, checked: Boolean, modifier: Modifier = Modifier, onToggle: () -> Unit) {
-    val shape = RoundedCornerShape(50)
+internal fun TogglePill(
+    label: String,
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+    choice: Boolean = false,
+    onToggle: () -> Unit,
+) {
     Row(
         modifier
-            .clip(shape)
-            .border(if (checked) 3.dp else 1.dp, PILL_YELLOW, shape)
-            .clickable(role = Role.Switch, onClick = onToggle)
-            .padding(start = 10.dp, end = 18.dp, top = 8.dp, bottom = 8.dp),
+            .clip(RoundedCornerShape(50))
+            .then(
+                if (choice) {
+                    Modifier.selectable(selected = checked, role = Role.RadioButton, onClick = onToggle)
+                } else {
+                    Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = { onToggle() })
+                },
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val box = RoundedCornerShape(6.dp)
-        Box(
-            Modifier
-                .size(28.dp)
-                .then(if (checked) Modifier.background(PILL_YELLOW, box) else Modifier.border(2.dp, PILL_YELLOW, box)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (checked) Canvas(Modifier.size(20.dp)) {
-                // Drawn rather than the Material glyph, whose stroke is too thin to read at arm's length.
-                val tick = Path().apply {
-                    moveTo(size.width * 0.08f, size.height * 0.55f)
-                    lineTo(size.width * 0.40f, size.height * 0.85f)
-                    lineTo(size.width * 0.94f, size.height * 0.18f)
-                }
-                drawPath(tick, Color.Black, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            }
+        if (choice) {
+            RadioButton(
+                selected = checked,
+                onClick = null,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = role(UiRole.RADIO_ON),
+                    unselectedColor = role(UiRole.RADIO_OFF),
+                ),
+            )
         }
-        Text(
-            label,
-            fontSize = 16.sp,
-            color = PILL_YELLOW,
-        )
+        Text(label, fontSize = 16.sp, color = role(UiRole.LIST_LABEL))
+        if (!choice) ThemedSwitch(checked = checked, onCheckedChange = null)
     }
 }
-
-private val PILL_YELLOW = Color(0xFFFFFF00)
 
 /**
  * 閉じる on a window opened from the 言語島 board: back to the board, not out of 言語島. The board

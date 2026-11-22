@@ -27,6 +27,8 @@ import com.opentasker.core.capabilities.ActionCapability
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.CapabilityRequirement
 import com.opentasker.core.capabilities.CapabilityState
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * The capability note shown beneath an action everywhere it appears (picker, task editor, config
@@ -55,7 +57,10 @@ internal fun CapabilityNote(capability: ActionCapability, modifier: Modifier = M
     }
 
     val ok = met
-    val pillColor = if (ok) Color(0xFFFFFF00) else MaterialTheme.colorScheme.error
+    // The status pill is a regular pill that opens Settings: the button roles when the requirement
+    // is met, the warning role on frame and label alike when it is not. Never filled.
+    val pillFrame = if (ok) role(UiRole.BUTTON_FRAME) else role(UiRole.WARNING)
+    val pillColor = if (ok) role(UiRole.BUTTON_LABEL) else role(UiRole.WARNING)
     Row(
         modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -75,8 +80,8 @@ internal fun CapabilityNote(capability: ActionCapability, modifier: Modifier = M
                 }
             },
             shape = RoundedCornerShape(50),
-            color = Color(0xFF000000),
-            border = BorderStroke(1.dp, pillColor),
+            color = Color.Transparent,
+            border = BorderStroke(1.25.dp, pillFrame),
         ) {
             Row(
                 Modifier.padding(horizontal = 10.dp, vertical = 5.dp),

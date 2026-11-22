@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Folder
@@ -58,15 +59,17 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.Upload
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.MenuDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -81,7 +84,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -121,6 +123,8 @@ import com.opentasker.ui.components.TabActionsFab
 import com.opentasker.ui.components.ThemedDropdownMenu
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -886,6 +890,8 @@ fun ActiveAutomationUi(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = role(UiRole.BAR_TITLE),
+                    actionIconContentColor = role(UiRole.BAR_ICON),
                 ),
                 actions = {
                     // Expand / collapse every card on the current list tab (de9f47a). Default = all collapsed.
@@ -925,15 +931,18 @@ fun ActiveAutomationUi(
                     ThemedDropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
                         DropdownMenuItem(
                             text = { Text("白い熊 自由作業盤 UI") },
-                            leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                            icon = Icons.Filled.Settings,
+                            role = IconRole.VIEW,
+                            opens = true,
                             onClick = { showOverflow = false; showUiCustomization = true },
                         )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                        MenuDivider()
                         // Restart is the everyday one: the same teardown as an exit, minus the stop flag,
                         // followed by a fresh start — re-establishes the context layer after a bad state.
                         DropdownMenuItem(
                             text = { Text("Restart engine") },
-                            leadingIcon = { Icon(Icons.Filled.RestartAlt, contentDescription = null) },
+                            icon = Icons.Filled.RestartAlt,
+                            role = IconRole.CONNECT,
                             onClick = {
                                 showOverflow = false
                                 AppShutdown.restartEngine(context)
@@ -944,7 +953,10 @@ fun ActiveAutomationUi(
                         )
                         DropdownMenuItem(
                             text = { Text("Exit app fully") },
-                            leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, contentDescription = null) },
+                            icon = Icons.Filled.PowerSettingsNew,
+                            role = IconRole.BLOCK,
+                            // Opens the shutdown report, which is where the exit is confirmed.
+                            opens = true,
                             onClick = {
                                 showOverflow = false
                                 exitBusy = true
@@ -965,7 +977,7 @@ fun ActiveAutomationUi(
             // The fork's uniform per-tab "+" menu: New <item> / Import JSON / Export <selection> (set
             // apart by a divider). Import routes through the unified bundle flow; export reuses the
             // selective-export bundle (exportSelectionBundle).
-            val importJson = TabAction("Import JSON…", Icons.Filled.Add) {
+            val importJson = TabAction("Import JSON…", Icons.Filled.Download) {
                 openTaskerBundleImportLauncher.launch(OPEN_TASKER_BUNDLE_MIME_TYPES)
             }
             val actions: List<TabAction> = when (screen) {
@@ -975,7 +987,7 @@ fun ActiveAutomationUi(
                     },
                     TabAction("From template…", Icons.Filled.Add) { showTemplateDialog = true },
                     importJson,
-                    TabAction("Export profiles…", Icons.Filled.Edit, dividerBefore = true) {
+                    TabAction("Export profiles…", Icons.Filled.Upload, dividerBefore = true) {
                         startSelectionExport(
                             PendingExport(
                                 fileName = exportFileName("profiles"),
@@ -984,7 +996,7 @@ fun ActiveAutomationUi(
                             ),
                         )
                     },
-                    TabAction("Export everything…", Icons.Filled.Edit) {
+                    TabAction("Export everything…", Icons.Filled.Upload) {
                         openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
                     },
                 )
@@ -992,7 +1004,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Tasks -> listOf(
                     TabAction("New task", Icons.Filled.Add) { showCreateTaskDialog = true },
                     importJson,
-                    TabAction("Export tasks…", Icons.Filled.Edit, dividerBefore = true) {
+                    TabAction("Export tasks…", Icons.Filled.Upload, dividerBefore = true) {
                         startSelectionExport(
                             PendingExport(
                                 fileName = exportFileName("tasks"),
@@ -1001,7 +1013,7 @@ fun ActiveAutomationUi(
                             ),
                         )
                     },
-                    TabAction("Export everything…", Icons.Filled.Edit) {
+                    TabAction("Export everything…", Icons.Filled.Upload) {
                         openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
                     },
                 )
@@ -1009,7 +1021,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Widgets -> listOf(
                     TabAction("New widget template", Icons.Filled.Add) { widgetCreateSignal++ },
                     importJson,
-                    TabAction("Export templates…", Icons.Filled.Edit, dividerBefore = true) {
+                    TabAction("Export templates…", Icons.Filled.Upload, dividerBefore = true) {
                         startSelectionExport(
                             PendingExport(
                                 fileName = exportFileName("widget templates"),
@@ -1018,14 +1030,14 @@ fun ActiveAutomationUi(
                             ),
                         )
                     },
-                    TabAction("Export everything…", Icons.Filled.Edit) {
+                    TabAction("Export everything…", Icons.Filled.Upload) {
                         openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
                     },
                 )
 
                 OpenTaskerScreen.Vars -> listOf(
                     importJson,
-                    TabAction("Export variables…", Icons.Filled.Edit, dividerBefore = true) {
+                    TabAction("Export variables…", Icons.Filled.Upload, dividerBefore = true) {
                         startSelectionExport(
                             PendingExport(
                                 fileName = exportFileName("variables"),
@@ -1034,7 +1046,7 @@ fun ActiveAutomationUi(
                             ),
                         )
                     },
-                    TabAction("Export everything…", Icons.Filled.Edit) {
+                    TabAction("Export everything…", Icons.Filled.Upload) {
                         openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
                     },
                 )
@@ -1042,7 +1054,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Scenes -> listOf(
                     TabAction("New scene", Icons.Filled.Add) { sceneCreateSignal++ },
                     importJson,
-                    TabAction("Export scenes…", Icons.Filled.Edit, dividerBefore = true) {
+                    TabAction("Export scenes…", Icons.Filled.Upload, dividerBefore = true) {
                         startSelectionExport(
                             PendingExport(
                                 fileName = exportFileName("scenes"),
@@ -1051,7 +1063,7 @@ fun ActiveAutomationUi(
                             ),
                         )
                     },
-                    TabAction("Export everything…", Icons.Filled.Edit) {
+                    TabAction("Export everything…", Icons.Filled.Upload) {
                         openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
                     },
                 )
@@ -1059,7 +1071,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Projects -> listOf(
                     TabAction("New project", Icons.Filled.Add) { projectCreateSignal++ },
                     importJson,
-                    TabAction("Export everything…", Icons.Filled.Edit, dividerBefore = true) {
+                    TabAction("Export everything…", Icons.Filled.Upload, dividerBefore = true) {
                         openTaskerBundleExportLauncher.launch(openTaskerBundleExportName())
                     },
                 )
@@ -1081,6 +1093,8 @@ fun ActiveAutomationUi(
                 HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.primary)
                 val navScroll = rememberScrollState()
                 val primary = MaterialTheme.colorScheme.primary
+                // The wash behind the destination that is open: the chosen-entry role, thinned.
+                val selectedWash = role(UiRole.LIST_SELECTED).copy(alpha = 0.13f)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1107,7 +1121,7 @@ fun ActiveAutomationUi(
                                 .widthIn(min = 64.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .then(tapModifier)
-                                .background(if (selected) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.13f) else androidx.compose.ui.graphics.Color.Transparent)
+                                .background(if (selected) selectedWash else androidx.compose.ui.graphics.Color.Transparent)
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -1719,9 +1733,9 @@ internal fun StatusPill(
 ) {
     Surface(
         modifier = modifier,
-        // Neutral grey fill (was the accent at low alpha → olive over black); the accent stays as the
-        // border + text so the pill still reads as accented without the olive tint.
-        color = Color.White.copy(alpha = 0.09f),
+        // The quiet-panel ground of the scheme (was a white wash, and before that the accent at low
+        // alpha → olive over black); the accent stays as the border + text.
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
     ) {
@@ -1741,8 +1755,8 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
     val isError = color == MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        // Error notices keep their red wash; others use a neutral grey fill (no olive).
-        color = if (isError) color.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.07f),
+        // Error notices keep their red wash; others sit on the scheme's quiet-panel ground (no olive).
+        color = if (isError) color.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {

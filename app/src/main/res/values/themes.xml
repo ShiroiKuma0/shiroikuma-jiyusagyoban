@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        windowBackground is what the splash and the pre-composition window paint. Hardcoding black
-        meant every Light-mode launch flashed black before Compose drew the cream surface. The
-        night variant keeps black; see values-night/themes.xml.
+        windowBackground is what the splash and the pre-composition window paint, before any code
+        can read a colour role. It is black in light and dark mode alike (values/colors.xml and
+        values-night/colors.xml) and is the one colour a theme here may name.
     -->
     <style name="Theme.OpenTasker" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>

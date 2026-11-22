@@ -75,8 +75,8 @@ import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CheckboxDefaults
+import com.opentasker.ui.components.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -143,6 +143,8 @@ import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -440,9 +442,9 @@ private fun SceneCard(
                 else Modifier.size((sw * scale).dp, (sh * scale).dp),
             )
             .clip(shape)
-            // Blank background defaults to the theme background (black); blank border to outline (yellow).
-            .background(sceneColor(scene.bgColor) ?: MaterialTheme.colorScheme.background)
-            .then(if (borderW > 0) Modifier.border((borderW * scale).dp, sceneColor(scene.borderColor) ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
+            // Blank background defaults to the theme's scene ground (black); blank border to outline (yellow).
+            .background(sceneColor(scene.bgColor) ?: role(UiRole.SCENE_GROUND))
+            .then(if (borderW > 0) Modifier.border((borderW * scale).dp, sceneColor(scene.borderColor) ?: role(UiRole.SCENE_BORDER), shape) else Modifier)
             // Modal: absorb taps so tapping the card (not the scrim) doesn't dismiss.
             .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier)
             // Tap-through panel with "Tap outside closes": the card's own empty area is outside the
@@ -552,13 +554,13 @@ internal fun SceneElementView(
             val bg = sceneColor(v("bgColor"))
             val shape = RoundedCornerShape(8.dp)
             val annotated = sceneSpans(v("text"))
-            val fillColor = sceneColor(v("textColor")) ?: MaterialTheme.colorScheme.onSurface
+            val fillColor = sceneColor(v("textColor")) ?: role(UiRole.SCENE_TEXT)
             val strokeColor = styleStrokeColor
             val strokeWpx = styleStrokeWpx
             Box(
                 Modifier.fillMaxSize()
                     .then(if (bg != null) Modifier.background(bg, shape) else Modifier)
-                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
+                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: role(UiRole.SCENE_BORDER), shape) else Modifier)
                     // A TEXT carrying a tap task used to do NOTHING, silently: only BUTTON, the input
                     // widgets and RECTANGLE/OVAL ever read `tapTaskName`, so a scene author who bound a
                     // task to a text element got a dead element and no complaint from anywhere. 白い熊
@@ -667,13 +669,26 @@ internal fun SceneElementView(
             fun pick(dx: Float, dy: Float, up: String?, down: String?, left: String?, right: String?): String? =
                 if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) { if (dx > 0) right else left }
                 else { if (dy > 0) down else up }
+            val buttonGround = sceneColor(v("bgColor"))
             Box(
                 Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(10.dp))
                     // bgColor read via v() so a (debug) task can flip an edge strip visible/invisible live.
-                    .background(sceneColor(v("bgColor")) ?: MaterialTheme.colorScheme.primary)
-                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)) else Modifier)
+                    // A button that sets no ground of its own takes the theme: nothing filled, a
+                    // frame and a label in the scene-button roles. One that sets bgColor is untouched.
+                    .background(buttonGround ?: Color.Transparent)
+                    .then(
+                        when {
+                            styleBorderW > 0 -> Modifier.border(
+                                styleBorderW.dp,
+                                styleBorderColor ?: if (buttonGround == null) role(UiRole.SCENE_BUTTON_FRAME) else role(UiRole.SCENE_BORDER),
+                                RoundedCornerShape(10.dp),
+                            )
+                            buttonGround == null -> Modifier.border(1.25.dp, role(UiRole.SCENE_BUTTON_FRAME), RoundedCornerShape(10.dp))
+                            else -> Modifier
+                        },
+                    )
                     // Swipe or double-tap bound → the full edge-gesture detector (it consumes the down so
                     // the tap-through overlay claims the move stream). Otherwise the lightweight tap
                     // detector, so a plain button's tap stays instant (no double-tap wait).
@@ -724,7 +739,7 @@ internal fun SceneElementView(
                     label,
                     // Via styleLabelColor (v()-expanded) like every other element, so a %var can drive
                     // the colour/alpha live (e.g. the 音楽端灯 buttons' fade knob %Ongaku_Btncolor).
-                    color = styleLabelColor ?: MaterialTheme.colorScheme.onPrimary,
+                    color = styleLabelColor ?: if (buttonGround == null) role(UiRole.SCENE_BUTTON_LABEL) else MaterialTheme.colorScheme.onPrimary,
                     fontFamily = styleFont,
                     fontSize = styleSize,
                     fontWeight = styleWeight,
@@ -776,8 +791,8 @@ internal fun SceneElementView(
             // are configurable; drag (or tap) anywhere on the bar sets the level. Inherently vertical.
             val styleFill = cfg["style"].equals("fill", ignoreCase = true)
             if (styleFill) {
-                val trackColor = sceneColor(v("trackColor")) ?: Color(0xFF222222)
-                val fillColor = sceneColor(v("fillColor")) ?: tint ?: Color(0xFFFFFF00)
+                val trackColor = sceneColor(v("trackColor")) ?: role(UiRole.SCENE_PANEL)
+                val fillColor = sceneColor(v("fillColor")) ?: tint ?: role(UiRole.SCENE_SLIDER)
                 val iconSpec = cfg["icon"]?.trim()
                 val iconColor = sceneColor(v("iconColor")) ?: trackColor
                 val iconSz = cfg["iconSize"]?.toFloatOrNull() ?: 22f
@@ -821,7 +836,7 @@ internal fun SceneElementView(
                 // A horizontal Slider rotated 90° CCW: its track length follows the element height, so
                 // the top is max and dragging up increases the value.
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontFamily = styleFont, fontWeight = styleWeightOrNull)
+                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontFamily = styleFont, fontWeight = styleWeightOrNull)
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         val trackLength = maxHeight
                         Slider(
@@ -838,7 +853,7 @@ internal fun SceneElementView(
                 }
             } else {
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontFamily = styleFont, fontWeight = styleWeightOrNull)
+                    if (label.isNotBlank()) Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontFamily = styleFont, fontWeight = styleWeightOrNull)
                     Slider(
                         value = value,
                         onValueChange = onChange,
@@ -895,10 +910,18 @@ internal fun SceneElementView(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (element.type == SceneElementType.CHECKBOX) {
-                    Checkbox(checked = checked, onCheckedChange = onChanged)
-                    Text(v("label", "Checkbox"), color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = onChanged,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = role(UiRole.CHECK_ON),
+                            uncheckedColor = role(UiRole.CHECK_OFF),
+                            checkmarkColor = role(UiRole.CHECK_MARK),
+                        ),
+                    )
+                    Text(v("label", "Checkbox"), color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                 } else {
-                    Text(v("label", "Toggle"), color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
+                    Text(v("label", "Toggle"), color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                     ThemedSwitch(checked = checked, onCheckedChange = onChanged)
                 }
             }
@@ -917,7 +940,7 @@ internal fun SceneElementView(
                 OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxSize()) {
                     Text(
                         selected.ifBlank { v("label", "Select") },
-                        color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface,
+                        color = styleLabelColor ?: role(UiRole.SCENE_TEXT),
                         fontSize = styleSize,
                         fontWeight = styleWeightOrNull,
                         maxLines = 1,
@@ -927,7 +950,7 @@ internal fun SceneElementView(
                 }
                 ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     options.forEach { opt ->
-                        DropdownMenuItem(text = { Text(opt) }, onClick = {
+                        DropdownMenuItem(text = { Text(opt) }, choice = true, onClick = {
                             selected = opt
                             expanded = false
                             // On select: write the value to `var` and run the tap task.
@@ -956,7 +979,7 @@ internal fun SceneElementView(
             val label = v("label", "")
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 if (label.isNotBlank()) {
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull)
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull)
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
@@ -967,7 +990,7 @@ internal fun SceneElementView(
                     ) { Text("−", fontSize = 20.sp) }
                     Text(
                         value.toString(),
-                        color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface,
+                        color = styleLabelColor ?: role(UiRole.SCENE_TEXT),
                         fontSize = if (styleSize != TextUnit.Unspecified) styleSize else 18.sp,
                         fontWeight = styleWeight,
                         textAlign = TextAlign.Center,
@@ -997,7 +1020,7 @@ internal fun SceneElementView(
                     .fillMaxSize()
                     .clip(shape)
                     .then(if (fill != null) Modifier.background(fill) else Modifier)
-                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
+                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: role(UiRole.SCENE_BORDER), shape) else Modifier)
                     .then(
                         if (tapRef != null || longPressRef != null) {
                             Modifier.pointerInput(element.id) {
@@ -1020,7 +1043,7 @@ internal fun SceneElementView(
                 Image(bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(source.ifBlank { "Image" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(source.ifBlank { "Image" }, style = MaterialTheme.typography.labelSmall, color = role(UiRole.SCENE_NOTE))
                 }
             }
         }
@@ -1189,7 +1212,7 @@ internal fun SceneElementView(
         }
 
         else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(element.type.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(element.type.name, style = MaterialTheme.typography.labelSmall, color = role(UiRole.SCENE_NOTE))
         }
     }
 }

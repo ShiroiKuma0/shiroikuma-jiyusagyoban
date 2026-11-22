@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -15,6 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * The black-yellow pill — the one button look of every 白い熊 app (白い熊, 2026-11-02/03).
@@ -31,6 +32,9 @@ import androidx.compose.ui.unit.dp
  * added later — a new screen picks these up by importing from here. [shape] is accepted and
  * ignored, and so is [border]: a pill is always fully round and its frame is its weight. A caller's `colors` keeps its meaning by lending its
  * colour to the frame and the text (a red destructive button becomes a red-framed pill).
+ *
+ * Frame and label are roles of their own, the main pill's apart from the others' (UiRoles.kt). A
+ * pill that deletes says so with [destructiveButtonColors], which lends it the Delete role.
  */
 private val PILL_SHAPE = RoundedCornerShape(percent = 50)
 private val PILL_STROKE_MAIN = 3.dp
@@ -91,10 +95,12 @@ private fun Pill(
     content: @Composable RowScope.() -> Unit,
 ) {
     // A filled caller's container colour was its accent; an outlined caller's content colour was.
-    val accent = colors?.let { c ->
+    val lent = colors?.let { c ->
         c.containerColor.takeIf { it != Color.Transparent && it.alpha > 0f } ?: c.contentColor
-    } ?: MaterialTheme.colorScheme.primary
-    val ink = if (enabled) accent else accent.copy(alpha = DISABLED_ALPHA)
+    }
+    val frame = lent ?: role(if (main) UiRole.BUTTON_MAIN_FRAME else UiRole.BUTTON_FRAME)
+    val accent = lent ?: role(if (main) UiRole.BUTTON_MAIN_LABEL else UiRole.BUTTON_LABEL)
+    val ink = if (enabled) frame else frame.copy(alpha = DISABLED_ALPHA)
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
         modifier = modifier,
@@ -116,3 +122,13 @@ private fun Pill(
         }
     }
 }
+
+/**
+ * The colours of a pill that deletes: pass as `colors`. Frame and label take the Delete role, and
+ * nothing is filled — the one way a destructive button is marked, in every dialog and screen.
+ */
+@Composable
+fun destructiveButtonColors(): ButtonColors = ButtonDefaults.outlinedButtonColors(
+    containerColor = Color.Transparent,
+    contentColor = role(UiRole.DELETE),
+)

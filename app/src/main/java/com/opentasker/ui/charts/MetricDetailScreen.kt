@@ -37,6 +37,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import androidx.compose.foundation.border
 
 /**
  * One metric, full screen.
@@ -294,8 +297,8 @@ private fun CrosshairHint(crosshair: CrosshairState, readout: String? = null) {
 }
 
 /**
- * The back arrow. Plain, unlike the ringed `i` beside it: back is a gesture everyone already knows,
- * whereas the `i` is the only route to what a metric actually means and has to advertise itself.
+ * The back arrow: a glyph in a thin ring, never a filled disc — the theme's regular button, round
+ * because it holds one glyph.
  */
 @Composable
 private fun CircleButton(label: String, onClick: () -> Unit) {
@@ -303,11 +306,11 @@ private fun CircleButton(label: String, onClick: () -> Unit) {
         Modifier
             .size(36.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.25.dp, role(UiRole.BUTTON_FRAME), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text(label, style = MaterialTheme.typography.titleMedium, color = role(UiRole.BUTTON_LABEL))
     }
 }
 

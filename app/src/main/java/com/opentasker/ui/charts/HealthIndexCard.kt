@@ -271,7 +271,7 @@ private fun ScoreBar(score: Int?, step: Int?) {
     Canvas(Modifier.fillMaxWidth().height(14.dp)) {
         val r = size.height / 2f
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.08f),
+            color = Color(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.CHART_TRACK)).copy(alpha = 0.08f),
             size = size,
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
         )

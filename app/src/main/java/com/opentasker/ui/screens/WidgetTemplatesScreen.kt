@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +49,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -74,6 +73,9 @@ import com.opentasker.ui.components.SelectionBar
 import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import com.opentasker.ui.components.dialogFrame
 import com.opentasker.widget.WidgetEditor
 import com.opentasker.widget.WidgetTemplate
 
@@ -175,11 +177,14 @@ fun WidgetTemplatesScreen(
             onDismissRequest = { editing = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            WidgetEditor(
-                initialJson = target.layout,
-                onDone = { layout -> onSave(target.name, layout); editing = null },
-                onCancel = { editing = null },
-            )
+            // The editor fills the window, so the frame runs square along the window's edge.
+            Box(Modifier.fillMaxSize().background(role(UiRole.DIALOG_GROUND)).dialogFrame(RectangleShape)) {
+                WidgetEditor(
+                    initialJson = target.layout,
+                    onDone = { layout -> onSave(target.name, layout); editing = null },
+                    onCancel = { editing = null },
+                )
+            }
         }
     }
 }
@@ -254,7 +259,7 @@ private fun TemplatePreview(layout: String) {
         WidgetLayoutCodec.decode(expanded)
     }
     Box(
-        Modifier.size(84.dp, 52.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF202020)),
+        Modifier.size(84.dp, 52.dp).clip(RoundedCornerShape(6.dp)).background(role(UiRole.WIDGET_GROUND)),
     ) {
         if (node != null) {
             val maxFont = remember(node) { maxFontSize(node).coerceIn(12, 240) }

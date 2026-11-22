@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Save
 import com.opentasker.ui.components.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,6 +77,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
+import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.MenuDivider
+import androidx.compose.material.icons.filled.Description
 
 /**
  * 「記事編集」 — the article, against the screenshots it was read from.
@@ -202,17 +205,28 @@ fun ArticleEditScreen(
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "メニュー")
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("HTML を開く") },
                         onClick = { menuOpen = false; onOpenHtml() },
+                        icon = Icons.Filled.Description,
+                        role = IconRole.VIEW,
+                        opens = true,
                     )
                     DropdownMenuItem(
                         text = { Text("元の画像を開く") },
-                        leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
                         onClick = { menuOpen = false; imagePicker.launch(arrayOf("image/*")) },
+                        icon = Icons.Filled.Image,
+                        role = IconRole.VIEW,
+                        opens = true,
                     )
-                    DropdownMenuItem(text = { Text("閉じる") }, onClick = { menuOpen = false; onClose() })
+                    MenuDivider()
+                    DropdownMenuItem(
+                        text = { Text("閉じる") },
+                        onClick = { menuOpen = false; onClose() },
+                        icon = Icons.Filled.Close,
+                        role = IconRole.BLOCK,
+                    )
                 }
             }
         }

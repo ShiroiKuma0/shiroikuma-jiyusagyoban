@@ -1,8 +1,12 @@
 package com.opentasker.ui.screens
 
 import com.opentasker.ui.theme.ThemedSwitch
+import com.opentasker.ui.components.IconRole
 import com.opentasker.ui.components.OutlinedButton
-import androidx.compose.foundation.BorderStroke
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -79,6 +84,8 @@ import com.opentasker.core.engine.outcome
 private val GREEN = Color(0xFF00E676)
 private val RED = Color(0xFFFF5252)
 private val AMBER = Color(0xFFFFC107)
+// A status colour like the three above: the dot of something idle or static. Text beside a dot is
+// not status and takes the list's second-line role instead.
 private val GREY = Color(0xFF9E9E9E)
 
 /** One row of the Monitor's aggregated task-activity view: a task's run count + last run + failures. */
@@ -216,7 +223,7 @@ fun MonitorScreen(
                                 maxLines = 1,
                                 modifier = Modifier.weight(1f),
                             )
-                            Text("${entry.kind.title} · ${entry.detail}", color = GREY, fontSize = 13.sp)
+                            Text("${entry.kind.title} · ${entry.detail}", color = role(UiRole.LIST_NOTE), fontSize = 13.sp)
                             IconButton(onClick = { entry.stop(context) }) {
                                 Icon(Icons.Filled.Close, contentDescription = "Stop ${entry.label}", tint = RED)
                             }
@@ -401,7 +408,7 @@ fun MonitorScreen(
                             color = if (a.fails > 0) RED else GREEN,
                             name = a.name,
                             detail = "${a.count}× · last ${rel(now - a.lastAt)} ago" + if (a.fails > 0) " · ${a.fails} failed" else "",
-                            detailColor = if (a.fails > 0) RED else GREY,
+                            detailColor = if (a.fails > 0) RED else role(UiRole.LIST_NOTE),
                             vpad = 0.dp,
                         )
                     }
@@ -469,7 +476,6 @@ fun MonitorScreen(
                             color = if (!running) RED else GREY,
                             name = p.name,
                             detail = if (fired == null) "idle · not run yet" else "ran ${rel(ago)} ago",
-                            detailColor = GREY,
                             vpad = 0.dp,
                         )
                     }
@@ -544,10 +550,9 @@ fun MonitorScreen(
         // A plain Surface dialog (not AlertDialog) so we can draw the yellow border around it.
         Dialog(onDismissRequest = { pickerFor = null }) {
             Surface(
+                modifier = Modifier.dialogFrame(RoundedCornerShape(20.dp)),
                 shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(3.dp, MaterialTheme.colorScheme.primary),
-                tonalElevation = 6.dp,
+                color = role(UiRole.DIALOG_GROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -555,7 +560,7 @@ fun MonitorScreen(
                             if (forExit) "Run on exit — pick a task" else "Run on start — pick a task",
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = role(UiRole.DIALOG_TITLE),
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = { expanded = if (allOpen) emptySet() else groups.map { it.first }.toSet() }) {
@@ -585,10 +590,7 @@ fun MonitorScreen(
                             }
                             if (open) {
                                 items(ts, key = { "t-${it.id}" }) { t ->
-                                    Text(
-                                        t.name,
-                                        fontSize = 15.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                    Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
@@ -597,7 +599,12 @@ fun MonitorScreen(
                                                 pickerFor = null
                                             }
                                             .padding(start = 30.dp, top = 10.dp, bottom = 10.dp),
-                                    )
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        RoleIcon(Icons.Filled.PlayArrow, IconRole.CONNECT, Modifier.size(18.dp))
+                                        Spacer(Modifier.size(8.dp))
+                                        Text(t.name, fontSize = 15.sp, color = role(UiRole.LIST_LABEL))
+                                    }
                                 }
                             }
                         }
@@ -612,7 +619,7 @@ fun MonitorScreen(
 }
 
 @Composable
-private fun StatusRow(color: Color, name: String, detail: String, detailColor: Color = GREY, vpad: Dp = 6.dp) {
+private fun StatusRow(color: Color, name: String, detail: String, detailColor: Color = role(UiRole.LIST_NOTE), vpad: Dp = 6.dp) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = vpad),
         verticalAlignment = Alignment.CenterVertically,

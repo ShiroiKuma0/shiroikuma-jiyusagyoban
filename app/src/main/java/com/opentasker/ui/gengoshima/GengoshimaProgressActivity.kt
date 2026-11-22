@@ -52,6 +52,10 @@ import com.opentasker.core.gengoshima.GenerationRunner.StepState
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.delay
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.components.destructiveButtonColors
 
 /**
  * 言語島's progress window — the run as it happens, step by step, over whatever was on screen.
@@ -120,7 +124,7 @@ internal fun ProgressPanelContent(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f))
+            .background(role(UiRole.SCHEME_SCRIM).copy(alpha = 0.6f))
             .windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.Center,
     ) {
@@ -129,8 +133,9 @@ internal fun ProgressPanelContent(
                 .padding(16.dp)
                 .widthIn(max = 560.dp)
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background, RoundedCornerShape(16.dp))
-                .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                // A dialog in everything but its window, so it wears the dialog's ground and frame.
+                .background(role(UiRole.DIALOG_GROUND), RoundedCornerShape(16.dp))
+                .dialogFrame(RoundedCornerShape(16.dp))
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -211,9 +216,9 @@ internal fun ProgressPanelContent(
                 OutlinedButton(
                     onClick = onCancel,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = CANCEL_RED),
+                    colors = destructiveButtonColors(),
                 ) {
-                    Text("中止 / Cancel the run", fontSize = 16.sp, color = CANCEL_RED)
+                    Text("中止 / Cancel the run", fontSize = 16.sp)
                 }
                 Text(
                     "通知を押すとこの画面に戻ります。\nTap the notification to come back here.",
@@ -228,9 +233,6 @@ internal fun ProgressPanelContent(
         }
     }
 }
-
-/** 中止's red: pure, like the yellow beside it. */
-private val CANCEL_RED = Color(0xFFFF0000)
 
 /** One step: a glyph AND a colour for its state, never the colour alone. */
 @Composable

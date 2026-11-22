@@ -46,7 +46,7 @@ object RecordingNotification {
             )
             val notification = NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setColor(ContextCompat.getColor(app, R.color.notification_accent))
+                .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
                 .setContentTitle("録音中 · Recording")
                 .setContentText("タップで停止して保存 · Tap to stop and save")
                 .setOngoing(true)

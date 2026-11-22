@@ -420,7 +420,7 @@ object GnssForecastReminder {
         )
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+            .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
             .setContentTitle(title)
             // The collapsed line is the PUNCHLINE, not the first sentence of a paragraph: a
             // notification whose text is cut off mid-word says nothing at all (白い熊, 2026-09-21).

@@ -37,9 +37,14 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
 import com.opentasker.ui.components.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.MenuDivider
+import com.opentasker.ui.components.RoleIcon
 import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.components.destructiveButtonColors
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -112,23 +117,29 @@ fun ProjectSwitcher(
                             Text(project.name)
                         }
                     },
+                    // Always present, also when empty, so every row keeps the ✓ column.
                     leadingIcon = {
                         if (filter is ProjectFilter.Of && filter.projectId == project.id) {
-                            Icon(Icons.Filled.Check, contentDescription = "Selected")
+                            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = role(UiRole.LIST_SELECTED))
                         }
                     },
+                    choice = true,
                     onClick = { onSelect(ProjectFilter.Of(project.id)); expanded = false },
                 )
             }
-            HorizontalDivider()
+            MenuDivider()
             DropdownMenuItem(
                 text = { Text("Export everything…") },
-                leadingIcon = { Icon(Icons.Filled.Upload, contentDescription = null) },
+                icon = Icons.Filled.Upload,
+                role = IconRole.SHARE,
+                opens = true,
                 onClick = { onExportEverything(); expanded = false },
             )
             DropdownMenuItem(
                 text = { Text("Manage projects…") },
-                leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                icon = Icons.Filled.Settings,
+                role = IconRole.VIEW,
+                opens = true,
                 onClick = { onManage(); expanded = false },
             )
         }
@@ -139,7 +150,8 @@ fun ProjectSwitcher(
 private fun FilterItem(label: String, selected: Boolean, onClick: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label) },
-        leadingIcon = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected") },
+        leadingIcon = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected", tint = role(UiRole.LIST_SELECTED)) },
+        choice = true,
         onClick = onClick,
     )
 }
@@ -433,19 +445,13 @@ private fun DeleteProjectDialog(
                 if (members == 0) {
                     com.opentasker.ui.components.Button(
                         onClick = onReassign,
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError,
-                        ),
+                        colors = destructiveButtonColors(),
                     ) { Text("Delete") }
                 } else {
                     com.opentasker.ui.components.Button(onClick = onReassign) { Text("Move items to Unfiled") }
                     com.opentasker.ui.components.Button(
                         onClick = onDeleteItems,
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError,
-                        ),
+                        colors = destructiveButtonColors(),
                     ) { Text("Delete items too") }
                 }
             }
@@ -468,6 +474,8 @@ fun ProjectPickerDialog(
         text = {
             Column(Modifier.fillMaxWidth()) {
                 PickerRow("Unfiled", null, currentProjectId == null) { onPick(null) }
+                // "No project" and the projects are two groups of rows.
+                if (projects.isNotEmpty()) HorizontalDivider(color = role(UiRole.LIST_DIVIDER))
                 projects.forEach { project ->
                     PickerRow(project.name, project.color, currentProjectId == project.id) { onPick(project.id) }
                 }
@@ -487,9 +495,10 @@ private fun PickerRow(label: String, color: Int?, selected: Boolean, onClick: ()
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        RoleIcon(Icons.Filled.Folder, IconRole.PERSON, Modifier.size(20.dp))
         ColorDot(color)
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = MaterialTheme.colorScheme.primary)
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = role(UiRole.LIST_LABEL), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = role(UiRole.LIST_SELECTED))
     }
 }
 

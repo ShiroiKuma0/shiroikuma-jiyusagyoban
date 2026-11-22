@@ -53,6 +53,13 @@ import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.IconRole
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 
 /**
  * 「言語島 取り込む」 — the vocabulary and sentences another chat handed over as text
@@ -418,11 +425,16 @@ private fun TargetDialog(
             LazyColumn(Modifier.heightIn(max = 480.dp)) {
                 if (named.isNotEmpty()) item {
                     TextButton(onClick = { onPick(null) }, modifier = Modifier.fillMaxWidth()) {
+                        // Every row of a picker carries an icon coloured by what the row is about.
+                        RoleIcon(Icons.Filled.Landscape, IconRole.PERSON, Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
                         Text("$named（文面のとおり / as written）", fontSize = 17.sp, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 items(islands, key = { it.id }) { isl ->
                     TextButton(onClick = { onPick(IslandChoice.Existing(isl.id)) }, modifier = Modifier.fillMaxWidth()) {
+                        RoleIcon(Icons.Filled.Landscape, IconRole.PERSON, Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
                         Text(islandLabel(isl), fontSize = 17.sp, modifier = Modifier.fillMaxWidth())
                     }
                 }

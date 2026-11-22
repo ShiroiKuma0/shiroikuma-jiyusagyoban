@@ -53,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
 
 /**
  * The window's annotation language: a note pill, its editor, and an authored-count pill.
@@ -259,11 +261,13 @@ fun ActionPill(
      */
     large: Boolean = false,
 ) {
-    val ink = if (enabled) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
+    // A disabled pill is the same pill at 38 %, as everywhere in the theme.
+    val ink = if (enabled) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = 0.38f)
     Row(
         modifier
             .clip(RoundedCornerShape(100.dp))
-            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            // The theme's two button weights: the point of its card is the main pill, 3 dp.
+            .border(if (large) 3.dp else PILL_FRAME, ink, RoundedCornerShape(100.dp))
             // Padding BEFORE clickable, or the touch target shrinks to the glyph.
             .padding(
                 horizontal = if (large) 14.dp else 10.dp,
@@ -294,6 +298,9 @@ fun ActionPill(
 /** Opacity of an "add" affordance: present, but reading as an invitation rather than as content. */
 private const val ADD_ALPHA = 0.55f
 
+/** The frame of a pill that is pressed — the theme's regular button weight (ui/components/Pills.kt). */
+private val PILL_FRAME = 1.25.dp
+
 /**
  * Pure yellow on black, the fork's own livery — and now the whole annotation language's, not just
  * the stop count's.
@@ -304,7 +311,10 @@ private const val ADD_ALPHA = 0.55f
  * morning pill — so the one thing on these screens that 白い熊 WROTE looked like a different object
  * in each place. One colour for every annotation, and it is the app's own.
  */
-val ANNOTATION_INK = Color(0xFFFFFF00)
+// Read from the role table at each use rather than written here, so the colour set on the UI page
+// reaches every annotation; a getter and not a composable one, because the ink is also read inside
+// draw scopes.
+val ANNOTATION_INK: Color get() = Color(UiRoles.argb(UiRole.ANNOTATION_INK))
 /**
  * The ground every annotation is drawn on: the fork's own black, never the card it happens to sit on.
  *
@@ -312,7 +322,7 @@ val ANNOTATION_INK = Color(0xFFFFFF00)
  * glyph straight onto a scale colour is invisible on the yellow step and nearly so on the emerald
  * (白い熊), and what makes the pills legible anywhere is precisely that they bring their own ground.
  */
-val ANNOTATION_FILL = Color(0xFF000000)
+val ANNOTATION_FILL: Color get() = Color(UiRoles.argb(UiRole.ANNOTATION_GROUND))
 
 /**
  * A note affordance for one thing — a night, a walk, whatever carries [note].
@@ -353,7 +363,7 @@ fun NotePill(
     Row(
         modifier
             .clip(RoundedCornerShape(100.dp))
-            .border(1.5.dp, border, RoundedCornerShape(100.dp))
+            .border(if (onClick != null) PILL_FRAME else 1.5.dp, border, RoundedCornerShape(100.dp))
             // Padding BEFORE clickable, or the touch target shrinks to the glyph — the same trap the
             // morning card's 1–5 buttons carry a note about, found there the hard way.
             .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -588,7 +598,7 @@ fun WeightPill(kg: Double?, modifier: Modifier = Modifier, onClick: () -> Unit) 
     Row(
         modifier
             .clip(RoundedCornerShape(100.dp))
-            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            .border(PILL_FRAME, ink, RoundedCornerShape(100.dp))
             // Padding BEFORE clickable, or the touch target shrinks to the glyph — see [NotePill].
             .padding(horizontal = 8.dp, vertical = 3.dp)
             .clickable(onClick = onClick),
@@ -838,7 +848,7 @@ fun NightEdgePill(atMs: Long?, end: Boolean, authored: Boolean, modifier: Modifi
     Row(
         modifier
             .clip(RoundedCornerShape(100.dp))
-            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            .border(PILL_FRAME, ink, RoundedCornerShape(100.dp))
             .padding(horizontal = 8.dp, vertical = 3.dp)
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,

@@ -5,8 +5,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,10 +73,10 @@ fun SelectionBar(
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy / cut / clone / paste") }
                     ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        onClone?.let { act -> DropdownMenuItem(text = { Text("Clone") }, onClick = { menu = false; act() }) }
-                        DropdownMenuItem(text = { Text("Copy") }, onClick = { menu = false; onCopy() })
-                        onCut?.let { act -> DropdownMenuItem(text = { Text("Cut") }, onClick = { menu = false; act() }) }
-                        onPaste?.let { act -> DropdownMenuItem(text = { Text("Paste") }, onClick = { menu = false; act() }) }
+                        onClone?.let { act -> DropdownMenuItem(text = { Text("Clone") }, icon = Icons.Filled.CopyAll, role = IconRole.SHARE, onClick = { menu = false; act() }) }
+                        DropdownMenuItem(text = { Text("Copy") }, icon = Icons.Filled.ContentCopy, role = IconRole.SHARE, onClick = { menu = false; onCopy() })
+                        onCut?.let { act -> DropdownMenuItem(text = { Text("Cut") }, icon = Icons.Filled.ContentCut, role = IconRole.SHARE, onClick = { menu = false; act() }) }
+                        onPaste?.let { act -> DropdownMenuItem(text = { Text("Paste") }, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE, onClick = { menu = false; act() }) }
                     }
                 }
             }

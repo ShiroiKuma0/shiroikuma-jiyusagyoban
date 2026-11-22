@@ -192,7 +192,7 @@ internal fun VocabEditDialog(
                 Text("島 / island", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     islands.forEach { i ->
-                        TogglePill(i.nameJa.ifBlank { i.nameEn }, i.id == islandId) { islandId = i.id }
+                        TogglePill(i.nameJa.ifBlank { i.nameEn }, i.id == islandId, choice = true) { islandId = i.id }
                     }
                 }
                 if (meaning.isBlank()) Text("訳が要ります / a translation is required", fontSize = 13.sp, color = MaterialTheme.colorScheme.error)

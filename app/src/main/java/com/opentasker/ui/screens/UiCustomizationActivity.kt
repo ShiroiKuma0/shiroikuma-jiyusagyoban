@@ -39,7 +39,7 @@ class UiCustomizationActivity : ComponentActivity() {
     companion object {
         const val EXTRA_FOCUS = "shiroikuma.jiyusagyoban.extra.UI_FOCUS"
 
-        /** Opens the settings with [focus]'s rows hoisted to the top. */
+        /** Opens the settings with [focus]'s section unfolded and scrolled to. */
         fun open(context: Context, focus: String? = null) {
             context.startActivity(
                 Intent(context, UiCustomizationActivity::class.java).apply {

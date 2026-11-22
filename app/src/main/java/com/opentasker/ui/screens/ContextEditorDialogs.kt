@@ -11,13 +11,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sensors
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.Card
@@ -41,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
@@ -57,6 +66,8 @@ import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.RoleIcon
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 import com.opentasker.ui.utils.expandCollapseToggle
@@ -78,6 +89,21 @@ internal fun filterContextPickerItems(
             item.description.contains(normalizedQuery, ignoreCase = true) ||
             item.type.name.contains(normalizedQuery, ignoreCase = true)
     }
+}
+
+/**
+ * The icon of a context type and the role that colours it, for the rows of the type picker: the
+ * clock and the calendar in the accent, what the device itself reports in cyan, a place in orange,
+ * and what fires or is asked from outside in green.
+ */
+internal fun contextTypeIcon(type: ContextType): Pair<ImageVector, IconRole> = when (type) {
+    ContextType.APPLICATION -> Icons.Filled.Apps to IconRole.PERSON
+    ContextType.TIME -> Icons.Filled.Schedule to IconRole.VIEW
+    ContextType.DAY -> Icons.Filled.CalendarMonth to IconRole.VIEW
+    ContextType.LOCATION -> Icons.Filled.LocationOn to IconRole.SHARE
+    ContextType.STATE -> Icons.Filled.Sensors to IconRole.PERSON
+    ContextType.EVENT -> Icons.Filled.Bolt to IconRole.CONNECT
+    ContextType.PLUGIN -> Icons.Filled.Extension to IconRole.CONNECT
 }
 
 @Composable
@@ -138,9 +164,16 @@ internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTy
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
                                 shape = RoundedCornerShape(14.dp),
                             ) {
-                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-                                    Text(localized.title, style = MaterialTheme.typography.titleSmall)
-                                    Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val (typeIcon, typeRole) = contextTypeIcon(type)
+                                Row(
+                                    Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                                ) {
+                                    RoleIcon(typeIcon, typeRole, Modifier.size(20.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+                                        Text(localized.title, style = MaterialTheme.typography.titleSmall)
+                                        Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             }
                         }

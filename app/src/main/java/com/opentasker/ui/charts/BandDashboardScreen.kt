@@ -46,6 +46,8 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * The order the cards appear in, top to bottom — 白い熊's, 2026-08-07.
@@ -340,26 +342,19 @@ private val BATTERY_BAR_WIDTH = 72.dp
 
 @Composable
 private fun SyncButton(running: Boolean, onSync: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(if (running) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary)
-            .clickable(enabled = !running, onClick = onSync)
-            .padding(horizontal = 20.dp, vertical = 11.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+    // The main action of the dashboard: the app's main pill — a thick frame, never filled, and the
+    // same pill dimmed while a sync runs.
+    com.opentasker.ui.components.Button(onClick = onSync, enabled = !running) {
         if (running) {
             CircularProgressIndicator(
                 Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
+                color = role(UiRole.BUTTON_MAIN_LABEL),
             )
         } else {
             Text(
                 BandText.syncNow[LocalBandLanguage.current],
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
             )
         }
     }
@@ -470,8 +465,8 @@ fun InfoCircle(
         Modifier
             .size(diameter)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.5.dp, accent, CircleShape)
+            // A glyph in a ring, nothing filled: the card shows through, as in every pill.
+            .border(1.25.dp, accent, CircleShape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
