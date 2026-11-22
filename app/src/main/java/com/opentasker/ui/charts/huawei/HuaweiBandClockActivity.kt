@@ -59,6 +59,9 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import com.opentasker.ui.components.dialogFrame
 
 /**
  * 「バンドの時計」 — stand the band's clock wherever a face needs looking at.
@@ -99,8 +102,9 @@ class HuaweiBandClockActivity : ComponentActivity() {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CARD_SHAPE,
-                        color = MaterialTheme.colorScheme.background,
-                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                        // A dialog in all but name, so the dialog's own ground and frame.
+                        color = role(UiRole.DIALOG_GROUND),
+                        border = BorderStroke(1.5.dp, role(UiRole.DIALOG_FRAME)),
                     ) {
                         BandClockScreen(
                             address = HuaweiSettings.address(applicationContext),
@@ -253,7 +257,7 @@ private fun BandClockScreen(address: String, context: Context) {
             onDismissRequest = { showDate = false },
             // Black on a dimmed black page again: the calendar needs an edge as much as the card
             // that opened it (白い熊, 2026-09-05).
-            modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, DatePickerDefaults.shape),
+            modifier = Modifier.dialogFrame(DatePickerDefaults.shape),
             confirmButton = {
                 Button(onClick = {
                     dateState.selectedDateMillis?.let { day = it }

@@ -45,6 +45,7 @@ import com.opentasker.ui.charts.sectionInk
 import com.opentasker.ui.charts.sectionNote
 import java.time.LocalDate
 import java.time.ZoneId
+import com.opentasker.ui.charts.ANNOTATION_FILL
 
 /**
  * 機能訓練 — the rehab exercises, ticked off a day at a time.
@@ -100,7 +101,7 @@ fun rehabCells(
     DayGridCell(
         epochDay = day,
         fill = if (isDone) ANNOTATION_INK else REST_FILL,
-        ink = if (isDone) Color.Black else ANNOTATION_INK.copy(alpha = 0.8f),
+        ink = if (isDone) ANNOTATION_FILL else ANNOTATION_INK.copy(alpha = 0.8f),
         bold = isDone,
         hasNote = notes[key]?.isNotBlank() == true,
     )
@@ -142,8 +143,8 @@ fun HuaweiRehabCard(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .background(link.copy(alpha = 0.10f))
-                .border(2.dp, link, RoundedCornerShape(14.dp))
+                // An action, so never tinted inside: the frame alone, at the regular button weight.
+                .border(1.25.dp, link, RoundedCornerShape(14.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp)
                 .clickable(onClick = onOpen),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -254,7 +255,7 @@ fun HuaweiRehabDayDialog(
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDone) Color.Black else sectionNote,
+                        color = if (isDone) ANNOTATION_FILL else sectionNote,
                     )
                     // The state on file is marked by a GLYPH, exactly as the rating dialog marks
                     // its own — the two colours here already mean "done" and "not done", and a
@@ -264,7 +265,7 @@ fun HuaweiRehabDayDialog(
                             "✓",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDone) Color.Black else sectionNote,
+                            color = if (isDone) ANNOTATION_FILL else sectionNote,
                         )
                     }
                 }

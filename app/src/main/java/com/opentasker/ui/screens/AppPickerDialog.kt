@@ -39,6 +39,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -73,11 +76,13 @@ internal fun AppPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            tonalElevation = 6.dp,
-            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+            // No tonal elevation: it would tint the ground away from the dialog role.
+            color = role(UiRole.DIALOG_GROUND),
+            contentColor = role(UiRole.DIALOG_BODY),
+            modifier = Modifier.dialogFrame(RoundedCornerShape(28.dp)),
         ) {
             Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).padding(16.dp)) {
-                Text("Pick an app", style = MaterialTheme.typography.titleMedium)
+                Text("Pick an app", style = MaterialTheme.typography.titleMedium, color = role(UiRole.DIALOG_TITLE))
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = query,

@@ -2,7 +2,6 @@ package com.opentasker.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,12 +9,40 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.BrightnessMedium
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.DataObject
+import androidx.compose.material.icons.filled.DoNotDisturbOn
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,7 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +73,45 @@ import com.opentasker.core.capabilities.ActionCapability
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.CapabilityState
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+
+/**
+ * The icon of an action category and the role that colours it — shared by both action pickers, so a
+ * category looks the same wherever its actions are listed. Chosen from the category's name; a
+ * category added later falls back to a neutral bolt until it is given a line here.
+ */
+internal fun actionCategoryIcon(category: String): Pair<ImageVector, IconRole> = when (category) {
+    "Alert" -> Icons.Filled.NotificationsActive to IconRole.WRITE
+    "App" -> Icons.Filled.Apps to IconRole.VIEW
+    "Battery" -> Icons.Filled.BatteryFull to IconRole.VIEW
+    "Calendar" -> Icons.Filled.CalendarMonth to IconRole.VIEW
+    "Calls" -> Icons.Filled.Call to IconRole.CONNECT
+    "Display" -> Icons.Filled.BrightnessMedium to IconRole.VIEW
+    "File" -> Icons.Filled.InsertDriveFile to IconRole.SHARE
+    "Flow" -> Icons.Filled.AccountTree to IconRole.CONNECT
+    "Focus" -> Icons.Filled.DoNotDisturbOn to IconRole.BLOCK
+    "Habits" -> Icons.Filled.Repeat to IconRole.PERSON
+    "Health" -> Icons.Filled.MonitorHeart to IconRole.PERSON
+    "Import" -> Icons.Filled.Download to IconRole.SHARE
+    "Interface" -> Icons.Filled.Dashboard to IconRole.VIEW
+    "Location", "Location-lite" -> Icons.Filled.LocationOn to IconRole.VIEW
+    "Media" -> Icons.Filled.MusicNote to IconRole.CONNECT
+    "Network" -> Icons.Filled.Wifi to IconRole.SHARE
+    "Notification" -> Icons.Filled.Notifications to IconRole.WRITE
+    "Plugin" -> Icons.Filled.Extension to IconRole.CONNECT
+    "Safety" -> Icons.Filled.HealthAndSafety to IconRole.BLOCK
+    "Script" -> Icons.Filled.Code to IconRole.WRITE
+    "Settings" -> Icons.Filled.Settings to IconRole.VIEW
+    "Sleep" -> Icons.Filled.Bedtime to IconRole.PERSON
+    "System" -> Icons.Filled.PhoneAndroid to IconRole.VIEW
+    "Tasks" -> Icons.Filled.PlayArrow to IconRole.CONNECT
+    "Text" -> Icons.Filled.TextFields to IconRole.WRITE
+    "Variable" -> Icons.Filled.DataObject to IconRole.WRITE
+    else -> Icons.Filled.Bolt to IconRole.VIEW
+}
 
 /**
  * Full-screen action picker (advanced mode). Actions are foldable by category; expanding a category
@@ -136,6 +202,7 @@ fun AdvancedActionPickerScreen(
 
 @Composable
 private fun CategoryHeaderRow(category: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    val (categoryIcon, categoryRole) = actionCategoryIcon(category)
     Column {
         Row(
             modifier = Modifier
@@ -150,10 +217,12 @@ private fun CategoryHeaderRow(category: String, count: Int, expanded: Boolean, o
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
             )
+            RoleIcon(categoryIcon, categoryRole, Modifier.size(22.dp))
             Text(category, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        // The line under a category heading is the group divider of this list.
+        HorizontalDivider(color = role(UiRole.LIST_DIVIDER))
     }
 }
 
@@ -170,7 +239,7 @@ private fun ActionAccordionItem(
     val context = LocalContext.current
     val met = CapabilityState.isMet(capability.requirement, context)
     val effectiveLevel = if (met) CapabilityLevel.Supported else capability.level
-    val warningColor = if (isSystemInDarkTheme()) Color(0xFFFFD54F) else Color(0xFF8D6E00)
+    val (categoryIcon, categoryRole) = actionCategoryIcon(metadata.category)
     Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -185,12 +254,13 @@ private fun ActionAccordionItem(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            RoleIcon(categoryIcon, categoryRole, Modifier.size(20.dp))
             Text(metadata.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (effectiveLevel != CapabilityLevel.Supported) {
                 Text(
                     if (effectiveLevel == CapabilityLevel.Unsupported) "Unsupported" else "Setup",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (effectiveLevel == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    color = role(UiRole.WARNING),
                 )
             }
         }
@@ -198,7 +268,7 @@ private fun ActionAccordionItem(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 56.dp, end = 16.dp, bottom = 14.dp),
+                    .padding(start = 96.dp, end = 16.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

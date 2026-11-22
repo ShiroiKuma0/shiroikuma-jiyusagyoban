@@ -10,6 +10,8 @@ import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
 
 /**
  * Draws a [WidgetNode] tree into a Bitmap with Canvas — the only way to put a custom .otf font and
@@ -218,7 +220,8 @@ class WidgetRenderer(
             // single-style custom font. Only derive a synthetic style when bold/italic is requested.
             typeface = if (style == Typeface.NORMAL) base else Typeface.create(base, style)
             textSize = dpf(node.size ?: inh.size ?: 14)
-            color = color(node.color ?: inh.color, Color.WHITE)
+            // A text node whose template sets no colour, here or above it, takes the theme's.
+            color = color(node.color ?: inh.color, UiRoles.argb(UiRole.WIDGET_TEXT))
         }
     }
 

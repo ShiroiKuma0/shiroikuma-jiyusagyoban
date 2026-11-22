@@ -89,7 +89,7 @@ class SingleActionRunTest {
             "if (SingleActionRun.isRunnableAlone(action)) {",
             // The fork's action menu is its own (Clone/Copy/Cut/Delete on the whole selection), so the
             // slice ends at ITS delete item rather than upstream's multi-line, resource-backed one.
-            "DropdownMenuItem(text = { Text(\"Clone\") }, onClick = onClone)",
+            "DropdownMenuItem(text = { Text(\"Clone\") }, onClick = onClone,",
         )
         assertTrue("the run option must sit behind the runnable check", "R.string.action_run_alone" in guarded)
         assertTrue("the run option must call back", "onRun()" in guarded)

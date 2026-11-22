@@ -74,6 +74,13 @@ import com.opentasker.ui.theme.ThemeStore
 import java.io.File
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import com.opentasker.ui.components.destructiveButtonColors
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.IconRole
+import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.foundation.layout.size
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * 「言語島 編集」 — the islands and everything in them, changed after the fact.
@@ -562,12 +569,20 @@ private fun MoveDialog(targets: List<GengoshimaIslandEntity>, onDismiss: () -> U
         text = {
             LazyColumn {
                 items(targets, key = { it.id }) { i ->
-                    Text(
-                        "${AudioTree.number(i.position, 3)} ${i.nameJa.ifBlank { i.nameEn }}",
-                        fontSize = 18.sp,
-                        modifier = Modifier.fillMaxWidth().clickable { onPick(i) }.padding(vertical = 10.dp),
-                    )
-                    HorizontalDivider()
+                    // A picker row: its icon, coloured by what the row is about, then the island.
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(i) }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RoleIcon(Icons.Filled.Landscape, IconRole.PERSON, Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "${AudioTree.number(i.position, 3)} ${i.nameJa.ifBlank { i.nameEn }}",
+                            fontSize = 18.sp,
+                            color = role(UiRole.LIST_LABEL),
+                        )
+                    }
+                    HorizontalDivider(color = role(UiRole.LIST_DIVIDER))
                 }
             }
         },
@@ -582,7 +597,7 @@ private fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, on
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(body) },
-        confirmButton = { Button(onClick = onConfirm) { Text("消す / delete") } },
+        confirmButton = { Button(onClick = onConfirm, colors = destructiveButtonColors()) { Text("消す / delete") } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }

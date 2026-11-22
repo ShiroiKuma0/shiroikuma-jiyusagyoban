@@ -41,6 +41,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.ControlPointDuplicate
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
@@ -53,7 +59,9 @@ import androidx.compose.material.icons.filled.Search
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.MenuDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -131,6 +139,8 @@ import com.opentasker.ui.components.rememberGroupMoveHost
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import com.opentasker.ui.theme.isNarrowScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1230,14 +1240,30 @@ private fun TaskCard(
                             Icon(Icons.Filled.MoreVert, contentDescription = "Task menu", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         ThemedDropdownMenu(expanded = taskMenu, onDismissRequest = { taskMenu = false }) {
-                            DropdownMenuItem(text = { Text("Rename") }, onClick = { taskMenu = false; showRename = true })
-                            DropdownMenuItem(text = { Text("Edit") }, onClick = { taskMenu = false; onEdit() })
+                            DropdownMenuItem(
+                                text = { Text("Rename") },
+                                onClick = { taskMenu = false; showRename = true },
+                                icon = Icons.Filled.DriveFileRenameOutline,
+                                role = IconRole.WRITE,
+                                opens = true,
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = { taskMenu = false; onEdit() },
+                                icon = Icons.Filled.Edit,
+                                role = IconRole.WRITE,
+                                opens = true,
+                            )
+                            MenuDivider()
                             // Kept whole, simply not run — by a profile, a widget, `task.run`, a
                             // shortcut or the bridge alike, because the gate is in the one place
                             // every run funnels through.
                             DropdownMenuItem(
-                                text = { Text(if (task.enabled) "Disable" else "Enable") },
+                                text = { Text("Enabled") },
                                 onClick = { taskMenu = false; onToggleEnabled(!task.enabled) },
+                                icon = Icons.Filled.PowerSettingsNew,
+                                role = IconRole.CONNECT,
+                                checked = task.enabled,
                             )
                         }
                     }
@@ -1583,19 +1609,26 @@ internal fun ActionRow(
                         },
                         enabled = !runBusy,
                         onClick = { onMenuDismiss(); onRun() },
+                        icon = Icons.Filled.PlayArrow,
+                        role = IconRole.CONNECT,
                     )
                 }
-                DropdownMenuItem(text = { Text("Clone") }, onClick = onClone)
-                DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy)
-                DropdownMenuItem(text = { Text("Cut") }, onClick = onCut)
-                DropdownMenuItem(text = { Text("Delete") }, onClick = onDeleteSelection)
+                DropdownMenuItem(text = { Text("Clone") }, onClick = onClone, icon = Icons.Filled.ControlPointDuplicate, role = IconRole.SHARE)
+                DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy, icon = Icons.Filled.ContentCopy, role = IconRole.SHARE)
+                DropdownMenuItem(text = { Text("Cut") }, onClick = onCut, icon = Icons.Filled.ContentCut, role = IconRole.SHARE)
+                DropdownMenuItem(text = { Text("Delete") }, onClick = onDeleteSelection, icon = Icons.Filled.Delete, destructive = true)
+                MenuDivider()
                 DropdownMenuItem(
-                    text = { Text(if (action.enabled) "Disable" else "Enable") },
+                    text = { Text("Enabled") },
                     onClick = { onMenuDismiss(); onToggleEnabled() },
+                    icon = Icons.Filled.PowerSettingsNew,
+                    role = IconRole.CONNECT,
+                    checked = action.enabled,
                 )
                 if (!clipboardEmpty) {
-                    DropdownMenuItem(text = { Text("Paste before") }, onClick = onPasteBefore)
-                    DropdownMenuItem(text = { Text("Paste after") }, onClick = onPaste)
+                    MenuDivider()
+                    DropdownMenuItem(text = { Text("Paste before") }, onClick = onPasteBefore, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE)
+                    DropdownMenuItem(text = { Text("Paste after") }, onClick = onPaste, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE)
                 }
             }
         }
@@ -1627,7 +1660,7 @@ private fun RowScope.ArgPill(
     val nameColor = Color(themePrefs.actionNameColor)   // the variable name (settable)
     val valueColor = Color(themePrefs.actionValueColor) // action value (settable)
     val dataSize = themePrefs.actionValueSizeSp.sp
-    val pillColor = Color(0xFF9AA7B4)   // the (key) pill — muted (pill colour moves to the theme step)
+    val pillColor = role(UiRole.LIST_NOTE)   // the (key) pill — the quieter second-line role
     Text(
         argKey,
         style = MaterialTheme.typography.labelMedium,

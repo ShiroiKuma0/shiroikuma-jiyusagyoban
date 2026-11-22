@@ -70,7 +70,7 @@ class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
 
         val builder = NotificationCompat.Builder(ctx.app, channelDef.id)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ContextCompat.getColor(ctx.app, R.color.notification_accent))
+            .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

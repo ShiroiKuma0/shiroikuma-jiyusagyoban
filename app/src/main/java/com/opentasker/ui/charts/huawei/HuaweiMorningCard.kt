@@ -170,8 +170,8 @@ fun HuaweiMorningCard(
                     .fillMaxWidth()
                     .padding(top = 6.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(link.copy(alpha = 0.10f))
-                    .border(2.dp, link, RoundedCornerShape(14.dp))
+                    // An action, so never tinted inside: the frame alone, at the regular button weight.
+                    .border(1.25.dp, link, RoundedCornerShape(14.dp))
                     // Padding BEFORE clickable, so the whole pill is the target rather than the
                     // text inside it — the same trap the 1–5 buttons above carry a note about.
                     .padding(horizontal = 14.dp, vertical = 12.dp)

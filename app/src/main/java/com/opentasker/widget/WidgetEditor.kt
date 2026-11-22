@@ -31,8 +31,7 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import com.opentasker.ui.components.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -221,7 +220,7 @@ private fun WidgetPreview(root: WidgetNode, widthDp: Int, heightDp: Int) {
     val density = LocalDensity.current.density
     Box(
         Modifier.fillMaxWidth().heightIn(min = 96.dp, max = 460.dp).padding(12.dp)
-            .background(Color(0xFF202020), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
             .verticalScroll(rememberScrollState())
             .horizontalScroll(rememberScrollState()),
     ) {
@@ -433,7 +432,7 @@ private fun DropdownField(label: String, value: String, options: List<String>, o
         Box(Modifier.matchParentSize().clickable { expanded = true })
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { opt ->
-                DropdownMenuItem(text = { Text(opt) }, onClick = { onSelect(opt); expanded = false })
+                DropdownMenuItem(text = { Text(opt) }, onClick = { onSelect(opt); expanded = false }, choice = true)
             }
         }
     }

@@ -1164,7 +1164,7 @@ object GenerationRunner {
                 NOTIFICATION_ID,
                 NotificationCompat.Builder(app, CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setColor(ContextCompat.getColor(app, R.color.notification_accent))
+                    .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
                     .setContentTitle(title)
                     .setContentText(text)
                     .setContentIntent(openWindow())
@@ -1182,7 +1182,7 @@ object GenerationRunner {
                 NOTIFICATION_ID,
                 NotificationCompat.Builder(app, CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setColor(ContextCompat.getColor(app, R.color.notification_accent))
+                    .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
                     .setContentTitle(if (bad) "言語島：終わらなかったものがあります" else "言語島：できました / done")
                     .setContentText(summary.line())
                     .setStyle(NotificationCompat.BigTextStyle().bigText(summary.line()))

@@ -34,6 +34,13 @@ data class ThemePrefs(
     val fontWeight: Int = 0,        // 0 = leave each text style's own weight; else 100..900
     val fontScalePct: Int = 100,    // 100 = 1.0x; clamped to [SCALE_MIN, SCALE_MAX]
     val advancedActionPicker: Boolean = true,   // full-screen, category-foldable action picker (fork default)
+    // ---- The role table (UiRoles.kt): the roles 白い熊 has set apart from their defaults, by role key.
+    val roleOverrides: Map<String, Int> = emptyMap(),
+    // ---- The UI page itself: its sections in 白い熊's order, and the ones that are unfolded. Section
+    // ids, comma-separated; "" = the built-in order / everything folded. Kept here, in the page's own
+    // preferences, so that they travel in the export with the colours and fonts.
+    val uiSectionOrder: String = "",
+    val uiSectionsOpen: String = "",
     // ---- Flash / toast (the transient snackbar that reports task results) -----------------------
     val flashBackground: Int = BLACK,            // opaque so content never shows through
     val flashText: Int = YELLOW,
@@ -171,6 +178,8 @@ data class ThemePrefs(
         const val BLACK = 0xFF000000.toInt()
         const val NEAR_BLACK = 0xFF0D0D0D.toInt()  // card/surface, subtly above the background
         const val YELLOW = 0xFFFFFF00.toInt()       // pure yellow, not material #FFEB3B
+        const val DIM_GOLD = 0xFFC8C800.toInt()     // explanations and their left rule
+        const val DELETE_RED = 0xFFFF0000.toInt()   // what deletes
 
         const val SCALE_MIN = 80
         const val SCALE_MAX = 160
@@ -317,6 +326,9 @@ object ThemeStore {
     private const val K_FONT_WEIGHT = "font_weight"
     private const val K_FONT_SCALE = "font_scale"
     private const val K_ADVANCED_ACTION_PICKER = "advanced_action_picker"
+    private const val K_ROLE_OVERRIDES = "role_overrides"
+    private const val K_UI_SECTION_ORDER = "ui_section_order"
+    private const val K_UI_SECTIONS_OPEN = "ui_sections_open"
     private const val K_FLASH_BACKGROUND = "flash_background"
     private const val K_FLASH_TEXT = "flash_text"
     private const val K_FLASH_BORDER = "flash_border"
@@ -542,6 +554,9 @@ object ThemeStore {
             fontWeight = prefs.getInt(K_FONT_WEIGHT, d.fontWeight),
             fontScalePct = prefs.getInt(K_FONT_SCALE, d.fontScalePct),
             advancedActionPicker = prefs.getBoolean(K_ADVANCED_ACTION_PICKER, d.advancedActionPicker),
+            roleOverrides = UiRoles.decode(prefs.getString(K_ROLE_OVERRIDES, "").orEmpty()),
+            uiSectionOrder = prefs.getString(K_UI_SECTION_ORDER, "").orEmpty(),
+            uiSectionsOpen = prefs.getString(K_UI_SECTIONS_OPEN, "").orEmpty(),
             flashBackground = prefs.getInt(K_FLASH_BACKGROUND, d.flashBackground),
             flashText = prefs.getInt(K_FLASH_TEXT, d.flashText),
             flashBorder = prefs.getInt(K_FLASH_BORDER, d.flashBorder),
@@ -658,6 +673,9 @@ object ThemeStore {
             putInt(K_FONT_WEIGHT, p.fontWeight)
             putInt(K_FONT_SCALE, p.fontScalePct)
             putBoolean(K_ADVANCED_ACTION_PICKER, p.advancedActionPicker)
+            putString(K_ROLE_OVERRIDES, UiRoles.encode(p.roleOverrides))
+            putString(K_UI_SECTION_ORDER, p.uiSectionOrder)
+            putString(K_UI_SECTIONS_OPEN, p.uiSectionsOpen)
             putInt(K_FLASH_BACKGROUND, p.flashBackground)
             putInt(K_FLASH_TEXT, p.flashText)
             putInt(K_FLASH_BORDER, p.flashBorder)

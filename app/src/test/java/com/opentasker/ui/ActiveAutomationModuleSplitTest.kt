@@ -40,7 +40,10 @@ class ActiveAutomationModuleSplitTest {
         val listSource = screensSourceRoot.resolve("ActiveAutomationLists.kt").readText()
         val editorSource = screensSourceRoot.resolve("EditorDialogs.kt").readText()
 
-        assertTrue("Create actions should stay labeled, not icon-only", shellSource.contains("ExtendedFloatingActionButton"))
+        // The fork's create actions are the labelled rows of the "+" menu (TabActionsFab); upstream's
+        // extended floating button was never drawn here — only its import was left, which is what
+        // this assertion used to match.
+        assertTrue("Create actions should stay labeled, not icon-only", shellSource.contains("TabActionsFab") && shellSource.contains("TabAction(\"Import JSON…\""))
         assertTrue("First-run onboarding should recommend guided templates first", listSource.contains("R.string.action_browse_templates"))
         assertTrue("Empty-state actions should not stretch awkwardly on large screens", editorSource.contains("widthIn(max = 420.dp)"))
     }

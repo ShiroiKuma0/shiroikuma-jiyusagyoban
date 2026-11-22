@@ -1093,7 +1093,7 @@ class AutomationService : Service() {
             // notification is visible permanently, and holo renders as a muddy alpha blob whose
             // shape is not a stable cross-OEM contract.
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ContextCompat.getColor(this, R.color.notification_accent))
+            .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()

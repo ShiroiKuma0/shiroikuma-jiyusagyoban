@@ -54,6 +54,8 @@ import androidx.compose.ui.zIndex
 import com.opentasker.ui.charts.SectionCard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.opentasker.ui.charts.ANNOTATION_INK
+import com.opentasker.ui.charts.ANNOTATION_FILL
 
 /**
  * One tile of the 言語島 board: a picture ([key] picks it), a task run by name, a Japanese title with
@@ -252,7 +254,7 @@ private fun GsCard(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = if (tile.wide) MaterialTheme.colorScheme.primary else Color(0xFF8A8A85)
+    val accent = if (tile.wide) MaterialTheme.colorScheme.primary else com.opentasker.ui.theme.role(com.opentasker.ui.theme.UiRole.ISLAND_TILE_FRAME)
     SectionCard(accent = accent, modifier = modifier) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(if (tile.wide) 2.4f else 4f / 3f)
@@ -270,9 +272,11 @@ private fun GsCard(
                     "$badge",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black,
+                    // A count tag, not a button, so it may be filled: the annotation ink as its
+                    // ground and the annotation ground as its letters, both from the role table.
+                    color = ANNOTATION_FILL,
                     modifier = Modifier.padding(8.dp)
-                        .background(Color(0xFFFFFF00), RoundedCornerShape(50))
+                        .background(ANNOTATION_INK, RoundedCornerShape(50))
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                 )
             }

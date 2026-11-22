@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
 
 /**
  * The sync dialog's run, held by the app rather than by the window that shows it.
@@ -277,7 +279,7 @@ object HuaweiSyncSession {
             NOTIFICATION_ID,
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+                .setColor(UiRoles.argb(UiRole.NOTIFICATION_ACCENT))
                 .setContentTitle(NOTE_RUNNING[lang])
                 .setContentText(if (cuts > 0) NOTE_CUTS[lang].format(cuts) else NOTE_TAP[lang])
                 .setOngoing(true)
@@ -297,7 +299,7 @@ object HuaweiSyncSession {
             NOTIFICATION_ID,
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+                .setColor(UiRoles.argb(UiRole.NOTIFICATION_ACCENT))
                 .setContentTitle(NOTE_DONE[lang])
                 .setContentText(text.lineSequence().firstOrNull().orEmpty())
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))

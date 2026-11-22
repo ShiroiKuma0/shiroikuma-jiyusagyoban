@@ -77,6 +77,25 @@ import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import kotlin.math.abs
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.destructiveButtonColors
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Edit
 
 /**
  * 「言語島 語彙」 — 白い熊's own vocabulary, as a dictionary to read in.
@@ -470,15 +489,22 @@ private fun VocabScreen(openTerm: Long, openAsk: Int, onReturn: () -> Unit, onCl
             title = "語彙",
             onDismiss = { menu = false },
             actions = listOfNotNull(
-                "取り込む / Import" to { context.startActivity(GengoshimaImportActivity.intent(context)) },
-                (if (tab <= TAB_ALL) "全部を書き出す / Export everything" else "この島を書き出す / Export this island") to
-                    { export(tab.takeIf { it > TAB_ALL }); Unit },
+                MenuAction("取り込む / Import", Icons.Filled.Download, IconRole.SHARE, opens = true) {
+                    context.startActivity(GengoshimaImportActivity.intent(context))
+                },
+                MenuAction(
+                    if (tab <= TAB_ALL) "全部を書き出す / Export everything" else "この島を書き出す / Export this island",
+                    Icons.Filled.Upload, IconRole.SHARE,
+                ) { export(tab.takeIf { it > TAB_ALL }); Unit },
                 groups?.takeIf { it.size > 1 }?.let { gs ->
                     val keys = gs.mapTo(HashSet()) { it.key }
-                    if (keys.all { it in ui.folded }) "すべて開く / Unfold every heading" to { ui.fold(ui.folded - keys) }
-                    else "すべて畳む / Fold every heading" to { ui.fold(ui.folded + keys) }
+                    if (keys.all { it in ui.folded }) {
+                        MenuAction("すべて開く / Unfold every heading", Icons.Filled.UnfoldMore, IconRole.VIEW) { ui.fold(ui.folded - keys) }
+                    } else {
+                        MenuAction("すべて畳む / Fold every heading", Icons.Filled.UnfoldLess, IconRole.VIEW) { ui.fold(ui.folded + keys) }
+                    }
                 },
-                "辞書を更新 / Ask 辞書 again" to {
+                MenuAction("辞書を更新 / Ask 辞書 again", Icons.Filled.Refresh, IconRole.CONNECT) {
                     message = "辞書に聞いています… / asking 辞書…"
                     scope.launch {
                         message = runCatching { VocabJisho.fetch(context.applicationContext, dao, all = true).line }
@@ -487,7 +513,8 @@ private fun VocabScreen(openTerm: Long, openAsk: Int, onReturn: () -> Unit, onCl
                     Unit
                 },
                 last?.let {
-                    "直前の取り込みを取り消す（${it.summary}）/ Undo the last import" to {
+                    // It deletes what the import added, so it is marked as every deleting action is.
+                    MenuAction("直前の取り込みを取り消す（${it.summary}）/ Undo the last import", Icons.AutoMirrored.Filled.Undo, IconRole.DELETE, destructive = true) {
                         scope.launch {
                             val gone = VocabImporter.undoLast(context.applicationContext)
                             message = gone?.let { g -> "取り消しました: ${g.summary.replace('+', '−')}" } ?: "取り消すものがありません"
@@ -510,12 +537,14 @@ private fun VocabScreen(openTerm: Long, openAsk: Int, onReturn: () -> Unit, onCl
             title = island.nameJa.ifBlank { island.nameEn },
             onDismiss = { islandMenu = null },
             actions = listOf(
-                "聴く / Listen" to { play(id, ListenMode.LISTEN) },
-                "シャドーイング / Shadow" to { play(id, ListenMode.SHADOW) },
-                "思い出す / Recall" to { play(id, ListenMode.RECALL) },
-                "辞書で学ぶ / Study in 辞書" to { message = studyInJisho(context, island) },
-                "島を編集 / Edit the island" to { context.startActivity(GengoshimaIslandsActivity.intent(context)) },
-                "書き出す / Export" to { export(id); Unit },
+                MenuAction("聴く / Listen", Icons.Filled.Headphones, IconRole.CONNECT, opens = true) { play(id, ListenMode.LISTEN) },
+                MenuAction("シャドーイング / Shadow", Icons.Filled.RecordVoiceOver, IconRole.CONNECT, opens = true) { play(id, ListenMode.SHADOW) },
+                MenuAction("思い出す / Recall", Icons.Filled.Psychology, IconRole.CONNECT, opens = true) { play(id, ListenMode.RECALL) },
+                MenuAction("辞書で学ぶ / Study in 辞書", Icons.Filled.School, IconRole.VIEW, opens = true) { message = studyInJisho(context, island) },
+                MenuAction("島を編集 / Edit the island", Icons.Filled.Edit, IconRole.WRITE, opens = true) {
+                    context.startActivity(GengoshimaIslandsActivity.intent(context))
+                },
+                MenuAction("書き出す / Export", Icons.Filled.Upload, IconRole.SHARE) { export(id); Unit },
             ),
         )
     }
@@ -672,7 +701,7 @@ private fun SingleTerm(
                 item { OutlinedButton(onClick = { onJisho(entry) }) { Text("辞書で開く") } }
                 item { OutlinedButton(onClick = { onCopy(entry) }) { Text("コピー") } }
                 item { OutlinedButton(onClick = { onShare(entry) }) { Text("共有") } }
-                item { OutlinedButton(onClick = { deleting = entry }) { Text("削除") } }
+                item { OutlinedButton(onClick = { deleting = entry }, colors = destructiveButtonColors()) { Text("削除") } }
             }
         }
     }
@@ -681,23 +710,47 @@ private fun SingleTerm(
             onDismissRequest = { deleting = null },
             title = { Text("「${entry.vocab.term}」を削除しますか？") },
             text = { Text("語だけを消します。例文は島に残ります。\nOnly the term is deleted; its example sentences stay in the island.") },
-            confirmButton = { Button(onClick = { deleting = null; onDelete(entry) }) { Text("削除") } },
+            confirmButton = { Button(onClick = { deleting = null; onDelete(entry) }, colors = destructiveButtonColors()) { Text("削除") } },
             dismissButton = { OutlinedButton(onClick = { deleting = null }) { Text("やめる") } },
         )
     }
 }
 
-/** A menu in the house style: every action a pill across the whole width. */
+/**
+ * One line of a [MenuDialog]: what it says, the icon that shows what it does ([role] gives the
+ * icon its colour), whether it [opens] a screen (a › at the right) and whether it deletes.
+ */
+private class MenuAction(
+    val label: String,
+    val icon: ImageVector,
+    val role: IconRole,
+    val opens: Boolean = false,
+    val destructive: Boolean = false,
+    val run: () -> Unit,
+)
+
+/**
+ * A menu in the house style: every action a pill across the whole width, its icon inside at the
+ * left and coloured by what the action does — a list is read by colour before it is read by word.
+ */
 @Composable
-private fun MenuDialog(title: String, onDismiss: () -> Unit, actions: List<Pair<String, () -> Unit>>) {
+private fun MenuDialog(title: String, onDismiss: () -> Unit, actions: List<MenuAction>) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                actions.forEach { (label, action) ->
-                    OutlinedButton(onClick = { onDismiss(); action() }, modifier = Modifier.fillMaxWidth()) {
-                        Text(label, modifier = Modifier.fillMaxWidth())
+                actions.forEach { action ->
+                    OutlinedButton(
+                        onClick = { onDismiss(); action.run() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = if (action.destructive) destructiveButtonColors() else null,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        RoleIcon(action.icon, if (action.destructive) IconRole.DELETE else action.role, Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(action.label, modifier = Modifier.weight(1f))
+                        if (action.opens) Text("›", fontWeight = FontWeight.Bold)
                     }
                 }
             }

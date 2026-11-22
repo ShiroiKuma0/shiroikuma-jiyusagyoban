@@ -71,6 +71,7 @@ import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.ui.charts.Loc
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.SectionCard
+import com.opentasker.ui.components.destructiveButtonColors
 
 /**
  * 健康 — the band's board.
@@ -839,7 +840,8 @@ private fun SyncDialog(
             {
                 OutlinedButton(
                     onClick = onCancel,
-                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = SYNC_ALARM_INK),
+                    // The pill that ends the run: marked the one way every such pill is.
+                    colors = destructiveButtonColors(),
                 ) { Text(SYNC_CANCEL[lang]) }
             }
         } else {

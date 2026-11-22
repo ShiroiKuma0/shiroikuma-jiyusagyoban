@@ -1,47 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<!--
+    No colour is written here: TaskWidgetProvider paints the ground and frame (a bitmap in
+    widget_background), the icon and both lines from the theme's roles each time it updates the
+    widget. What shows before that first update, and in the launcher's widget picker, is this
+    layout uncoloured.
+-->
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:padding="14dp"
-    android:background="@drawable/widget_task_background">
+    android:layout_height="match_parent">
 
     <ImageView
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:src="@drawable/ic_qs_tile_play"
-        android:tint="@color/widget_primary"
-        android:contentDescription="@string/widget_run_selected_task"
-        android:layout_marginEnd="12dp" />
+        android:id="@+id/widget_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:importantForAccessibility="no" />
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="14dp">
 
-        <TextView
-            android:id="@+id/widget_task_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
+        <ImageView
+            android:id="@+id/widget_icon"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/ic_qs_tile_play"
+            android:contentDescription="@string/widget_run_selected_task"
+            android:layout_marginEnd="12dp" />
 
-        <TextView
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/widget_tap_to_run"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="12sp"
-            android:maxLines="1"
-            android:ellipsize="end" />
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_task_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/app_name"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_task_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_tap_to_run"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
     </LinearLayout>
 
-</LinearLayout>
+</FrameLayout>

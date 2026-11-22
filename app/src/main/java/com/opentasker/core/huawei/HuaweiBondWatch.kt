@@ -243,7 +243,7 @@ object HuaweiBondWatch {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+            .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
             .setContentTitle("時計の接続が外れました（$at）/ Watch unpaired")
             .setContentText(text.lineSequence().first())
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

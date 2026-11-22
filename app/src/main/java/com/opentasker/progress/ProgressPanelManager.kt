@@ -75,6 +75,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
 
 /**
  * The progress panel's controller — two auto-following list panes (the run's steps on top, the current
@@ -492,17 +494,29 @@ object ProgressPanelManager {
 // ── Palette — the fork's black panel / yellow accent, same look as the 進捗盤 scene it replaces ──
 // Fully opaque: the panel sits over whatever is in front, and even a few percent of bleed-through made
 // the app underneath (bright yellow on black) legible right across the rows.
-private val PanelBg = Color(0xFF000000)
-private val Accent = Color(0xFFFFFF00)
-// Every item is the fork's pure yellow. Finished rows are separated by OPACITY alone (and their
-// full-strength tick), never by a duller hue — a tinted "yellow" reads as olive next to the real one.
-private val DoneColor = Color(0xFFFFFF00)
-private val PendingColor = Color(0xFFFFFF00)
-private val FailColor = Color(0xFFFF9E9E)
-/** Wash behind anything red: thin red glyphs on pure black are the hardest thing here to read. */
-private val FailBg = Color(0x33FF5A5A)
-private val HeaderColor = Color(0xFFFFFFFF)
-private val ActiveRowBg = Color(0x33FFFF00)
+//
+// The panel is an overlay drawn outside the app's Compose theme, so it cannot read the roles through
+// the theme's composition local. Each colour is therefore a getter on the role table itself: it is
+// read again at every composition, which means every time the panel is shown, and a colour set on
+// the UI page reaches the panel without a restart. Nothing here is a literal.
+private fun roleColor(role: UiRole) = Color(UiRoles.argb(role))
+private val PanelBg: Color get() = roleColor(UiRole.PROGRESS_GROUND)
+private val Accent: Color get() = roleColor(UiRole.PROGRESS_FRAME)
+// Every item is the fork's pure yellow by default. Finished rows are separated by OPACITY alone (and
+// their full-strength tick), never by a duller hue — a tinted "yellow" reads as olive next to the real one.
+private val DoneColor: Color get() = roleColor(UiRole.PROGRESS_TEXT)
+private val PendingColor: Color get() = roleColor(UiRole.PROGRESS_TEXT)
+private val FailColor: Color get() = roleColor(UiRole.PROGRESS_FAIL)
+/** Wash behind anything that failed: thin red glyphs on the bare ground are the hardest thing here to read. */
+private val FailBg: Color get() = FailColor.copy(alpha = 0.2f)
+private val HeaderColor: Color get() = roleColor(UiRole.PROGRESS_TITLE)
+private val ActiveRowBg: Color get() = roleColor(UiRole.PROGRESS_BAR).copy(alpha = 0.2f)
+
+// The panel's buttons are the theme's pills, drawn here for the same reason: never filled, a 3 dp
+// frame and bold for the main action of a block, 1.25 dp and normal weight for every other.
+private val PanelPill = RoundedCornerShape(percent = 50)
+private val PanelPillMain = 3.dp
+private val PanelPillRegular = 1.25.dp
 
 private val OuterRowHeight = 30.dp
 private val InnerRowHeight = 26.dp
@@ -807,7 +821,7 @@ private fun PaneHeader(title: String, counter: String, emphasise: Boolean, scale
     Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = title,
-            color = if (emphasise) Accent else DoneColor,
+            color = if (emphasise) HeaderColor else DoneColor,
             textDecoration = if (emphasise) TextDecoration.Underline else null,
             fontSize = (if (emphasise) 16f else 13f).times(scale).sp,
             fontWeight = if (emphasise) FontWeight.Bold else FontWeight.Normal,
@@ -865,7 +879,7 @@ private fun Pane(
         modifier = Modifier
             .fillMaxWidth()
             .height((rowHeight + lineGap) * visibleLines)
-            .background(Color.Black, RoundedCornerShape(10.dp))
+            .background(PanelBg, RoundedCornerShape(10.dp))
             .border(1.dp, Accent, RoundedCornerShape(10.dp)),
         contentPadding = PaddingValues(vertical = 2.dp, horizontal = 3.dp),
         verticalArrangement = Arrangement.spacedBy(lineGap),
@@ -1154,7 +1168,7 @@ private fun ToggleLine(label: String, indent: Dp, rowHeight: Dp, textScale: Floa
     ) {
         Row(
             Modifier
-                .border(2.dp, Accent, RoundedCornerShape(999.dp))
+                .border(PanelPillRegular, roleColor(UiRole.BUTTON_FRAME), RoundedCornerShape(999.dp))
                 .clickable { onClick() }
                 .padding(horizontal = 12.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1195,7 +1209,7 @@ private fun DirPill(
         Box(
             Modifier
                 .weight(1f)
-                .border(2.dp, Accent, RoundedCornerShape(999.dp))
+                .border(PanelPillRegular, roleColor(UiRole.BUTTON_FRAME), RoundedCornerShape(999.dp))
                 .clickable { onClick() }
                 .padding(horizontal = 14.dp, vertical = 6.dp),
         ) {
@@ -1259,16 +1273,19 @@ private fun PanelButton(
         modifier
             .then(if (modifier == Modifier) Modifier.fillMaxWidth() else Modifier)
             .height(38.dp)
-            .background(if (emphasise) Color(0x22FFFF00) else Color(0x1AFFFFFF), RoundedCornerShape(10.dp))
-            .border(1.dp, if (emphasise) Accent else PendingColor, RoundedCornerShape(10.dp))
+            .border(
+                if (emphasise) PanelPillMain else PanelPillRegular,
+                roleColor(if (emphasise) UiRole.BUTTON_MAIN_FRAME else UiRole.BUTTON_FRAME),
+                PanelPill,
+            )
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            color = if (emphasise) Accent else HeaderColor,
+            color = roleColor(if (emphasise) UiRole.BUTTON_MAIN_LABEL else UiRole.BUTTON_LABEL),
             fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = if (emphasise) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp),
@@ -1278,27 +1295,21 @@ private fun PanelButton(
 
 @Composable
 private fun CancelButton(label: String, cancelled: Boolean) {
+    // The one pill here that ends something, so it wears the Delete role on frame and label — and,
+    // once pressed, the same pill at 38 %, as every pill that can no longer be pressed.
+    val ink = roleColor(UiRole.DELETE).let { if (cancelled) it.copy(alpha = 0.38f) else it }
     Box(
         Modifier
             .fillMaxWidth()
             .height(40.dp)
-            .background(
-                if (cancelled) Color(0x22FF7A7A) else Color(0x22FFFF00),
-                RoundedCornerShape(10.dp),
-            )
-            .border(
-                1.dp,
-                if (cancelled) FailColor else Accent,
-                RoundedCornerShape(10.dp),
-            )
+            .border(PanelPillRegular, ink, PanelPill)
             .then(if (cancelled) Modifier else Modifier.clickable { ProgressPanel.requestCancel() }),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = if (cancelled) "$label 中…" else label,
-            color = if (cancelled) FailColor else Accent,
+            color = ink,
             fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
         )
     }
 }

@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import com.opentasker.ui.components.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +49,17 @@ import com.opentasker.core.storage.GengoshimaSentenceEntity
 import com.opentasker.ui.charts.ActionPill
 import com.opentasker.ui.components.AlertDialog
 import java.io.File
+import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Upload
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import androidx.compose.ui.draw.clip
 
 /**
  * Where a sentence stands, on its card (白い熊, 2026-10-26: "the edited state should then be colour
@@ -242,12 +251,12 @@ internal fun SentenceCard(
             IconButton(onClick = onUp, enabled = !first) { Icon(Icons.Filled.ArrowUpward, "上へ") }
             IconButton(onClick = onDown, enabled = !last) { Icon(Icons.Filled.ArrowDownward, "下へ") }
             IconButton(onClick = onMove, enabled = canMove && !working) { Icon(Icons.Filled.DriveFileMove, "別の島へ / move") }
-            IconButton(onClick = onDelete, enabled = !working) { Icon(Icons.Filled.Delete, "消す / delete", tint = MaterialTheme.colorScheme.error) }
+            IconButton(onClick = onDelete, enabled = !working) { Icon(Icons.Filled.Delete, "消す / delete", tint = role(UiRole.DELETE)) }
             Box(Modifier.weight(1f))
             var menu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { menu = true }, enabled = !working) { Icon(Icons.Filled.MoreVert, "その他 / more") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     val items = listOfNotNull(
                         ("分けるだけ / split only — check before voicing" to SentenceAction.SPLIT_ONLY)
                             .takeIf { state == CardState.TO_TRANSLATE || state == CardState.TO_SPLIT },
@@ -257,7 +266,16 @@ internal fun SentenceCard(
                         ("暗記を更新 / update in 暗記" to SentenceAction.ANKI).takeIf { state == CardState.READY },
                     )
                     items.forEach { (label, a) ->
-                        DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; onAction(a) })
+                        // Each row says what it does by its icon's colour: the three that rewrite
+                        // the sentence, the one that runs the voice, the one that sends it out.
+                        val (icon, does) = when (a) {
+                            SentenceAction.SPLIT_ONLY -> Icons.Filled.ContentCut to IconRole.WRITE
+                            SentenceAction.TRANSLATE_AGAIN -> Icons.Filled.Translate to IconRole.WRITE
+                            SentenceAction.RESPLIT -> Icons.Filled.Refresh to IconRole.WRITE
+                            SentenceAction.REVOICE -> Icons.Filled.RecordVoiceOver to IconRole.CONNECT
+                            SentenceAction.ANKI -> Icons.Filled.Upload to IconRole.SHARE
+                        }
+                        DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; onAction(a) }, icon = icon, role = does)
                     }
                 }
             }
@@ -402,11 +420,16 @@ internal fun WordDialog(tokens: List<Translator.Token>, k: Int, onDismiss: () ->
 
 @Composable
 private fun StateMarkButton(text: String, onClick: () -> Unit) {
+    // An action — cut the word here — so the theme's regular pill: 1.25 dp and the button roles.
+    // Drawn here because a row of cut points needs a pill no taller than its text.
+    val pill = RoundedCornerShape(100.dp)
     Text(
         text,
         fontSize = 18.sp,
+        color = role(UiRole.BUTTON_LABEL),
         modifier = Modifier
-            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(100.dp))
+            .clip(pill)
+            .border(1.25.dp, role(UiRole.BUTTON_FRAME), pill)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )

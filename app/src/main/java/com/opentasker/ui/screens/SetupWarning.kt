@@ -35,12 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -50,6 +48,9 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.components.OutlinedButton
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
+import com.opentasker.ui.theme.role
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -151,7 +152,7 @@ object SetupWarning {
             val text = off.joinToString(" · ")
             val notification = NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setColor(ContextCompat.getColor(app, R.color.notification_accent))
+                .setColor(UiRoles.argb(UiRole.NOTIFICATION_ACCENT))
                 .setContentTitle("設定が外れています · ${off.size} setup item${if (off.size == 1) "" else "s"} switched off")
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -237,7 +238,7 @@ private fun SetupWarningPanel(onLater: () -> Unit, onAllReady: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
+            .background(role(UiRole.SCHEME_SCRIM).copy(alpha = 0.72f))
             .systemBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
@@ -245,7 +246,7 @@ private fun SetupWarningPanel(onLater: () -> Unit, onAllReady: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth(0.94f)
                 .fillMaxHeight(0.92f)
-                .background(Color.Black, RoundedCornerShape(24.dp))
+                .background(role(UiRole.DIALOG_GROUND), RoundedCornerShape(24.dp))
                 .border(2.dp, MaterialTheme.colorScheme.error, RoundedCornerShape(24.dp))
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

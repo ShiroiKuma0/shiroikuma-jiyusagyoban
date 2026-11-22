@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -48,7 +47,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -58,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.delay
@@ -68,8 +67,10 @@ import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.RunLogSource
 import com.opentasker.core.engine.RunLogTemplateDiagnostic
+import com.opentasker.ui.components.destructiveButtonColors
 import com.opentasker.ui.theme.DesignSystem
-import com.opentasker.ui.theme.selectedContainerColor
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import com.opentasker.core.engine.outcome
 import com.opentasker.core.engine.toRunLogDiagnostics
 import com.opentasker.core.model.RunLogEntry
@@ -221,23 +222,8 @@ private fun RunLogRetentionCard(
                             .fillMaxWidth()
                             .animateContentSize()
                             .semantics { stateDescription = selectionDescription },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (selected) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-                            } else {
-                                Color.Transparent
-                            },
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (selected) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
-                            },
-                        ),
+                        // The pill is never filled, so the chosen option is told by its mark (and
+                        // the bold label), not by a tinted ground the pill would turn into its frame.
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                     ) {
                         Column(
@@ -256,11 +242,16 @@ private fun RunLogRetentionCard(
                                         modifier = Modifier
                                             .size(16.dp)
                                             .clearAndSetSemantics { },
+                                        tint = role(UiRole.LIST_SELECTED),
                                     )
                                 } else {
                                     Spacer(Modifier.size(16.dp))
                                 }
-                                Text(option.label, style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    option.label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                )
                             }
                             Text(
                                 option.description,
@@ -282,11 +273,9 @@ private fun RunLogRetentionCard(
                     TextButton(
                         onClick = { confirmClear = true },
                         modifier = Modifier.testTag(RUN_LOG_CLEAR_TAG),
+                        colors = destructiveButtonColors(),
                     ) {
-                        Text(
-                            stringResource(R.string.run_log_clear_action),
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                        Text(stringResource(R.string.run_log_clear_action))
                     }
                 }
             }
@@ -311,8 +300,9 @@ private fun RunLogRetentionCard(
                         confirmClear = false
                         onClearRunLog()
                     },
+                    colors = destructiveButtonColors(),
                 ) {
-                    Text(stringResource(R.string.run_log_clear_action), color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.run_log_clear_action))
                 }
             },
             dismissButton = {
@@ -420,26 +410,25 @@ private fun RunLogFilterChip(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.semantics { stateDescription = selectionDescription },
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) {
-                selectedContainerColor()
-            } else {
-                Color.Transparent
-            },
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
-            },
-        ),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // A filter that is on is told by its ✓ and its bold label: the pill itself is never filled.
+        if (selected) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = role(UiRole.LIST_SELECTED),
+            )
+            Spacer(Modifier.size(4.dp))
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

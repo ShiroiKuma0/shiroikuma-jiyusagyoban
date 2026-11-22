@@ -6,9 +6,16 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.os.Bundle
 import android.widget.RemoteViews
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.app.R
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +46,16 @@ class TaskWidgetProvider : AppWidgetProvider() {
                 pending.finish()
             }
         }
+    }
+
+    // The ground is a bitmap drawn for the widget's size, so a resize needs a fresh one.
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        updateWidget(context, appWidgetManager, appWidgetId)
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
@@ -105,6 +122,39 @@ class TaskWidgetProvider : AppWidgetProvider() {
             editor.apply()
         }
 
+        /**
+         * The widget's ground and frame: a rounded rectangle filled with WIDGET_GROUND and stroked
+         * with WIDGET_FRAME. A shape drawable would need its colours in XML, and RemoteViews has
+         * no setter for a shape's stroke.
+         */
+        private fun groundBitmap(context: Context, manager: AppWidgetManager, widgetId: Int): Bitmap {
+            val density = context.resources.displayMetrics.density
+            val options = runCatching { manager.getAppWidgetOptions(widgetId) }.getOrNull()
+            // Portrait size as the launcher reports it (min width × max height); the provider's
+            // own minimum when it reports nothing. The view stretches the bitmap to its bounds.
+            val widthDp = (options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0)
+                .takeIf { it > 0 } ?: 110
+            val heightDp = (options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0)
+                .takeIf { it > 0 } ?: 40
+            // Capped: a bitmap in RemoteViews travels through a binder transaction.
+            val width = (widthDp * density).toInt().coerceIn(1, 1200)
+            val height = (heightDp * density).toInt().coerceIn(1, 600)
+            val stroke = density.coerceAtLeast(1f)
+            val radius = 16f * density
+            val rect = RectF(stroke / 2f, stroke / 2f, width - stroke / 2f, height - stroke / 2f)
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.style = Paint.Style.FILL
+            paint.color = UiRoles.argb(UiRole.WIDGET_GROUND)
+            canvas.drawRoundRect(rect, radius, radius, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = stroke
+            paint.color = UiRoles.argb(UiRole.WIDGET_FRAME)
+            canvas.drawRoundRect(rect, radius, radius, paint)
+            return bitmap
+        }
+
         fun updateWidget(context: Context, manager: AppWidgetManager, widgetId: Int) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val taskId = prefs.getLong(keyTaskId(widgetId), -1L)
@@ -113,6 +163,13 @@ class TaskWidgetProvider : AppWidgetProvider() {
 
             val views = RemoteViews(context.packageName, R.layout.widget_task)
             views.setTextViewText(R.id.widget_task_name, taskName)
+
+            // The layout carries no colour; every one is read from its role here, so a colour
+            // changed on the UI page shows the next time the widget is updated.
+            views.setTextColor(R.id.widget_task_name, UiRoles.argb(UiRole.WIDGET_TEXT))
+            views.setTextColor(R.id.widget_task_hint, UiRoles.argb(UiRole.WIDGET_NOTE))
+            views.setInt(R.id.widget_icon, "setColorFilter", UiRoles.argb(UiRole.WIDGET_ICON))
+            views.setImageViewBitmap(R.id.widget_background, groundBitmap(context, manager, widgetId))
 
             val target = if (taskId >= 0) {
                 Intent(context, TaskRunActivity::class.java).apply {

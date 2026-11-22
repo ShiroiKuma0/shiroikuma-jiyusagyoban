@@ -21,16 +21,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
@@ -50,11 +51,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -80,8 +78,11 @@ import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
 import com.opentasker.core.icons.TaskIconStore
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.destructiveButtonColors
 import com.opentasker.ui.theme.DesignSystem
-import com.opentasker.ui.theme.selectedContainerColor
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -129,25 +130,34 @@ internal fun TemplatePickerDialog(
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
                         shape = RoundedCornerShape(14.dp),
                     ) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-                            ) {
-                                Text(template.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                StatusPill(
-                                    status,
-                                    when (template.availability) {
-                                        TemplateAvailability.Ready -> MaterialTheme.colorScheme.tertiary
-                                        TemplateAvailability.RequiresSetup -> MaterialTheme.colorScheme.primary
-                                        TemplateAvailability.Planned -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                )
+                        // The category's icon in its role colour leads the row — the same icon the
+                        // action pickers use for that category — and every line shares one label edge.
+                        val (categoryIcon, categoryRole) = actionCategoryIcon(template.category)
+                        Row(
+                            Modifier.padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                        ) {
+                            RoleIcon(categoryIcon, categoryRole, Modifier.size(22.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                                ) {
+                                    Text(template.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                    StatusPill(
+                                        status,
+                                        when (template.availability) {
+                                            TemplateAvailability.Ready -> MaterialTheme.colorScheme.tertiary
+                                            TemplateAvailability.RequiresSetup -> MaterialTheme.colorScheme.primary
+                                            TemplateAvailability.Planned -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                }
+                                Text(template.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                Text(template.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(template.safetyNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Text(template.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                            Text(template.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(template.safetyNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -214,26 +224,15 @@ internal fun TemplateSlotDialog(
         // (白い熊, 2026-09-10). Outlined rather than filled, so the destructive button is still the
         // one that carries weight — the two are equally PRESSABLE, not equally loud.
         dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(50),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ),
-            ) {
+            // The app's regular pill as it is: frame and label come from the button roles.
+            OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.action_cancel))
             }
         },
         // The dialog's own edge. On a black ground an unbordered surface floats with nothing to say
         // where it ends — the content simply stops — and every other surface in this app is framed.
+        // The app's AlertDialog draws that frame round this shape, and the ground, from their roles.
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.border(
-            2.dp,
-            MaterialTheme.colorScheme.primary,
-            RoundedCornerShape(DesignSystem.Radii.lg),
-        ),
     )
 }
 
@@ -269,8 +268,6 @@ internal fun TaskEditorDialog(
     }
 
     AlertDialog(
-        // Yellow edge, matching the action editor and the other editor dialogs.
-        modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = cleanupAndDismiss,
         title = { Text(if (task == null) stringResource(R.string.dialog_create_task) else stringResource(R.string.dialog_edit_task)) },
         text = {
@@ -827,40 +824,38 @@ internal fun SelectableOption(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    OutlinedButton(
-        onClick = onClick,
+    // A choice of a group, not an action — so not a pill, and not a fill at 42 %: a framed row whose
+    // chosen state is told by the chosen-entry role, on its frame and on the ✓ at its right.
+    val shape = RoundedCornerShape(DesignSystem.Radii.lg)
+    val chosen = role(UiRole.LIST_SELECTED)
+    Row(
         // These groups are radio pickers (overflow policy, lifetime, retrigger). Without the role
         // and selected state a screen reader announced them as plain buttons, so an unselected
         // option said nothing about being unselected and gave no group context.
         modifier = Modifier
             .fillMaxWidth()
-            .semantics {
-                this.role = Role.RadioButton
-                this.selected = selected
-            },
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) selectedContainerColor() else Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
-        ),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            .clip(shape)
+            .border(
+                if (selected) 2.dp else 1.dp,
+                if (selected) chosen else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
+                shape,
+            )
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.labelLarge)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (selected) {
-                StatusPill(stringResource(R.string.label_selected), MaterialTheme.colorScheme.primary)
-            }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (selected) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = stringResource(R.string.label_selected),
+                tint = chosen,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
@@ -1108,12 +1103,7 @@ internal fun DeleteConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    // onPrimary happens to pass contrast today, but its hue is not the error
-                    // hue under Material You and a scheme edit would break it silently.
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
+                colors = destructiveButtonColors(),
             ) {
                 Text(confirmLabel)
             }
