@@ -26,19 +26,24 @@ internal fun RunLogRetentionPreviewDialog(
     val oldest = preview.oldestTimestamp?.let { timestamp ->
         displayDateTimeFormat(context, withSeconds = false).format(Date(timestamp))
     } ?: stringResource(R.string.label_none)
+    val removed = preview.prunableCount + preview.heldPrunableCount
+    val body = stringResource(
+        R.string.run_log_retention_preview_body,
+        pluralStringResource(R.plurals.count_run_log_entries, preview.storedCount, preview.storedCount),
+        oldest,
+        pluralStringResource(R.plurals.count_run_log_entries, removed, removed),
+    )
+    // Held runs can still be replayed, so losing them is called out on its own.
+    val held = if (preview.heldPrunableCount > 0) {
+        " " + pluralStringResource(R.plurals.run_log_retention_preview_held, preview.heldPrunableCount, preview.heldPrunableCount)
+    } else {
+        ""
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.run_log_retention_preview_title)) },
         text = {
-            Text(
-                stringResource(
-                    R.string.run_log_retention_preview_body,
-                    pluralStringResource(R.plurals.count_run_log_entries, preview.storedCount, preview.storedCount),
-                    oldest,
-                    pluralStringResource(R.plurals.count_run_log_entries, preview.prunableCount, preview.prunableCount),
-                ),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-            )
+            Text(body + held, modifier = Modifier.verticalScroll(rememberScrollState()))
         },
         confirmButton = {
             Button(onClick = onConfirm) { Text(stringResource(R.string.run_log_retention_confirm)) }

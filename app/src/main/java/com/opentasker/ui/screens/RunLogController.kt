@@ -197,18 +197,21 @@ internal class RunLogController(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val dao = db.runLogDao()
+                    val cutoff = normalized.minimumTimestamp(System.currentTimeMillis())
                     RunLogRetentionPreview(
                         policy = normalized,
                         storedCount = dao.count(),
-                        prunableCount = dao.countPrunable(
-                            maxEntries = normalized.maxEntries,
-                            minimumTimestamp = normalized.minimumTimestamp(System.currentTimeMillis()),
-                        ),
+                        prunableCount = dao.countPrunable(maxEntries = normalized.maxEntries, minimumTimestamp = cutoff),
                         oldestTimestamp = dao.oldestTimestamp(),
+                        // applyRetention prunes held rows too, under their own smaller cap.
+                        heldPrunableCount = dao.countHeldPrunable(
+                            maxHeldEntries = normalized.maxHeldEntries,
+                            minimumTimestamp = cutoff,
+                        ),
                     )
                 }
             }.onSuccess { preview ->
-                if (preview.prunableCount == 0) updateRunLogRetention(preview.policy)
+                if (preview.prunableCount + preview.heldPrunableCount == 0) updateRunLogRetention(preview.policy)
                 else _runLogRetentionPreview.value = preview
             }.onFailure { events.send(loggedUiErrorMessage(it, R.string.ui_error_retention_preview)) }
         }

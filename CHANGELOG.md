@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- Picking a shorter run log retention could delete held runs, the ones you can still replay, without showing the review first, because the review only counted ordinary entries. It counts held runs now and says how many would go.
 - In Diagnostics, a scheduled job's "Earlier run stopped by Android" line no longer starts with a stray space.
 - Diagnostics reads in Simplified Chinese all the way down now. Time alarms, app standby, the service types, blocked scheduled jobs, why the app last closed and the health evidence lines were still in English and in the engine's own terms, so they're plain words in both languages. The shared report stays in English, so a bug report reads the same from any phone.
 - A Wi-Fi name pattern written as a predicate, like `wifi~Home*`, never started Wi-Fi watching, so its profile couldn't turn on. It does now.

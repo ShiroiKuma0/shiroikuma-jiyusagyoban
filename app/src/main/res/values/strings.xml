@@ -1044,6 +1044,10 @@
         <item quantity="one">%1$d run log entry</item>
         <item quantity="other">%1$d run log entries</item>
     </plurals>
+    <plurals name="run_log_retention_preview_held">
+        <item quantity="one">That includes %1$d held run you could still replay.</item>
+        <item quantity="other">That includes %1$d held runs you could still replay.</item>
+    </plurals>
     <plurals name="count_days">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>

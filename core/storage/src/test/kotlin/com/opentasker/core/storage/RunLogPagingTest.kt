@@ -235,6 +235,7 @@ class RunLogPagingTest {
         override suspend fun getByExecutionId(executionId: String): RunLogEntity? = unused()
         override suspend fun setStarred(id: Long, starred: Boolean) = unused()
         override suspend fun pruneRetention(maxEntries: Int, minimumTimestamp: Long): Int = unused()
+        override suspend fun countHeldPrunable(maxHeldEntries: Int, minimumTimestamp: Long): Int = unused()
         override suspend fun pruneHeldRetention(maxHeldEntries: Int, minimumTimestamp: Long): Int = unused()
         override suspend fun clearUnpinned(): Int = unused()
         override suspend fun clearHeld(id: Long): Int = unused()

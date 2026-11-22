@@ -131,6 +131,35 @@ class RunLogDaoInstrumentedTest {
         }
     }
 
+    /**
+     * The retention preview counted ordinary rows only, so moving to a policy with a smaller held
+     * cap skipped the preview when no ordinary row was due and deleted held runs unannounced.
+     */
+    @Test
+    fun theHeldCountMatchesWhatShorterRetentionDeletes() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.runLogDao()
+            val now = 1_800_000_000_000L
+            repeat(300) { index -> dao.insert(run(taskId = index + 1L, timestamp = now - index * 1_000L, held = true)) }
+            dao.insert(run(taskId = 301, timestamp = now - 1_000L, held = true, starred = true))
+            dao.insert(run(taskId = 302, timestamp = now))
+            val short = RunLogRetentionOptions.all.first { it.policy.maxEntries == 250 }.policy
+            val cutoff = short.minimumTimestamp(now)
+
+            assertEquals(0, dao.countPrunable(maxEntries = short.maxEntries, minimumTimestamp = cutoff))
+            assertEquals(275, dao.countHeldPrunable(maxHeldEntries = short.maxHeldEntries, minimumTimestamp = cutoff))
+            assertEquals(275, dao.applyRetention(short, now))
+            assertEquals(0, dao.countHeldPrunable(maxHeldEntries = short.maxHeldEntries, minimumTimestamp = cutoff))
+            assertEquals(27, dao.count())
+        } finally {
+            db.close()
+        }
+    }
+
     @Test
     fun clearHeldConsumesAReplayedRowOnlyOnce() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

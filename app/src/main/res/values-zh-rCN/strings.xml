@@ -1021,6 +1021,9 @@
     <plurals name="count_run_log_entries">
         <item quantity="other">%1$d 条运行日志记录</item>
     </plurals>
+    <plurals name="run_log_retention_preview_held">
+        <item quantity="other">其中包括%1$d个仍可重放的已保留运行。</item>
+    </plurals>
     <plurals name="count_days">
         <item quantity="other">%1$d 天</item>
     </plurals>

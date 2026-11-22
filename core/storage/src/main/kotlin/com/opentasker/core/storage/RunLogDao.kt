@@ -332,6 +332,25 @@ interface RunLogDao {
     )
     suspend fun countPrunable(maxEntries: Int, minimumTimestamp: Long): Int
 
+    /** What [pruneHeldRetention] would delete, so the retention preview can say so first. */
+    @Query(
+        """
+        SELECT COUNT(*) FROM run_logs
+        WHERE held = 1
+          AND starred = 0
+          AND (
+            timestamp < :minimumTimestamp
+            OR id NOT IN (
+                SELECT id FROM run_logs
+                WHERE held = 1 AND starred = 0
+                ORDER BY timestamp DESC, id DESC
+                LIMIT :maxHeldEntries
+            )
+          )
+        """
+    )
+    suspend fun countHeldPrunable(maxHeldEntries: Int, minimumTimestamp: Long): Int
+
     @Query("SELECT MAX(id) FROM run_logs")
     suspend fun maximumId(): Long?
 

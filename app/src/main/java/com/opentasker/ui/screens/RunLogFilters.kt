@@ -69,4 +69,6 @@ data class RunLogRetentionPreview(
     val storedCount: Int,
     val prunableCount: Int,
     val oldestTimestamp: Long?,
+    /** Held runs the policy's smaller held cap would drop, which `prunableCount` leaves out. */
+    val heldPrunableCount: Int = 0,
 )
