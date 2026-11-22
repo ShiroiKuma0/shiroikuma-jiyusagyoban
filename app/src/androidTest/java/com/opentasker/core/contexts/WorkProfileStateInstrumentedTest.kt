@@ -11,7 +11,7 @@ import org.junit.Test
 import java.io.FileInputStream
 
 /**
- * `work_profile` read from real profiles (A-280, verifier 25). Private Space is a profile Android
+ * `work_profile` read from real profiles (A-280). Private Space is a profile Android
  * hides from this app, so it must not read as a work profile, and Android 15's profile types have
  * to name the work profile for this app or every work profile would read none.
  *

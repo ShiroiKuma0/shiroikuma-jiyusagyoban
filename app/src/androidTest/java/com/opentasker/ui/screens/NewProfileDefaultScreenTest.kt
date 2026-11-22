@@ -83,7 +83,7 @@ class NewProfileDefaultScreenTest {
         try {
             val viewModel = ViewModelProvider(store, ActiveAutomationViewModelFactory(db, context))[ActiveAutomationViewModel::class.java]
             // A rotated screen reads the value on its first frame, before it collects anything, so
-            // the value has to arrive with nobody collecting (verifier 28). Read without collecting.
+            // the value has to arrive with nobody collecting. Read without collecting.
             val deadline = System.currentTimeMillis() + TIMEOUT_MS
             while (!viewModel.newProfilesEnabled.value && System.currentTimeMillis() < deadline) Thread.sleep(50)
 

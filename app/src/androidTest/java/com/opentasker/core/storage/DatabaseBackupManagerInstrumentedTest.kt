@@ -638,8 +638,8 @@ class DatabaseBackupManagerInstrumentedTest {
     /**
      * A restore whose journal can't be retired, and whose old database can't be copied back
      * either, keeps the restored database live, so Undo has to point at the copy it replaced even
-     * though no write of that record was tried before the failure (verifier 24). A write that
-     * fails once is tried again there too (verifier 25).
+     * though no write of that record was tried before the failure. A write that
+     * fails once is tried again there too.
      */
     @Test
     fun aKeptRestoreWhoseJournalWontRetireStillRecordsItsUndo() = keptRestoreWithBlockedJournal(failingCommits = 0)
@@ -694,7 +694,7 @@ class DatabaseBackupManagerInstrumentedTest {
     /**
      * With no database before it, a restore has nothing for Undo, so it clears the record of an
      * earlier restore. A clear that fails once is tried again, or Setup would offer to go back to
-     * that older copy over the new database (verifier 24).
+     * that older copy over the new database.
      */
     @Test
     fun aRestoreOverNoDatabaseClearsAnOlderUndoEvenAfterAFailedWrite() = runBlocking {

@@ -84,7 +84,7 @@ class NewProfileDefaultComposeTest {
         enableSwitch().assertIsOn().performClick()
         enableSwitch().assertIsOff()
 
-        // A recreated screen reads the setting as off until the stored value loads (verifier 27).
+        // A recreated screen reads the setting as off until the stored value loads.
         setting = false
         restorationTester.emulateSavedInstanceStateRestore()
         setting = true

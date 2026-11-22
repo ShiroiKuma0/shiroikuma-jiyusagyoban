@@ -999,7 +999,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         composeTestRule.onNodeWithText("Add Step").assertIsDisplayed()
     }
 
-    /** A check mark sat beside "1 issue(s)", and the icon read "Flow" to TalkBack. */
+    /** A check mark sat beside "1 issue", and the icon read "Flow" to TalkBack. */
     @Test
     fun flowOverviewIconFollowsTheIssueCount() {
         val task = Task(id = 7, name = "Lights", actions = listOf(ActionSpec(type = "notify.show", label = "Notify")))
@@ -1020,7 +1020,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
             }
         }
 
-        composeTestRule.onNodeWithText("1 issue(s)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 issue").assertIsDisplayed()
         composeTestRule.onNodeWithTag(FLOW_OVERVIEW_ISSUES_ICON_TAG, useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithTag(FLOW_OVERVIEW_READY_ICON_TAG, useUnmergedTree = true).assertDoesNotExist()
         composeTestRule.onAllNodesWithContentDescription("Flow", useUnmergedTree = true).assertCountEquals(0)
