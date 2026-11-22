@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.ui.theme.ThemedSwitch
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
@@ -132,6 +133,8 @@ fun SceneLibraryScreen(
     onUpdateScene: (Scene, String) -> Unit,
     onDeleteScene: (Scene) -> Unit,
     contentPadding: PaddingValues,
+    /** Last-edited times by [lastEditedKey], for the "Last edited" view. */
+    lastEdited: Map<String, Long> = emptyMap(),
 ) {
     // Item + group multi-selection live here (re-mounting the screen on a tab switch resets them). Set<Long>
     // has no Saver, so plain remember — not rememberSaveable — is correct. Mirrors TasksScreen.
@@ -150,6 +153,7 @@ fun SceneLibraryScreen(
     var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
     var pendingElementDeleteIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
+    val sceneSort = rememberLibrarySort(LibraryList.Scenes)
     val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
         sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
     }
@@ -332,7 +336,18 @@ fun SceneLibraryScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
-                if (groupOps.groups.isEmpty()) {
+                // The list's own order is by name already, so the choice is that or Last edited.
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        LibrarySortButton(sceneSort, defaultLabel = "Name", offerName = false)
+                    }
+                }
+                if (sceneSort.order == LibrarySortOrder.LastEdited) {
+                    item { LibrarySortNotice(sceneSort.order, defaultLabel = "Name") }
+                    // A VIEW: flat, no groups, no drag handles — so nothing here can write an order.
+                    val sorted = sortLibrary(sortedScenes, LibrarySortOrder.LastEdited, { it.name }) { lastEdited[lastEditedKey(EditHistoryDao.TYPE_SCENE, it.id)] }
+                    items(sorted, key = { it.id }) { scene -> sceneCard(scene) }
+                } else if (groupOps.groups.isEmpty()) {
                     items(sortedScenes, key = { it.id }) { scene -> sceneCard(scene) }
                 } else {
                     groupedItems(

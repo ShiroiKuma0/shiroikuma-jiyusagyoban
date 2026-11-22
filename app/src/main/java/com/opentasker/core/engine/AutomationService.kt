@@ -1007,7 +1007,17 @@ class AutomationService : Service() {
     private fun reserveCooldown(profileId: Long, cooldownSec: Int): CooldownReservation {
         val now = System.currentTimeMillis()
         synchronized(profileCooldowns) {
-            val cooldownUntil = profileCooldowns[profileId] ?: 0
+            var cooldownUntil = profileCooldowns[profileId] ?: 0
+            // Upstream's clock clamp (8612b32c, 6614e83e): a deadline further off than one window
+            // came from a clock since set back or a cooldown since shortened. Brought in and saved
+            // that way, so the profile is never held longer than its own cooldown.
+            val clamped = clampedCooldownDeadline(cooldownUntil, cooldownSec, now)
+            if (clamped != cooldownUntil) {
+                AppLogger.info(TAG, "Profile $profileId cooldown brought in by ${(cooldownUntil - clamped) / 1000}s (clock moved or cooldown shortened)")
+                cooldownUntil = clamped
+                profileCooldowns[profileId] = clamped
+                cooldownStore.set(profileId, clamped)
+            }
             if (now < cooldownUntil) {
                 AppLogger.info(TAG, "Profile $profileId on cooldown, skipping")
                 return CooldownReservation(accepted = false, remainingMs = cooldownUntil - now)
@@ -1182,3 +1192,10 @@ private data class CooldownReservation(
     val accepted: Boolean,
     val remainingMs: Long = 0,
 )
+
+/**
+ * [deadlineMs] as a cooldown of [cooldownSec] can still mean it at [nowMs]: never more than one
+ * window away. Pure, so the rule is tested without a service.
+ */
+internal fun clampedCooldownDeadline(deadlineMs: Long, cooldownSec: Int, nowMs: Long): Long =
+    minOf(deadlineMs, nowMs + cooldownSec.coerceAtLeast(0) * 1000L)

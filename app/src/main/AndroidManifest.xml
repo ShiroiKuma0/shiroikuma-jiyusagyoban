@@ -723,38 +723,10 @@
         </service>
 
         <!--
-            The digital assistant route for airplane mode. Android binds these only after the person
-            picks OpenTasker as the assistant app, and only the system holds BIND_VOICE_INTERACTION.
-            The recognizer is the one Android requires an assistant to name; it answers every request
-            with an error and never records.
+            FORK: upstream's digital-assistant route for airplane mode (0a6c6d73) is not shipped —
+            its three services (voice interaction, session, recognition) are left out, so the app is
+            never offered as an assistant. Airplane mode here goes through Shizuku.
         -->
-        <service
-            android:name="com.opentasker.core.assistant.OpenTaskerVoiceInteractionService"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_VOICE_INTERACTION">
-            <meta-data
-                android:name="android.voice_interaction"
-                android:resource="@xml/voice_interaction_service" />
-            <intent-filter>
-                <action android:name="android.service.voice.VoiceInteractionService" />
-            </intent-filter>
-        </service>
-        <service
-            android:name="com.opentasker.core.assistant.OpenTaskerVoiceSessionService"
-            android:exported="true"
-            android:permission="android.permission.BIND_VOICE_INTERACTION" />
-        <service
-            android:name="com.opentasker.core.assistant.OpenTaskerRecognitionService"
-            android:exported="true"
-            android:label="@string/app_name">
-            <meta-data
-                android:name="android.speech"
-                android:resource="@xml/recognition_service" />
-            <intent-filter>
-                <action android:name="android.speech.RecognitionService" />
-            </intent-filter>
-        </service>
 
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"

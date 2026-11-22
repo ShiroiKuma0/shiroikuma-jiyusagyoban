@@ -1885,6 +1885,8 @@ fun registerActionMetadata() {
                 ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default LOC_ — writes <prefix>Lat, Lon, Acc, AgeMs, Provider, Ok"),
                 ActionField("max_age_ms", "Accept a fix this old (ms)", FieldType.NUMBER, hint = "default 120000 — a cached fix this fresh is used as-is, costing no GPS time"),
                 ActionField("timeout_ms", "Wait for a fresh fix (ms)", FieldType.NUMBER, hint = "default 20000 — on timeout it falls back to the newest stale fix rather than failing"),
+                ActionField("accuracy", "Accuracy wanted (m)", FieldType.NUMBER, hint = "blank = any fix. A cached fix worse than this is not used, and the wait goes on until one this good arrives; on timeout the best one seen is still written — check <prefix>Acc"),
+                ActionField("hide", "Hide the coordinates", FieldType.CHECKBOX, hint = "Lat and Lon are stored as sensitive: never shown in the run log, left out of exports, and anything built from them is hidden too. Leave off when a task puts the position into a file name or a link"),
             ),
         ),
     )

@@ -665,6 +665,16 @@ fun UiCustomizationScreen(
                     onCheckedChange = { ThemeStore.update { p -> p.copy(advancedActionPicker = it) } },
                 )
             }
+            item {
+                SwitchRow(
+                    level = 1,
+                    label = "New profiles start on",
+                    icon = Icons.Filled.ToggleOn,
+                    description = "A profile you make in the editor is switched on when you save it. Imports, templates and copies still start off.",
+                    checked = prefs.newProfilesEnabled,
+                    onCheckedChange = { ThemeStore.update { p -> p.copy(newProfilesEnabled = it) } },
+                )
+            }
 
             }
             "tasklist" -> {

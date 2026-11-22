@@ -2,34 +2,45 @@ package com.opentasker.ui.screens
 
 import android.content.Context
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.opentasker.app.R
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.OutlinedButton
+import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** How a library list is ordered. [Default] is the order each list has always had. */
 enum class LibrarySortOrder { Default, Name, LastEdited }
@@ -129,47 +140,77 @@ class LibrarySortControl(
     val onOrderChange: (LibrarySortOrder) -> Unit = {},
 )
 
+/** [list]'s remembered order, and the writer that stores another. */
+@Composable
+internal fun rememberLibrarySort(list: LibraryList): LibrarySortControl {
+    val context = LocalContext.current.applicationContext
+    val scope = rememberCoroutineScope()
+    val orders by remember(context) { LibrarySortPreference.orders(context) }.collectAsState(initial = emptyMap())
+    val order = orders[list] ?: LibrarySortOrder.Default
+    return remember(order, list) {
+        LibrarySortControl(order) { picked -> scope.launch { LibrarySortPreference.set(context, list, picked) } }
+    }
+}
+
 /**
- * The sort button beside a list's search field. [defaultIsName] is for a list whose own order is
- * already by name, so it offers Name and Last edited instead of a Name twice.
+ * The key [lastEdited] maps are read by, the same one edit history and [LibraryEditTimes] write.
+ */
+internal fun lastEditedKey(entityType: String, entityId: Long): String = EditHistoryAvailabilityState.key(entityType, entityId)
+
+/**
+ * The sort pill beside a list's search field, in the fork's look: an outlined pill naming the
+ * current order, opening a menu of choice rows.
+ *
+ * FORK: a sort here is a VIEW. [LibrarySortOrder.Default] is the list as 白い熊 arranged it — groups,
+ * drag order, `position` — and it is called [defaultLabel]. Any other order shows a flat list and
+ * writes nothing: no `position`, no group, no bundle `sort` changes because of it. [offerName] is
+ * false for a list whose own order is already by name.
  */
 @Composable
-internal fun LibrarySortButton(control: LibrarySortControl, defaultIsName: Boolean = false) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val options = if (defaultIsName) {
-        listOf(LibrarySortOrder.Default to R.string.library_sort_name, LibrarySortOrder.LastEdited to R.string.library_sort_last_edited)
-    } else {
-        listOf(
-            LibrarySortOrder.Default to R.string.library_sort_default,
-            LibrarySortOrder.Name to R.string.library_sort_name,
-            LibrarySortOrder.LastEdited to R.string.library_sort_last_edited,
-        )
+internal fun LibrarySortButton(
+    control: LibrarySortControl,
+    modifier: Modifier = Modifier,
+    defaultLabel: String = "Manual",
+    offerName: Boolean = true,
+) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    val options = buildList {
+        add(LibrarySortOrder.Default to defaultLabel)
+        if (offerName) add(LibrarySortOrder.Name to "Name")
+        add(LibrarySortOrder.LastEdited to "Last edited")
     }
     val current = options.firstOrNull { it.first == control.order } ?: options.first()
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(
-                Icons.AutoMirrored.Filled.Sort,
-                contentDescription = stringResource(R.string.library_sort_button, stringResource(current.second)),
-            )
+    Box(modifier) {
+        OutlinedButton(onClick = { open = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort order", modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(current.second, maxLines = 1)
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { (order, labelRes) ->
-                val isCurrent = order == current.first
+        ThemedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { (order, label) ->
+                val chosen = order == current.first
                 DropdownMenuItem(
-                    text = { Text(stringResource(labelRes)) },
+                    text = { Text(label) },
+                    leadingIcon = { if (chosen) Icon(Icons.Filled.Check, contentDescription = null, tint = role(UiRole.LIST_SELECTED)) },
+                    choice = true,
+                    modifier = Modifier.semantics { selected = chosen },
                     onClick = {
-                        expanded = false
-                        if (!isCurrent) control.onOrderChange(order)
-                    },
-                    modifier = Modifier.semantics { selected = isCurrent },
-                    trailingIcon = if (isCurrent) {
-                        { Icon(Icons.Filled.Check, contentDescription = null) }
-                    } else {
-                        null
+                        open = false
+                        if (!chosen) control.onOrderChange(order)
                     },
                 )
             }
         }
     }
+}
+
+/** Says, above a sorted list, that the order is a view and how to get the arranged list back. */
+@Composable
+internal fun LibrarySortNotice(order: LibrarySortOrder, defaultLabel: String = "Manual") {
+    Text(
+        text = (if (order == LibrarySortOrder.Name) "Sorted by name" else "Sorted by last edited, newest first") +
+            " — a view only. Groups and your own order are untouched; “$defaultLabel” shows them again.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
