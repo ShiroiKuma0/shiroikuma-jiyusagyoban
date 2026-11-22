@@ -157,6 +157,9 @@ class OpenTaskerApp_NoHilt : Application() {
                 } finally {
                     databaseReady.countDown()
                 }
+                // Started once the database is ready rather than waiting on it, which gives up after
+                // 30 seconds; a restore with a cipher migration can take longer.
+                launch { keepTaskShortcutsCurrent() }
 
                 runCatching {
                     val recovery = reconcileExecutionJournal(db, processStartedAtMs = processStartedAtMs)
@@ -176,18 +179,6 @@ class OpenTaskerApp_NoHilt : Application() {
                     AppLogger.error("OpenTasker", "Legacy secret migration failed", error)
                 }
             }
-            // Shortcuts hold a task id and the name it had. Every rename, delete, undo, import and
-            // restore changes this list, so following it keeps them all current.
-            applicationScope.launch {
-                runCatching {
-                    db.taskDao().getAllAsFlow()
-                        .map { tasks -> tasks.associate { it.id to it.name } }
-                        .distinctUntilChanged()
-                        .collect { TaskShortcutHelper.reconcile(this@OpenTaskerApp_NoHilt, it) }
-                }.onFailure { error ->
-                    AppLogger.error("OpenTasker", "Keeping task shortcuts current failed", error)
-                }
-            }
             // Devices paired before presence was watched (or by an older version) get watched too.
             applicationScope.launch {
                 runCatching {
@@ -202,6 +193,22 @@ class OpenTaskerApp_NoHilt : Application() {
             UpdateCheckWorker.enqueueIfEnabled(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
+        }
+    }
+
+    /**
+     * Shortcuts hold a task id and the name it had. Every rename, delete, undo, import and restore
+     * changes the task list, so following it keeps them all current for the life of the process.
+     */
+    private suspend fun keepTaskShortcutsCurrent() {
+        val database = readyDb ?: return // Preparing it failed, and that's logged.
+        runCatching {
+            database.taskDao().observeNames()
+                .map { rows -> rows.associate { it.id to it.name } }
+                .distinctUntilChanged()
+                .collect { TaskShortcutHelper.reconcile(this, it) }
+        }.onFailure { error ->
+            AppLogger.error("OpenTasker", "Keeping task shortcuts current stopped", error)
         }
     }
 

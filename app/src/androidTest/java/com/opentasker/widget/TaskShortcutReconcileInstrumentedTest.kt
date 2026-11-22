@@ -18,20 +18,21 @@ import org.junit.runner.RunWith
 
 /**
  * A task's shortcut follows the task through the app's own database: renaming the task renames
- * the shortcut, and deleting it takes the shortcut out of use. Nothing here calls the helper's
- * reconcile; the app does that whenever the task list changes.
+ * the shortcut Pin made, and deleting it takes the shortcut out of use. A shortcut published with
+ * its own label keeps it. Nothing here calls the helper's reconcile; the app does that whenever
+ * the task list changes.
  */
 @RunWith(AndroidJUnit4::class)
 class TaskShortcutReconcileInstrumentedTest {
     private val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
     private val db = OpenTaskerApp_NoHilt.db
     private val name = "shortcut probe ${System.nanoTime()}"
-    private var taskId = 0L
+    private val taskIds = mutableListOf<Long>()
 
     @After
     fun cleanUp() {
-        runBlocking { db.taskDao().getById(taskId)?.let { db.taskDao().delete(it) } }
-        ShortcutManagerCompat.removeDynamicShortcuts(app, listOf("task_$taskId"))
+        runBlocking { taskIds.forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } } }
+        ShortcutManagerCompat.removeDynamicShortcuts(app, taskIds.map { "task_$it" })
     }
 
     @Test
@@ -39,19 +40,33 @@ class TaskShortcutReconcileInstrumentedTest {
         // Android limits how often an app in the background updates its shortcuts, and a test
         // process counts as one. Lift that so the rename isn't held back.
         shell("cmd shortcut reset-throttling")
-        taskId = db.taskDao().insert(Task(name = name, actions = emptyList()).toEntity())
-        val shortcutId = "task_$taskId"
-        TaskShortcutHelper.publishShortcut(app, shortcutId, taskId, name, TaskShortcutHelper.PublishMode.DYNAMIC)
+        val followed = db.taskDao().insert(Task(name = name, actions = emptyList()).toEntity()).also { taskIds += it }
+        val picked = db.taskDao().insert(Task(name = "$name picked", actions = emptyList()).toEntity()).also { taskIds += it }
+        // Built the way Pin builds one, pushed as dynamic so no launcher has to confirm it.
+        ShortcutManagerCompat.pushDynamicShortcut(
+            app,
+            TaskShortcutHelper.taskShortcut(app, "task_$followed", followed, name, labelPicked = false),
+        )
+        TaskShortcutHelper.publishShortcut(app, "task_$picked", picked, "Picked label", TaskShortcutHelper.PublishMode.DYNAMIC)
 
-        val entity = requireNotNull(db.taskDao().getById(taskId))
-        db.taskDao().update(entity.copy(name = "$name renamed"))
-        assertEquals("$name renamed", awaitShortcut(shortcutId) { it?.shortLabel?.toString() == "$name renamed" }?.shortLabel?.toString())
+        // The picked one first, so by the time the followed one's new label shows, the app has seen both.
+        listOf(picked, followed).forEach { id ->
+            val entity = requireNotNull(db.taskDao().getById(id))
+            db.taskDao().update(entity.copy(name = entity.name + " renamed"))
+        }
+        assertEquals(
+            "$name renamed",
+            awaitShortcut("task_$followed") { it?.shortLabel?.toString() == "$name renamed" }?.shortLabel?.toString(),
+        )
+        assertEquals("Picked label", shortcut("task_$picked")?.shortLabel?.toString())
 
-        db.taskDao().delete(entity)
+        listOf(followed, picked).forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } }
         // A shortcut that's only dynamic goes away when it's disabled. A pinned one would stay,
         // greyed out with the deleted message.
-        val afterDelete = awaitShortcut(shortcutId) { it == null || !it.isEnabled }
-        assertTrue("the shortcut still runs a deleted task", afterDelete == null || !afterDelete.isEnabled)
+        listOf(followed, picked).forEach { id ->
+            val afterDelete = awaitShortcut("task_$id") { it == null || !it.isEnabled }
+            assertTrue("shortcut task_$id still runs a deleted task", afterDelete == null || !afterDelete.isEnabled)
+        }
     }
 
     private suspend fun awaitShortcut(id: String, done: (ShortcutInfoCompat?) -> Boolean): ShortcutInfoCompat? {
