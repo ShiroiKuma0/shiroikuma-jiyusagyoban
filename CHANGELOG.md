@@ -32,7 +32,7 @@
 
 ### Fixed
 
-- A restore that failed after its database was already in place, and couldn't put the old one back, could lose its Undo at the next start, and Setup then offered the one from before. The app writes it again now. A restore record saved with the wrong type also fails that restore cleanly instead of tripping over it at every start.
+- A restore that failed after its database was already in place, and couldn't put the old one back, could lose its Undo at the next start, and Setup then offered the one from before. The app writes it again now, including when the restore's journal couldn't be finished before the record was written. A restore over no database tries twice to clear an older restore's Undo, so Setup can't offer to go back to that copy. A restore record saved with the wrong type fails that restore cleanly and is cleared, so the next restore works and Setup's backup card no longer trips over it.
 - Three Settings rows now say what they do. Release update checks explains that it sends nothing about you or your phone and never downloads anything, Pre-unlock time triggers says what runs before your first unlock, and Global failure fallback says when its task runs. The text was in the app all along but never shown.
 - Encrypted snapshots from Settings can be restored now. Pick one under Import and the app asks for the snapshot passphrase, then shows the same review as any other backup before you stage it. A wrong passphrase lets you try again. Until now the restore picker only took a plain database file, so a snapshot couldn't be restored from the app at all.
 - Array Push and Pop failed on a Position holding a number with a fraction, like 2.5. They count it by its whole part now, as Tasker does.

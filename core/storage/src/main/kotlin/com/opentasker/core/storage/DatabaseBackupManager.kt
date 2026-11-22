@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.database.Cursor
 import android.net.Uri
 import androidx.room.withTransaction
@@ -373,9 +374,16 @@ class DatabaseBackupManager(
     /** The copy of the database the last restore replaced, while it still exists. */
     fun lastRestoreRollback(): RestoreRollback? {
         val prefs = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE)
-        val name = prefs.getString(restoreRollbackKey(databaseName), null) ?: return null
-        val file = File(backupDir, name).takeIf { it.isFile && isManagedBackupName(databaseName, it.name) } ?: return null
-        return RestoreRollback(file, prefs.getLong(restoredAtKey(databaseName), file.lastModified()))
+        return try {
+            val name = prefs.getString(restoreRollbackKey(databaseName), null) ?: return null
+            val file = File(backupDir, name).takeIf { it.isFile && isManagedBackupName(databaseName, it.name) } ?: return null
+            RestoreRollback(file, prefs.getLong(restoredAtKey(databaseName), file.lastModified()))
+        } catch (_: ClassCastException) {
+            // A record of another type names nothing Undo can use, and left there it would throw
+            // at every look.
+            clearRestoreRecord(prefs, databaseName)
+            null
+        }
     }
 
     fun hasPendingRestore(): Boolean = pendingRestoreFile(context, databaseName).exists()
@@ -506,6 +514,7 @@ class DatabaseBackupManager(
             // rather than escape and leave the journal to throw again at every start.
             var rollbackBefore: String? = null
             var restoredAtBefore = -1L
+            var recordRead = false
             var undoWritten = false
             var rollbackRecorded = false
 
@@ -525,6 +534,7 @@ class DatabaseBackupManager(
             return try {
                 rollbackBefore = restorePrefs.getString(restoreRollbackKey(databaseName), null)
                 restoredAtBefore = restorePrefs.getLong(restoredAtKey(databaseName), -1L)
+                recordRead = true
                 validateDatabaseFile(context, pending)
                 dbFile.parentFile?.mkdirs()
                 rollback = if (dbFile.exists()) {
@@ -559,6 +569,9 @@ class DatabaseBackupManager(
                 val spent = retireRestoreJournal(pending)
                 undoWritten = true
                 rollbackRecorded = recordRollback()
+                // With no database before, a failed clear would leave Undo on an older restore's
+                // copy, and nothing below catches it, so it gets one more try here.
+                if (!rollbackRecorded && rollback == null) rollbackRecorded = recordRollback()
                 // A write that fails returns false instead of throwing. Unrecorded, the rollback
                 // can't be undone from Setup, so the restore goes back as failed. With no database
                 // before it there's nothing for Undo to go back to, so the new database stays.
@@ -601,11 +614,15 @@ class DatabaseBackupManager(
                         if (restoredAtBefore >= 0) putLong(restoredAtKey(databaseName), restoredAtBefore) else remove(restoredAtKey(databaseName))
                         commit()
                     }
-                } else if (undoWritten && !rollbackRecorded) {
-                    // The restored database stays live, so its Undo is the right one, but the write
-                    // that records it failed: a restart would read the record from before and never
-                    // offer or clean up this rollback. Try the write once more.
+                } else if (replacementPublished && !databaseWentBack && !rollbackRecorded) {
+                    // The restored database stays live, so its Undo is the right one, but it isn't
+                    // recorded: the write failed, or the journal couldn't be retired before it was
+                    // tried. A restart would read the record from before and never offer or clean
+                    // up this rollback, so write it now.
                     runCatching { recordRollback() }
+                } else if (!recordRead) {
+                    // A record of another type fails this restore. Cleared, it can't fail the next.
+                    clearRestoreRecord(restorePrefs, databaseName)
                 }
                 val replacementKept = replacementPublished && !databaseWentBack
                 // The restored database stays live, so the replaced one's state goes before the
@@ -661,6 +678,10 @@ class DatabaseBackupManager(
         private fun restoreRollbackKey(databaseName: String) = "rollback_name:$databaseName"
 
         private fun restoredAtKey(databaseName: String) = "restored_at_ms:$databaseName"
+
+        private fun clearRestoreRecord(prefs: SharedPreferences, databaseName: String) {
+            runCatching { prefs.edit().remove(restoreRollbackKey(databaseName)).remove(restoredAtKey(databaseName)).commit() }
+        }
 
         /** An ordinary backup, as opposed to the copies a restore leaves behind. */
         internal fun isRegularBackupName(databaseName: String, fileName: String): Boolean =

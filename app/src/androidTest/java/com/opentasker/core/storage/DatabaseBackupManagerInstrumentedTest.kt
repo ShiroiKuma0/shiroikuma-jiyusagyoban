@@ -593,7 +593,10 @@ class DatabaseBackupManagerInstrumentedTest {
                 db.close()
             }
             backup.copyTo(DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE), overwrite = true)
-            val prefs = FlakyRestorePrefs().also { it.memory["rollback_name:$TEST_DATABASE"] = 5L }
+            val prefs = FlakyRestorePrefs().also {
+                it.memory["rollback_name:$TEST_DATABASE"] = 5L
+                it.disk.putAll(it.memory)
+            }
             val restoring = withRestorePrefs(context, prefs)
 
             val result = DatabaseBackupManager.applyPendingRestoreIfPresent(restoring, TEST_DATABASE)
@@ -601,6 +604,115 @@ class DatabaseBackupManagerInstrumentedTest {
             assertTrue("the restore reports it failed: $result", result is PendingRestoreApplyResult.Failed)
             assertFalse((result as PendingRestoreApplyResult.Failed).replacementKept)
             assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(restoring, TEST_DATABASE))
+            // The bad record goes with it, so it can't fail every restore after this one.
+            assertFalse(prefs.memory.containsKey("rollback_name:$TEST_DATABASE"))
+            assertFalse(prefs.disk.containsKey("rollback_name:$TEST_DATABASE"))
+            backup.copyTo(DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE), overwrite = true)
+            val next = DatabaseBackupManager.applyPendingRestoreIfPresent(restoring, TEST_DATABASE)
+            assertTrue("the next restore applies: $next", next is PendingRestoreApplyResult.Applied)
+        } finally {
+            cleanup(context)
+        }
+    }
+
+    /** Setup's look at Undo reads a record of another type as none and clears it, instead of throwing. */
+    @Test
+    fun undoReadsARecordOfAnotherTypeAsNoneAndClearsIt() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        val prefs = FlakyRestorePrefs().also {
+            it.memory["rollback_name:$TEST_DATABASE"] = 5L
+            it.memory["restored_at_ms:$TEST_DATABASE"] = "yesterday"
+        }
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+        try {
+            assertEquals(null, DatabaseBackupManager(withRestorePrefs(context, prefs), db, TEST_DATABASE).lastRestoreRollback())
+            assertFalse(prefs.memory.containsKey("rollback_name:$TEST_DATABASE"))
+            assertFalse(prefs.memory.containsKey("restored_at_ms:$TEST_DATABASE"))
+        } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
+    /**
+     * A restore whose journal can't be retired, and whose old database can't be copied back
+     * either, keeps the restored database live, so Undo has to point at the copy it replaced even
+     * though no write of that record was tried before the failure (verifier 24).
+     */
+    @Test
+    fun aKeptRestoreWhoseJournalWontRetireStillRecordsItsUndo() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        val pending = DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE)
+        // A non-empty directory on each name makes the journal's rename and the copy back fail.
+        val spentBlock = File(pending.parentFile, "${pending.name}.spent")
+        val copyBackBlock = File(context.getDatabasePath(TEST_DATABASE).parentFile, "$TEST_DATABASE.rollback.tmp")
+        try {
+            val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+            try {
+                db.profileDao().insert(Profile(name = "In the backup", enterTaskId = 1).toEntity())
+                val backup = DatabaseBackupManager(context, db, TEST_DATABASE).backup().getOrThrow()
+                db.profileDao().insert(Profile(name = "Replaced", enterTaskId = 1).toEntity())
+                backup.copyTo(pending, overwrite = true)
+            } finally {
+                db.close()
+            }
+            listOf(spentBlock, copyBackBlock).forEach { block ->
+                assertTrue(block.mkdirs())
+                File(block, "keep").writeText("x")
+            }
+            val prefs = FlakyRestorePrefs().also {
+                it.memory["rollback_name:$TEST_DATABASE"] = "opentasker-backup-test_pre_restore_older.db"
+                it.disk.putAll(it.memory)
+            }
+            // The start of the apply would finish a spent journal; this one is a directory to keep.
+            var drops = 0
+
+            val result = DatabaseBackupManager.applyPendingRestoreIfPresent(withRestorePrefs(context, prefs), TEST_DATABASE) { drops++ > 0 }
+
+            assertTrue("the restore reports it failed: $result", result is PendingRestoreApplyResult.Failed)
+            assertTrue("the restored database stays live", (result as PendingRestoreApplyResult.Failed).replacementKept)
+            val replaced = context.filesDir.resolve("backups")
+                .listFiles { file -> file.name.startsWith("opentasker-backup-test_pre_restore_") && file.name.endsWith(".db") }
+                .orEmpty()
+                .single()
+            assertEquals(replaced.name, prefs.disk["rollback_name:$TEST_DATABASE"])
+        } finally {
+            spentBlock.deleteRecursively()
+            copyBackBlock.deleteRecursively()
+            cleanup(context)
+        }
+    }
+
+    /**
+     * With no database before it, a restore has nothing for Undo, so it clears the record of an
+     * earlier restore. A clear that fails once is tried again, or Setup would offer to go back to
+     * that older copy over the new database (verifier 24).
+     */
+    @Test
+    fun aRestoreOverNoDatabaseClearsAnOlderUndoEvenAfterAFailedWrite() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        try {
+            val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+            try {
+                db.profileDao().insert(Profile(name = "In the backup", enterTaskId = 1).toEntity())
+                DatabaseBackupManager(context, db, TEST_DATABASE).backup().getOrThrow()
+                    .copyTo(DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE), overwrite = true)
+            } finally {
+                db.close()
+            }
+            assertTrue(context.deleteDatabase(TEST_DATABASE))
+            val prefs = FlakyRestorePrefs(failingCommits = 1).also {
+                it.memory["rollback_name:$TEST_DATABASE"] = "opentasker-backup-test_pre_restore_older.db"
+                it.disk.putAll(it.memory)
+            }
+
+            val result = DatabaseBackupManager.applyPendingRestoreIfPresent(withRestorePrefs(context, prefs), TEST_DATABASE)
+
+            assertTrue("the restore applies: $result", result is PendingRestoreApplyResult.Applied)
+            assertFalse("the older Undo is gone from disk", prefs.disk.containsKey("rollback_name:$TEST_DATABASE"))
         } finally {
             cleanup(context)
         }
