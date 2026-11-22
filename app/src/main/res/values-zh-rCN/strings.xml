@@ -1743,7 +1743,7 @@
     <string name="ui_message_profile_created">配置文件已创建</string>
     <string name="ui_message_profile_duplicated">配置文件已复制为禁用副本</string>
     <string name="ui_message_profile_updated">配置文件已更新</string>
-    <string name="ui_message_profile_left_off_for_review">已保存，但保持关闭。它的任务可能会触发自身的触发器，请先检查这一点再开启。</string>
+    <string name="ui_message_profile_left_off_for_review">已保存，但保持关闭。它的任务可能会触发自身的触发器，开启时会先请你确认这一点。</string>
     <plurals name="ui_profile_lint_warnings">
         <item quantity="one">配置文件已保存，带有 %1$d 条检查警告；请在上下文检查器中查看自动化检查。</item>
         <item quantity="other">配置文件已保存，带有 %1$d 条检查警告；请在上下文检查器中查看自动化检查。</item>

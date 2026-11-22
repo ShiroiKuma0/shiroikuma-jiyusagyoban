@@ -28,11 +28,11 @@
     <string name="catalog_action_notify_show_field_button3_label_hint" formatted="false">第三个按钮标签</string>
     <string name="catalog_action_notify_show_field_button3_task_id_label" formatted="false">按钮3任务</string>
     <string name="catalog_action_notify_show_field_button3_task_id_hint" formatted="false">点击时运行的任务</string>
-    <string name="catalog_action_notify_show_field_button1_url_label" formatted="false">按钮 1 链接</string>
+    <string name="catalog_action_notify_show_field_button1_url_label" formatted="false">按钮1链接</string>
     <string name="catalog_action_notify_show_field_button1_url_hint" formatted="false">点击时打开的网址，未设置任务时使用</string>
-    <string name="catalog_action_notify_show_field_button2_url_label" formatted="false">按钮 2 链接</string>
+    <string name="catalog_action_notify_show_field_button2_url_label" formatted="false">按钮2链接</string>
     <string name="catalog_action_notify_show_field_button2_url_hint" formatted="false">点击时打开的网址，未设置任务时使用</string>
-    <string name="catalog_action_notify_show_field_button3_url_label" formatted="false">按钮 3 链接</string>
+    <string name="catalog_action_notify_show_field_button3_url_label" formatted="false">按钮3链接</string>
     <string name="catalog_action_notify_show_field_button3_url_hint" formatted="false">点击时打开的网址，未设置任务时使用</string>
     <string name="catalog_action_notify_cancel_name" formatted="false">取消通知</string>
     <string name="catalog_action_notify_cancel_description" formatted="false">按标签和/或ID取消通知</string>
