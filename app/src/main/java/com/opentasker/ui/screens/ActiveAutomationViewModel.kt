@@ -518,11 +518,12 @@ class ActiveAutomationViewModel(
                 }
                 val previousTask = previous.toDomain()
                 val renamed = !previousTask.name.equals(task.name, ignoreCase = true)
+                val allTasks = if (renamed) db.taskDao().getAll() else emptyList()
                 if (renamed) {
                     saved = AutomationReferenceRewriter.stabilizeOwnNameReferences(
                         previousTask,
                         task,
-                        taskIds = db.taskDao().getAll().mapTo(hashSetOf()) { it.id },
+                        taskIds = allTasks.mapTo(hashSetOf()) { it.id },
                     )
                 }
                 recordEdit(
@@ -540,7 +541,7 @@ class ActiveAutomationViewModel(
                     val rewrite = AutomationReferenceRewriter.stabilizeNameReferences(
                         target = previousTask,
                         profiles = db.profileDao().getAll().map { it.toDomain() },
-                        tasks = db.taskDao().getAll().map { it.toDomain() },
+                        tasks = allTasks.map { it.toDomain() },
                         scenes = db.sceneDao().getAll().map { it.toDomain() },
                     )
                     rewrite.profiles.forEach { db.profileDao().upsert(it.toEntity()) }

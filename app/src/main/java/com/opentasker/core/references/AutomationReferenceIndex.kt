@@ -425,9 +425,10 @@ object AutomationReferenceIndex {
         for (button in 1..NotificationTaskBindings.BUTTON_COUNT) {
             val idKey = NotificationTaskBindings.taskIdKey(button)
             val nameKey = NotificationTaskBindings.legacyTaskNameKey(button)
-            val rawId = args[idKey]?.trim()
-            if (!rawId.isNullOrBlank()) {
-                val id = rawId.toLongOrNull()?.takeIf { it > 0 } ?: continue
+            // As NotificationTaskBindings reads a button: the id key whenever it's there, even blank
+            // or invalid, and the legacy name only without it.
+            if (idKey in args) {
+                val id = args[idKey]?.trim()?.toLongOrNull()?.takeIf { it > 0 } ?: continue
                 add(
                     TaskReference(
                         TaskReferenceSite.NotificationButton(owner.id, owner.name, actionIndex, button, idKey),

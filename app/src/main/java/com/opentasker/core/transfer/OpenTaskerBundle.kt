@@ -490,7 +490,7 @@ object OpenTaskerBundleCodec {
             }
         }
 
-        AutomationReferenceIndex.build(bundle.profiles, bundle.tasks, bundle.scenes).forEach { reference ->
+        AutomationReferenceIndex.build(bundle.profiles, bundle.tasks, bundle.scenes, taskIds = taskIds).forEach { reference ->
             val ownerProjectId = when (reference.site.ownerKind) {
                 com.opentasker.core.references.TaskReferenceSite.OwnerKind.PROFILE -> profilesById[reference.site.ownerId]?.projectId
                 com.opentasker.core.references.TaskReferenceSite.OwnerKind.TASK -> tasksById[reference.site.ownerId]?.projectId

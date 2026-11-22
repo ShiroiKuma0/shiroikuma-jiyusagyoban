@@ -227,8 +227,12 @@ object AutomationReferenceRewriter {
 
     /**
      * Rewrites every task reference through [idMap], used when a bundle's tasks are inserted under
-     * fresh ids. References that [idMap] does not cover are left untouched so an import can report
-     * them rather than silently retargeting a stranger's task.
+     * fresh ids, with [tasks] carrying their new ids. References that [idMap] does not cover are left
+     * untouched so an import can report them rather than silently retargeting a stranger's task.
+     *
+     * A `task.run` or `task.stop` number that no bundle task has as its id names a task, as the
+     * engine reads it. Left as it is, after the import it would mean whatever task here has that
+     * id, so it's pinned to the new id of the one bundle task with that name.
      */
     fun remapIds(
         idMap: Map<Long, Long>,
@@ -246,8 +250,12 @@ object AutomationReferenceRewriter {
             profile.copy(enterTaskId = enter, exitTaskId = exit, fallbackTaskId = fallback)
                 .takeIf { it != profile }
         }
+        val numericNames = tasks.filter { it.name.toLongOrNull() != null }
+            .groupBy { it.name }
+            .filterValues { it.size == 1 }
+            .mapValues { (_, named) -> named.single().id }
         val changedTasks = tasks.mapNotNull { task ->
-            val actions = task.actions.map { action -> action.mapTaskArgs { id -> idMap[id] ?: id } }
+            val actions = task.actions.map { action -> action.mapTaskArgs({ id -> idMap[id] }, numericNames) }
             task.copy(actions = actions).takeIf { it != task }
         }
         val changedScenes = scenes.mapNotNull { scene ->
@@ -318,15 +326,20 @@ object AutomationReferenceRewriter {
         )
     }
 
-    /** Applies [mapId] to every numeric task id an action stores; name references are left alone. */
-    private fun ActionSpec.mapTaskArgs(mapId: (Long) -> Long): ActionSpec {
+    /**
+     * Applies [mapId] to every numeric task id an action stores, leaving the ones it returns null
+     * for. A `task.run` or `task.stop` number it doesn't cover is pinned through [numericNames] when
+     * a task has that name. Other name references are left alone.
+     */
+    private fun ActionSpec.mapTaskArgs(mapId: (Long) -> Long?, numericNames: Map<String, Long>): ActionSpec {
         val updated = args.toMutableMap()
         var changed = false
 
         if (type == SUB_TASK_ACTION_ID || type == STOP_TASK_ACTION_ID) {
             SUB_TASK_REF_KEYS.forEach { key ->
-                val id = updated[key]?.trim()?.toLongOrNull()?.takeIf { it > 0 } ?: return@forEach
-                val mapped = mapId(id)
+                val raw = updated[key]?.trim().orEmpty()
+                val id = raw.toLongOrNull()?.takeIf { it > 0 } ?: return@forEach
+                val mapped = mapId(id) ?: numericNames[raw] ?: return@forEach
                 if (mapped != id) {
                     updated[key] = mapped.toString()
                     changed = true
@@ -337,7 +350,7 @@ object AutomationReferenceRewriter {
         for (button in 1..NotificationTaskBindings.BUTTON_COUNT) {
             val key = NotificationTaskBindings.taskIdKey(button)
             val id = updated[key]?.trim()?.toLongOrNull()?.takeIf { it > 0 } ?: continue
-            val mapped = mapId(id)
+            val mapped = mapId(id) ?: continue
             if (mapped != id) {
                 updated[key] = mapped.toString()
                 changed = true
@@ -370,9 +383,13 @@ object AutomationReferenceRewriter {
             val idKey = NotificationTaskBindings.taskIdKey(button)
             val nameKey = NotificationTaskBindings.legacyTaskNameKey(button)
             val labelKey = "button${button}_label"
-            // The id key holds an id and the legacy key a name, even a name that is a number.
-            val bound = updated[idKey]?.trim()?.toLongOrNull() == target.id ||
+            // As NotificationTaskBindings reads a button: the id key whenever it's there, and the
+            // legacy key, a name even when it's a number, only without it.
+            val bound = if (idKey in updated) {
+                updated[idKey]?.trim()?.toLongOrNull() == target.id
+            } else {
                 updated[nameKey]?.trim()?.equals(target.name, ignoreCase = true) == true
+            }
             if (!bound) continue
             updated.remove(nameKey)
             if (replacement == null) {
