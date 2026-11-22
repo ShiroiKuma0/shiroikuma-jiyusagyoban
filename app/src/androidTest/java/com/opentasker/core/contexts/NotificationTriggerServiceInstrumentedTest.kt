@@ -12,9 +12,9 @@ import org.junit.runner.RunWith
 
 /**
  * What the notification listener hands the matcher, with real Notification extras (a Bundle can't
- * be built in a JVM test). Nothing is posted and no listener access is needed, and the event is
- * built rather than published: that bus is the one the engine listens on, so a published test
- * event could fire a notification profile with no package filter on the phone running the test.
+ * be built in a JVM test). The service is called directly, so nothing is posted and no listener
+ * access is needed. Its publish goes to a recorder, not the bus the engine listens on: a published
+ * test event could fire a notification profile with no package filter on the phone running this.
  */
 @RunWith(AndroidJUnit4::class)
 class NotificationTriggerServiceInstrumentedTest {
@@ -22,8 +22,14 @@ class NotificationTriggerServiceInstrumentedTest {
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     private fun posted(notification: Notification): Map<String, String> {
-        val fields = postedNotification(statusBar(notification))
-        return NotificationContextEvents.buildEvent(fields.packageName, fields.title, fields.body).metadata
+        val published = mutableListOf<Map<String, String>>()
+        val service = NotificationTriggerService()
+        service.publish = { packageName, title, body ->
+            published += NotificationContextEvents.buildEvent(packageName, title, body).metadata
+            true
+        }
+        service.onNotificationPosted(statusBar(notification))
+        return published.single()
     }
 
     @Suppress("DEPRECATION")
