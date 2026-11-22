@@ -248,6 +248,7 @@ internal fun SceneCard(
                 onToggleSelect = { index ->
                     selectedIndices = if (index in selectedIndices) selectedIndices - index else selectedIndices + index
                 },
+                onSelectOnly = { index -> selectedIndices = setOf(index) },
                 onMoveSelected = { dx, dy ->
                     val updatedScene = SceneEditorMutations.moveSelected(scene, selectedIndices, dx, dy)
                     if (updatedScene != scene) {

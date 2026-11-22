@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -61,6 +62,7 @@ internal fun ScenePreviewBox(
     selectedIndices: Set<Int> = emptySet(),
     onToggleSelect: (Int) -> Unit = {},
     onMoveSelected: (Int, Int) -> Unit = { _, _ -> },
+    onSelectOnly: (Int) -> Unit = {},
 ) {
     var activeGuides by remember { mutableStateOf<List<AlignmentGuide>>(emptyList()) }
     Surface(
@@ -118,6 +120,7 @@ internal fun ScenePreviewBox(
                                     onResizeElement = onResizeElement,
                                     selected = index in selectedIndices,
                                     onSelect = { onToggleSelect(index) },
+                                    onSelectOnly = { onSelectOnly(index) },
                                     onAlignmentGuidesChanged = { guides -> activeGuides = guides },
                                 )
                             }
@@ -171,6 +174,7 @@ private fun SceneCanvasElement(
     onResizeElement: (Int, Int, Int) -> Unit = { _, _, _ -> },
     selected: Boolean = false,
     onSelect: () -> Unit = {},
+    onSelectOnly: () -> Unit = {},
     onAlignmentGuidesChanged: (List<AlignmentGuide>) -> Unit = {},
 ) {
     val element = projection.element
@@ -267,6 +271,7 @@ private fun SceneCanvasElement(
     val currentProjection by rememberUpdatedState(projection)
     val currentSelected by rememberUpdatedState(selected)
     val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnSelectOnly by rememberUpdatedState(onSelectOnly)
     val currentOnMoveElement by rememberUpdatedState(onMoveElement)
     val currentOnResizeElement by rememberUpdatedState(onResizeElement)
     val currentOnAlignmentGuidesChanged by rememberUpdatedState(onAlignmentGuidesChanged)
@@ -296,10 +301,10 @@ private fun SceneCanvasElement(
                 }
                 .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
-                        // Only add to the selection if this member isn't already selected; toggling
-                        // here would deselect a selected element the moment the user starts to drag
-                        // it, silently dropping it from a multi-selection group move.
-                        onDragStart = { if (!currentSelected) currentOnSelect() },
+                        // Dragging a selected element moves the whole selection. Any other drag
+                        // selects just this element, so it moves alone: adding it instead grew the
+                        // selection with every drag, and the next drag dragged the earlier ones too.
+                        onDragStart = { if (!currentSelected) currentOnSelectOnly() },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             dragX += dragAmount.x / density.density
@@ -350,7 +355,9 @@ private fun SceneCanvasElement(
                             currentOnAlignmentGuidesChanged(emptyList())
                         },
                     )
-                },
+                }
+                // A tap adds an element to the selection or takes it out, to move several at once.
+                .pointerInput(Unit) { detectTapGestures(onTap = { currentOnSelect() }) },
             color = color.copy(alpha = if (selected) 0.22f else 0.14f),
             shape = RoundedCornerShape(8.dp),
             border = BorderStroke(borderWidth, borderColor),
