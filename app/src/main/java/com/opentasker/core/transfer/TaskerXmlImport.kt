@@ -1086,6 +1086,9 @@ object TaskerXmlImporter {
             trimmed.removePrefix("%")
         } else {
             val sum = TASKER_SIMPLE_SUM.matchEntire(trimmed) ?: return null
+            // Tasker fails a step whose sum comes out infinite (`Expr.d`), where the div filter
+            // would hand the variable back unchanged.
+            if (sum.groupValues[2] == "/" && sum.groupValues[3].toDouble() == 0.0) return null
             filters += "${TASKER_SUM_FILTERS.getValue(sum.groupValues[2])}:${sum.groupValues[3]}"
             sum.groupValues[1]
         }

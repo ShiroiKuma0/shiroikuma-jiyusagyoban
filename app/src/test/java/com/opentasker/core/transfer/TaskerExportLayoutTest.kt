@@ -186,6 +186,16 @@ class TaskerExportLayoutTest {
     }
 
     @Test
+    fun aTimeoutTemplateGoesBackAsWrittenRatherThanAsASum() {
+        // The import scales seconds in a variable to milliseconds with a template. Written back as
+        // Tasker's sum it would come in again scaled twice, 1000 times too long.
+        val millis = "{{ x | mul:1000 }}"
+
+        assertHas(xml("screen.timeout", "millis" to millis), """<Int sr="arg0"><var>$millis</var></Int>""")
+        assertEquals(millis, roundTrip("screen.timeout", "millis" to millis).args["millis"])
+    }
+
+    @Test
     fun customSettingWritesItsThreeFields() {
         assertHas(
             xml("settings.write", "table" to "secure", "key" to "doze_always_on", "value" to "1"),

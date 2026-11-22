@@ -927,6 +927,17 @@ class TaskerRealExportLayoutTest {
     }
 
     @Test
+    fun aPositionThatDividesByZeroStaysAPlaceholder() {
+        // Tasker's sum comes out infinite and the step fails (`Expr.d`); the div filter would hand
+        // %i back unchanged and push there.
+        listOf("%i/0", "%i / 0.0").forEach { position ->
+            val xml = """<code>355</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1"><var>$position</var></Int><Str sr="arg2" ve="3">x</Str><Int sr="arg3" val="0"/>"""
+            assertEquals(position, placeholder, action(xml).type)
+        }
+        assertEquals("array.push", action("""<code>355</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1"><var>%i/0.5</var></Int><Str sr="arg2" ve="3">x</Str><Int sr="arg3" val="0"/>""").type)
+    }
+
+    @Test
     fun aPositionSumIsWorkedOutWhenTheStepRuns() {
         // Tasker fills the sum in and keeps the whole part (decompiled 6.7.8, `i.F` and `Expr.d`).
         fun push(position: String) =

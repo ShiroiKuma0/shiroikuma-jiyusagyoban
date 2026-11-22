@@ -499,13 +499,13 @@ object TaskerXmlExporter {
             }
             "array.push" -> {
                 appendStr(sb, 0, taskerVariableName(args["array"], "arr"))
-                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1")
+                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1", sum = true)
                 appendStr(sb, 2, args["value"].orEmpty())
                 appendInt(sb, 3, taskerFlag(args["fill_spaces"]))
             }
             "array.pop" -> {
                 appendStr(sb, 0, taskerVariableName(args["array"], "arr"))
-                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1")
+                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1", sum = true)
                 appendStr(sb, 2, args["to_var"]?.ifBlank { null }?.let { taskerVariableName(it, it) }.orEmpty())
             }
             "array.clear" -> appendStr(sb, 0, taskerVariableName(args["array"], "arr"))
@@ -1097,13 +1097,19 @@ object TaskerXmlExporter {
         return trimmed
     }
 
-    /** A number field holding a variable or a sum is written the way Tasker writes it, in a `<var>`. */
-    private fun appendInt(sb: StringBuilder, index: Int, value: String) {
+    /**
+     * A number field holding a variable is written the way Tasker writes it, in a `<var>`. With
+     * [sum], a sum the import made a template of goes back as Tasker's sum. Only Push and Pop's
+     * Position ask for that: other fields scale their template by the field's unit, which a
+     * sum written back would then get applied twice.
+     */
+    private fun appendInt(sb: StringBuilder, index: Int, value: String, sum: Boolean = false) {
         val trimmed = value.trim()
         if (trimmed.toIntOrNull() != null) {
             sb.appendLine("""      <Int sr="arg$index" val="$trimmed"/>""")
         } else {
-            sb.appendLine("""      <Int sr="arg$index"><var>${escapeXml(taskerIntSum(trimmed) ?: trimmed)}</var></Int>""")
+            val written = if (sum) taskerIntSum(trimmed) ?: trimmed else trimmed
+            sb.appendLine("""      <Int sr="arg$index"><var>${escapeXml(written)}</var></Int>""")
         }
     }
 
