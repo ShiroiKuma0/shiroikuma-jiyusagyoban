@@ -25,7 +25,7 @@
 - Send Intent can name a component whose class sits outside the app's package name, which is common when an app's id differs from its code's (AutoJs6 is `org.autojs.autojs6` with `org.autojs.autojs` classes). A Tasker Send Intent like that imports now. Written as `package/class`, the package part has to match the step's app. Inside OpenTasker itself, a step can still name only classes under `com.opentasker.app`, as before.
 - Importing a Tasker task that jumps back over a Wait with a Goto (a poll) now says that a run here stops after 100,000 steps, where Tasker keeps going. When the waits are plain numbers it also gives a rough time, so a one-second poll over three steps reads about 9 hours.
 - Flow's context cards read like the Inspector now, so a battery check shows as `battery level <= 20` instead of `key=battery_level, operator=<=, value=20`. Sun and day contexts name the moment and the days. A field with a password or token in its name stays hidden. A long state name is cut short the same way a long value is, and a line break in one doesn't split the card.
-- An encrypted backup in the old v1 format now restores only up to 8 MB. That format gets decrypted in one piece, so a big one could run the phone out of memory partway through. Backups from current versions use the newer format and can still be as large as before.
+- An encrypted backup in the old v1 format now restores only up to 8 MB. That format gets decrypted in one piece, so a big one could run the phone out of memory partway through. A bigger one says it's the old format and names the limit. Backups from current versions use the newer format and can still be as large as before.
 
 ### Fixed
 

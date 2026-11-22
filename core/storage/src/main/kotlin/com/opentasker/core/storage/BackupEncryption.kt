@@ -19,6 +19,10 @@ import javax.crypto.spec.SecretKeySpec
 class BackupDecryptionException(cause: Exception) :
     IOException("Decryption failed. The passphrase is wrong or the file is damaged.", cause)
 
+/** A legacy v1 backup larger than that format restores, so the restore can say why it stopped. */
+class LegacyBackupTooLargeException(val limitBytes: Long) :
+    IOException("Backup file uses the old format, which restores only up to ${limitBytes / 1024 / 1024} MB")
+
 /**
  * Encrypts and decrypts `.otbackup` files using AES-256-GCM with PBKDF2-derived keys.
  *
@@ -357,11 +361,7 @@ object BackupEncryption {
     private fun backupTooLarge(maxBytes: Long): IOException =
         IOException("Backup file exceeds ${maxBytes / 1024 / 1024} MB limit")
 
-    private fun legacyBackupTooLarge(): IOException =
-        IOException(
-            "Backup file uses the old format, which restores only up to " +
-                "${MAX_LEGACY_V1_PLAINTEXT_BYTES / 1024 / 1024} MB",
-        )
+    private fun legacyBackupTooLarge(): IOException = LegacyBackupTooLargeException(MAX_LEGACY_V1_PLAINTEXT_BYTES)
 
     private fun decryptionFailure(cause: Exception): IOException = BackupDecryptionException(cause)
 

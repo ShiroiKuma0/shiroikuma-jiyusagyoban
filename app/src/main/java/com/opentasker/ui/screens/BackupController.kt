@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.opentasker.app.R
 import com.opentasker.core.storage.BackupDecryptionException
+import com.opentasker.core.storage.LegacyBackupTooLargeException
 import com.opentasker.core.storage.ConfigurationSnapshotPolicy
 import com.opentasker.core.storage.ConfigurationSnapshotSettings
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
@@ -46,6 +47,14 @@ internal fun readsAsWrongPassphrase(error: Throwable): Boolean =
     generateSequence(error) { it.cause.takeIf { cause -> cause !== it } }
         .take(8)
         .any { it is BackupDecryptionException }
+
+/** The old format's size limit in MB when [error] is an old-format snapshot over it, else null. */
+internal fun legacyBackupLimitMb(error: Throwable): Long? =
+    generateSequence(error) { it.cause.takeIf { cause -> cause !== it } }
+        .take(8)
+        .filterIsInstance<LegacyBackupTooLargeException>()
+        .firstOrNull()
+        ?.let { it.limitBytes / 1024 / 1024 }
 
 /**
  * The Settings backup card's lane of [ActiveAutomationViewModel]: backup, export, restore review and
@@ -144,7 +153,12 @@ internal class BackupController(
                             _encryptedRestorePrompt.value = prompt.copy(wrongPassphrase = true)
                         } else {
                             _encryptedRestorePrompt.value = null
-                            events.send(loggedUiErrorMessage(error, R.string.ui_error_backup_import))
+                            val shown = loggedUiErrorMessage(error, R.string.ui_error_backup_import)
+                            events.send(
+                                legacyBackupLimitMb(error)
+                                    ?.let { UiMessage(R.string.ui_error_backup_legacy_too_large, listOf(it)) }
+                                    ?: shown,
+                            )
                         }
                     }
             } finally {

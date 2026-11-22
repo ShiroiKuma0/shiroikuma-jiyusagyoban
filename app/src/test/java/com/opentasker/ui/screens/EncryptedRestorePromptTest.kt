@@ -2,11 +2,14 @@ package com.opentasker.ui.screens
 
 import com.opentasker.core.storage.BackupEncryption
 import com.opentasker.core.storage.DatabaseKeyUnavailableException
+import com.opentasker.core.storage.LegacyBackupTooLargeException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import javax.crypto.AEADBadTagException
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +46,17 @@ class EncryptedRestorePromptTest {
         // The snapshot decrypted fine and the device key failed while the candidate was checked:
         // a crypto error, but not the passphrase's, so asking again would loop forever.
         assertFalse(readsAsWrongPassphrase(DatabaseKeyUnavailableException("key unwrap failed", AEADBadTagException("keystore"))))
+    }
+
+    @Test
+    fun anOldFormatSnapshotOverItsLimitSaysSo() {
+        val overLimit = LegacyBackupTooLargeException(8L * 1024 * 1024)
+
+        assertEquals(8L, legacyBackupLimitMb(overLimit))
+        assertEquals("wrapped further out still counts", 8L, legacyBackupLimitMb(IOException("outer", overLimit)))
+        assertFalse("not a wrong passphrase, so the prompt closes", readsAsWrongPassphrase(overLimit))
+        assertNull(legacyBackupLimitMb(IOException("Backup file exceeds 100 MB limit")))
+        assertNull(legacyBackupLimitMb(decryptError("a", "b")))
     }
 
     @Test

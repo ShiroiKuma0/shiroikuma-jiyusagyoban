@@ -2,6 +2,7 @@ package com.opentasker.core.storage
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -151,9 +152,28 @@ class BackupEncryptionTest {
             BackupEncryption.decrypt(ByteArrayInputStream(legacyV1Backup(ByteArray(cap + 1), passphrase)), overCap, passphrase)
             fail("Expected an old-format backup over the cap to be refused")
         } catch (error: IOException) {
+            assertTrue(error is LegacyBackupTooLargeException)
             assertTrue(error.message.orEmpty().contains("old format"))
         }
         assertEquals(0L, overCap.count)
+    }
+
+    @Test
+    fun aCallerLimitUnderTheLegacyCapKeepsTheGenericMessage() {
+        val passphrase = "legacy-small".toCharArray()
+
+        try {
+            BackupEncryption.decrypt(
+                ByteArrayInputStream(legacyV1Backup(ByteArray(1_001), passphrase)),
+                ByteArrayOutputStream(),
+                passphrase,
+                maxPlaintextBytes = 1_000,
+            )
+            fail("Expected the caller's own limit to apply")
+        } catch (error: IOException) {
+            assertFalse(error is LegacyBackupTooLargeException)
+            assertTrue(error.message.orEmpty().contains("exceeds"))
+        }
     }
 
     @Test

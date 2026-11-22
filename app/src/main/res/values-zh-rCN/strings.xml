@@ -1621,6 +1621,7 @@
     <string name="ui_error_backup_export">数据库备份导出失败</string>
     <string name="ui_error_tasker_xml_export">Tasker XML导出失败</string>
     <string name="ui_error_backup_import">数据库备份导入失败</string>
+    <string name="ui_error_backup_legacy_too_large">此备份为旧格式，最多只能恢复 %1$d MB</string>
     <string name="ui_error_snapshot_destination">快照目标设置失败</string>
     <string name="ui_error_restore_stage">暂存恢复失败</string>
     <string name="ui_error_undo">撤销失败</string>
