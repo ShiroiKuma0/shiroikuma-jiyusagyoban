@@ -4,6 +4,8 @@ import com.opentasker.widget.TaskShortcutHelper.ReconcileOutcome
 import com.opentasker.widget.TaskShortcutHelper.ShortcutKind
 import com.opentasker.widget.TaskShortcutHelper.ShortcutState
 import com.opentasker.widget.TaskShortcutHelper.WatchState
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -128,6 +130,60 @@ class TaskShortcutPlanTest {
         assertEquals(WatchState(mapOf(4L to "B"), afterRestore = false), held.after(ReconcileOutcome.APPLIED, mapOf(4L to "B")))
         // So the older Pin shortcut still follows from the name it was first seen with.
         assertEquals(listOf(pinned(4, "B")), TaskShortcutHelper.plan(listOf(older(4, "A")), mapOf(4L to "B"), held.previous).update)
+    }
+
+    /**
+     * A rename Android held back, then a delete and its undo, used to leave the shortcut gray for
+     * good: it still said the old name, so the task that came back looked like another one.
+     */
+    @Test
+    fun aShortcutWhoseRenameWasHeldBackComesBackAfterAnUndo() {
+        val shortcut = pinned(4, "A")
+        val seen = WatchState(previous = mapOf(4L to "A"), afterRestore = false)
+        val renamed = mapOf(4L to "B")
+        val rename = TaskShortcutHelper.plan(listOf(shortcut), renamed, seen.previous, heldBack = seen.heldBack)
+        assertEquals(listOf(pinned(4, "B")), rename.update)
+        val held = seen.after(ReconcileOutcome.CHECKED, renamed, rename.updatedNames)
+
+        assertEquals(listOf("task_4"), TaskShortcutHelper.plan(listOf(shortcut), emptyMap(), held.previous, heldBack = held.heldBack).disable)
+        val deleted = held.after(ReconcileOutcome.APPLIED, emptyMap())
+
+        val undo = TaskShortcutHelper.plan(listOf(shortcut.copy(enabled = false)), renamed, deleted.previous, heldBack = deleted.heldBack)
+        assertEquals(listOf("task_4"), undo.enable)
+        assertEquals(listOf(pinned(4, "B", enabled = false)), undo.update)
+        assertEquals(emptyMap<Long, String>(), deleted.after(ReconcileOutcome.APPLIED, renamed).heldBack)
+    }
+
+    /**
+     * After a restore whose first pass failed, a rename used to turn the renamed task's own
+     * shortcut off, since its new name didn't match. The name first seen after the restore counts.
+     */
+    @Test
+    fun afterARestoreARenameDoesNotMakeItAnotherTask() {
+        val failed = WatchState(previous = null, afterRestore = true).after(ReconcileOutcome.FAILED, mapOf(4L to "A", 5L to "Y"))
+        val plan = TaskShortcutHelper.plan(
+            listOf(pinned(4, "A"), pinned(5, "X")),
+            mapOf(4L to "B", 5L to "Y"),
+            failed.previous,
+            failed.afterRestore,
+        )
+
+        assertEquals(listOf("task_5"), plan.disable)
+        assertEquals(listOf(pinned(4, "B")), plan.update)
+    }
+
+    /** A pass that failed outright used to wait for the next edit, so a restore's check could wait for days. */
+    @Test
+    fun aFailedPassIsTriedAgain() = runBlocking {
+        val seen = mutableListOf<WatchState>()
+        val watcher = TaskShortcutHelper.Watcher(afterRestore = true, retryDelayMs = 1L) { _, state ->
+            seen += state
+            TaskShortcutHelper.Reconciled(if (seen.size == 1) ReconcileOutcome.FAILED else ReconcileOutcome.APPLIED)
+        }
+        watcher.watch(flowOf(mapOf(4L to "A")))
+
+        assertEquals(listOf(WatchState(null, afterRestore = true), WatchState(mapOf(4L to "A"), afterRestore = true)), seen)
+        assertEquals(WatchState(mapOf(4L to "A"), afterRestore = false), watcher.state)
     }
 
     /** A restore swaps every task at once, so a new name under a shortcut's id may be another task. */

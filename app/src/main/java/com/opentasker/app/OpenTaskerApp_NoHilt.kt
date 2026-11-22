@@ -208,15 +208,16 @@ class OpenTaskerApp_NoHilt : Application() {
      */
     private suspend fun keepTaskShortcutsCurrent() {
         val database = readyDb ?: return // Preparing it failed, and that's logged.
-        var state = TaskShortcutHelper.WatchState(previous = null, afterRestore = restoredAtStart)
+        val watcher = TaskShortcutHelper.Watcher(afterRestore = restoredAtStart) { names, state ->
+            TaskShortcutHelper.reconcile(this, names, state)
+        }
         while (true) {
             try {
-                database.taskDao().observeNames()
-                    .map { rows -> rows.associate { it.id to it.name } }
-                    .distinctUntilChanged()
-                    .collect { names ->
-                        state = state.after(TaskShortcutHelper.reconcile(this, names, state.previous, state.afterRestore), names)
-                    }
+                watcher.watch(
+                    database.taskDao().observeNames()
+                        .map { rows -> rows.associate { it.id to it.name } }
+                        .distinctUntilChanged(),
+                )
                 return
             } catch (error: CancellationException) {
                 throw error

@@ -8,6 +8,9 @@ import androidx.core.graphics.drawable.IconCompat
 import com.opentasker.app.R
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Task
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
 
 object TaskShortcutHelper {
 
@@ -48,7 +51,11 @@ object TaskShortcutHelper {
         val disable: List<String>,
         val enable: List<String>,
         val update: List<ShortcutState>,
-    )
+    ) {
+        /** The task name each shortcut in [update] is being written for. */
+        val updatedNames: Map<Long, String>
+            get() = update.mapNotNull { shortcut -> shortcut.madeFor?.let { shortcut.taskId to it } }.toMap()
+    }
 
     fun canPinShortcut(context: Context): Boolean =
         ShortcutManagerCompat.isRequestPinShortcutSupported(context)
@@ -91,18 +98,17 @@ object TaskShortcutHelper {
     }
 
     /**
-     * Brings the app's task shortcuts in line with [taskNames], every task's id and name.
-     * [previousNames] is the list as this process last saw it, or null on the first call, and
-     * [afterRestore] says a restore replaced the database at this start. See [plan] and
-     * [ReconcileOutcome] for how far it got.
+     * Brings the app's task shortcuts in line with [taskNames], every task's id and name, using
+     * what the app carried from the last pass in [state]. See [plan] and [Reconciled] for how far
+     * it got.
      */
     fun reconcile(
         context: Context,
         taskNames: Map<Long, String>,
-        previousNames: Map<Long, String>? = null,
-        afterRestore: Boolean = false,
-    ): ReconcileOutcome {
+        state: WatchState = WatchState(previous = null, afterRestore = false),
+    ): Reconciled {
         var outcome = ReconcileOutcome.FAILED
+        var heldBack = emptyMap<Long, String>()
         runCatching {
             val shortcuts = ShortcutManagerCompat.getShortcuts(
                 context,
@@ -122,7 +128,7 @@ object TaskShortcutHelper {
                     madeFor = intent.getStringExtra(EXTRA_MADE_FOR),
                 )
             }
-            val plan = plan(states, taskNames, previousNames, afterRestore)
+            val plan = plan(states, taskNames, state.previous, state.afterRestore, state.heldBack)
             if (plan.disable.isNotEmpty()) {
                 ShortcutManagerCompat.disableShortcuts(context, plan.disable, context.getString(R.string.shortcut_task_deleted))
             }
@@ -137,10 +143,11 @@ object TaskShortcutHelper {
             if (updated) {
                 outcome = ReconcileOutcome.APPLIED
             } else {
+                heldBack = plan.updatedNames
                 AppLogger.warn(TAG, "Android held back renaming task shortcuts; the next change tries again")
             }
         }.onFailure { AppLogger.error(TAG, "Could not update task shortcuts", it) }
-        return outcome
+        return Reconciled(outcome, heldBack)
     }
 
     /** How far a [reconcile] got. */
@@ -153,27 +160,64 @@ object TaskShortcutHelper {
         APPLIED,
     }
 
+    /** How far a [reconcile] got, and the name of each task whose shortcuts Android didn't let it rename. */
+    data class Reconciled(val outcome: ReconcileOutcome, val heldBack: Map<Long, String> = emptyMap())
+
     /**
      * What the app carries from one [reconcile] to the next. A restore's caution lasts until a
      * pass has turned off what it had to. [previous] is the task names the shortcuts last matched,
-     * kept while renames are held back so an older shortcut can still follow from its label.
+     * or the first ones seen until then, kept while renames are held back so an older shortcut can
+     * still follow from its label. [heldBack] is the name each task had when Android held back
+     * renaming its shortcuts, so one turned off before the rename got through still comes back
+     * with its task.
      */
-    data class WatchState(val previous: Map<Long, String>?, val afterRestore: Boolean) {
-        fun after(outcome: ReconcileOutcome, names: Map<Long, String>) = WatchState(
+    data class WatchState(
+        val previous: Map<Long, String>?,
+        val afterRestore: Boolean,
+        val heldBack: Map<Long, String> = emptyMap(),
+    ) {
+        fun after(outcome: ReconcileOutcome, names: Map<Long, String>, heldBack: Map<Long, String> = emptyMap()) = WatchState(
             previous = if (outcome == ReconcileOutcome.APPLIED) names else previous ?: names,
             afterRestore = afterRestore && outcome == ReconcileOutcome.FAILED,
+            heldBack = if (outcome == ReconcileOutcome.FAILED) this.heldBack else this.heldBack - names.keys + heldBack,
         )
+    }
+
+    /**
+     * Runs [pass] on every new task list, carrying [state] from one to the next for the life of
+     * the process. A pass that failed outright is tried again every [retryDelayMs] until it gets
+     * through or the list changes, so a restore's check doesn't wait for the next edit.
+     */
+    class Watcher(
+        afterRestore: Boolean,
+        private val retryDelayMs: Long = 60_000L,
+        private val pass: (Map<Long, String>, WatchState) -> Reconciled,
+    ) {
+        var state = WatchState(previous = null, afterRestore = afterRestore)
+            private set
+
+        suspend fun watch(names: Flow<Map<Long, String>>) = names.collectLatest { current ->
+            while (true) {
+                val result = pass(current, state)
+                state = state.after(result.outcome, current, result.heldBack)
+                if (result.outcome != ReconcileOutcome.FAILED) break
+                delay(retryDelayMs)
+            }
+        }
     }
 
     /**
      * A shortcut keeps the task id and label it was made with. One for a task that's gone is
      * disabled with a message instead of failing when tapped, and comes back when a task with that
-     * id and the name it was made for returns, as an undo does. Android removes a disabled shortcut
-     * that's only dynamic, so only a pinned one is left to come back.
+     * id and the name it was made for returns, as an undo does, or with the name Android held back
+     * renaming it to ([heldBack]). Android removes a disabled shortcut that's only dynamic, so only
+     * a pinned one is left to come back.
      *
      * A rename gives the ones Pin made the task's new name, and a label picked through the publish
      * action stays. A restore swaps every task at once, so after one ([afterRestore]) a new name
-     * under the same id may be another task, and the shortcut is turned off instead.
+     * under the same id may be another task, and the shortcut is turned off instead. The name the
+     * task had when the restored tasks were first seen ([previousNames]) is the one that counts,
+     * since a rename after that doesn't make it a different task.
      *
      * A shortcut from an older version doesn't say which kind it is or what it was made for, so
      * the first pass that finds its task records both: a `task_<id>` one whose label is the task's
@@ -185,6 +229,7 @@ object TaskShortcutHelper {
         taskNames: Map<Long, String>,
         previousNames: Map<Long, String>? = null,
         afterRestore: Boolean = false,
+        heldBack: Map<Long, String> = emptyMap(),
     ): ShortcutPlan {
         val disable = mutableListOf<String>()
         val enable = mutableListOf<String>()
@@ -196,10 +241,11 @@ object TaskShortcutHelper {
                 continue
             }
             val madeFor = if (shortcut.kind == ShortcutKind.LEGACY) shortcut.label else shortcut.madeFor
+            val sameTask = madeFor == (if (afterRestore) previousNames?.get(shortcut.taskId) ?: name else name)
             if (!shortcut.enabled) {
-                if (madeFor != name) continue
+                if (!sameTask && heldBack[shortcut.taskId] != name) continue
                 enable += shortcut.id
-            } else if (afterRestore && madeFor != name) {
+            } else if (afterRestore && !sameTask) {
                 disable += shortcut.id
                 continue
             }
