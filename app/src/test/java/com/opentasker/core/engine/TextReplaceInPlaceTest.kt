@@ -46,10 +46,12 @@ class TextReplaceInPlaceTest {
         },
     )
 
-    private fun run(store: VariableStore, step: ActionSpec): Boolean = runBlocking {
+    private fun run(store: VariableStore, step: ActionSpec): Boolean = run(store, listOf(step))
+
+    private fun run(store: VariableStore, steps: List<ActionSpec>): Boolean = runBlocking {
         logs.clear()
         TaskRunner(ActionContext(ContextWrapper(null), store, logger = { logs += it }))
-            .run(Task(id = 1, name = "Search Replace", actions = listOf(step))).success
+            .run(Task(id = 1, name = "Search Replace", actions = steps)).success
     }
 
     private fun storedGlobals(store: VariableStore) = store.toTemplateScope().global
@@ -75,6 +77,25 @@ class TextReplaceInPlaceTest {
         val store = VariableStore().apply { set("Text", "aaa") }
         assertTrue(run(store, searchReplace("a+", "")))
         assertFalse(storedGlobals(store).toString(), "Text" in storedGlobals(store))
+    }
+
+    @Test
+    fun aResultWithNothingLeftUnsetsEveryCopyInTheTask() {
+        // An event's variables are stored before the run opens its own scope, so the first step's
+        // write sits over the stored value. Unsetting only that write brought "abc" back.
+        val store = VariableStore().apply { set("text", "abc") }
+        assertTrue(
+            run(
+                store,
+                listOf(
+                    searchReplace("b", "", name = "text"),
+                    searchReplace(".+", "", name = "text"),
+                    ActionSpec(type = "var.set", args = mapOf("name" to "%Out", "value" to "[%text]")),
+                ),
+            ),
+        )
+        // Unset reads as written or as nothing, depending on the step; never as the old value.
+        assertTrue(store.get("Out").toString(), store.get("Out") in setOf("[%text]", "[]"))
     }
 
     @Test

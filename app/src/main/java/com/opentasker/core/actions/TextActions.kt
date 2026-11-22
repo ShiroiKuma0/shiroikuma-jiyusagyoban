@@ -90,7 +90,9 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
                 return ActionResult.Failure("invalid or oversized pattern")
             }
         if (inPlace && replaced.isEmpty()) {
-            ctx.variables.remove(varName)
+            // As Variable Clear unsets it: every copy in this task, and in a sub-task only hidden,
+            // so neither an event's stored value nor the caller's comes back or goes missing.
+            ctx.variables.clearForTask(varName)
             ctx.logger("text.replace -> \$$varName unset, nothing left")
             return ActionResult.Success
         }
