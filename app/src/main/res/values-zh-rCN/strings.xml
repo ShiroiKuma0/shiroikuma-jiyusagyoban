@@ -280,7 +280,7 @@
     <string name="profile_lifecycle_one_shot_consumed">此一次性配置文件已运行过。</string>
     <string name="profile_lifecycle_missing_expiry">此配置文件没有有效的到期日期。</string>
     <string name="profile_lifecycle_expired">此配置文件已于 %1$s 到期。</string>
-    <string name="profile_lifecycle_suppressed_by_priority">已被更高优先级的配置文件 \'%1$s\' 抑制。</string>
+    <string name="profile_lifecycle_suppressed_by_priority">已被更高优先级的配置文件“%1$s”抑制。</string>
     <string name="profile_retrigger_label">重新触发行为</string>
     <string name="profile_new">新建配置文件</string>
     <string name="profile_delete">删除配置文件</string>
@@ -374,7 +374,7 @@
     <string name="setup_snapshots_label">自动设备外快照</string>
     <string name="setup_snapshots_helper">将加密恢复存档写入你选择的文件夹。OpenTasker从不上传它们，且恢复仅在审阅后应用。</string>
     <string name="setup_snapshots_retention">最多保留 %1$s，为期 %2$s。</string>
-    <string name="setup_snapshots_choice">%1$d / %2$d天</string>
+    <string name="setup_snapshots_choice">%1$d · %2$d 天</string>
     <string name="setup_snapshots_status_ok">上次快照 %1$s · 已存储 %2$d 个 · %3$s</string>
     <string name="setup_snapshots_status_failed">上次快照失败于 %1$s：%2$s</string>
     <string name="setup_snapshots_status_pending">尚未拍摄快照；第一个将在下一次计划检查时运行。</string>
@@ -543,7 +543,7 @@
     <string name="setup_phone_state_required_for">漫游和通话上下文</string>
     <string name="setup_dnd_title">勿扰模式访问</string>
     <string name="setup_dnd_body">OpenTasker更改打扰过滤器或创建、更新、移除专有Zen规则前需要此项。</string>
-    <string name="setup_dnd_required_for">DND和Zen规则操作</string>
+    <string name="setup_dnd_required_for">勿扰模式操作</string>
     <string name="setup_shizuku_title">Shizuku电源模式</string>
     <string name="setup_shizuku_required_for">提权操作</string>
     <string name="setup_shizuku_status_not_installed">未安装Shizuku管理器。</string>
@@ -1060,7 +1060,7 @@
     <string name="scenes_move_up_content_description">将元素向上移动 1 dp</string>
     <string name="scenes_move_down_content_description">将元素向下移动 1 dp</string>
     <string name="scenes_move_right_content_description">将元素向右移动 1 dp</string>
-    <string name="scenes_canvas_element_with_label">%1$s • %2$s</string>
+    <string name="scenes_canvas_element_with_label">%1$s · %2$s</string>
     <string name="scenes_canvas_element_description">%1$s、%2$s，位于 %3$d,%4$d dp，尺寸 %5$dx%6$d dp</string>
     <string name="scenes_unlabeled_element">未标签的元素</string>
     <string name="scenes_select_element_content_description">选择元素</string>
@@ -1240,7 +1240,7 @@
     <string name="flow_context_title">上下文 %1$d：%2$s</string>
     <string name="flow_action_subtask_title">步骤 %1$d：运行子任务 "%2$s"</string>
     <string name="flow_action_title">步骤 %1$d：%2$s</string>
-    <string name="flow_action_subtask_detail">子任务 -&gt; %1$s</string>
+    <string name="flow_action_subtask_detail">子任务 → %1$s</string>
     <string name="flow_continues_after_error">出错后继续</string>
     <string name="flow_output_variables">输出：%1$s</string>
 
@@ -1262,7 +1262,9 @@
     <string name="blueprint_input_type_decimal">小数</string>
     <string name="blueprint_input_type_time">时间</string>
     <string name="blueprint_input_supporting">输入类型：%1$s</string>
-    <string name="blueprint_input_bounds">%1$s · 允许范围 %2$s</string>
+    <string name="blueprint_input_range">%1$s，%2$s 到 %3$s</string>
+    <string name="blueprint_input_minimum">%1$s，至少 %2$s</string>
+    <string name="blueprint_input_maximum">%1$s，最多 %2$s</string>
     <string name="blueprint_section_collapse">折叠 %1$s</string>
     <string name="blueprint_section_expand">展开 %1$s</string>
     <string name="blueprint_update_review">更新的模板只会向你展示以供审阅。你已有的任何内容都不会被覆盖。</string>
@@ -1545,13 +1547,13 @@
 
     <!-- Secondary-surface localization -->
     <string name="nav_more">更多</string>
-    <string name="header_profiles_detail">%1$d 个已启用 • 共 %2$d 个</string>
-    <string name="header_tasks_detail">%1$s • %2$s</string>
+    <string name="header_profiles_detail">%1$d 个已启用 · 共 %2$d 个</string>
+    <string name="header_tasks_detail">%1$s · %2$s</string>
     <plurals name="header_variables_detail">
         <item quantity="other">%1$d 个全局变量</item>
     </plurals>
-    <string name="header_flow_detail">%1$s • %2$s</string>
-    <string name="header_scenes_detail">%1$s • %2$s</string>
+    <string name="header_flow_detail">%1$s · %2$s</string>
+    <string name="header_scenes_detail">%1$s · %2$s</string>
     <string name="header_inspector_detail">实时上下文健康</string>
     <string name="header_setup_detail">权限与可靠性检查</string>
     <plurals name="header_run_log_detail">
@@ -1569,7 +1571,14 @@
     <string name="setup_update_status_available">有较新版本可用：%1$s</string>
     <string name="setup_update_open_release">打开发布页面</string>
     <string name="ui_flow_target_missing">流程目标不再存在</string>
-    <string name="ui_error_generic">操作失败</string>
+    <string name="ui_error_generic">更改未保存。详情见“诊断”。</string>
+    <string name="ui_error_task_duplicate">无法复制任务。详情见“诊断”。</string>
+    <string name="ui_error_profile_duplicate">无法复制配置文件。详情见“诊断”。</string>
+    <string name="ui_error_profile_delete">无法删除配置文件。详情见“诊断”。</string>
+    <string name="ui_error_scene_duplicate">无法复制场景。详情见“诊断”。</string>
+    <string name="ui_error_scene_delete">无法删除场景。详情见“诊断”。</string>
+    <string name="ui_error_project_move">无法移动项目。详情见“诊断”。</string>
+    <string name="ui_error_run_log_star">无法更改星标。详情见“诊断”。</string>
     <!-- A rejection that already explains itself; the reason comes from the validation that
          refused the change, so this carries it through without prefixing it with noise. -->
     <string name="ui_error_reason">%1$s</string>
@@ -1584,7 +1593,7 @@
     <string name="ui_error_variable_referenced">%1$s 仍被 %2$s 使用。请先移除这些引用。</string>
     <string name="ui_error_corrupt_record">无法读取已保存的数据。请恢复备份或删除受影响的项目。</string>
     <string name="ui_error_diagnostics_refresh">无法刷新诊断</string>
-    <string name="ui_error_task_delete">任务删除失败</string>
+    <string name="ui_error_task_delete">无法删除任务。详情见“诊断”。</string>
     <string name="ui_error_tasker_xml_preview">Tasker XML导入预览失败。详情见“诊断”。</string>
     <string name="ui_error_automation_import_preview">Tasker或MacroDroid导入预览失败。详情见“诊断”。</string>
     <string name="ui_error_automation_import">Tasker或MacroDroid导入失败</string>

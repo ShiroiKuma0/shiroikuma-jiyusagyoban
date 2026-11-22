@@ -122,7 +122,7 @@ class LoadStateTest {
     }
 
     private companion object {
-        const val UNAVAILABLE_TITLE = "Context inspector unavailable"
+        const val UNAVAILABLE_TITLE = "Inspector unavailable"
         const val MAX_FRAMES = 400
         const val FRAME_WAIT_MS = 10L
         const val LOAD_TIMEOUT_MS = 10_000L

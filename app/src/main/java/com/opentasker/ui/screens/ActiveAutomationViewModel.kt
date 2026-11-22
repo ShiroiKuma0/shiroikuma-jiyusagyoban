@@ -490,7 +490,7 @@ class ActiveAutomationViewModel(
                     recordCreation(EditHistoryDao.TYPE_TASK, newId, StorageJson.encodeToString(duplicate))
                 }
             }.onSuccess { events.send(message(R.string.ui_message_task_duplicated)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_task_duplicate)) }
         }
     }
 
@@ -697,7 +697,7 @@ class ActiveAutomationViewModel(
                     recordCreation(EditHistoryDao.TYPE_SCENE, newId, StorageJson.encodeToString(persisted))
                 }
             }.onSuccess { events.send(message(R.string.ui_message_scene_duplicated)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_scene_duplicate)) }
         }
     }
 
@@ -754,7 +754,7 @@ class ActiveAutomationViewModel(
                         action = UiMessageAction.Undo(EditHistoryDao.TYPE_SCENE, scene.id),
                     ),
                 )
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_scene_delete)) }
         }
     }
 
@@ -826,7 +826,7 @@ class ActiveAutomationViewModel(
                     recordCreation(EditHistoryDao.TYPE_PROFILE, newId, StorageJson.encodeToString(persisted))
                 }
             }.onSuccess { events.send(message(R.string.ui_message_profile_duplicated)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_profile_duplicate)) }
         }
     }
 
@@ -925,7 +925,7 @@ class ActiveAutomationViewModel(
             }
                 // "Moved" only when something moved: the first row's Move up used to report success.
                 .onSuccess { moved -> if (moved) events.send(UiMessage(R.string.ui_message_project_reordered)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_project_move)) }
         }
     }
 
@@ -1067,7 +1067,7 @@ class ActiveAutomationViewModel(
                         action = UiMessageAction.Undo(EditHistoryDao.TYPE_PROFILE, profile.id),
                     ),
                 )
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_profile_delete)) }
         }
     }
 

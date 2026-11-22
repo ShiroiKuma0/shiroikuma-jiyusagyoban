@@ -43,5 +43,5 @@ private object EnglishProfileLifecycleStrings : ProfileLifecycleStrings {
     override fun expired(date: String): String = "This profile expired on $date."
 
     override fun suppressedByPriority(profileName: String): String =
-        "Suppressed by higher-priority profile '$profileName'."
+        "Suppressed by higher-priority profile “$profileName”."
 }

@@ -225,19 +225,11 @@ internal fun TemplateSlotDialog(
                     if (collapsedSection != section) {
                         items(inputs, key = { "blueprint-input-${it.key}" }) { input ->
                             val selectorLabel = blueprintSelectorLabel(input.selector)
-                            val bounds = listOfNotNull(
-                                input.minimum?.let { "≥ ${it.blueprintNumber()}" },
-                                input.maximum?.let { "≤ ${it.blueprintNumber()}" },
-                            ).joinToString(" ")
                             AutomationBlueprintInputField(
                                 label = input.label + if (input.required) " *" else "",
                                 value = values[input.key].orEmpty(),
                                 placeholder = input.hint,
-                                supportingText = if (bounds.isNotEmpty()) {
-                                    stringResource(R.string.blueprint_input_bounds, selectorLabel, bounds)
-                                } else {
-                                    stringResource(R.string.blueprint_input_supporting, selectorLabel)
-                                },
+                                supportingText = blueprintInputSupportingText(selectorLabel, input.minimum, input.maximum),
                                 errorText = invalidInputs[input.key],
                                 keyboard = input.selector.automationInputKeyboard(),
                                 onValueChange = { values = values + (input.key to it) },
@@ -287,6 +279,15 @@ private fun BlueprintSelectorKind.automationInputKeyboard(): AutomationInputKeyb
 }
 
 private fun Double.blueprintNumber(): String = toString().removeSuffix(".0")
+
+@Composable
+private fun blueprintInputSupportingText(selectorLabel: String, minimum: Double?, maximum: Double?): String = when {
+    minimum != null && maximum != null ->
+        stringResource(R.string.blueprint_input_range, selectorLabel, minimum.blueprintNumber(), maximum.blueprintNumber())
+    minimum != null -> stringResource(R.string.blueprint_input_minimum, selectorLabel, minimum.blueprintNumber())
+    maximum != null -> stringResource(R.string.blueprint_input_maximum, selectorLabel, maximum.blueprintNumber())
+    else -> stringResource(R.string.blueprint_input_supporting, selectorLabel)
+}
 
 @Composable
 internal fun TaskEditorDialog(

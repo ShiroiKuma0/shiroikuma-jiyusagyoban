@@ -44,7 +44,7 @@ class DiagnosticsScreenTest {
 
         composeTestRule.onNodeWithText("Checking engine health…").assertIsDisplayed()
         composeTestRule.onAllNodesWithText("Needs attention").assertCountEquals(0)
-        composeTestRule.onAllNodesWithText("Engine healthy").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Running normally").assertCountEquals(0)
     }
 
     @Test
@@ -80,7 +80,7 @@ class DiagnosticsScreenTest {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Engine healthy").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Running normally").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Share redacted report").performClick()
         assertTrue(shared.get())
         composeTestRule.onNodeWithContentDescription("Copy redacted report").performClick()

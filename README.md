@@ -22,9 +22,9 @@
 
 ## Screenshots
 
-| Profiles | Tasks | Run Log |
+| Profiles | Tasks | Run log |
 |---|---|---|
-| ![Profiles](fastlane/metadata/android/en-US/images/phoneScreenshots/01-profiles.png) | ![Tasks](fastlane/metadata/android/en-US/images/phoneScreenshots/02-tasks.png) | ![Run Log](fastlane/metadata/android/en-US/images/phoneScreenshots/03-run-log.png) |
+| ![Profiles](fastlane/metadata/android/en-US/images/phoneScreenshots/01-profiles.png) | ![Tasks](fastlane/metadata/android/en-US/images/phoneScreenshots/02-tasks.png) | ![Run log](fastlane/metadata/android/en-US/images/phoneScreenshots/03-run-log.png) |
 
 | Flow | Setup | Settings |
 |---|---|---|
@@ -87,7 +87,7 @@
 
 | Category | Count | Examples |
 |----------|------:|---------|
-| Settings | 22 | Wi-Fi, Wi-Fi scan, Bluetooth, brightness, volume, airplane, mobile data, Wi-Fi hotspot, always-on display, screen timeout, write and read setting, DND, Zen rule set/clear, ringer mode, torch, tile state, wallpaper, temporary state, keyboard info, keyboard picker |
+| Settings | 22 | Wi-Fi, Wi-Fi scan, Bluetooth, brightness, volume, airplane, mobile data, Wi-Fi hotspot, always-on display, screen timeout, write and read setting, Do Not Disturb, Do Not Disturb rule set and clear, ringer mode, torch, tile state, wallpaper, temporary state, keyboard info, keyboard picker |
 | App | 11 | launch intent, launch app, publish shortcut, kill, archive, unarchive, go home, open URL, SMS, screenshot, add calendar event |
 | File | 5 | read, write, append, delete, list |
 | Network | 9 | HTTP Request, Home Assistant webhook, MQTT publish, legacy GET/POST aliases, ping, download, Wake-on-LAN, WireGuard and Tailscale tunnels |
@@ -112,7 +112,7 @@ The **Clipboard** actions read and write text without an extra permission, cap t
 
 **Quick Settings tiles** provide four app-owned slots. Long-press a tile to bind a task and configure its label, subtitle, icon, and state. `tile.set` can update a configured slot at runtime, and tile-triggered task runs use the same foreground execution and run-log identity as other external entry points.
 
-The **Temporary State** action applies a bounded reversible setting (brightness, volume, ringer mode, or DND) and restores the captured prior value through a unique persisted WorkManager job. Reusing the same revert key replaces the earlier timer, and pending work remains inspectable through WorkManager after process death.
+The **Temporary State** action applies a bounded reversible setting (brightness, volume, ringer mode or Do Not Disturb) and restores the captured prior value through a unique persisted WorkManager job. Reusing the same revert key replaces the earlier timer, and pending work remains inspectable through WorkManager after process death.
 
 The **Keyboard** actions report the current/enabled IMEs into bounded variables. `ime.set` validates the requested component or package and opens Android's picker. Normal applications cannot silently select another keyboard, so it fails with an explicit user-selection message rather than pretending the switch happened.
 
@@ -126,7 +126,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 
 - OEM battery-killer detection with per-vendor remediation (Samsung, Xiaomi, OnePlus, Oppo, Realme, Vivo, Huawei, etc.)
 - Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
-- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, physical activity, Bluetooth, SMS, phone state, call log, DND, modify system settings, Health Connect, Shizuku, and Termux
+- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, physical activity, Bluetooth, SMS, phone state, call log, Do Not Disturb, modify system settings, Health Connect, Shizuku, and Termux
 - Optional Android 16+ promoted ongoing notifications for active tasks, with standard foreground-notification fallback when promotion is unavailable or denied
 - Context inspector with live source health, latest values, per-profile match explanations, and
   Loading/Ready/Stale/Error observation status with age-aware reporting
@@ -152,7 +152,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 
 ### UI and theming
 
-- True-black workspace surfaces now use a compact, information-first layout across Profiles, Tasks, Variables, Flow, Scenes, Inspector, Setup, Run Log, Diagnostics, and Settings
+- True-black workspace surfaces now use a compact, information-first layout across Profiles, Tasks, Variables, Flow, Scenes, Inspector, Setup, Run log, Diagnostics and Settings
 - Five primary destinations stay visible in the bottom navigation, while advanced workspaces remain one tap away in More
 - Project scope, readiness, search, and primary creation actions have a consistent hierarchy on every main page
 - AMOLED-first Catppuccin Mocha (dark) and Latte (light) palettes, high contrast mode

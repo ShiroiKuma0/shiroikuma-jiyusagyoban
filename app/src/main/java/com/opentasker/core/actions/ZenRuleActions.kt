@@ -95,7 +95,7 @@ class ZenRuleSetAction(
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val spec = ZenRuleActionSupport.parse(args).getOrElse {
-            return ActionResult.Failure(it.message ?: "invalid Zen rule arguments")
+            return ActionResult.Failure(it.message ?: "invalid Do Not Disturb rule arguments")
         }
         val nm = ctx.app.getSystemService(NotificationManager::class.java)
             ?: return ActionResult.Failure("notification service not available")
@@ -105,7 +105,7 @@ class ZenRuleSetAction(
         if (Build.VERSION.SDK_INT < AUTOMATIC_ZEN_RULE_API || !ZenRuleActionSupport.usesAutomaticRules(sdkInt())) {
             return try {
                 nm.setInterruptionFilter(spec.interruptionFilter)
-                ctx.logger("Zen rule ${spec.id}: ${spec.mode} (transient DND fallback)")
+                ctx.logger("Do Not Disturb rule ${spec.id}: ${spec.mode} (plain Do Not Disturb, as rules need Android 15)")
                 ActionResult.Success
             } catch (ex: SecurityException) {
                 ActionResult.Failure("DND change blocked: ${ex.message}", ex)
@@ -142,24 +142,24 @@ class ZenRuleSetAction(
                 .build()
             val systemId = if (existingId != null && existingRule != null) {
                 if (!nm.updateAutomaticZenRule(existingId, rule)) {
-                    return ActionResult.Failure("system rejected the Zen rule update")
+                    return ActionResult.Failure("Android rejected the Do Not Disturb rule update")
                 }
                 existingId
             } else {
                 nm.addAutomaticZenRule(rule)
-                    ?: return ActionResult.Failure("system rejected the Zen rule")
+                    ?: return ActionResult.Failure("Android rejected the Do Not Disturb rule")
             }
             store.put(spec.id, systemId)
             nm.setAutomaticZenRuleState(
                 systemId,
                 Condition(conditionId, spec.name, Condition.STATE_TRUE),
             )
-            ctx.logger("Zen rule ${spec.id}: ${spec.mode}, effects=" + effectsSummary(spec))
+            ctx.logger("Do Not Disturb rule ${spec.id}: ${spec.mode}, effects=" + effectsSummary(spec))
             ActionResult.Success
         } catch (ex: SecurityException) {
-            ActionResult.Failure("Zen rule change blocked: ${ex.message}", ex)
+            ActionResult.Failure("Do Not Disturb rule change blocked: ${ex.message}", ex)
         } catch (ex: IllegalArgumentException) {
-            ActionResult.Failure("Zen rule rejected: ${ex.message}", ex)
+            ActionResult.Failure("Do Not Disturb rule rejected: ${ex.message}", ex)
         }
     }
 
@@ -187,7 +187,7 @@ class ZenRuleClearAction(
         if (Build.VERSION.SDK_INT < AUTOMATIC_ZEN_RULE_API || !ZenRuleActionSupport.usesAutomaticRules(sdkInt())) {
             return try {
                 nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
-                ctx.logger("Zen rule $id: cleared (transient DND fallback)")
+                ctx.logger("Do Not Disturb rule $id: cleared (plain Do Not Disturb, as rules need Android 15)")
                 ActionResult.Success
             } catch (ex: SecurityException) {
                 ActionResult.Failure("DND change blocked: ${ex.message}", ex)
@@ -211,15 +211,15 @@ class ZenRuleClearAction(
                 Condition(rule.conditionId, rule.name, Condition.STATE_FALSE),
             )
             if (!nm.removeAutomaticZenRule(systemId)) {
-                return ActionResult.Failure("system rejected the Zen rule removal")
+                return ActionResult.Failure("Android rejected the Do Not Disturb rule removal")
             }
             store.remove(id)
-            ctx.logger("Zen rule $id: cleared")
+            ctx.logger("Do Not Disturb rule $id: cleared")
             ActionResult.Success
         } catch (ex: SecurityException) {
-            ActionResult.Failure("Zen rule removal blocked: ${ex.message}", ex)
+            ActionResult.Failure("Do Not Disturb rule removal blocked: ${ex.message}", ex)
         } catch (ex: IllegalArgumentException) {
-            ActionResult.Failure("Zen rule removal rejected: ${ex.message}", ex)
+            ActionResult.Failure("Do Not Disturb rule removal rejected: ${ex.message}", ex)
         }
     }
 }

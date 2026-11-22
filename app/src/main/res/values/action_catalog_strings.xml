@@ -61,7 +61,7 @@
     <string name="catalog_action_var_persist_name" formatted="false">Persist Variable</string>
     <string name="catalog_action_var_persist_description" formatted="false">Copy a variable\'s current value into the global scope so it survives across task runs</string>
     <string name="catalog_action_var_persist_field_name_label" formatted="false">Source variable</string>
-    <string name="catalog_action_var_persist_field_name_hint" formatted="false">local variable name</string>
+    <string name="catalog_action_var_persist_field_name_hint" formatted="false">Local variable name</string>
     <string name="catalog_action_var_persist_field_global_name_label" formatted="false">Global name</string>
     <string name="catalog_action_var_persist_field_global_name_hint" formatted="false">Auto-uppercased from source if omitted</string>
     <string name="catalog_action_var_clear_name" formatted="false">Variable Clear</string>
@@ -77,7 +77,7 @@
     <string name="catalog_action_clipboard_get_name" formatted="false">Get Clipboard</string>
     <string name="catalog_action_clipboard_get_description" formatted="false">Read text from the system clipboard into a sensitive variable</string>
     <string name="catalog_action_clipboard_get_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_clipboard_get_field_var_hint" formatted="false">default: Clipboard (also sets %Clipboard_has_text)</string>
+    <string name="catalog_action_clipboard_get_field_var_hint" formatted="false">Default: Clipboard (also sets %Clipboard_has_text)</string>
     <string name="catalog_action_clipboard_set_name" formatted="false">Set Clipboard</string>
     <string name="catalog_action_clipboard_set_description" formatted="false">Write bounded text to the system clipboard</string>
     <string name="catalog_action_clipboard_set_field_text_label" formatted="false">Text</string>
@@ -117,7 +117,7 @@
     <string name="catalog_action_calendar_event_query_field_max_hint" formatted="false">10 by default, 50 at most</string>
     <string name="catalog_action_calendar_event_query_field_var_label" formatted="false">Variable prefix</string>
     <string name="catalog_action_calendar_event_query_field_var_hint" formatted="false">event by default. Titles and locations are kept hidden in the run log</string>
-    <string name="catalog_action_contacts_lookup_field_var_hint" formatted="false">default: Contact; also sets name, phone, email, arrays, and count</string>
+    <string name="catalog_action_contacts_lookup_field_var_hint" formatted="false">Default: Contact. Also sets name, phone, email, arrays and count</string>
     <string name="action_option_contacts_permission" formatted="false">Permission (unattended)</string>
     <string name="action_option_contacts_picker" formatted="false">System picker (Android 17+)</string>
     <string name="action_option_location_fix" formatted="false">Fresh fix</string>
@@ -131,56 +131,56 @@
     <string name="catalog_action_data_read_field_path_label" formatted="false">Selector</string>
     <string name="catalog_action_data_read_field_path_hint" formatted="false">JSON items[0].name · CSV column c or cell r,c · XML root/item/name · HTML CSS selector</string>
     <string name="catalog_action_data_read_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_data_read_field_var_hint" formatted="false">default: data (also sets %var array + %var_count)</string>
+    <string name="catalog_action_data_read_field_var_hint" formatted="false">Default: data (also sets the %var array and %var_count)</string>
     <string name="catalog_action_datetime_format_name" formatted="false">Format Date/Time</string>
     <string name="catalog_action_datetime_format_description" formatted="false">Format an epoch-millis time (or now) into a string</string>
     <string name="catalog_action_datetime_format_field_time_label" formatted="false">Time</string>
-    <string name="catalog_action_datetime_format_field_time_hint" formatted="false">epoch millis or \'now\' (default)</string>
+    <string name="catalog_action_datetime_format_field_time_hint" formatted="false">Epoch milliseconds, or now (the default)</string>
     <string name="catalog_action_datetime_format_field_format_label" formatted="false">Pattern</string>
-    <string name="catalog_action_datetime_format_field_format_hint" formatted="false">default yyyy-MM-dd HH:mm:ss</string>
+    <string name="catalog_action_datetime_format_field_format_hint" formatted="false">Default: yyyy-MM-dd HH:mm:ss</string>
     <string name="catalog_action_datetime_format_field_zone_label" formatted="false">Time zone</string>
-    <string name="catalog_action_datetime_format_field_zone_hint" formatted="false">e.g. UTC or America/New_York (optional)</string>
+    <string name="catalog_action_datetime_format_field_zone_hint" formatted="false">For example UTC or America/New_York (optional)</string>
     <string name="catalog_action_datetime_format_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_datetime_format_field_var_hint" formatted="false">default: datetime</string>
+    <string name="catalog_action_datetime_format_field_var_hint" formatted="false">Default: datetime</string>
     <string name="catalog_action_datetime_parse_name" formatted="false">Parse Date/Time</string>
     <string name="catalog_action_datetime_parse_description" formatted="false">Parse a date-time string into epoch milliseconds</string>
     <string name="catalog_action_datetime_parse_field_text_label" formatted="false">Text</string>
-    <string name="catalog_action_datetime_parse_field_text_hint" formatted="false">e.g. 2026-07-14 09:30</string>
+    <string name="catalog_action_datetime_parse_field_text_hint" formatted="false">For example 2026-07-14 09:30</string>
     <string name="catalog_action_datetime_parse_field_format_label" formatted="false">Pattern</string>
-    <string name="catalog_action_datetime_parse_field_format_hint" formatted="false">e.g. yyyy-MM-dd HH:mm</string>
+    <string name="catalog_action_datetime_parse_field_format_hint" formatted="false">For example yyyy-MM-dd HH:mm</string>
     <string name="catalog_action_datetime_parse_field_zone_label" formatted="false">Time zone</string>
-    <string name="catalog_action_datetime_parse_field_zone_hint" formatted="false">optional</string>
+    <string name="catalog_action_datetime_parse_field_zone_hint" formatted="false">Optional</string>
     <string name="catalog_action_datetime_parse_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_datetime_parse_field_var_hint" formatted="false">default: datetime (epoch millis)</string>
+    <string name="catalog_action_datetime_parse_field_var_hint" formatted="false">Default: datetime (epoch milliseconds)</string>
     <string name="catalog_action_datetime_add_name" formatted="false">Add to Date/Time</string>
     <string name="catalog_action_datetime_add_description" formatted="false">Add or subtract a duration from an epoch-millis time</string>
     <string name="catalog_action_datetime_add_field_time_label" formatted="false">Time</string>
-    <string name="catalog_action_datetime_add_field_time_hint" formatted="false">epoch millis or \'now\' (default)</string>
+    <string name="catalog_action_datetime_add_field_time_hint" formatted="false">Epoch milliseconds, or now (the default)</string>
     <string name="catalog_action_datetime_add_field_amount_label" formatted="false">Amount</string>
-    <string name="catalog_action_datetime_add_field_amount_hint" formatted="false">integer, may be negative</string>
+    <string name="catalog_action_datetime_add_field_amount_hint" formatted="false">Whole number, can be negative</string>
     <string name="catalog_action_datetime_add_field_unit_label" formatted="false">Unit</string>
     <string name="catalog_action_datetime_add_field_unit_hint" formatted="false">seconds/minutes/hours/days/weeks/months/years</string>
     <string name="catalog_action_datetime_add_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_datetime_add_field_var_hint" formatted="false">default: datetime (epoch millis)</string>
+    <string name="catalog_action_datetime_add_field_var_hint" formatted="false">Default: datetime (epoch milliseconds)</string>
     <string name="catalog_action_text_match_name" formatted="false">Match Text (regex)</string>
     <string name="catalog_action_text_match_description" formatted="false">Find the first regex match; captures become the output array (%var(1)=group 1)</string>
     <string name="catalog_action_text_match_field_source_label" formatted="false">Source text</string>
     <string name="catalog_action_text_match_field_pattern_label" formatted="false">Regex pattern</string>
-    <string name="catalog_action_text_match_field_pattern_hint" formatted="false">linear-time RE2</string>
+    <string name="catalog_action_text_match_field_pattern_hint" formatted="false">Regular expression (RE2 syntax)</string>
     <string name="catalog_action_text_match_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_text_match_field_var_hint" formatted="false">default: match (also sets array + %var_count)</string>
+    <string name="catalog_action_text_match_field_var_hint" formatted="false">Default: match (also sets the array and %var_count)</string>
     <string name="catalog_action_text_replace_name" formatted="false">Replace Text (regex)</string>
     <string name="catalog_action_text_replace_description" formatted="false">Replace regex matches or store them in an array. Supports $1 group references</string>
     <string name="catalog_action_text_replace_field_source_label" formatted="false">Source text</string>
     <string name="catalog_action_text_replace_field_pattern_label" formatted="false">Regex pattern</string>
     <string name="catalog_action_text_replace_field_replacement_label" formatted="false">Replacement</string>
-    <string name="catalog_action_text_replace_field_replacement_hint" formatted="false">may reference $1, $2, ...</string>
+    <string name="catalog_action_text_replace_field_replacement_hint" formatted="false">Can use $1, $2, …</string>
     <string name="catalog_action_text_replace_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_text_replace_field_var_hint" formatted="false">default: result</string>
+    <string name="catalog_action_text_replace_field_var_hint" formatted="false">Default: result</string>
     <string name="catalog_action_text_replace_field_first_only_label" formatted="false">First match only</string>
     <string name="catalog_action_text_replace_field_first_only_hint" formatted="false">Replace and store only the first match</string>
     <string name="catalog_action_text_replace_field_matches_label" formatted="false">Store matches in array</string>
-    <string name="catalog_action_text_replace_field_matches_hint" formatted="false">%found gets each match as %found1, %found2, ...</string>
+    <string name="catalog_action_text_replace_field_matches_hint" formatted="false">%found gets each match as %found1, %found2 and so on</string>
     <string name="catalog_action_text_replace_field_search_only_label" formatted="false">Only find matches</string>
     <string name="catalog_action_text_replace_field_search_only_hint" formatted="false">Store the matches and leave the output variable as it is</string>
     <string name="catalog_action_text_replace_field_in_place_label" formatted="false">Edit the output variable in place</string>
@@ -189,41 +189,41 @@
     <string name="catalog_action_text_split_description" formatted="false">Split into an array by a literal delimiter or a regex pattern</string>
     <string name="catalog_action_text_split_field_source_label" formatted="false">Source text</string>
     <string name="catalog_action_text_split_field_delimiter_label" formatted="false">Delimiter</string>
-    <string name="catalog_action_text_split_field_delimiter_hint" formatted="false">literal separator (or use a regex pattern)</string>
+    <string name="catalog_action_text_split_field_delimiter_hint" formatted="false">Text to split on (or use a regex pattern)</string>
     <string name="catalog_action_text_split_field_pattern_label" formatted="false">Regex pattern</string>
-    <string name="catalog_action_text_split_field_pattern_hint" formatted="false">regex separator (takes precedence)</string>
+    <string name="catalog_action_text_split_field_pattern_hint" formatted="false">Regex to split on (wins over the separator)</string>
     <string name="catalog_action_text_split_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_text_split_field_var_hint" formatted="false">default: parts (array + %var_count)</string>
+    <string name="catalog_action_text_split_field_var_hint" formatted="false">Default: parts (array and %var_count)</string>
     <string name="catalog_action_text_join_name" formatted="false">Join Text</string>
     <string name="catalog_action_text_join_description" formatted="false">Join an array variable into a single string</string>
     <string name="catalog_action_text_join_field_array_label" formatted="false">Array variable</string>
-    <string name="catalog_action_text_join_field_array_hint" formatted="false">name of an array (from split/read)</string>
+    <string name="catalog_action_text_join_field_array_hint" formatted="false">Name of an array (from a split or read)</string>
     <string name="catalog_action_text_join_field_delimiter_label" formatted="false">Delimiter</string>
-    <string name="catalog_action_text_join_field_delimiter_hint" formatted="false">default: ,</string>
+    <string name="catalog_action_text_join_field_delimiter_hint" formatted="false">Default: ,</string>
     <string name="catalog_action_text_join_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_text_join_field_var_hint" formatted="false">default: joined</string>
+    <string name="catalog_action_text_join_field_var_hint" formatted="false">Default: joined</string>
     <string name="catalog_action_text_substring_name" formatted="false">Substring</string>
     <string name="catalog_action_text_substring_description" formatted="false">Extract part of a string by character index (bounds are clamped)</string>
     <string name="catalog_action_text_substring_field_source_label" formatted="false">Source text</string>
     <string name="catalog_action_text_substring_field_start_label" formatted="false">Start index</string>
     <string name="catalog_action_text_substring_field_start_hint" formatted="false">0-based</string>
     <string name="catalog_action_text_substring_field_end_label" formatted="false">End index</string>
-    <string name="catalog_action_text_substring_field_end_hint" formatted="false">exclusive; omit for end of string</string>
+    <string name="catalog_action_text_substring_field_end_hint" formatted="false">Not included. Leave empty for the end of the text</string>
     <string name="catalog_action_text_substring_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_text_substring_field_var_hint" formatted="false">default: substring</string>
+    <string name="catalog_action_text_substring_field_var_hint" formatted="false">Default: substring</string>
     <string name="catalog_action_text_length_name" formatted="false">Text Length</string>
     <string name="catalog_action_text_length_description" formatted="false">Count the characters in some text</string>
     <string name="catalog_action_text_length_field_source_label" formatted="false">Text</string>
     <string name="catalog_action_text_length_field_var_label" formatted="false">Output variable</string>
-    <string name="catalog_action_text_length_field_var_hint" formatted="false">default: length</string>
+    <string name="catalog_action_text_length_field_var_hint" formatted="false">Default: length</string>
     <string name="catalog_action_var_split_name" formatted="false">Variable Split</string>
     <string name="catalog_action_var_split_description" formatted="false">Split a variable into numbered elements, the way Tasker does (%text1, %text2, …)</string>
     <string name="catalog_action_var_split_field_name_label" formatted="false">Name</string>
     <string name="catalog_action_var_split_field_name_hint" formatted="false">%text becomes %text1, %text2, …</string>
     <string name="catalog_action_var_split_field_values_label" formatted="false">Values</string>
-    <string name="catalog_action_var_split_field_values_hint" formatted="false">split this text instead of the variable\'s own value, like Tasker\'s Array Set</string>
+    <string name="catalog_action_var_split_field_values_hint" formatted="false">Split this text instead of the variable\'s own value, like Tasker\'s Array Set</string>
     <string name="catalog_action_var_split_field_splitter_label" formatted="false">Splitter</string>
-    <string name="catalog_action_var_split_field_splitter_hint" formatted="false">blank splits on spaces and new lines</string>
+    <string name="catalog_action_var_split_field_splitter_hint" formatted="false">Blank splits on spaces and new lines</string>
     <string name="catalog_action_var_split_field_regex_label" formatted="false">Splitter is a regex</string>
     <string name="catalog_action_var_split_field_delete_base_label" formatted="false">Delete the variable after splitting</string>
     <string name="catalog_action_var_join_name" formatted="false">Variable Join</string>
@@ -245,18 +245,18 @@
     <string name="catalog_action_array_push_field_array_label" formatted="false">Array</string>
     <string name="catalog_action_array_push_field_array_hint" formatted="false">%arr, with elements %arr1, %arr2, …</string>
     <string name="catalog_action_array_push_field_position_label" formatted="false">Position</string>
-    <string name="catalog_action_array_push_field_position_hint" formatted="false">default: 1; past the end appends</string>
+    <string name="catalog_action_array_push_field_position_hint" formatted="false">Default: 1. Past the end appends</string>
     <string name="catalog_action_array_push_field_value_label" formatted="false">Value</string>
     <string name="catalog_action_array_push_field_fill_spaces_label" formatted="false">Fill spaces</string>
-    <string name="catalog_action_array_push_field_fill_spaces_hint" formatted="false">only move elements up to the first gap</string>
+    <string name="catalog_action_array_push_field_fill_spaces_hint" formatted="false">Only move elements up to the first gap</string>
     <string name="catalog_action_array_pop_name" formatted="false">Array Pop</string>
     <string name="catalog_action_array_pop_description" formatted="false">Remove an element from an array and move later elements down</string>
     <string name="catalog_action_array_pop_field_array_label" formatted="false">Array</string>
     <string name="catalog_action_array_pop_field_array_hint" formatted="false">%arr, with elements %arr1, %arr2, …</string>
     <string name="catalog_action_array_pop_field_position_label" formatted="false">Position</string>
-    <string name="catalog_action_array_pop_field_position_hint" formatted="false">default: 1; past the end pops the last</string>
+    <string name="catalog_action_array_pop_field_position_hint" formatted="false">Default: 1. Past the end pops the last</string>
     <string name="catalog_action_array_pop_field_to_var_label" formatted="false">To variable</string>
-    <string name="catalog_action_array_pop_field_to_var_hint" formatted="false">optional, gets the removed value</string>
+    <string name="catalog_action_array_pop_field_to_var_hint" formatted="false">Optional. Gets the removed value</string>
     <string name="catalog_action_array_clear_name" formatted="false">Array Clear</string>
     <string name="catalog_action_array_clear_description" formatted="false">Unset every element of an array</string>
     <string name="catalog_action_array_clear_field_array_label" formatted="false">Array</string>
@@ -297,7 +297,7 @@
     <string name="catalog_action_flow_wait_description" formatted="false">Pause task execution for a specified duration</string>
     <string name="catalog_category_flow" formatted="false">Flow</string>
     <string name="catalog_action_flow_wait_field_millis_label" formatted="false">Milliseconds</string>
-    <string name="catalog_action_flow_wait_field_millis_hint" formatted="false">Duration in ms</string>
+    <string name="catalog_action_flow_wait_field_millis_hint" formatted="false">Duration in milliseconds</string>
     <string name="catalog_action_profile_set_name" formatted="false">Profile Status</string>
     <string name="catalog_action_profile_set_description" formatted="false">Turn a profile on or off by its name</string>
     <string name="catalog_action_profile_set_field_profile_label" formatted="false">Profile name</string>
@@ -343,7 +343,7 @@
       <string name="catalog_action_flow_try_field_max_attempts_hint" formatted="false">1 to 5. The block review below lists actions that can retry.</string>
       <string name="catalog_action_flow_try_field_backoff_label" formatted="false">Base backoff (ms)</string>
       <string name="catalog_action_flow_try_field_backoff_hint" formatted="false">0 to 60000, growing exponentially between retries</string>
-      <string name="flow_try_retry_summary_empty" formatted="false">Retries apply only to idempotent actions added inside this block.</string>
+      <string name="flow_try_retry_summary_empty" formatted="false">Retries only apply to steps inside this block that are safe to repeat.</string>
       <string name="flow_try_retryable_summary" formatted="false">Retryable actions: %1$s</string>
       <string name="flow_try_non_retryable_summary" formatted="false">Will not retry: %1$s</string>
       <string name="catalog_action_flow_catch_name" formatted="false">Catch</string>
@@ -398,7 +398,7 @@
     <string name="catalog_action_plugin_locale_fire_field_bundlejson_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
     <string name="catalog_action_plugin_locale_fire_field_blurb_label" formatted="false">Blurb</string>
     <string name="catalog_action_plugin_locale_fire_field_blurb_hint" formatted="false">Short user-visible summary</string>
-    <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">Timeout ms</string>
+    <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
     <string name="catalog_action_plugin_locale_fire_field_timeoutms_hint" formatted="false">5000</string>
     <string name="catalog_action_plugin_locale_query_name" formatted="false">Locale Plugin Condition</string>
     <string name="catalog_action_plugin_locale_query_description" formatted="false">Query an explicit Locale/Tasker-compatible condition plugin and store its state</string>
@@ -408,7 +408,7 @@
     <string name="catalog_action_plugin_locale_query_field_bundlejson_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
     <string name="catalog_action_plugin_locale_query_field_blurb_label" formatted="false">Blurb</string>
     <string name="catalog_action_plugin_locale_query_field_blurb_hint" formatted="false">Short user-visible summary</string>
-    <string name="catalog_action_plugin_locale_query_field_timeoutms_label" formatted="false">Timeout ms</string>
+    <string name="catalog_action_plugin_locale_query_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
     <string name="catalog_action_plugin_locale_query_field_timeoutms_hint" formatted="false">5000</string>
     <string name="catalog_action_plugin_locale_query_field_resultvariable_label" formatted="false">Result variable</string>
     <string name="catalog_action_plugin_locale_query_field_resultvariable_hint" formatted="false">%plugin_state</string>
@@ -421,7 +421,7 @@
     <string name="catalog_action_script_shizuku_run_field_arguments_hint" formatted="false">Optional shell-style arguments</string>
     <string name="catalog_action_script_shizuku_run_field_captureprefix_label" formatted="false">Output variable prefix</string>
     <string name="catalog_action_script_shizuku_run_field_captureprefix_hint" formatted="false">%script</string>
-    <string name="catalog_action_script_shizuku_run_field_timeoutms_label" formatted="false">Timeout ms</string>
+    <string name="catalog_action_script_shizuku_run_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
     <string name="catalog_action_script_shizuku_run_field_timeoutms_hint" formatted="false">30000 (1000 to 120000)</string>
     <string name="catalog_action_script_termux_run_name" formatted="false">Run Termux Script</string>
     <string name="catalog_action_script_termux_run_description" formatted="false">Run an approved Termux script and optionally capture bounded output</string>
@@ -433,10 +433,10 @@
     <string name="catalog_action_script_termux_run_field_workingdirectory_label" formatted="false">Working directory</string>
     <string name="catalog_action_script_termux_run_field_workingdirectory_hint" formatted="false">Optional Termux working directory</string>
     <string name="catalog_action_script_termux_run_field_stdin_label" formatted="false">Standard input</string>
-    <string name="catalog_action_script_termux_run_field_stdin_hint" formatted="false">Optional stdin payload</string>
+    <string name="catalog_action_script_termux_run_field_stdin_hint" formatted="false">Optional text sent to the command\'s input</string>
     <string name="catalog_action_script_termux_run_field_captureprefix_label" formatted="false">Output variable prefix</string>
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
-    <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">Timeout ms</string>
+    <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000 (1000 to 120000)</string>
     <string name="catalog_action_tasker_unsupported_name" formatted="false">Unsupported Tasker Action</string>
     <string name="catalog_action_tasker_unsupported_description" formatted="false">Placeholder for a Tasker action that could not be safely mapped during import</string>
@@ -472,11 +472,11 @@
     <string name="catalog_action_ime_info_name" formatted="false">Get Keyboard Info</string>
     <string name="catalog_action_ime_info_description" formatted="false">Report current and enabled keyboards</string>
     <string name="catalog_action_ime_info_field_var_label" formatted="false">Output variable base</string>
-    <string name="catalog_action_ime_info_field_var_hint" formatted="false">Defaults to IME; writes _CURRENT, _ENABLED, and _COUNT</string>
+    <string name="catalog_action_ime_info_field_var_hint" formatted="false">IME by default, giving %IME_CURRENT, %IME_ENABLED and %IME_COUNT</string>
     <string name="catalog_action_ime_set_name" formatted="false">Switch Keyboard</string>
     <string name="catalog_action_ime_set_description" formatted="false">Validate a keyboard and open the system picker</string>
     <string name="catalog_action_ime_set_field_ime_id_label" formatted="false">Keyboard ID or package</string>
-    <string name="catalog_action_ime_set_field_ime_id_hint" formatted="false">Component ID from ime.info</string>
+    <string name="catalog_action_ime_set_field_ime_id_hint" formatted="false">Keyboard ID from Get Keyboard Info</string>
     <string name="catalog_action_volume_set_name" formatted="false">Set Volume</string>
     <string name="catalog_action_volume_set_description" formatted="false">Adjust volume for a stream</string>
     <string name="catalog_action_volume_set_field_stream_label" formatted="false">Stream</string>
@@ -536,32 +536,32 @@
     <string name="catalog_action_settings_read_field_var_label" formatted="false">Store in</string>
     <string name="catalog_action_settings_read_field_var_hint" formatted="false">A setting that isn\'t there is stored as empty, as in Tasker.</string>
     <string name="catalog_action_dnd_set_name" formatted="false">Set Do Not Disturb</string>
-    <string name="catalog_action_dnd_set_description" formatted="false">Set DND interruption filter mode</string>
+    <string name="catalog_action_dnd_set_description" formatted="false">Set the Do Not Disturb mode</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">Mode</string>
     <string name="catalog_action_dnd_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
-    <string name="catalog_action_zen_rule_set_name" formatted="false">Set Zen rule</string>
-    <string name="catalog_action_zen_rule_set_description" formatted="false">Create or update an owned DND rule with Android 15 device effects</string>
+    <string name="catalog_action_zen_rule_set_name" formatted="false">Set Do Not Disturb Rule</string>
+    <string name="catalog_action_zen_rule_set_description" formatted="false">Add or update one of OpenTasker\'s own Do Not Disturb rules, with Android 15 device effects</string>
     <string name="catalog_action_zen_rule_set_field_id_label" formatted="false">Rule ID</string>
-    <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">stable key, for example focus_evening</string>
+    <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">Stable key, for example focus_evening</string>
     <string name="catalog_action_zen_rule_set_field_name_label" formatted="false">Rule name</string>
-    <string name="catalog_action_zen_rule_set_field_name_hint" formatted="false">name shown in Android DND settings</string>
+    <string name="catalog_action_zen_rule_set_field_name_hint" formatted="false">Name shown in Android\'s Do Not Disturb settings</string>
     <string name="catalog_action_zen_rule_set_field_mode_label" formatted="false">Mode</string>
     <string name="catalog_action_zen_rule_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
     <string name="catalog_action_zen_rule_set_field_enabled_label" formatted="false">Enabled</string>
-    <string name="catalog_action_zen_rule_set_field_enabled_hint" formatted="false">whether Android may activate this rule</string>
+    <string name="catalog_action_zen_rule_set_field_enabled_hint" formatted="false">Whether Android may turn this rule on</string>
     <string name="catalog_action_zen_rule_set_field_grayscale_label" formatted="false">Grayscale display</string>
     <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">Dim wallpaper</string>
     <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">Night mode</string>
-    <string name="catalog_action_zen_rule_clear_name" formatted="false">Clear Zen rule</string>
-    <string name="catalog_action_zen_rule_clear_description" formatted="false">Remove an OpenTasker-owned DND rule</string>
+    <string name="catalog_action_zen_rule_clear_name" formatted="false">Clear Do Not Disturb Rule</string>
+    <string name="catalog_action_zen_rule_clear_description" formatted="false">Remove one of OpenTasker\'s own Do Not Disturb rules</string>
     <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">Rule ID</string>
-    <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">the stable key used by Set Zen rule</string>
+    <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">The key used by Set Do Not Disturb Rule</string>
     <string name="catalog_action_ringer_set_name" formatted="false">Set Ringer Mode</string>
     <string name="catalog_action_ringer_set_description" formatted="false">Set device ringer mode</string>
     <string name="catalog_action_ringer_set_field_mode_label" formatted="false">Mode</string>
     <string name="catalog_action_ringer_set_field_mode_hint" formatted="false">normal/vibrate/silent</string>
-    <string name="catalog_action_torch_set_name" formatted="false">Toggle Torch</string>
-    <string name="catalog_action_torch_set_description" formatted="false">Turn camera flashlight on or off</string>
+    <string name="catalog_action_torch_set_name" formatted="false">Toggle Flashlight</string>
+    <string name="catalog_action_torch_set_description" formatted="false">Turn the flashlight on or off</string>
     <string name="catalog_action_torch_set_field_state_label" formatted="false">State</string>
     <string name="catalog_action_torch_set_field_state_hint" formatted="false">on/off/toggle</string>
     <string name="catalog_action_tile_set_name" formatted="false">Set Tile State</string>
@@ -593,8 +593,8 @@
     <string name="catalog_action_app_launch_description" formatted="false">Launch an installed application</string>
     <string name="catalog_action_app_launch_field_package_label" formatted="false">Package name</string>
     <string name="catalog_action_app_launch_field_package_hint" formatted="false">com.example.app</string>
-    <string name="catalog_action_app_kill_name" formatted="false">Kill App</string>
-    <string name="catalog_action_app_kill_description" formatted="false">Force close an app</string>
+    <string name="catalog_action_app_kill_name" formatted="false">Force Stop App</string>
+    <string name="catalog_action_app_kill_description" formatted="false">Force stop an app</string>
     <string name="catalog_action_app_kill_field_package_label" formatted="false">Package name</string>
     <string name="catalog_action_app_archive_name" formatted="false">Archive App</string>
     <string name="catalog_action_app_archive_description" formatted="false">Archive an installed application while retaining its user data</string>
@@ -613,7 +613,7 @@
     <string name="catalog_action_screenshot_take_name" formatted="false">Take Screenshot</string>
     <string name="catalog_action_screenshot_take_description" formatted="false">Capture device screenshot</string>
     <string name="catalog_action_screenshot_take_field_path_label" formatted="false">Output path</string>
-    <string name="catalog_action_screenshot_take_field_path_hint" formatted="false">optional output path</string>
+    <string name="catalog_action_screenshot_take_field_path_hint" formatted="false">Optional output path</string>
     <string name="catalog_action_file_read_name" formatted="false">Read File</string>
     <string name="catalog_action_file_read_description" formatted="false">Read file contents into a variable</string>
     <string name="catalog_category_file" formatted="false">File</string>
@@ -646,7 +646,7 @@
     <string name="catalog_action_http_request_field_query_label" formatted="false">Query parameters</string>
     <string name="catalog_action_http_request_field_query_hint" formatted="false">One name=value pair per line</string>
     <string name="catalog_action_http_request_field_headers_label" formatted="false">Request headers</string>
-    <string name="catalog_action_http_request_field_headers_hint" formatted="false">One Name: Value header per line; run-log details are redacted</string>
+    <string name="catalog_action_http_request_field_headers_hint" formatted="false">One Name: Value header per line. The run log hides their values</string>
     <string name="catalog_action_http_request_field_authorization_label" formatted="false">Authorization</string>
     <string name="catalog_action_http_request_field_authorization_hint" formatted="false">For example, Bearer %SECRET_TOKEN; always redacted from logs</string>
     <string name="catalog_action_http_request_field_body_label" formatted="false">Inline request body</string>
@@ -697,7 +697,7 @@
     <string name="catalog_action_home_assistant_webhook_field_url_label" formatted="false">Webhook URL</string>
     <string name="catalog_action_home_assistant_webhook_field_url_hint" formatted="false">HTTPS webhook URL; the secret path is redacted from display</string>
     <string name="catalog_action_home_assistant_webhook_field_payload_label" formatted="false">JSON payload</string>
-    <string name="catalog_action_home_assistant_webhook_field_payload_hint" formatted="false">JSON object, maximum 16 KB; payload is redacted from display</string>
+    <string name="catalog_action_home_assistant_webhook_field_payload_hint" formatted="false">JSON object up to 16 KB. It\'s hidden wherever the step is shown.</string>
     <string name="catalog_action_home_assistant_webhook_field_message_label" formatted="false">Home Assistant message/command</string>
     <string name="catalog_action_home_assistant_webhook_field_message_hint" formatted="false">Optional Companion notification message, such as command_broadcast_intent; use with data</string>
     <string name="catalog_action_home_assistant_webhook_field_data_label" formatted="false">Home Assistant data</string>
@@ -709,7 +709,7 @@
     <string name="catalog_action_home_assistant_webhook_field_backoff_label" formatted="false">Retry backoff (ms)</string>
     <string name="catalog_action_home_assistant_webhook_field_backoff_hint" formatted="false">Initial delay; exponential and capped at 10 seconds (100-5000)</string>
     <string name="catalog_action_home_assistant_webhook_field_allow_http_label" formatted="false">Allow HTTP</string>
-    <string name="catalog_action_home_assistant_webhook_field_allow_http_hint" formatted="false">Only for private-LAN endpoints; ACCESS_LOCAL_NETWORK and host policy still apply</string>
+    <string name="catalog_action_home_assistant_webhook_field_allow_http_hint" formatted="false">Only for addresses on your own network. Local network access and the host list still apply</string>
     <string name="catalog_action_mqtt_publish_name" formatted="false">MQTT Publish</string>
     <string name="catalog_action_mqtt_publish_description" formatted="false">Publish a bounded message to an MQTT 3.1.1 broker using the platform socket/TLS stack</string>
     <string name="catalog_action_mqtt_publish_field_host_label" formatted="false">Broker host</string>
@@ -721,9 +721,9 @@
     <string name="catalog_action_mqtt_publish_field_topic_label" formatted="false">Topic</string>
     <string name="catalog_action_mqtt_publish_field_topic_hint" formatted="false">Publish topic, without + or # wildcards</string>
     <string name="catalog_action_mqtt_publish_field_payload_label" formatted="false">Payload</string>
-    <string name="catalog_action_mqtt_publish_field_payload_hint" formatted="false">UTF-8 payload, maximum 64 KB; redacted from display</string>
+    <string name="catalog_action_mqtt_publish_field_payload_hint" formatted="false">UTF-8 text up to 64 KB. It\'s hidden wherever the step is shown.</string>
     <string name="catalog_action_mqtt_publish_field_qos_label" formatted="false">QoS</string>
-    <string name="catalog_action_mqtt_publish_field_qos_hint" formatted="false">0 or 1; QoS 1 waits for PUBACK</string>
+    <string name="catalog_action_mqtt_publish_field_qos_hint" formatted="false">0 or 1. With 1, the broker confirms it got the message</string>
     <string name="catalog_action_mqtt_publish_field_retain_label" formatted="false">Retain</string>
     <string name="catalog_action_mqtt_publish_field_retain_hint" formatted="false">Ask the broker to retain the last message</string>
     <string name="catalog_action_mqtt_publish_field_username_label" formatted="false">Username</string>
@@ -751,8 +751,8 @@
     <string name="catalog_action_download_field_max_bytes_hint" formatted="false">Default and maximum: 52428800 (50 MB)</string>
     <string name="catalog_action_wol_name" formatted="false">Wake-on-LAN</string>
     <string name="catalog_action_wol_description" formatted="false">Send a magic packet to wake a device on the local network</string>
-    <string name="catalog_action_wol_field_mac_label" formatted="false">MAC Address</string>
-    <string name="catalog_action_wol_field_mac_hint" formatted="false">e.g. AA:BB:CC:DD:EE:FF</string>
+    <string name="catalog_action_wol_field_mac_label" formatted="false">MAC address</string>
+    <string name="catalog_action_wol_field_mac_hint" formatted="false">For example AA:BB:CC:DD:EE:FF</string>
     <string name="catalog_action_wol_field_broadcast_label" formatted="false">Broadcast IP</string>
     <string name="catalog_action_wol_field_broadcast_hint" formatted="false">Default: 255.255.255.255</string>
     <string name="catalog_action_wol_field_port_label" formatted="false">Port</string>

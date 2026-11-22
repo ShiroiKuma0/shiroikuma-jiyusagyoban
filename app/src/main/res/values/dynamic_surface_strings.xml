@@ -20,19 +20,19 @@
     <string name="context_field_application_package_hint" formatted="false">com.example.app (work-profile apps are not visible)</string>
     <string name="context_field_application_component_label" formatted="false">Foreground component (optional)</string>
     <string name="context_field_application_component_hint" formatted="false">com.example.app.PlayerActivity or com.example.app.*</string>
-    <string name="context_field_time_start_label" formatted="false">Start HH:mm</string>
+    <string name="context_field_time_start_label" formatted="false">Start (HH:mm)</string>
     <string name="context_field_time_start_hint" formatted="false">09:00, or a global like %Sunrise</string>
-    <string name="context_field_time_end_label" formatted="false">End HH:mm</string>
+    <string name="context_field_time_end_label" formatted="false">End (HH:mm)</string>
     <string name="context_field_time_end_hint" formatted="false">17:00, or a global like %Sunset</string>
     <string name="context_field_day_days_label" formatted="false">Days</string>
     <string name="context_field_day_days_hint" formatted="false">weekdays, weekends, MON-FRI</string>
     <string name="context_field_location_latitude_label" formatted="false">Latitude</string>
     <string name="context_field_location_longitude_label" formatted="false">Longitude</string>
-    <string name="context_field_location_radius_label" formatted="false">Radius meters</string>
+    <string name="context_field_location_radius_label" formatted="false">Radius (meters)</string>
     <string name="context_field_location_radius_hint" formatted="false">100</string>
-    <string name="context_field_location_accuracy_label" formatted="false">Max accuracy meters</string>
+    <string name="context_field_location_accuracy_label" formatted="false">Max accuracy (meters)</string>
     <string name="context_field_location_accuracy_hint" formatted="false">50</string>
-    <string name="context_field_location_dwell_label" formatted="false">Dwell seconds</string>
+    <string name="context_field_location_dwell_label" formatted="false">Dwell (seconds)</string>
     <string name="context_field_location_dwell_hint" formatted="false">300</string>
     <string name="context_field_location_outside_label" formatted="false">Match when outside</string>
     <string name="context_field_location_outside_hint" formatted="false">Fire when away from this place instead of at it (with dwell)</string>
@@ -63,7 +63,7 @@
     <string name="context_field_event_state_hint" formatted="false">during, upcoming, connected, disconnected</string>
     <string name="context_field_event_calendar_label" formatted="false">Calendar name</string>
     <string name="context_field_event_calendar_hint" formatted="false">Work</string>
-    <string name="context_field_event_before_label" formatted="false">Before minutes</string>
+    <string name="context_field_event_before_label" formatted="false">Before (minutes)</string>
     <string name="context_field_event_before_hint" formatted="false">15</string>
     <string name="context_field_event_package_label" formatted="false">Package allowlist</string>
     <string name="context_field_event_package_hint" formatted="false">com.example.app, com.chat.app</string>
@@ -73,16 +73,16 @@
     <string name="context_field_event_latitude_hint" formatted="false">40.7128</string>
     <string name="context_field_event_longitude_label" formatted="false">Longitude</string>
     <string name="context_field_event_longitude_hint" formatted="false">-74.0060</string>
-    <string name="context_field_event_offset_label" formatted="false">Sun offset minutes</string>
+    <string name="context_field_event_offset_label" formatted="false">Sun offset (minutes)</string>
     <string name="context_field_event_offset_hint" formatted="false">-30</string>
-    <string name="context_field_event_window_label" formatted="false">Sun window minutes</string>
+    <string name="context_field_event_window_label" formatted="false">Sun window (minutes)</string>
     <string name="context_field_event_window_hint" formatted="false">5</string>
     <string name="context_field_event_elevation_label" formatted="false">Sun elevation</string>
     <string name="context_field_event_elevation_hint" formatted="false">Blank for sunrise or sunset, civil, nautical, astronomical, or degrees like -4</string>
     <string name="context_field_event_topic_label" formatted="false">Push topic</string>
     <string name="context_field_event_topic_hint" formatted="false">topic-name</string>
     <string name="context_field_event_id_label" formatted="false">Push event ID</string>
-    <string name="context_field_event_id_hint" formatted="false">optional exact delivery ID</string>
+    <string name="context_field_event_id_hint" formatted="false">Optional exact delivery ID</string>
     <string name="context_field_event_title_label" formatted="false">Title contains</string>
     <string name="context_field_event_title_hint" formatted="false">Optional notification title text</string>
     <string name="context_field_event_body_label" formatted="false">Body contains</string>
@@ -100,7 +100,7 @@
     <string name="locale_plugin_configure_refused">OpenTasker didn\'t open the plugin\'s settings: %1$s</string>
     <string name="context_field_plugin_blurb_label" formatted="false">Description</string>
     <string name="context_field_plugin_blurb_hint" formatted="false">Optional label from plugin config</string>
-    <string name="context_field_plugin_timeout_label" formatted="false">Query timeout ms</string>
+    <string name="context_field_plugin_timeout_label" formatted="false">Query timeout (milliseconds)</string>
     <string name="context_field_plugin_timeout_hint" formatted="false">5000</string>
 
     <string name="context_day_mon" formatted="false">MON</string>
@@ -178,43 +178,43 @@
     <string name="capability_bluetooth_permission" formatted="false">Requires Bluetooth permission.</string>
     <string name="capability_write_settings" formatted="false">Requires Write Settings special access.</string>
     <string name="capability_settings_write_setup" formatted="false">Writing a Global or Secure setting needs one-time access granted from a computer over a cable, set up in Setup. The System table uses Modify system settings instead.</string>
-    <string name="capability_app_kill_unsupported" formatted="false">Force-stopping another app requires privileged app-management access that no normal app can hold.</string>
+    <string name="capability_app_kill_unsupported" formatted="false">Force-stopping another app needs system app management access that no normal app can hold.</string>
     <string name="capability_app_archive_ready" formatted="false">Uses Android 15+ PackageInstaller archive requests. OpenTasker is not the installer of record, so Android asks you to confirm each request on screen; run this action with OpenTasker open.</string>
     <string name="capability_app_archive_unsupported" formatted="false">Package archive requests require Android 15 (API 35) or newer.</string>
     <string name="capability_local_network_setup" formatted="false">Android 17+ requires local network access for the LAN broadcast; grant it in Setup.</string>
     <string name="capability_dnd_access" formatted="false">Requires Do Not Disturb access.</string>
-    <string name="capability_zen_rule_access" formatted="false">Requires Do Not Disturb access; Android 15+ uses owned Zen rules with device effects.</string>
+    <string name="capability_zen_rule_access" formatted="false">Needs Do Not Disturb access. On Android 15 and later it uses OpenTasker\'s own Do Not Disturb rules with device effects.</string>
     <string name="capability_torch_ready" formatted="false">Uses the camera flashlight.</string>
-    <string name="capability_aod_unsupported" formatted="false">Always-on display changes require Shizuku permission and its privileged user-service transport, and some builds ignore the setting entirely. A display that stays on uses more battery.</string>
+    <string name="capability_aod_unsupported" formatted="false">Always-on display changes need Shizuku, and some builds ignore the setting entirely. A display that stays on uses more battery.</string>
     <string name="capability_sun_times_setup" formatted="false">Needs location access only when latitude or longitude is left blank, to read the phone\'s location.</string>
     <string name="capability_location_get_setup" formatted="false">Needs location access from the Foreground location row in Setup, and the Background location row when a profile runs it.</string>
     <string name="capability_wifi_scan_setup" formatted="false">Scanning needs location access, and Nearby Wi-Fi devices on Android 13 and later. Android rate-limits scans, so results may be the last cached scan rather than a fresh one.</string>
     <string name="capability_airplane_unsupported" formatted="false">Airplane mode changes need Shizuku, or OpenTasker set as the digital assistant app in Setup. Turning it on cuts calls, mobile data and usually Wi-Fi until something turns it back off.</string>
-    <string name="capability_mobile_data_unsupported" formatted="false">Mobile data changes require Shizuku permission and its privileged user-service transport. Turning it off stops anything that needs data, including remote access to this phone.</string>
-    <string name="capability_hotspot_unsupported" formatted="false">The Wi-Fi hotspot requires Android 11 or newer, Shizuku permission and its privileged user-service transport. Anyone with the saved password can join, and connected devices use your mobile data.</string>
+    <string name="capability_mobile_data_unsupported" formatted="false">Mobile data changes need Shizuku. Turning it off stops anything that needs data, including remote access to this phone.</string>
+    <string name="capability_hotspot_unsupported" formatted="false">The Wi-Fi hotspot needs Android 11 or newer and Shizuku. Anyone with the saved password can join, and connected devices use your mobile data.</string>
     <string name="capability_hotspot_android_version" formatted="false">The Wi-Fi hotspot action needs Android 11 or newer.</string>
-    <string name="capability_screenshot_unsupported" formatted="false">Screenshots require Shizuku permission and its privileged user-service transport. Each one saves whatever is on screen to OpenTasker\'s storage, passwords and messages included.</string>
-    <string name="capability_reboot_unsupported" formatted="false">Reboot requires Shizuku permission and its privileged user-service transport. The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.</string>
+    <string name="capability_screenshot_unsupported" formatted="false">Screenshots need Shizuku. Each one saves whatever is on screen to OpenTasker\'s storage, passwords and messages included.</string>
+    <string name="capability_reboot_unsupported" formatted="false">Reboot needs Shizuku. The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.</string>
     <string name="capability_lock_setup" formatted="false">Requires the Lock screen device admin, which you turn on in Setup.</string>
     <string name="capability_tile_ready" formatted="false">Updates a configured OpenTasker Quick Settings tile.</string>
-    <string name="capability_temporary_state_ready" formatted="false">Applies a reversible setting and schedules a durable restore.</string>
-    <string name="capability_ime_info_ready" formatted="false">Reports the current and enabled input methods.</string>
-    <string name="capability_ime_set_unsupported" formatted="false">Android requires user selection before a normal app can switch the active input method.</string>
-    <string name="capability_screen_off_unsupported" formatted="false">Screen-off requires Shizuku permission and its privileged user-service transport. The screen goes dark even if someone is using the phone, and it may lock.</string>
-    <string name="capability_wake_unsupported" formatted="false">Wake requires Shizuku permission and its privileged user-service transport. The screen turns on untouched, showing whatever is on the lock screen and using battery.</string>
+    <string name="capability_temporary_state_ready" formatted="false">Changes a setting and puts it back later, even after a restart.</string>
+    <string name="capability_ime_info_ready" formatted="false">Reports the keyboard in use and the ones turned on.</string>
+    <string name="capability_ime_set_unsupported" formatted="false">Android only lets you switch keyboards yourself, so no normal app can do it.</string>
+    <string name="capability_screen_off_unsupported" formatted="false">Turning the screen off needs Shizuku. The screen goes dark even if someone is using the phone, and it may lock.</string>
+    <string name="capability_wake_unsupported" formatted="false">Wake needs Shizuku. The screen turns on untouched, showing whatever is on the lock screen and using battery.</string>
     <string name="capability_vpn_tunnel_setup" formatted="false">Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on.</string>
     <string name="capability_shizuku_script_setup" formatted="false">Requires Shizuku access and an approved script hash.</string>
-    <string name="capability_termux_setup" formatted="false">Requires Termux 0.109 or newer, RUN_COMMAND permission, and an approved script hash.</string>
+    <string name="capability_termux_setup" formatted="false">Requires Termux 0.109 or newer, the Run commands in Termux environment permission, and an approved script hash.</string>
     <string name="capability_tasker_import_unsupported" formatted="false">The imported Tasker action could not be mapped to a supported OpenTasker action.</string>
     <string name="capability_macrodroid_import_unsupported" formatted="false">The imported MacroDroid action could not be mapped to a supported OpenTasker action.</string>
     <string name="capability_sms_permission" formatted="false">Requires SMS permission.</string>
     <string name="capability_calendar_event_add_setup" formatted="false">Needs the Calendar editing row in Setup, and a calendar that takes new events.</string>
     <string name="capability_calendar_event_query_setup" formatted="false">Needs the Calendar access row in Setup.</string>
     <string name="capability_contacts_permission" formatted="false">Requires an explicit Contacts permission for unattended lookup; Android 17+ also supports a field-scoped system picker mode.</string>
-    <string name="capability_audio_output_restricted" formatted="false">Android 17 restricts audio output unless OpenTasker has a while-in-use eligible foreground-service path.</string>
+    <string name="capability_audio_output_restricted" formatted="false">Android 17 blocks sound output unless OpenTasker\'s service is running in the foreground.</string>
     <string name="capability_audio_output_ready" formatted="false">Audio output is available.</string>
-    <string name="capability_media_key_restricted" formatted="false">Android 17 restricts media-key dispatch unless OpenTasker has a while-in-use eligible foreground-service path.</string>
-    <string name="capability_media_key_ready" formatted="false">Media-key dispatch is available.</string>
-    <string name="capability_volume_restricted" formatted="false">Android 17 restricts volume changes unless OpenTasker has a while-in-use eligible foreground-service path.</string>
+    <string name="capability_media_key_restricted" formatted="false">Android 17 blocks media keys unless OpenTasker\'s service is running in the foreground.</string>
+    <string name="capability_media_key_ready" formatted="false">Media keys can be sent.</string>
+    <string name="capability_volume_restricted" formatted="false">Android 17 blocks volume changes unless OpenTasker\'s service is running in the foreground.</string>
     <string name="capability_volume_policy" formatted="false">May require Do Not Disturb policy access.</string>
 </resources>

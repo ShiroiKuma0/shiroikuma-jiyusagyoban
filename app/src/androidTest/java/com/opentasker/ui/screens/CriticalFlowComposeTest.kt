@@ -125,7 +125,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         composeTestRule.onNodeWithText("Work-hours focus").assertIsDisplayed()
         scrollToText("Start time *")
         composeTestRule.onNodeWithText("Start time *").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Create for Review").assertIsEnabled()
+        composeTestRule.onNodeWithText("Create for review").assertIsEnabled()
     }
 
     @Test
@@ -267,7 +267,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Create Task").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Create task").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         composeTestRule.onAllNodes(hasSetTextAction())[0].performTextInput("Morning focus")
         composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
@@ -313,7 +313,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Create Profile").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Create profile").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         composeTestRule.onAllNodes(hasSetTextAction())[0].performTextInput("At work")
         composeTestRule.onNodeWithText("Morning focus").performScrollTo().assertIsDisplayed()
@@ -688,7 +688,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("No scenes yet").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Create Scene").performClick()
+        composeTestRule.onNodeWithText("Create scene").performClick()
         composeTestRule.onNodeWithText("Create").assertIsNotEnabled()
         composeTestRule.onAllNodes(hasSetTextAction())[0].performTextInput("HUD")
         composeTestRule.onNodeWithText("Create").assertIsEnabled().performClick()
@@ -723,7 +723,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         composeTestRule.onNodeWithText("Review OpenTasker bundle").assertIsDisplayed()
         scrollToText("Cannot import")
         composeTestRule.onNodeWithText("Cannot import").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Import Disabled").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Import disabled").assertIsNotEnabled()
     }
 
     @Test
@@ -763,12 +763,12 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Import Disabled").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Import disabled").assertIsNotEnabled()
         scrollToText("Keep existing")
         composeTestRule.onNodeWithText("Keep existing").performClick()
         scrollToText("Selected: Keep existing")
         composeTestRule.onNodeWithText("Selected: Keep existing").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Import for Review").assertIsEnabled()
+        composeTestRule.onNodeWithText("Import for review").assertIsEnabled()
         assertEquals(
             VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING),
             review.value.variableResolutions["API_TOKEN"],
@@ -992,11 +992,11 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }
         composeTestRule.performAccessibilityChecks()
 
-        scrollToText("Add Context")
+        scrollToText("Add context")
         composeTestRule.performAccessibilityChecks()
-        scrollToText("Add Step")
+        scrollToText("Add step")
         composeTestRule.performAccessibilityChecks()
-        composeTestRule.onNodeWithText("Add Step").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Add step").assertIsDisplayed()
     }
 
     /** A check mark sat beside "1 issue", and the icon read "Flow" to TalkBack. */
@@ -1067,7 +1067,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }.flatten().filter { it.layoutInfo.isPlaced }.maxOf { it.boundsInRoot.bottom }
         // The button's label is only in the unmerged tree, so find the clickable node around it.
         val createTop = composeTestRule
-            .onNode(hasClickAction() and hasAnyDescendant(hasText("Create Scene")), useUnmergedTree = true)
+            .onNode(hasClickAction() and hasAnyDescendant(hasText("Create scene")), useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot.top
         assertTrue(
             "The list's last line ($contentBottom px) must end above the create button ($createTop px)",
@@ -1105,7 +1105,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         // The name, not the header's middle, which is the Show button once overlays are allowed.
         composeTestRule.onNodeWithText("Dashboard", useUnmergedTree = true).performClick()
         composeTestRule.performAccessibilityChecks()
-        scrollToText("Add Element")
+        scrollToText("Add element")
         composeTestRule.performAccessibilityChecks()
         composeTestRule.onNodeWithContentDescription("Move element 4, Image, right 1 dp").performScrollTo()
         composeTestRule.performAccessibilityChecks()

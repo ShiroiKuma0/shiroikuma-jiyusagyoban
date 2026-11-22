@@ -789,7 +789,12 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                stringResource(R.string.run_log_trace_detail, trace.actionType, trace.durationMs, trace.message),
+                stringResource(
+                    R.string.run_log_trace_detail,
+                    ActionMetadataRegistry.get(trace.actionType)?.nameRes?.let { stringResource(it) } ?: trace.actionType,
+                    trace.durationMs,
+                    trace.message,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -1090,7 +1095,10 @@ private fun ActiveExecutionsCard(
                         Text(
                             stringResource(
                                 R.string.run_log_active_execution_detail,
-                                execution.source,
+                                RunLogSource.classify(execution.source).let { source ->
+                                    val name = runLogSourceName(source.key)
+                                    source.label?.let { "$name: $it" } ?: name
+                                },
                                 execution.stepIndex + 1,
                                 execution.stepLabel ?: stringResource(R.string.run_log_active_execution_starting),
                                 elapsedSeconds,

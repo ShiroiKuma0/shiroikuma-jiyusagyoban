@@ -583,6 +583,37 @@ class LocalizationSourceTest {
     }
 
     /**
+     * The microcopy pass (A-343) settled on " · " and "→" as separators, "…" for an ellipsis, and
+     * plain words for the engine's own terms. A lowercase term matches in any case.
+     */
+    @Test
+    fun userVisibleStringsUseTheAppsSeparatorsAndPlainWords() {
+        val banned = listOf(
+            " - ", "->", "...", "DND", "Zen rule", "run-log", "Run Log", "licence", "recognis", "Context inspector",
+            "predicate", "privileged", "user-service", "foreground-service", "flow.catch", "task.run", "event=",
+            "RUN_COMMAND", "PUBACK", "idempot", "interruption filter", "matcher",
+        )
+        val files = Files.list(resRoot.resolve("values")).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".xml") }.toList()
+        }
+        val offenders = files.flatMap { file ->
+            val document = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile())
+            listOf("string", "item").flatMap { tag ->
+                val nodes = document.getElementsByTagName(tag)
+                (0 until nodes.length).map { index -> nodes.item(index) }
+            }.flatMap { node ->
+                val text = node.textContent
+                val name = node.attributes?.getNamedItem("name")?.nodeValue
+                    ?: node.parentNode?.attributes?.getNamedItem("name")?.nodeValue
+                banned.filter { term ->
+                    if (term.first().isLowerCase()) text.contains(term, ignoreCase = true) else term in text
+                }.map { term -> "${file.fileName}: $name has \"$term\"" }
+            }
+        }
+        assertTrue("Separators or jargon in user-visible strings: $offenders", offenders.isEmpty())
+    }
+
+    /**
      * Every default string is used by the app's own code or resources (A-342), so copy nothing shows
      * can't pile up again. A lookup by name would hide a use from this check, so there is none.
      */

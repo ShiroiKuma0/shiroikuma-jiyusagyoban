@@ -455,7 +455,7 @@ private fun ProfileCard(
                         profileState,
                         pluralStringResource(R.plurals.label_context_count, profile.contexts.size, profile.contexts.size),
                         stringResource(R.string.label_cooldown_seconds, profile.cooldownSec),
-                    ).joinToString(" • "),
+                    ).joinToString(" · "),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -741,7 +741,7 @@ private fun TaskCard(
                     text = listOf(
                         stringResource(R.string.label_priority_short, task.priority),
                         collisionModeTitle(task.collisionMode),
-                    ).joinToString(" • "),
+                    ).joinToString(" · "),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -134,7 +134,7 @@ object DiagnosticExport {
         }
         sb.appendLine()
 
-        sb.appendLine("--- Run Log (recent 50) ---")
+        sb.appendLine("--- Run log (recent 50) ---")
         try {
             val logs = db.runLogDao().getRecent().take(50)
             val logCount = db.runLogDao().count()

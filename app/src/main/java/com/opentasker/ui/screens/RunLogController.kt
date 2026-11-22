@@ -271,7 +271,7 @@ internal class RunLogController(
             runCatching {
                 withContext(Dispatchers.IO) { db.runLogDao().setStarred(entry.id, starred) }
             }.onSuccess { refreshRunLogPage() }
-                .onFailure { events.send(loggedUiErrorMessage(it, R.string.ui_error_generic)) }
+                .onFailure { events.send(loggedUiErrorMessage(it, R.string.ui_error_run_log_star)) }
         }
     }
 }

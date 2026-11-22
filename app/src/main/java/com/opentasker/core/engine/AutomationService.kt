@@ -369,13 +369,13 @@ class AutomationService : Service() {
         scope.launch {
             val entry = com.opentasker.core.storage.RunLogEntity(
                 taskId = 0,
-                taskName = "AutomationService",
+                taskName = "OpenTasker",
                 timestamp = System.currentTimeMillis(),
                 durationMs = 0,
                 success = false,
-                message = "Service stopped by system foreground-service timeout",
-                source = "system",
-                sourceLabel = "FGS timeout",
+                message = "Android stopped the engine because its time running in the background ran out",
+                source = RunLogSource.OTHER,
+                sourceLabel = null,
             )
             runCatching { db.runLogDao().insert(entry) }
         }

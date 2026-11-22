@@ -465,7 +465,7 @@
     <string name="catalog_action_dnd_set_description" formatted="false">设置DND打扰过滤模式</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">模式</string>
     <string name="catalog_action_dnd_set_field_mode_hint" formatted="false">关闭/优先/仅闹钟/完全静音</string>
-    <string name="catalog_action_zen_rule_set_name" formatted="false">设置Zen规则</string>
+    <string name="catalog_action_zen_rule_set_name" formatted="false">设置勿扰规则</string>
     <string name="catalog_action_zen_rule_set_description" formatted="false">创建或更新带Android 15设备效果的专有DND规则</string>
     <string name="catalog_action_zen_rule_set_field_id_label" formatted="false">规则ID</string>
     <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">稳定键，例如 focus_evening</string>
@@ -478,7 +478,7 @@
     <string name="catalog_action_zen_rule_set_field_grayscale_label" formatted="false">灰度显示</string>
     <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">调暗壁纸</string>
     <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">夜间模式</string>
-    <string name="catalog_action_zen_rule_clear_name" formatted="false">清除Zen规则</string>
+    <string name="catalog_action_zen_rule_clear_name" formatted="false">清除勿扰规则</string>
     <string name="catalog_action_zen_rule_clear_description" formatted="false">移除OpenTasker专有的DND规则</string>
     <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">规则ID</string>
     <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">由“设置Zen规则”使用的稳定键</string>
@@ -519,7 +519,7 @@
     <string name="catalog_action_app_launch_description" formatted="false">启动一个已安装的应用</string>
     <string name="catalog_action_app_launch_field_package_label" formatted="false">包名</string>
     <string name="catalog_action_app_launch_field_package_hint" formatted="false">com.example.app</string>
-    <string name="catalog_action_app_kill_name" formatted="false">结束应用</string>
+    <string name="catalog_action_app_kill_name" formatted="false">强制停止应用</string>
     <string name="catalog_action_app_kill_description" formatted="false">强制关闭一个应用</string>
     <string name="catalog_action_app_kill_field_package_label" formatted="false">包名</string>
     <string name="catalog_action_app_archive_name" formatted="false">归档应用</string>

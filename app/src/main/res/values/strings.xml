@@ -36,10 +36,10 @@
     <string name="nfc_write_no_ndef">This NFC tag doesn\'t support NDEF writes.</string>
     <string name="nfc_write_written">NFC tag written with OpenTasker helper text.</string>
     <string name="nfc_write_formatted">NFC tag formatted and written with OpenTasker helper text.</string>
-    <string name="share_draft_default_name">OpenTasker Community Share</string>
-    <string name="share_draft_default_title">OpenTasker Share</string>
+    <string name="share_draft_default_name">OpenTasker community share</string>
+    <string name="share_draft_default_title">OpenTasker share</string>
     <string name="share_draft_default_description">A local OpenTasker profile share draft.</string>
-    <string name="workspace_export_name">OpenTasker Workspace Export</string>
+    <string name="workspace_export_name">OpenTasker workspace export</string>
     <string name="workspace_export_description">Profiles, tasks, variables, and scenes exported from OpenTasker.</string>
 
     <!-- Navigation -->
@@ -75,7 +75,7 @@
     <string name="locale_setting_task_id">Task #%1$d</string>
     <string name="nav_profiles">Profiles</string>
     <string name="nav_tasks">Tasks</string>
-    <string name="nav_run_log">Run Log</string>
+    <string name="nav_run_log">Run log</string>
     <string name="nav_setup">Setup</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_variables">Variables</string>
@@ -196,7 +196,7 @@
     <string name="about_body">Free and open source, MIT licensed. Everything runs on this device. There is no account, and nothing is uploaded anywhere.</string>
     <string name="about_source">Source code</string>
     <string name="about_releases">Release notes</string>
-    <string name="about_license">Read the licence</string>
+    <string name="about_license">Read the license</string>
     <string name="about_report">Report a problem</string>
     <string name="about_report_body">Opens a new issue with your build and device already filled in. If you can, paste in the report from the Diagnostics screen too.</string>
     <string name="scenes_search_hint">Search scenes</string>
@@ -214,10 +214,10 @@
     <string name="title_starter_templates">Starter templates</string>
 
     <!-- Dialog titles -->
-    <string name="dialog_create_task">Create Task</string>
-    <string name="dialog_edit_task">Edit Task</string>
-    <string name="dialog_create_profile">Create Profile</string>
-    <string name="dialog_edit_profile">Edit Profile</string>
+    <string name="dialog_create_task">Create task</string>
+    <string name="dialog_edit_task">Edit task</string>
+    <string name="dialog_create_profile">Create profile</string>
+    <string name="dialog_edit_profile">Edit profile</string>
     <string name="dialog_add_action">Add action</string>
     <string name="dialog_add_context">Add context</string>
     <string name="action_picker_search_label">Search actions</string>
@@ -247,13 +247,13 @@
     <string name="profile_exit_task_helper">Optional cleanup task to run when this profile stops matching.</string>
     <string name="profile_exit_task_required_helper">Runs when this profile stops matching. A profile with no enter task needs one.</string>
     <string name="profile_fallback_task">Profile fallback task</string>
-    <string name="profile_fallback_task_helper">Optional task to run when the profile task fails without a flow.catch.</string>
-    <string name="profile_cooldown_label">Cooldown seconds</string>
+    <string name="profile_fallback_task_helper">Optional task to run when the profile\'s task fails and no Catch step handles it.</string>
+    <string name="profile_cooldown_label">Cooldown (seconds)</string>
     <string name="profile_cooldown_helper">Minimum seconds between triggers, up to 3600. Default is 0 (no cooldown).</string>
     <string name="profile_priority_label">Profile priority</string>
     <string name="profile_priority_helper">Higher priority wins when enabled profiles match at the same time. Equal priorities use the lower profile ID.</string>
     <string name="profile_priority_invalid">Enter a whole number from -100 to 100.</string>
-    <string name="profile_grace_period_label">Activation grace seconds</string>
+    <string name="profile_grace_period_label">Activation grace (seconds)</string>
     <string name="profile_grace_period_helper">Require the contexts to stay matched or unmatched for this long before changing state. Default is 0.</string>
     <string name="profile_grace_period_invalid">Enter a whole number from 0 to 3600.</string>
     <string name="profile_max_active_label">Active execution limit</string>
@@ -265,9 +265,9 @@
     <string name="profile_concurrency_inherit_hint">Inherited default</string>
     <string name="profile_overflow_policy_label">When the limit is reached</string>
     <string name="profile_overflow_log_title">Log and hold</string>
-    <string name="profile_overflow_log_body">Record rejected runs in the Run Log so they can be replayed after capacity returns.</string>
+    <string name="profile_overflow_log_body">Record rejected runs in the run log so they can be replayed after capacity returns.</string>
     <string name="profile_overflow_silent_title">Skip silently</string>
-    <string name="profile_overflow_silent_body">Skip rejected runs without creating a Run Log entry.</string>
+    <string name="profile_overflow_silent_body">Skip rejected runs without a run log entry.</string>
     <string name="profile_lifetime_label">Profile lifetime</string>
     <string name="profile_lifetime_never_title">Always available</string>
     <string name="profile_lifetime_never_body">The profile remains eligible until you disable or edit it.</string>
@@ -286,11 +286,11 @@
     <string name="profile_lifecycle_one_shot_consumed">This one-shot profile has already run.</string>
     <string name="profile_lifecycle_missing_expiry">This profile has no valid expiry date.</string>
     <string name="profile_lifecycle_expired">This profile expired on %1$s.</string>
-    <string name="profile_lifecycle_suppressed_by_priority">Suppressed by higher-priority profile \'%1$s\'.</string>
+    <string name="profile_lifecycle_suppressed_by_priority">Suppressed by higher-priority profile “%1$s”.</string>
     <string name="profile_retrigger_label">Re-trigger behavior</string>
     <string name="profile_new">New profile</string>
-    <string name="profile_delete">Delete Profile</string>
-    <string name="profile_add_context">Add Context</string>
+    <string name="profile_delete">Delete profile</string>
+    <string name="profile_add_context">Add context</string>
     <string name="profile_edit_context_logic">Edit context logic</string>
     <string name="profile_simulate_trigger">Simulate trigger</string>
     <string name="context_simulate_trigger">Simulate trigger</string>
@@ -311,8 +311,8 @@
     <string name="collision_mode_wait_title">Wait</string>
     <string name="collision_mode_wait_body">Queue each request and run one at a time in arrival order.</string>
     <string name="task_new">New task</string>
-    <string name="task_delete">Delete Task</string>
-    <string name="task_add_action">Add Action</string>
+    <string name="task_delete">Delete task</string>
+    <string name="task_add_action">Add action</string>
 
     <!-- Action editor -->
     <string name="action_label_field">Action label</string>
@@ -362,7 +362,7 @@
 
     <!-- Setup - Backup -->
     <string name="setup_backup_label">Backup and restore</string>
-    <string name="setup_backup_create">Create Local Backup</string>
+    <string name="setup_backup_create">Create local backup</string>
     <string name="setup_backup_restore_staged">Restore staged</string>
     <string name="setup_backup_available">Backup available</string>
     <string name="setup_backup_none">No backup yet</string>
@@ -371,7 +371,7 @@
     <string name="setup_direct_boot_title">Pre-unlock time triggers</string>
     <string name="setup_direct_boot_body">Optional and off by default. When it is on, the only thing OpenTasker starts before you first unlock the phone is its own once-a-minute clock, and it remembers a single tick in storage the lock screen can reach. Your profiles, tasks, saved data, secrets, and every other kind of trigger wait until you unlock.</string>
     <string name="setup_direct_boot_enabled">On: one clock tick may be remembered before you unlock.</string>
-    <string name="setup_direct_boot_disabled">Disabled: all triggers wait until unlock.</string>
+    <string name="setup_direct_boot_disabled">Off: all triggers wait until unlock.</string>
     <string name="setup_backup_helper_full">Create a local database backup, export a copy, or keep encrypted snapshots in a folder you control. Secret variable values remain device-bound and must be re-entered after a transfer.</string>
     <string name="setup_backup_working">Working…</string>
     <string name="setup_backup_restore_body">Restart OpenTasker to apply the staged restore before the database opens.</string>
@@ -383,7 +383,7 @@
     <string name="setup_snapshots_label">Automatic off-device snapshots</string>
     <string name="setup_snapshots_helper">Write encrypted recovery archives to a folder you choose. OpenTasker never uploads them, and a restore is applied only after review.</string>
     <string name="setup_snapshots_retention">Keeping up to %1$s for %2$s.</string>
-    <string name="setup_snapshots_choice">%1$d / %2$dd</string>
+    <string name="setup_snapshots_choice">%1$d · %2$d days</string>
     <string name="setup_snapshots_status_ok">Last snapshot %1$s · %2$d stored · %3$s</string>
     <string name="setup_snapshots_status_failed">Last snapshot failed %1$s: %2$s</string>
     <string name="setup_snapshots_status_pending">No snapshot taken yet; the first one runs on the next scheduled check.</string>
@@ -403,7 +403,7 @@
     <string name="setup_snapshots_passphrase_save">Save and use folder</string>
     <string name="setup_snapshots_destination_save_failed">The snapshot folder grant or recovery passphrase could not be saved.</string>
     <string name="setup_global_fallback_title">Global failure fallback</string>
-    <string name="setup_global_fallback_body">When a task fails without a flow.catch or profile fallback, run this task once with the structured FLOW_ERROR_JSON payload.</string>
+    <string name="setup_global_fallback_body">When a task fails and neither a Catch step nor a profile fallback handles it, run this task once. It gets the error details in %FLOW_ERROR_JSON.</string>
     <string name="setup_global_fallback_label">Global fallback task</string>
     <string name="restore_review_title">Review restore</string>
     <string name="restore_review_summary">%1$s · %2$s · schema v%3$d</string>
@@ -419,24 +419,24 @@
     <string name="setup_action_open_setup_guide">Open setup guide</string>
     <string name="setup_action_open_shizuku_settings">Open Shizuku</string>
     <string name="setup_action_request_permission">Request permission</string>
-    <string name="setup_action_disable_power_mode">Disable power mode</string>
-    <string name="setup_action_enable_power_mode">Enable power mode</string>
+    <string name="setup_action_disable_power_mode">Turn off power mode</string>
+    <string name="setup_action_enable_power_mode">Turn on power mode</string>
     <string name="setup_action_open_oem_settings">Open %1$s settings</string>
     <string name="setup_action_open_dontkillmyapp">Open dontkillmyapp.com</string>
     <string name="setup_shizuku_permission_requested">Shizuku permission requested.</string>
     <string name="setup_shizuku_permission_failed">Shizuku permission could not be requested; confirm the service is running.</string>
     <string name="setup_shizuku_permission_granted">Shizuku gave OpenTasker permission.</string>
     <string name="setup_shizuku_permission_denied">Shizuku said no. If it stopped asking, allow OpenTasker in the list of authorized apps inside Shizuku.</string>
-    <string name="setup_shizuku_mode_disabled">Shizuku power mode disabled.</string>
-    <string name="setup_shizuku_mode_enabled">Shizuku power mode enabled.</string>
+    <string name="setup_shizuku_mode_disabled">Shizuku power mode is off.</string>
+    <string name="setup_shizuku_mode_enabled">Shizuku power mode is on.</string>
 
     <string name="setup_notifications_card_title">Notifications</string>
-    <string name="setup_notifications_card_body">Required for foreground-service visibility and user-facing notification actions on Android 13 and newer.</string>
+    <string name="setup_notifications_card_body">Needed on Android 13 and newer so OpenTasker can show its running notification and the notifications your tasks post.</string>
     <string name="setup_notifications_required_for">Foreground service, notification actions</string>
     <string name="setup_promoted_notifications_title">Promoted running-task notifications</string>
     <string name="setup_promoted_notifications_body">Optional on Android 16 and newer. When enabled, an active task can appear as a status-bar live update; the standard foreground notification remains available when promotion is unavailable or disabled.</string>
     <string name="setup_promoted_notifications_required_for">Optional live update for active tasks</string>
-    <string name="service_notification_channel_name">OpenTasker engine</string>
+    <string name="service_notification_channel_name">OpenTasker automation</string>
     <string name="service_notification_idle_title">OpenTasker is running</string>
     <string name="service_notification_active_title">Task running: %1$s</string>
     <string name="service_notification_open_status">Tap to open automation status</string>
@@ -469,7 +469,7 @@
     <string name="setup_calendar_write_body">Needed to add calendar events. Android grants it apart from reading the calendar, so this asks for both.</string>
     <string name="setup_calendar_write_required_for">Adding calendar events</string>
     <string name="setup_contacts_access_title">Contacts access</string>
-    <string name="setup_contacts_access_body">Needed for unattended contact lookup actions. Contact values are written as sensitive variables and never copied into run-log messages. On Android 17+, picker mode can grant only the selected fields instead.</string>
+    <string name="setup_contacts_access_body">Needed for unattended contact lookup actions. Contact values are written as sensitive variables and never copied into the run log. On Android 17 and later, picker mode can grant only the fields you pick instead.</string>
     <string name="setup_contacts_access_required_for">Unattended contact lookup and telling a stranger\'s call from a contact\'s</string>
     <string name="setup_nfc_tags_title">Read NFC tags</string>
     <string name="setup_nfc_tags_body">Android 16 and later only hand a scanned tag to apps you\'ve allowed. Until OpenTasker is allowed, scanning a tag does nothing and NFC profiles never run.</string>
@@ -546,13 +546,13 @@
     <string name="platform_family_advanced_protection">an Advanced Protection change</string>
     <string name="platform_family_bluetooth_security">a Bluetooth key or encryption change</string>
     <string name="setup_advanced_protection_title">Advanced Protection is on</string>
-    <string name="setup_advanced_protection_body">Android Advanced Protection can restrict automation-related capabilities. OpenTasker does not use Accessibility, but some privileged extensions may be limited while this protection is enabled.</string>
+    <string name="setup_advanced_protection_body">Android Advanced Protection can restrict what automation apps may do. OpenTasker doesn\'t use Accessibility, but Shizuku power actions may be limited while it\'s on.</string>
     <string name="setup_local_network_required_for">LAN network actions</string>
     <string name="setup_sms_title">SMS send</string>
     <string name="setup_sms_body">Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.</string>
     <string name="setup_sms_required_for">SMS actions</string>
     <string name="setup_sms_receive_title">SMS and MMS receive</string>
-    <string name="setup_sms_receive_body">Allows event=sms_received automations to receive sanitized sender and body values. Android 17 may delay standard OTP SMS delivery for up to three hours unless the app is exempt.</string>
+    <string name="setup_sms_receive_body">Lets an Event context of type sms_received read a cleaned-up copy of the sender and message. On Android 17, texts with one-time codes can be held back for up to three hours unless the app is exempt.</string>
     <string name="setup_sms_receive_required_for">SMS/MMS-received event contexts</string>
     <string name="setup_phone_state_title">Phone state</string>
     <string name="setup_phone_state_body">Needed for roaming and phone-call state contexts and the incoming call trigger. OpenTasker reads only the current state needed for matching and does not store phone numbers or call history.</string>
@@ -561,8 +561,8 @@
     <string name="setup_call_log_body">Android tells an app who is calling only if it holds the Call log permission. OpenTasker uses the number while the phone rings, and doesn\'t read or store your call history.</string>
     <string name="setup_call_log_required_for">The incoming call trigger\'s number</string>
     <string name="setup_dnd_title">Do Not Disturb access</string>
-    <string name="setup_dnd_body">Needed before OpenTasker can change interruption filters or create, update, and remove owned Zen rules.</string>
-    <string name="setup_dnd_required_for">DND and Zen rule actions</string>
+    <string name="setup_dnd_body">Needed before OpenTasker can change Do Not Disturb mode or add, change and remove its own Do Not Disturb rules.</string>
+    <string name="setup_dnd_required_for">Do Not Disturb actions</string>
     <string name="setup_shizuku_title">Shizuku power mode</string>
     <string name="setup_shizuku_required_for">Elevated actions</string>
     <string name="setup_shizuku_status_not_installed">Shizuku is not running and no Shizuku manager is installed. Sui and Shizuku forks show up here once their service is running.</string>
@@ -589,8 +589,8 @@
     <string name="setup_termux_title">Termux script bridge</string>
     <string name="setup_termux_status_missing">Termux is not installed.</string>
     <string name="setup_termux_status_version_unsupported">Termux 0.109 or newer is required for bounded command results.</string>
-    <string name="setup_termux_status_permission_needed">Termux is installed, but OpenTasker needs RUN_COMMAND permission.</string>
-    <string name="setup_termux_status_ready">Termux is installed and RUN_COMMAND permission is granted.</string>
+    <string name="setup_termux_status_permission_needed">Termux is installed, but OpenTasker needs the Run commands in Termux environment permission.</string>
+    <string name="setup_termux_status_ready">Termux is installed and OpenTasker may run its commands.</string>
     <string name="setup_termux_body">%1$s Only approved scripts with a matching SHA-256 hash can run.</string>
     <string name="setup_termux_required_for">Script actions</string>
     <string name="setup_termux_allowlist_title">Approved Termux scripts</string>
@@ -652,7 +652,7 @@
     <string name="run_log_share_short">Share</string>
     <string name="share_uri_unreadable">OpenTasker could not read the shared file. Re-share it with read access.</string>
     <string name="share_invalid">OpenTasker could not read that share.</string>
-    <string name="run_log_loading">Loading run logs…</string>
+    <string name="run_log_loading">Loading the run log…</string>
     <string name="run_log_load_more">Load more</string>
     <string name="run_log_refresh">Refresh</string>
     <string name="run_log_replay">Replay</string>
@@ -740,9 +740,9 @@
     <string name="automation_lint_missing_reversal_detail">%1$s writes %2$s when it enters but has no exit task.</string>
     <string name="automation_lint_missing_reversal_fix">Add an exit task that restores the setting, or use a bounded temporary-state action.</string>
     <string name="automation_lint_repeated_triggering_title">Repeated triggering</string>
-    <string name="automation_lint_repeated_triggering_detail">%1$s has a state context without a cooldown, dwell, or explicit idempotency guard.</string>
+    <string name="automation_lint_repeated_triggering_detail">%1$s has a state context with no cooldown or dwell, so it can run over and over while the state holds.</string>
     <string name="automation_lint_repeated_triggering_fix">Add a cooldown, a dwell requirement, or an explicit guard condition to the enter task.</string>
-    <string name="automation_lint_repeated_exit_triggering_detail">%1$s has a state context without a grace period, dwell, or explicit idempotency guard.</string>
+    <string name="automation_lint_repeated_exit_triggering_detail">%1$s has a state context with no grace period or dwell, so its exit task can run over and over as the state flickers.</string>
     <string name="automation_lint_repeated_exit_triggering_fix">Add a grace period, a dwell requirement, or an explicit guard condition to the exit task.</string>
     <string name="automation_lint_priority_conflict_title">Priority conflict</string>
     <string name="automation_lint_priority_conflict_detail">%1$s and %2$s can both write %3$s while their profile priorities are %4$d and %5$d.</string>
@@ -750,7 +750,7 @@
     <string name="automation_lint_priority_conflict_ordered_fix">Confirm that the higher-priority task should win, or make the contexts mutually exclusive.</string>
     <string name="automation_lint_inter_profile_loop_title">Inter-profile loop</string>
     <string name="automation_lint_inter_profile_loop_detail">Profiles form a direct task cycle: %1$s.</string>
-    <string name="automation_lint_inter_profile_loop_fix">Remove one task.run edge or add an explicit state guard so the chain cannot retrigger itself.</string>
+    <string name="automation_lint_inter_profile_loop_fix">Remove one Run Task step from the loop, or add a state check, so the chain can\'t set itself off again.</string>
     <string name="automation_lint_shadowed_rule_title">Shadowed profile</string>
     <string name="automation_lint_shadowed_rule_detail">%1$s can be active with %2$s, which writes %3$s at priority %4$d versus %5$d.</string>
     <string name="automation_lint_shadowed_rule_fix">Make the contexts mutually exclusive, or confirm that the lower-priority profile should remain available.</string>
@@ -786,7 +786,7 @@
     <string name="automation_invariant_validation_name">Enter a name of at most 64 characters.</string>
     <string name="automation_invariant_validation_guard_key">Start with a letter, then use letters, numbers, dots, underscores, colons, or hyphens.</string>
     <string name="automation_invariant_validation_guard_value">Enter a value of at most 96 characters.</string>
-    <string name="automation_invariant_validation_write_key">Enter a setting name OpenTasker recognises.</string>
+    <string name="automation_invariant_validation_write_key">Enter a setting name OpenTasker recognizes.</string>
     <string name="automation_invariant_validation_generic">Fill in every field with a valid value.</string>
     <string name="automation_invariant_save">Save rule</string>
     <string name="automation_invariant_cancel">Cancel</string>
@@ -798,13 +798,13 @@
     <string name="automation_invariant_operator_less_or_equal">at most (&lt;=)</string>
 
     <!-- Scenes screen -->
-    <string name="scenes_create">Create Scene</string>
+    <string name="scenes_create">Create scene</string>
     <string name="scenes_delete">Delete scene %1$s</string>
 
     <!-- Inspector -->
     <string name="inspector_sources_title">Context sources</string>
     <string name="inspector_match_title">Profile match state</string>
-    <string name="inspector_refresh">Refresh Status</string>
+    <string name="inspector_refresh">Refresh status</string>
     <string name="inspector_last_update">Last update</string>
     <string name="inspector_no_value">No value observed yet</string>
     <string name="inspector_no_contexts">No contexts</string>
@@ -836,8 +836,8 @@
     <string name="import_migration_warnings">Migration warnings</string>
     <string name="import_unsupported_actions">Unsupported source actions</string>
     <string name="import_mapped_actions">Mapped actions</string>
-    <string name="import_for_review">Import for Review</string>
-    <string name="import_disabled">Import Disabled</string>
+    <string name="import_for_review">Import for review</string>
+    <string name="import_disabled">Import disabled</string>
     <string name="import_tasker">Import Tasker or MacroDroid</string>
     <string name="import_reading_xml">Reading import</string>
     <string name="import_export_json">Export JSON</string>
@@ -919,14 +919,14 @@
     <string name="action_retry">Retry</string>
     <string name="action_show">Show</string>
     <string name="action_arm">Arm</string>
-    <string name="action_add_element">Add Element</string>
-    <string name="action_create_blank_task">Create Blank Task</string>
-    <string name="action_create_blank_profile">Create Blank Profile</string>
-    <string name="action_browse_templates">Browse Templates</string>
-    <string name="action_create_for_review">Create for Review</string>
+    <string name="action_add_element">Add element</string>
+    <string name="action_create_blank_task">Create blank task</string>
+    <string name="action_create_blank_profile">Create blank profile</string>
+    <string name="action_browse_templates">Browse templates</string>
+    <string name="action_create_for_review">Create for review</string>
     <string name="action_import_tasker_xml">Import Tasker / MacroDroid</string>
-    <string name="action_create_task">Create Task</string>
-    <string name="action_add_step">Add Step</string>
+    <string name="action_create_task">Create task</string>
+    <string name="action_add_step">Add step</string>
     <string name="action_choose_image">Choose image</string>
     <string name="scene_image_repair_required">Choose a readable image URI before saving.</string>
     <string name="action_task_binding_missing_id">Missing task ID %1$d. Choose another task or None.</string>
@@ -942,8 +942,8 @@
     <string name="permission_denied_settings_body">Android will no longer show the request dialog; use app settings to recover access.</string>
 
     <string name="label_actions">Actions</string>
-    <string name="label_width_dp">Width dp</string>
-    <string name="label_height_dp">Height dp</string>
+    <string name="label_width_dp">Width (dp)</string>
+    <string name="label_height_dp">Height (dp)</string>
     <string name="label_none">None</string>
     <string name="label_text">Text</string>
     <string name="label_button_label">Button label</string>
@@ -1056,7 +1056,7 @@
         <item quantity="one">%1$d action skipped</item>
         <item quantity="other">%1$d actions skipped</item>
     </plurals>
-    <string name="label_cooldown_seconds">%1$ds cooldown</string>
+    <string name="label_cooldown_seconds">%1$d sec cooldown</string>
     <string name="label_priority_short">Priority %1$d</string>
     <string name="label_more_count">%1$d more</string>
 
@@ -1113,7 +1113,7 @@
         <item quantity="other">Listening for %1$d broadcast actions: %2$s</item>
     </plurals>
     <string name="inspector_broadcast_idle">No enabled profile is waiting for a broadcast.</string>
-    <string name="context_sms_received_android_17_note">On Android 17+, standard SMS messages containing OTPs may be withheld for up to three hours for non-default-SMS apps. Connected-device and other exempt apps can receive them sooner; use SMS Retriever or User Consent when OTP timing matters.</string>
+    <string name="context_sms_received_android_17_note">On Android 17 and later, texts with one-time codes can be held back for up to three hours from apps that aren\'t the default SMS app. Connected-device apps and other exempt apps get them sooner. Use SMS Retriever or User Consent when the code\'s timing matters.</string>
 
     <string name="empty_first_automation_title">Build your first automation</string>
     <string name="empty_first_automation_body">Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.</string>
@@ -1130,7 +1130,7 @@
     <string name="scenes_move_up_content_description">Move element up 1 dp</string>
     <string name="scenes_move_down_content_description">Move element down 1 dp</string>
     <string name="scenes_move_right_content_description">Move element right 1 dp</string>
-    <string name="scenes_canvas_element_with_label">%1$s • %2$s</string>
+    <string name="scenes_canvas_element_with_label">%1$s · %2$s</string>
     <string name="scenes_canvas_element_description">%1$s, %2$s, at %3$d,%4$d dp, size %5$dx%6$d dp</string>
     <string name="scenes_unlabeled_element">Unlabeled element</string>
     <string name="scenes_select_element_content_description">Select element</string>
@@ -1141,11 +1141,11 @@
     <string name="scenes_resize_taller_content_description">Make element taller by 1 dp</string>
 
     <string name="inspector_not_matching">Not matching</string>
-    <string name="inspector_unavailable_content_description">Context inspector unavailable</string>
-    <string name="inspector_unavailable_title">Context inspector unavailable</string>
+    <string name="inspector_unavailable_content_description">Inspector unavailable</string>
+    <string name="inspector_unavailable_title">Inspector unavailable</string>
     <string name="inspector_waiting_for_sources">Waiting for sources</string>
 
-    <string name="import_reading_bundle">Reading Bundle...</string>
+    <string name="import_reading_bundle">Reading bundle…</string>
 
     <string name="workspace_stored_data_review">Stored data needs review</string>
     <string name="workspace_stored_data_review_body">OpenTasker blocked affected records from execution and editing. %1$s%2$s. Restore a database backup before continuing; the raw stored data remains untouched.</string>
@@ -1163,9 +1163,9 @@
     <string name="workspace_no_matching_profiles_body">Clear search or switch groups to see more automations.</string>
     <string name="workspace_no_matching_tasks">No matching tasks</string>
     <string name="workspace_no_matching_tasks_body">Clear search to return to the full task library.</string>
-    <string name="workspace_search_profiles">Search profiles...</string>
+    <string name="workspace_search_profiles">Search profiles…</string>
     <string name="workspace_actions_content_description">Workspace tools</string>
-    <string name="workspace_search_tasks">Search tasks...</string>
+    <string name="workspace_search_tasks">Search tasks…</string>
 
     <string name="flow_empty_content_description">Flow view empty</string>
     <string name="flow_empty_profile_graph_title">No profile graph yet</string>
@@ -1307,7 +1307,7 @@
     <string name="flow_context_title">Context %1$d: %2$s</string>
     <string name="flow_action_subtask_title">Step %1$d: run sub-task "%2$s"</string>
     <string name="flow_action_title">Step %1$d: %2$s</string>
-    <string name="flow_action_subtask_detail">sub-task -&gt; %1$s</string>
+    <string name="flow_action_subtask_detail">Subtask → %1$s</string>
     <string name="flow_continues_after_error">continues after error</string>
     <string name="flow_output_variables">Outputs: %1$s</string>
 
@@ -1330,7 +1330,9 @@
     <string name="blueprint_input_type_time">Time</string>
     <string name="blueprint_input_type_caller_search_url">Search address</string>
     <string name="blueprint_input_supporting">Input type: %1$s</string>
-    <string name="blueprint_input_bounds">%1$s · allowed range %2$s</string>
+    <string name="blueprint_input_range">%1$s from %2$s to %3$s</string>
+    <string name="blueprint_input_minimum">%1$s, at least %2$s</string>
+    <string name="blueprint_input_maximum">%1$s, at most %2$s</string>
     <string name="blueprint_section_collapse">Collapse %1$s</string>
     <string name="blueprint_section_expand">Expand %1$s</string>
     <string name="blueprint_update_review">A newer template is only ever shown to you for review. Nothing you already have is overwritten.</string>
@@ -1341,7 +1343,7 @@
     <string name="task_priority_invalid">Enter a value from 0 to 10.</string>
     <string name="profile_enable_after_save_helper">Leave off until contexts and actions are reviewed.</string>
     <string name="profile_cooldown_invalid">Enter whole seconds, up to 3600.</string>
-    <string name="automation_mode_single_body">If the task is still running when the profile fires again, skip the new run and note it in the Run Log.</string>
+    <string name="automation_mode_single_body">If the task is still running when the profile fires again, skip the new run and note it in the run log.</string>
     <string name="automation_mode_restart_body">Stop the running task and start it over.</string>
     <string name="automation_mode_queued_body">Let the running task finish, then run again. Up to 50 runs can wait their turn.</string>
     <string name="automation_mode_parallel_body">Start another run alongside the one already going.</string>
@@ -1370,8 +1372,8 @@
     <string name="label_min">Min</string>
     <string name="label_max">Max</string>
     <string name="label_value">Value</string>
-    <string name="label_x_dp">X dp</string>
-    <string name="label_y_dp">Y dp</string>
+    <string name="label_x_dp">X (dp)</string>
+    <string name="label_y_dp">Y (dp)</string>
     <string name="scenes_overview_summary">%1$s across %2$s</string>
     <plurals name="scenes_overview_errors">
         <item quantity="one">%1$d scene error</item>
@@ -1393,7 +1395,7 @@
     <string name="scene_element_type_slider">Slider</string>
     <string name="scene_element_type_image">Image</string>
 
-    <string name="diagnostics_status_healthy">Engine healthy</string>
+    <string name="diagnostics_status_healthy">Running normally</string>
     <string name="diagnostics_status_attention">Needs attention</string>
     <string name="diagnostics_status_checking">Checking engine health…</string>
     <string name="diagnostics_status_unavailable">Couldn\'t check engine health</string>
@@ -1451,9 +1453,9 @@
     <string name="diagnostics_advanced_protection">Advanced Protection</string>
     <string name="diagnostics_advanced_protection_on">On</string>
     <string name="diagnostics_advanced_protection_off">Off</string>
-    <string name="diagnostics_advanced_protection_warning">Android Advanced Protection Mode is on. It can revoke Accessibility from apps not registered as an accessibility tool and restrict some automation capabilities. OpenTasker does not use Accessibility, so its triggers keep working, but privileged extensions (such as Shizuku power actions) may be limited until you turn Advanced Protection off.</string>
+    <string name="diagnostics_advanced_protection_warning">Android Advanced Protection Mode is on. It can revoke Accessibility from apps not registered as an accessibility tool and restrict some automation capabilities. OpenTasker does not use Accessibility, so its triggers keep working, but Shizuku power actions may be limited until you turn Advanced Protection off.</string>
     <string name="diagnostics_exact_alarm">Time alarm delivery</string>
-    <string name="diagnostics_matcher_error">Last matcher error</string>
+    <string name="diagnostics_matcher_error">Last context matching error</string>
     <string name="diagnostics_worker_stop">Watchdog stop reason</string>
     <string name="diagnostics_scheduled_work_header">Scheduled work</string>
     <string name="diagnostics_scheduled_work_none">No run recorded yet</string>
@@ -1488,7 +1490,7 @@
     <string name="diagnostics_stop_reason_user">stopped by you</string>
     <string name="diagnostics_stop_reason_system_processing">system processing</string>
     <string name="diagnostics_stop_reason_estimated_app_launch_time_changed">estimated app launch time changed</string>
-    <string name="diagnostics_stop_reason_foreground_service_timeout">foreground-service time limit</string>
+    <string name="diagnostics_stop_reason_foreground_service_timeout">background service time limit</string>
     <string name="diagnostics_stop_reason_unknown">reason not reported</string>
     <string name="diagnostics_pending_jobs">Scheduled jobs blocked by</string>
     <string name="diagnostics_pending_jobs_none">Nothing blocking</string>
@@ -1622,14 +1624,14 @@
 
     <!-- Secondary-surface localization -->
     <string name="nav_more">More</string>
-    <string name="header_profiles_detail">%1$d enabled • %2$d total</string>
-    <string name="header_tasks_detail">%1$s • %2$s</string>
+    <string name="header_profiles_detail">%1$d enabled · %2$d total</string>
+    <string name="header_tasks_detail">%1$s · %2$s</string>
     <plurals name="header_variables_detail">
         <item quantity="one">%1$d global variable</item>
         <item quantity="other">%1$d global variables</item>
     </plurals>
-    <string name="header_flow_detail">%1$s • %2$s</string>
-    <string name="header_scenes_detail">%1$s • %2$s</string>
+    <string name="header_flow_detail">%1$s · %2$s</string>
+    <string name="header_scenes_detail">%1$s · %2$s</string>
     <string name="header_inspector_detail">Live context health</string>
     <string name="header_setup_detail">Permission and reliability checks</string>
     <plurals name="header_run_log_detail">
@@ -1640,15 +1642,22 @@
     <string name="header_settings_detail">App-wide behavior and recovery</string>
     <string name="setup_update_title">Release update checks</string>
     <string name="setup_update_body">Optional daily check of the public GitHub release page. It sends no account or device information, stores only a newer-version link, and never downloads or installs anything.</string>
-    <string name="setup_update_enabled">Release update checks enabled</string>
-    <string name="setup_update_disabled">Release update checks disabled</string>
+    <string name="setup_update_enabled">Release update checks on</string>
+    <string name="setup_update_disabled">Release update checks off</string>
     <string name="setup_update_status_off">Off</string>
     <string name="setup_update_status_pending">Enabled; the next scheduled check has not run yet</string>
     <string name="setup_update_status_current">No newer release found at the last check</string>
     <string name="setup_update_status_available">Newer release available: %1$s</string>
     <string name="setup_update_open_release">Open release page</string>
     <string name="ui_flow_target_missing">Flow target no longer exists</string>
-    <string name="ui_error_generic">Operation failed</string>
+    <string name="ui_error_generic">That change wasn\'t saved. Diagnostics has the details.</string>
+    <string name="ui_error_task_duplicate">The task couldn\'t be copied. Diagnostics has the details.</string>
+    <string name="ui_error_profile_duplicate">The profile couldn\'t be copied. Diagnostics has the details.</string>
+    <string name="ui_error_profile_delete">The profile couldn\'t be deleted. Diagnostics has the details.</string>
+    <string name="ui_error_scene_duplicate">The scene couldn\'t be copied. Diagnostics has the details.</string>
+    <string name="ui_error_scene_delete">The scene couldn\'t be deleted. Diagnostics has the details.</string>
+    <string name="ui_error_project_move">The project couldn\'t be moved. Diagnostics has the details.</string>
+    <string name="ui_error_run_log_star">The star couldn\'t be changed. Diagnostics has the details.</string>
     <!-- A rejection that already explains itself; the reason comes from the validation that
          refused the change, so this carries it through without prefixing it with noise. -->
     <string name="ui_error_reason">%1$s</string>
@@ -1663,17 +1672,17 @@
     <string name="ui_error_variable_referenced">%1$s is still used by %2$s. Remove those references first.</string>
     <string name="ui_error_corrupt_record">Saved data could not be read. Restore a backup or delete the affected item.</string>
     <string name="ui_error_diagnostics_refresh">Diagnostics could not be refreshed</string>
-    <string name="ui_error_task_delete">Task delete failed</string>
+    <string name="ui_error_task_delete">The task couldn\'t be deleted. Diagnostics has the details.</string>
     <string name="ui_error_tasker_xml_preview">Tasker XML import preview failed. Diagnostics has the details.</string>
     <string name="ui_error_automation_import_preview">Tasker or MacroDroid import preview failed. Diagnostics has the details.</string>
-    <string name="ui_error_automation_import">Tasker or MacroDroid import failed</string>
-    <string name="ui_error_bundle_export">OpenTasker bundle export failed</string>
+    <string name="ui_error_automation_import">The Tasker or MacroDroid import failed. Diagnostics has the details.</string>
+    <string name="ui_error_bundle_export">The OpenTasker bundle couldn\'t be exported. Diagnostics has the details.</string>
     <string name="ui_error_bundle_preview">OpenTasker bundle preview failed. Diagnostics has the details.</string>
-    <string name="ui_error_share_preview">Unable to prepare share preview</string>
-    <string name="ui_error_bundle_import">OpenTasker bundle import failed</string>
-    <string name="ui_error_run_logs_load">Run logs could not be loaded</string>
-    <string name="ui_error_run_logs_more">More run logs could not be loaded</string>
-    <string name="ui_error_run_log_export">Run log export failed</string>
+    <string name="ui_error_share_preview">The share preview couldn\'t be made. Diagnostics has the details.</string>
+    <string name="ui_error_bundle_import">The OpenTasker bundle couldn\'t be imported. Diagnostics has the details.</string>
+    <string name="ui_error_run_logs_load">The run log couldn\'t be loaded. Diagnostics has the details.</string>
+    <string name="ui_error_run_logs_more">More of the run log couldn\'t be loaded. Diagnostics has the details.</string>
+    <string name="ui_error_run_log_export">The run log couldn\'t be exported. Diagnostics has the details.</string>
     <string name="synthetic_trigger_cooldown_clear">No cooldown is currently blocking this profile.</string>
     <plurals name="synthetic_trigger_cooldown_remaining">
         <item quantity="one">Cooldown has %1$d second remaining.</item>
@@ -1723,15 +1732,15 @@
     <string name="run_log_source_scheduler">Scheduler</string>
     <string name="run_log_source_other">Other</string>
     <string name="run_log_source_unknown">Unknown</string>
-    <string name="ui_error_backup">Database backup failed</string>
-    <string name="ui_error_backup_export">Database backup export failed</string>
-    <string name="ui_error_tasker_xml_export">Tasker XML export failed</string>
-    <string name="ui_error_backup_import">Database backup import failed</string>
+    <string name="ui_error_backup">The database backup failed. Diagnostics has the details.</string>
+    <string name="ui_error_backup_export">The database backup couldn\'t be exported. Diagnostics has the details.</string>
+    <string name="ui_error_tasker_xml_export">The Tasker XML couldn\'t be exported. Diagnostics has the details.</string>
+    <string name="ui_error_backup_import">The database backup couldn\'t be imported. Diagnostics has the details.</string>
     <string name="ui_error_backup_legacy_too_large">This backup is in the old format, which restores only up to %1$d MB</string>
-    <string name="ui_error_snapshot_destination">Snapshot destination setup failed</string>
-    <string name="ui_error_restore_stage">Staging the restore failed</string>
-    <string name="ui_error_undo">Undo failed</string>
-    <string name="ui_error_redo">Redo failed</string>
+    <string name="ui_error_snapshot_destination">The snapshot folder couldn\'t be set up. Diagnostics has the details.</string>
+    <string name="ui_error_restore_stage">The restore couldn\'t be staged. Diagnostics has the details.</string>
+    <string name="ui_error_undo">Undo didn\'t work. Diagnostics has the details.</string>
+    <string name="ui_error_redo">Redo didn\'t work. Diagnostics has the details.</string>
     <string name="ui_error_variable_save">Variable could not be saved</string>
     <string name="ui_error_variable_delete">Variable could not be deleted</string>
     <string name="ui_error_invalid_variable_name">Invalid variable name</string>
@@ -1767,8 +1776,8 @@
     <string name="ui_message_profile_updated">Profile updated</string>
     <string name="ui_message_profile_left_off_for_review">Saved, but left off. Its task could set off its own trigger, so turn it on to review that first.</string>
     <plurals name="ui_profile_lint_warnings">
-        <item quantity="one">Profile saved with %1$d lint warning; review Automation lint in Context Inspector.</item>
-        <item quantity="other">Profile saved with %1$d lint warnings; review Automation lint in Context Inspector.</item>
+        <item quantity="one">Profile saved with %1$d lint warning. See Automation lint in the Inspector.</item>
+        <item quantity="other">Profile saved with %1$d lint warnings. See Automation lint in the Inspector.</item>
     </plurals>
     <string name="ui_message_profile_deleted">Profile deleted</string>
     <string name="ui_message_profile_reviewed">Imported profile reviewed and enabled</string>
@@ -1862,7 +1871,7 @@
     <string name="inspector_latest_value">Latest value</string>
     <string name="inspector_warning">Warning</string>
     <string name="inspector_causal_loop_title">Causal profile loop stopped</string>
-    <string name="inspector_causal_loop_body">The engine stopped this profile chain: %1$s. See Run Log and Diagnostics for the parent execution.</string>
+    <string name="inspector_causal_loop_body">OpenTasker stopped this chain of profiles: %1$s. The run log and Diagnostics show the run that started it.</string>
     <string name="inspector_no_profiles_body">Create a profile before reviewing match explanations.</string>
     <string name="inspector_ready">Ready</string>
     <plurals name="inspector_attention">
@@ -1881,9 +1890,9 @@
     <string name="inspector_oem_risk">%1$s background risk: %2$s</string>
     <string name="inspector_oem_summary">%1$s Open the Setup tab for OEM-specific steps.</string>
     <string name="inspector_time_just_now">just now</string>
-    <string name="inspector_time_seconds">%1$d s ago</string>
-    <string name="inspector_time_minutes">%1$d m ago</string>
-    <string name="inspector_time_hours">%1$d h ago</string>
+    <string name="inspector_time_seconds">%1$d sec ago</string>
+    <string name="inspector_time_minutes">%1$d min ago</string>
+    <string name="inspector_time_hours">%1$d hr ago</string>
     <string name="inspector_time_absolute">%1$s · %2$s</string>
     <string name="inspector_dwell_target">" of %1$s"</string>
     <string name="inspector_dwell_inside">Dwell: inside for %1$s%2$s.</string>
@@ -1913,7 +1922,7 @@
     <string name="context_source_plugin">Plugin condition</string>
     <string name="context_source_unknown">Unknown source</string>
     <string name="inspector_setup_usage_granted">Usage access is granted for foreground-app context checks.</string>
-    <string name="inspector_setup_usage_missing">Usage access is missing; application contexts cannot report foreground packages.</string>
+    <string name="inspector_setup_usage_missing">Usage access is off, so app contexts can\'t tell which app is open.</string>
     <string name="inspector_setup_clock_exact">Clock source is registered and exact alarms are available for scheduled engine ticks.</string>
     <string name="inspector_setup_clock_inexact">Clock source is registered; exact alarms are denied so scheduled engine ticks use the inexact fallback.</string>
     <string name="inspector_setup_state_ready">Battery, charging, media, screen, headset, and sensor-backed state checks are available when their device sensors and permissions are present.</string>
@@ -1922,10 +1931,10 @@
     <string name="inspector_setup_private_space_hidden">Private Space can\'t be read, since Android shows it only to the home screen app. work_profile covers the work profile alone.</string>
     <string name="inspector_setup_calendar_ready">Calendar events can be matched with redacted metadata.</string>
     <string name="inspector_setup_calendar_missing">Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates.</string>
-    <string name="inspector_setup_event_ready">Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. %1$s</string>
+    <string name="inspector_setup_event_ready">Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in memory for matching and is not written to the run log. %1$s</string>
     <string name="inspector_setup_event_notification_missing">Boot, system, NFC, calendar, and sun events are registered. Notification events need Notification Access in Setup before Android will bind the listener. %1$s</string>
     <string name="inspector_setup_nfc_blocked">Android isn\'t handing NFC tags to OpenTasker yet, so NFC events won\'t fire. Allow it in Setup under Read NFC tags.</string>
-    <string name="inspector_setup_source_generic">Source setup status is not specialized yet.</string>
+    <string name="inspector_setup_source_generic">This source has no setup check of its own yet.</string>
     <string name="diagnostics_health_state_ready">Ready</string>
     <string name="diagnostics_health_state_loading">Loading</string>
     <string name="diagnostics_health_state_stale">Stale</string>
@@ -1964,7 +1973,7 @@
     <string name="setup_push_copy">Copy legacy bridge token</string>
     <string name="setup_push_copied">Legacy bridge token copied.</string>
     <string name="setup_companion_title">Companion device presence</string>
-    <string name="setup_companion_body">Associate a nearby Bluetooth device with Android’s low-power companion service. Profiles can match event=companion_presence with state=present or absent.</string>
+    <string name="setup_companion_body">Associate a nearby Bluetooth device with Android’s low-power companion service. An Event context of type companion_presence can then match the device being present or absent.</string>
     <string name="setup_companion_empty">No companion devices are associated.</string>
     <string name="setup_companion_associate">Associate a device</string>
     <string name="setup_companion_revoke">Revoke</string>
@@ -2017,8 +2026,8 @@
     <string name="preflight_no_values">none</string>
     <string name="synthetic_trigger_title">Trigger simulation</string>
     <string name="synthetic_trigger_loading">Preparing the simulation…</string>
-    <string name="synthetic_trigger_notice">Preview only: synthetic events are matched in memory. No task, side effect, or production run-log row will be created.</string>
-    <string name="synthetic_trigger_profile_match">Profile predicate</string>
+    <string name="synthetic_trigger_notice">Preview only: synthetic events are matched in memory. No task runs, nothing changes, and nothing is added to the run log.</string>
+    <string name="synthetic_trigger_profile_match">Profile contexts</string>
     <string name="synthetic_trigger_passed">Would match</string>
     <string name="synthetic_trigger_blocked">Blocked</string>
     <string name="synthetic_trigger_cooldown">Cooldown</string>
@@ -2029,7 +2038,7 @@
     <string name="synthetic_trigger_source_event">Source event: %1$s</string>
     <string name="synthetic_trigger_template">Template: %1$s</string>
     <string name="synthetic_trigger_metadata">%1$s=%2$s</string>
-    <string name="synthetic_trigger_would_trigger">All predicates and gates pass; a live trigger would be admitted.</string>
+    <string name="synthetic_trigger_would_trigger">The contexts match and no cooldown or run limit is in the way, so a real trigger would run the task.</string>
     <string name="synthetic_trigger_would_not_trigger">This simulation would not trigger the task.</string>
     <string name="synthetic_trigger_no_contexts">No contexts are configured to simulate.</string>
     <string name="ui_error_preflight">Unable to create the preflight report.</string>

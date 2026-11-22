@@ -50,7 +50,7 @@ class ProjectLinksTest {
     fun `the report body asks for both diagnostic exports`() {
         val body = decodedBody(ProjectLinks.reportProblemUrl("0.2.96", 98, "standard", "16", 36, "Google Pixel 7"))
         assertTrue(body, "Diagnostics" in body && "crash log" in body)
-        assertTrue(body, "Run Log's JSON export" in body)
+        assertTrue(body, "run log's JSON export" in body)
     }
 
     @Test

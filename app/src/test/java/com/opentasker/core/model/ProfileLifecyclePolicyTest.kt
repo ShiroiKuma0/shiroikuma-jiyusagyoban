@@ -63,7 +63,7 @@ class ProfileLifecyclePolicyTest {
 
         assertEquals(highest, ProfileLifecyclePolicy.suppressor(lowerId, listOf(higherId, disabled, highest, lowerId)))
         assertEquals(
-            "Suppressed by higher-priority profile 'Highest'.",
+            "Suppressed by higher-priority profile “Highest”.",
             ProfileLifecyclePolicy.suppressionByPriority(lowerId, listOf(lowerId, highest)),
         )
         assertNull("a disabled profile never suppresses", ProfileLifecyclePolicy.suppressor(lowerId, listOf(lowerId, disabled)))
