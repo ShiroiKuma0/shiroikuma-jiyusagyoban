@@ -6,10 +6,12 @@ import com.opentasker.core.engine.variables.TaskerBuiltIns
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.registerCoreRuntime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 
@@ -87,12 +89,43 @@ class TaskerSubTaskRunningListTest {
     }
 
     @Test
-    fun aFailedSubTaskStopsCountingAsRunning() {
-        run(
-            Task(id = 1, name = "Outer", actions = listOf(runTask("Broken").copy(continueOnError = true))),
-            Task(id = 2, name = "Broken", actions = listOf(ActionSpec(type = "no.such.action"))),
-        )
+    fun aSubTaskThatFailsOrIsCancelledStopsCountingAsRunning() {
+        val seen = mutableListOf<List<Long>>()
+        ActionRegistry.register(object : Action {
+            override val id = "test.nested_ids"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                seen += ActiveExecutionRegistry.nestedTaskIds.value
+                return ActionResult.Success
+            }
+        })
+        ActionRegistry.register(object : Action {
+            override val id = "test.fail"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = ActionResult.Failure("broken")
+        })
+        ActionRegistry.register(object : Action {
+            override val id = "test.cancel"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = throw CancellationException("stopped")
+        })
+        val capture = ActionSpec(type = "test.nested_ids")
 
+        run(
+            Task(id = 1, name = "Outer", actions = listOf(runTask("Broken").copy(continueOnError = true), capture)),
+            Task(id = 2, name = "Broken", actions = listOf(capture, ActionSpec(type = "test.fail"))),
+        )
+        assertEquals("listed while it ran, gone once it failed", listOf(listOf(2L), emptyList<Long>()), seen)
+
+        seen.clear()
+        // A cancellation leaves the run by an exception, past the return a failure takes.
+        assertThrows(CancellationException::class.java) {
+            run(
+                Task(id = 1, name = "Outer", actions = listOf(runTask("Stopped"))),
+                Task(id = 3, name = "Stopped", actions = listOf(capture, ActionSpec(type = "test.cancel"))),
+            )
+        }
+        assertEquals(listOf(listOf(3L)), seen)
         assertEquals(emptyList<Long>(), ActiveExecutionRegistry.nestedTaskIds.value)
     }
 }
