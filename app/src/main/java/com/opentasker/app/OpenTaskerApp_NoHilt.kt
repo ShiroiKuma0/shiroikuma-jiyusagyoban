@@ -42,9 +42,11 @@ import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.power.ShizukuPowerBackend
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -113,6 +115,10 @@ class OpenTaskerApp_NoHilt : Application() {
 
     @Volatile
     private var unlockedInitialized = false
+
+    /** A restore replaced the database at this start; set before the database is published. */
+    @Volatile
+    private var restoredAtStart = false
 
     override fun onCreate() {
         super.onCreate()
@@ -202,13 +208,25 @@ class OpenTaskerApp_NoHilt : Application() {
      */
     private suspend fun keepTaskShortcutsCurrent() {
         val database = readyDb ?: return // Preparing it failed, and that's logged.
-        runCatching {
-            database.taskDao().observeNames()
-                .map { rows -> rows.associate { it.id to it.name } }
-                .distinctUntilChanged()
-                .collect { TaskShortcutHelper.reconcile(this, it) }
-        }.onFailure { error ->
-            AppLogger.error("OpenTasker", "Keeping task shortcuts current stopped", error)
+        var previous: Map<Long, String>? = null
+        var afterRestore = restoredAtStart
+        while (true) {
+            try {
+                database.taskDao().observeNames()
+                    .map { rows -> rows.associate { it.id to it.name } }
+                    .distinctUntilChanged()
+                    .collect { names ->
+                        TaskShortcutHelper.reconcile(this, names, previous, afterRestore)
+                        previous = names
+                        afterRestore = false
+                    }
+                return
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLogger.error("OpenTasker", "Keeping task shortcuts current stopped; trying again in a minute", error)
+                delay(60_000L)
+            }
         }
     }
 
@@ -228,6 +246,8 @@ class OpenTaskerApp_NoHilt : Application() {
                 if (!cleared) AppLogger.warn("OpenTasker", "Could not clear the plugin condition grants a restore left; the next start tries again")
             }
         }
+        restoredAtStart = restoreResult is PendingRestoreApplyResult.Applied ||
+            restoreResult == PendingRestoreApplyResult.StoppedAfterSwap
         when (restoreResult) {
             is PendingRestoreApplyResult.Applied -> {
                 AppLogger.info(

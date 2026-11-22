@@ -1,5 +1,6 @@
 package com.opentasker.widget
 
+import android.content.Intent
 import android.os.ParcelFileDescriptor
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -42,15 +43,25 @@ class TaskShortcutReconcileInstrumentedTest {
         shell("cmd shortcut reset-throttling")
         val followed = db.taskDao().insert(Task(name = name, actions = emptyList()).toEntity()).also { taskIds += it }
         val picked = db.taskDao().insert(Task(name = "$name picked", actions = emptyList()).toEntity()).also { taskIds += it }
+        val older = db.taskDao().insert(Task(name = "$name older", actions = emptyList()).toEntity()).also { taskIds += it }
         // Built the way Pin builds one, pushed as dynamic so no launcher has to confirm it.
         ShortcutManagerCompat.pushDynamicShortcut(
             app,
-            TaskShortcutHelper.taskShortcut(app, "task_$followed", followed, name, labelPicked = false),
+            TaskShortcutHelper.taskShortcut(app, "task_$followed", followed, name, TaskShortcutHelper.ShortcutKind.FOLLOWS, madeFor = name),
         )
-        TaskShortcutHelper.publishShortcut(app, "task_$picked", picked, "Picked label", TaskShortcutHelper.PublishMode.DYNAMIC)
+        TaskShortcutHelper.publishShortcut(app, "task_$picked", picked, "Picked label", TaskShortcutHelper.PublishMode.DYNAMIC, "$name picked")
+        // Published by a version from before shortcuts said what kind they are.
+        val olderIntent = Intent(app, TaskRunActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            putExtra(TaskRunActivity.EXTRA_TASK_ID, older)
+        }
+        ShortcutManagerCompat.pushDynamicShortcut(
+            app,
+            ShortcutInfoCompat.Builder(app, "task_$older").setShortLabel("Older label").setIntent(olderIntent).build(),
+        )
 
-        // The picked one first, so by the time the followed one's new label shows, the app has seen both.
-        listOf(picked, followed).forEach { id ->
+        // The other two first, so by the time the followed one's new label shows, the app has seen all three.
+        listOf(picked, older, followed).forEach { id ->
             val entity = requireNotNull(db.taskDao().getById(id))
             db.taskDao().update(entity.copy(name = entity.name + " renamed"))
         }
@@ -59,11 +70,12 @@ class TaskShortcutReconcileInstrumentedTest {
             awaitShortcut("task_$followed") { it?.shortLabel?.toString() == "$name renamed" }?.shortLabel?.toString(),
         )
         assertEquals("Picked label", shortcut("task_$picked")?.shortLabel?.toString())
+        assertEquals("Older label", shortcut("task_$older")?.shortLabel?.toString())
 
-        listOf(followed, picked).forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } }
+        listOf(followed, picked, older).forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } }
         // A shortcut that's only dynamic goes away when it's disabled. A pinned one would stay,
-        // greyed out with the deleted message.
-        listOf(followed, picked).forEach { id ->
+        // grayed out with the deleted message.
+        listOf(followed, picked, older).forEach { id ->
             val afterDelete = awaitShortcut("task_$id") { it == null || !it.isEnabled }
             assertTrue("shortcut task_$id still runs a deleted task", afterDelete == null || !afterDelete.isEnabled)
         }

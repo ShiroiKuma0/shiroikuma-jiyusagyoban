@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
+import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.platform.BackgroundActivityStart
@@ -55,7 +56,9 @@ class ShortcutPublishAction : DeclaredAction(ActionCatalog.require("shortcut.pub
         val validation = TaskShortcutHelper.validatePublish(shortcutId, taskId, label, mode)
         if (!validation.isValid) return ActionResult.Failure(validation.error ?: "invalid shortcut")
         val publishMode = TaskShortcutHelper.PublishMode.valueOf(mode.uppercase())
-        return if (TaskShortcutHelper.publishShortcut(ctx.app, shortcutId, taskId, label, publishMode)) {
+        // The task's name now lets the shortcut come back with it after a delete is undone.
+        val taskName = runCatching { OpenTaskerApp_NoHilt.readyDb?.taskDao()?.getById(taskId)?.name }.getOrNull()
+        return if (TaskShortcutHelper.publishShortcut(ctx.app, shortcutId, taskId, label, publishMode, taskName)) {
             ctx.logger("Shortcut published: $shortcutId ($mode)")
             ActionResult.Success
         } else {
