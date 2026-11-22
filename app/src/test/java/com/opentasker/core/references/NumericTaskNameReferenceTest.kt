@@ -75,6 +75,37 @@ class NumericTaskNameReferenceTest {
         assertEquals(caller.actions[2], actions[2])
     }
 
+    /** A button's legacy name runs only the task with exactly that name; "foo" is not "Foo". */
+    @Test
+    fun aButtonsLegacyNameMatchesOnlyItsExactTask() {
+        val upper = Task(id = 3, name = "Foo")
+        val lower = Task(id = 4, name = "foo")
+        val caller = caller(ActionSpec(type = "notify.show", args = mapOf("button1_label" to "Go", "button1_task" to "foo")))
+        val all = listOf(upper, lower, caller)
+
+        assertTrue(AutomationReferenceIndex.referencesTo(task = upper, tasks = all).isEmpty())
+        assertEquals(1, AutomationReferenceIndex.referencesTo(task = lower, tasks = all).size)
+        // A rewrite lists only the tasks it changed.
+        assertTrue(AutomationReferenceRewriter.retarget(upper, ReferenceResolution.Clear, tasks = all).tasks.isEmpty())
+        assertTrue(AutomationReferenceRewriter.stabilizeNameReferences(target = upper, tasks = all).tasks.isEmpty())
+    }
+
+    /** As the engine reads it, a number that is a bundle task's id means that task, even when another is named with it. */
+    @Test
+    fun importReadsABundleIdBeforeATaskNamedWithIt() {
+        // Bundle task 4 "Alpha" went in as 104, and bundle task 7, named "4", as 107.
+        val rewrite = AutomationReferenceRewriter.remapIds(
+            idMap = mapOf(4L to 104L, 7L to 107L, 30L to 130L),
+            tasks = listOf(
+                Task(id = 104, name = "Alpha"),
+                Task(id = 107, name = "4"),
+                Task(id = 130, name = "Caller", actions = listOf(ActionSpec(type = "task.run", args = mapOf("task" to "4")))),
+            ),
+        )
+
+        assertEquals("104", rewrite.tasks.single { it.id == 130L }.actions.single().args["task"])
+    }
+
     /** A bundle's call to its task named "1" would, after the import, run whatever task here has id 1. */
     @Test
     fun importPinsACallToANumericNameToTheImportedTask() {

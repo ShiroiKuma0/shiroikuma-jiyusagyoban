@@ -384,11 +384,11 @@ object AutomationReferenceRewriter {
             val nameKey = NotificationTaskBindings.legacyTaskNameKey(button)
             val labelKey = "button${button}_label"
             // As NotificationTaskBindings reads a button: the id key whenever it's there, and the
-            // legacy key, a name even when it's a number, only without it.
+            // legacy key, a name even when it's a number, only without it and only an exact match.
             val bound = if (idKey in updated) {
                 updated[idKey]?.trim()?.toLongOrNull() == target.id
             } else {
-                updated[nameKey]?.trim()?.equals(target.name, ignoreCase = true) == true
+                updated[nameKey]?.trim() == target.name
             }
             if (!bound) continue
             updated.remove(nameKey)

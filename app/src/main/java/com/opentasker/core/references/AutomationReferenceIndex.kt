@@ -152,11 +152,12 @@ data class VariableReference(
 /** How a site names the task it points at. */
 sealed interface TaskRef {
     data class ById(val id: Long) : TaskRef
-    data class ByName(val name: String) : TaskRef
+    /** [ignoreCase] is off where the runtime compares names exactly, as a button's legacy name. */
+    data class ByName(val name: String, val ignoreCase: Boolean = true) : TaskRef
 
     fun matches(task: Task): Boolean = when (this) {
         is ById -> id == task.id
-        is ByName -> name.equals(task.name, ignoreCase = true)
+        is ByName -> name.equals(task.name, ignoreCase)
     }
 }
 
@@ -426,7 +427,7 @@ object AutomationReferenceIndex {
             val idKey = NotificationTaskBindings.taskIdKey(button)
             val nameKey = NotificationTaskBindings.legacyTaskNameKey(button)
             // As NotificationTaskBindings reads a button: the id key whenever it's there, even blank
-            // or invalid, and the legacy name only without it.
+            // or invalid, and the legacy name only without it, matched exactly.
             if (idKey in args) {
                 val id = args[idKey]?.trim()?.toLongOrNull()?.takeIf { it > 0 } ?: continue
                 add(
@@ -442,7 +443,7 @@ object AutomationReferenceIndex {
                 add(
                     TaskReference(
                         TaskReferenceSite.NotificationButton(owner.id, owner.name, actionIndex, button, nameKey),
-                        TaskRef.ByName(rawName),
+                        TaskRef.ByName(rawName, ignoreCase = false),
                     ),
                 )
             }
