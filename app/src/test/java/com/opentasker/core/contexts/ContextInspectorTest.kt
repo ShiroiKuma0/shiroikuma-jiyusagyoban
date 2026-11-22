@@ -631,20 +631,90 @@ class ContextInspectorTest {
         assertEquals("Context 2 matches, and the rule needs it not to.", result.summary)
     }
 
+    // Two device-state contexts read the same reason when both don't match, so these checks give
+    // each context its own reason to tell which one the summary names.
+    private fun check(index: Int, matched: Boolean, orGroup: String? = null) = ContextCheck(
+        index = index,
+        spec = ContextSpec(ContextType.STATE, mapOf("key" to "k$index", "value" to "on"), orGroup = orGroup),
+        sourceKey = "state",
+        sourceLabel = "Device state",
+        sourceStatus = ContextSourceStatus.Active,
+        rawMatched = matched,
+        effectiveMatched = matched,
+        lastObservation = null,
+        reason = "reason ${index + 1}",
+        configSummary = "",
+    )
+
     @Test
     fun aFailingRuleBlamesAContextThatShouldMatchWithItsOwnReason() {
-        // The screen on or not charging: the screen is off and charging is on, so the screen is to blame.
+        // Not context 1, and context 2. Context 1 is off, which the NOT wants, so the first context
+        // that doesn't match isn't the one to blame. Context 2 is.
+        val rule = ContextExpressionNode.group(
+            ContextBooleanOperator.AND,
+            listOf(ContextExpressionNode(contextIndex = 0, invert = true), ContextExpressionNode.leaf(1)),
+        )
+
+        assertEquals("reason 2", blockingReason(listOf(check(0, false), check(1, false)), rule))
+    }
+
+    @Test
+    fun aContextThatSurelyFailsIsBlamedBeforeOneThatIsUnknown() {
+        // The Wi-Fi name is withheld, so context 1 is unknown. Context 2 wants the screen on and it
+        // is off, so the rule fails whatever the Wi-Fi turns out to be.
+        val withheld = DeviceStateEvents.wifiPatch(
+            "Unknown",
+            connected = true,
+            ssidUnavailableReason = "Android hides the Wi-Fi name from apps in the background.",
+        ) + mapOf("screen" to "off")
+        val source = screenOffCharging.copy(
+            lastObservation = ContextEventObservation(ContextEvent("state", true, withheld), observedAtMs = 1000),
+        )
+        val profile = Profile(
+            id = 15,
+            name = "Home screen",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(
+                ContextSpec(ContextType.STATE, mapOf("key" to "wifi_ssid", "value" to "Home")),
+                ContextSpec(ContextType.STATE, mapOf("key" to "screen", "value" to "on")),
+            ),
+            contextExpression = ContextExpressionNode.group(
+                ContextBooleanOperator.AND,
+                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(source)).single()
+
+        assertTrue(result.contexts[0].valueUnknown)
+        assertEquals(result.contexts[1].reason, result.summary)
+    }
+
+    @Test
+    fun withoutARuleAContextWhoseOrGroupHoldsIsNotBlamed() {
+        // Context 1 is off, but context 2 in its OR group matches. Context 3 stands alone and is off.
+        val checks = listOf(check(0, false, orGroup = "g"), check(1, true, orGroup = "g"), check(2, false))
+
+        assertFalse(evaluateChecks(checks, null))
+        assertEquals("reason 3", blockingReason(checks, null))
+        // With nothing in the group matching, the group's first context is named.
+        assertEquals("reason 1", blockingReason(listOf(check(0, false, orGroup = "g"), check(1, false, orGroup = "g"), check(2, false)), null))
+    }
+
+    @Test
+    fun aRuleThatCantBeEvaluatedNamesNoContext() {
+        // The rule points at a third context the profile doesn't have, so no context can fix it.
         val profile = stateProfile(
             ContextExpressionNode.group(
-                ContextBooleanOperator.OR,
-                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode(contextIndex = 1, invert = true)),
+                ContextBooleanOperator.AND,
+                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(2)),
             ),
         )
 
         val result = inspectProfiles(listOf(profile), listOf(screenOffCharging)).single()
 
         assertFalse(result.matching)
-        assertEquals(result.contexts[0].reason, result.summary)
-        assertFalse(result.contexts[0].effectiveMatched)
+        assertEquals("The profile's context rule doesn't hold.", result.summary)
     }
 }

@@ -197,19 +197,27 @@ internal fun evaluateChecks(
 
 /**
  * Why a profile's contexts don't hold, from the context that fails its rule. Without a rule that's
- * the first context that doesn't match. With one, the rule is walked down to a context whose state
- * keeps it from holding, so a context a NOT is happy to see off isn't blamed. Null when nothing
- * can be named, such as a rule that can't be evaluated.
+ * the first context that doesn't match, leaving out one whose OR group another member already
+ * satisfies. With one, the rule is walked down to a context whose state keeps it from holding, so
+ * a context a NOT is happy to see off isn't blamed. Null when nothing can be named, such as a rule
+ * that can't be evaluated.
  */
 internal fun blockingReason(checks: List<ContextCheck>, expression: ContextExpressionNode?): String? {
-    if (expression == null) return checks.firstOrNull { !it.effectiveMatched }?.reason
+    if (expression == null) {
+        val satisfiedGroups = checks.filter { it.effectiveMatched }.mapNotNullTo(HashSet()) { it.spec.orGroup }
+        return checks.firstOrNull { !it.effectiveMatched && it.spec.orGroup !in satisfiedGroups }?.reason
+    }
+    if (!expression.isValidForContextCount(checks.size)) return null
     val values = checks.map { if (it.valueUnknown) null else it.effectiveMatched }
     // The leaf keeping [node] from being [wanted], and whether that leaf needs to match.
     fun culprit(node: ContextExpressionNode, wanted: Boolean): Pair<ContextCheck, Boolean>? {
         if (node.evaluate(values) == wanted) return null
         val inner = if (node.invert) !wanted else wanted
         if (node.isLeaf()) return node.contextIndex?.let(checks::getOrNull)?.let { it to inner }
-        return node.children.firstNotNullOfOrNull { culprit(it, inner) }
+        // A child that is surely the wrong way goes before one whose value isn't known yet, which
+        // might turn out right and still leave the rule failing.
+        val (sure, unsure) = node.children.partition { it.evaluate(values) == !inner }
+        return (sure + unsure).firstNotNullOfOrNull { culprit(it, inner) }
     }
     val (check, needsMatch) = culprit(expression, true) ?: return null
     return when {
