@@ -721,6 +721,30 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun anOrGroupWithAContextNotKnownYetIsNamedAfterAContextThatSurelyFails() {
+        // Contexts 1 and 2 share an OR group, and context 1 isn't known yet, so the group might still
+        // hold even though context 2 is off. Context 3 is off and alone, so it surely keeps the profile off.
+        val checks = listOf(
+            check(0, false, orGroup = "g").copy(valueUnknown = true),
+            check(1, false, orGroup = "g"),
+            check(2, false),
+        )
+
+        assertEquals("reason 3", blockingReason(checks, null))
+        // The same contexts as a rule name the same one.
+        val rule = ContextExpressionNode.group(
+            ContextBooleanOperator.AND,
+            listOf(
+                ContextExpressionNode.group(ContextBooleanOperator.OR, listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1))),
+                ContextExpressionNode.leaf(2),
+            ),
+        )
+        assertEquals("reason 3", blockingReason(checks, rule))
+        // With context 3 on, the group is all that's left, and its known member is named first.
+        assertEquals("reason 2", blockingReason(checks.take(2) + check(2, true), null))
+    }
+
+    @Test
     fun aRuleThatCantBeEvaluatedNamesNoContext() {
         // The rule points at a third context the profile doesn't have, so no context can fix it.
         val profile = stateProfile(
