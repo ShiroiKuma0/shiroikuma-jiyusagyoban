@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- Picking "All-day busy" on a calendar context and then another preset, like "15 before", kept the all-day filter. The context then only fired before all-day events and never for a meeting. Every calendar preset now sets that filter itself.
 - A profile's cooldown started even when its run never did. If the run was refused for too many runs at once, a burst, or a paused profile, or was canceled before it began, every trigger for the rest of the cooldown said "on cooldown" though nothing had run, and that lasted across restarts. A run that doesn't start gives the cooldown back now.
 - After deleting a project, undoing an earlier edit to one of its tasks, profiles or scenes put the item back in the deleted project, where no list showed it, and undoing the project deletion then failed. Undo and redo now leave items in the project they're in, and a deleted item whose project is gone comes back in Default.
 - In the scene editor, dragging an element you'd already touched could undo the move you'd just made to another one, and dragging a selected element could unselect it. Each drag now works from the scene as it is. Dragging also picked up every element you'd dragged before and moved them all. Now a drag moves just that element, unless it's part of a selection. Tap elements to select several, then drag one of them to move the group.

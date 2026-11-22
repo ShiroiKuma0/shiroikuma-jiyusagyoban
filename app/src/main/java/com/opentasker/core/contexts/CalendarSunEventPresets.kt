@@ -10,21 +10,23 @@ data class EventContextPreset(
 )
 
 object CalendarSunEventPresets {
+    // A preset is merged into the config, so each sets allDay. A blank one matches any event, which
+    // undoes All-day busy: kept, it fired before all-day events only and never for a meeting.
     private val calendarPresets = listOf(
         EventContextPreset(
             id = "calendar-during",
             labelRes = R.string.context_preset_during_meeting,
-            config = mapOf("event" to "calendar", "state" to "during"),
+            config = mapOf("event" to "calendar", "state" to "during", "allDay" to ""),
         ),
         EventContextPreset(
             id = "calendar-15-before",
             labelRes = R.string.context_preset_15_before,
-            config = mapOf("event" to "calendar", "state" to "upcoming", "beforeMinutes" to "15"),
+            config = mapOf("event" to "calendar", "state" to "upcoming", "beforeMinutes" to "15", "allDay" to ""),
         ),
         EventContextPreset(
             id = "calendar-30-before",
             labelRes = R.string.context_preset_30_before,
-            config = mapOf("event" to "calendar", "state" to "upcoming", "beforeMinutes" to "30"),
+            config = mapOf("event" to "calendar", "state" to "upcoming", "beforeMinutes" to "30", "allDay" to ""),
         ),
         EventContextPreset(
             id = "calendar-all-day",
