@@ -1,7 +1,9 @@
 package com.opentasker.widget
 
+import com.opentasker.widget.TaskShortcutHelper.ReconcileOutcome
 import com.opentasker.widget.TaskShortcutHelper.ShortcutKind
 import com.opentasker.widget.TaskShortcutHelper.ShortcutState
+import com.opentasker.widget.TaskShortcutHelper.WatchState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -107,6 +109,25 @@ class TaskShortcutPlanTest {
         val restored = TaskShortcutHelper.plan(listOf(recorded), mapOf(4L to "Morning routine"), afterRestore = true)
         assertEquals(emptyList<String>(), restored.disable)
         assertEquals(emptyList<ShortcutState>(), restored.update)
+    }
+
+    /**
+     * A pass whose renames Android held back used to drop what the app compares with: the first
+     * pass's names were lost, so an older Pin shortcut was recorded with a stale label, and a
+     * restore's caution stayed on after its shortcuts were off, so a later rename grayed one.
+     */
+    @Test
+    fun aHeldBackPassKeepsTheNamesItSawAndEndsTheRestoreCaution() {
+        val first = mapOf(4L to "A")
+        val start = WatchState(previous = null, afterRestore = true)
+
+        assertEquals(WatchState(first, afterRestore = false), start.after(ReconcileOutcome.CHECKED, first))
+        assertEquals(WatchState(first, afterRestore = true), start.after(ReconcileOutcome.FAILED, first))
+        val held = WatchState(first, afterRestore = false)
+        assertEquals(held, held.after(ReconcileOutcome.CHECKED, mapOf(4L to "B")))
+        assertEquals(WatchState(mapOf(4L to "B"), afterRestore = false), held.after(ReconcileOutcome.APPLIED, mapOf(4L to "B")))
+        // So the older Pin shortcut still follows from the name it was first seen with.
+        assertEquals(listOf(pinned(4, "B")), TaskShortcutHelper.plan(listOf(older(4, "A")), mapOf(4L to "B"), held.previous).update)
     }
 
     /** A restore swaps every task at once, so a new name under a shortcut's id may be another task. */

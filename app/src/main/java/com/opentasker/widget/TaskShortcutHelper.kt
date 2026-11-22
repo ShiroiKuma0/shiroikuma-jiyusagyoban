@@ -93,15 +93,16 @@ object TaskShortcutHelper {
     /**
      * Brings the app's task shortcuts in line with [taskNames], every task's id and name.
      * [previousNames] is the list as this process last saw it, or null on the first call, and
-     * [afterRestore] says a restore replaced the database at this start. See [plan]. False when
-     * the shortcuts couldn't be read or changed, so the caller keeps what it would compare with.
+     * [afterRestore] says a restore replaced the database at this start. See [plan] and
+     * [ReconcileOutcome] for how far it got.
      */
     fun reconcile(
         context: Context,
         taskNames: Map<Long, String>,
         previousNames: Map<Long, String>? = null,
         afterRestore: Boolean = false,
-    ): Boolean =
+    ): ReconcileOutcome {
+        var outcome = ReconcileOutcome.FAILED
         runCatching {
             val shortcuts = ShortcutManagerCompat.getShortcuts(
                 context,
@@ -128,17 +129,41 @@ object TaskShortcutHelper {
             if (plan.enable.isNotEmpty()) {
                 ShortcutManagerCompat.enableShortcuts(context, shortcuts.filter { it.id in plan.enable })
             }
-            if (plan.update.isNotEmpty()) {
-                val updated = ShortcutManagerCompat.updateShortcuts(
-                    context,
-                    plan.update.map { taskShortcut(context, it.id, it.taskId, it.label, it.kind, it.madeFor) },
-                )
-                if (!updated) AppLogger.warn(TAG, "Android held back renaming task shortcuts; the next change tries again")
-                updated
+            outcome = ReconcileOutcome.CHECKED
+            val updated = plan.update.isEmpty() || ShortcutManagerCompat.updateShortcuts(
+                context,
+                plan.update.map { taskShortcut(context, it.id, it.taskId, it.label, it.kind, it.madeFor) },
+            )
+            if (updated) {
+                outcome = ReconcileOutcome.APPLIED
             } else {
-                true
+                AppLogger.warn(TAG, "Android held back renaming task shortcuts; the next change tries again")
             }
-        }.onFailure { AppLogger.error(TAG, "Could not update task shortcuts", it) }.getOrDefault(false)
+        }.onFailure { AppLogger.error(TAG, "Could not update task shortcuts", it) }
+        return outcome
+    }
+
+    /** How far a [reconcile] got. */
+    enum class ReconcileOutcome {
+        /** The shortcuts couldn't be read, or turning some off or on failed. */
+        FAILED,
+
+        /** Shortcuts for missing tasks are off and returning ones are on, but Android held back the renames. */
+        CHECKED,
+        APPLIED,
+    }
+
+    /**
+     * What the app carries from one [reconcile] to the next. A restore's caution lasts until a
+     * pass has turned off what it had to. [previous] is the task names the shortcuts last matched,
+     * kept while renames are held back so an older shortcut can still follow from its label.
+     */
+    data class WatchState(val previous: Map<Long, String>?, val afterRestore: Boolean) {
+        fun after(outcome: ReconcileOutcome, names: Map<Long, String>) = WatchState(
+            previous = if (outcome == ReconcileOutcome.APPLIED) names else previous ?: names,
+            afterRestore = afterRestore && outcome == ReconcileOutcome.FAILED,
+        )
+    }
 
     /**
      * A shortcut keeps the task id and label it was made with. One for a task that's gone is
