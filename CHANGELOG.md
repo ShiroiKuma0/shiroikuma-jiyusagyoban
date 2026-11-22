@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- `%found(#)` reads 0 when `%found` is set but has no elements, as it does in Tasker, and so do `(#<)` and `(#>)`. After Split Text into `%found` and then an Array Clear, or a Replace Text that found nothing, it used to read the first part.
 - Array Push, Array Pop and Array Process now work on a list Split Text or Match Text kept. They read it as elements 1, 2, 3 and so on, and what they leave is what Join Text, For Each and `%parts(#)` read next. Before, they changed only numbered elements, so Join Text and For Each kept reading the old list.
 - A huge range on a Split Text or Match Text array, like `%parts(0:2000000000)`, now reads the parts that exist straight away. It used to count through every number in the range first, which held the step up for seconds.
 - An imported Tasker Search Replace now acts like Tasker's. If the variable isn't set, the step fails and leaves the matches array alone. The variable only changes when something matched, and a result with nothing left unsets it. A Replace With that names a group the search doesn't have, like `$9`, is logged and the variable stays as it was. Before, an unset variable was searched as empty text and written back, and a missing group failed the step. Replace Text has a new Edit the output variable in place switch for this, and the import turns it on. Tasks imported earlier keep the old behavior until they're imported again.

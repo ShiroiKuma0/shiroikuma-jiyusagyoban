@@ -435,8 +435,9 @@ class VariableExpander {
         val pick = taskerJoinOrPick(expanded)
         if (pick == null && !TASKER_ARRAY_FORM.matches(form)) return null
         val items = store.numberedItems(name)
-        // A plain variable with no elements keeps its own operators, like `%n(+5)` adding 5.
-        if (items.isEmpty() && baseValue != null) return null
+        // A plain variable with no elements keeps its own operators, like `%n(+5)` adding 5. Tasker's
+        // counts aren't among them: they count elements whatever the base holds (`dq.V`), so 0.
+        if (items.isEmpty() && baseValue != null && form !in TASKER_COUNT_FORMS) return null
         when (pick) {
             TaskerJoinOrPick.AtRandom -> return items.values.randomOrNull().orEmpty()
             is TaskerJoinOrPick.Join -> return numberedRange(items, pick.range)?.joinToString(pick.separator).orEmpty()
@@ -1051,6 +1052,7 @@ class VariableExpander {
         private const val MAX_REGEX_INPUT_LENGTH = 10_000
         private val PATTERN_WILDCARD = Regex("[*+]")
         private val TASKER_ARRAY_FORM = Regex("""#[<>]?|[<>]|\d*(?::\d*)?""")
+        private val TASKER_COUNT_FORMS = setOf("#", "#<", "#>")
         private val STORED_ARRAY_FORM = Regex("""#|\d*(?::\d*)?""")
         private val TASKER_RANGE_FORM = Regex("""\d*(?::\d*)?""")
 
