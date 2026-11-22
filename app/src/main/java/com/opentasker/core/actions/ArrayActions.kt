@@ -41,10 +41,19 @@ private fun VariableStore.elementsWithFlags(base: String): java.util.TreeMap<Int
     return numbered.mapValuesTo(java.util.TreeMap()) { (index, value) -> value to isSensitive("$base$index") }
 }
 
-/** Writes [items] as [base]'s elements and drops a kept list of that name, so they're what reads see. */
-private fun VariableStore.replaceElements(base: String, items: Map<Int, Pair<String, Boolean>>) {
-    removeArray(base)
-    replaceNumberedItems(base, items)
+/**
+ * Writes [items] as [base]'s elements and drops a kept list of that name, so they're what reads
+ * see, or returns why it can't before anything changes. Elements that replace a kept list go next
+ * to [base], so a sub-task changing its caller's list leaves them with the caller.
+ */
+private fun VariableStore.replaceElements(base: String, items: Map<Int, Pair<String, Boolean>>): String? {
+    if (items.size > MAX_ELEMENTS) return "%$base would have more than $MAX_ELEMENTS elements"
+    val last = items.keys.maxOrNull()
+    if (last != null && elementName(base, last) == null) {
+        return "%$base element names would pass ${VariableNamePolicy.MAX_LENGTH} characters"
+    }
+    replaceNumberedItems(base, items, besideBase = removeArray(base))
+    return null
 }
 
 /**
@@ -126,7 +135,7 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
             return ActionResult.Failure("%$base element names would pass ${VariableNamePolicy.MAX_LENGTH} characters")
         }
         moved[at] = args["value"].orEmpty() to false
-        ctx.variables.replaceElements(base, moved)
+        ctx.variables.replaceElements(base, moved)?.let { return ActionResult.Failure(it) }
         ctx.logger("array.push -> %$base($at)")
         return ActionResult.Success
     }
@@ -153,7 +162,7 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
         val popped = items[at]
         val moved = java.util.TreeMap<Int, Pair<String, Boolean>>()
         items.forEach { (index, item) -> if (index != at) moved[if (index > at) index - 1 else index] = item }
-        ctx.variables.replaceElements(base, moved)
+        ctx.variables.replaceElements(base, moved)?.let { return ActionResult.Failure(it) }
         if (toVar != null) {
             if (popped == null) ctx.variables.remove(toVar) else ctx.variables.set(toVar, popped.first, sensitive = popped.second)
         }
@@ -196,7 +205,7 @@ class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")
             "squash" -> values.filter { it.first.isNotEmpty() }.withIndex().associate { (index, item) -> index + 1 to item }
             else -> items.keys.zip(reorder(type, values)).toMap()
         }
-        ctx.variables.replaceElements(base, processed)
+        ctx.variables.replaceElements(base, processed)?.let { return ActionResult.Failure(it) }
         ctx.logger("array.process -> %$base ($type, ${processed.size} element(s))")
         return ActionResult.Success
     }

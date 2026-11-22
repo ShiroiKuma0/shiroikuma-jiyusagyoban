@@ -231,9 +231,11 @@ class VariableStore {
      * scope shows through after a sub-task set one of its own, and the new ones go into the
      * outermost of those scopes that held an element, else the one [set] writes to. A sub-task
      * changing its caller's array changes it there, instead of writing the new elements into its
-     * own scope, gone when it returns.
+     * own scope, gone when it returns. With [besideBase] and no element anywhere, they go into the
+     * innermost of those scopes that holds [base] itself, as when they replace a list Split Text kept
+     * there, since those lists aren't scoped.
      */
-    fun replaceNumberedItems(base: String, items: Map<Int, Pair<String, Boolean>>) {
+    fun replaceNumberedItems(base: String, items: Map<Int, Pair<String, Boolean>>, besideBase: Boolean = false) {
         val normalizedBase = VariableNamePolicy.normalize(base) ?: return
         if (VariableNamePolicy.isGlobal(normalizedBase)) {
             globals.keys.filter { numberedIndex(normalizedBase, it) != null }.forEach(globals::remove)
@@ -245,7 +247,7 @@ class VariableStore {
             val scopes = arrayScopes(normalizedBase)
             val (values, sensitiveNames) = scopes.firstOrNull { (values, _) ->
                 values.keys.any { numberedIndex(normalizedBase, it) != null }
-            } ?: scopes.last()
+            } ?: scopes.lastOrNull { (values, _) -> besideBase && normalizedBase in values } ?: scopes.last()
             scopes.forEach { (scopeValues, scopeSensitiveNames) ->
                 scopeValues.keys.filter { numberedIndex(normalizedBase, it) != null }.forEach { name ->
                     scopeValues.remove(name)
