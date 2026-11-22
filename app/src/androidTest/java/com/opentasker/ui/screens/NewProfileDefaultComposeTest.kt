@@ -94,6 +94,29 @@ class NewProfileDefaultComposeTest {
     }
 
     @Test
+    fun aChoiceTurnedOnSurvivesARotation() {
+        // The case above can't tell a restored choice from the setting's first value, both off.
+        // Here the choice differs from the setting the whole time, so only restoring keeps it.
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent {
+            OpenTaskerTheme {
+                ProfileEditorDialog(
+                    profile = null,
+                    tasks = listOf(task),
+                    onDismiss = {},
+                    onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+                    newProfileEnabled = false,
+                )
+            }
+        }
+        enableSwitch().assertIsOff().performClick()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        enableSwitch().assertIsOn()
+    }
+
+    @Test
     fun anExistingProfileKeepsItsOwnState() {
         showEditor(profile = Profile(id = 7, name = "Work", enterTaskId = task.id, enabled = false), newProfileEnabled = true)
 

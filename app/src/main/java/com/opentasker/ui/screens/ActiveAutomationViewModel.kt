@@ -299,6 +299,14 @@ class ActiveAutomationViewModel(
         .map { entities -> entities.map { it.toDomainDecodeResult() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /**
+     * Held here, not read by the screen, so a rotated screen gets the stored value on its first
+     * frame. Read there, it started false after every rotation, and New profile tapped right then
+     * opened an editor that ignored the setting.
+     */
+    val newProfilesEnabled: StateFlow<Boolean> = ProfileDefaultsPreference.newProfilesEnabled(appContext)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     val profiles: StateFlow<ImmutableList<Profile>> = profileDecodeResults
         .map { results ->
             results.mapNotNull { result -> result.value.takeIf { result.issue == null } }

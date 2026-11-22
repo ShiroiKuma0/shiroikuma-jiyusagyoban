@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
@@ -21,6 +22,12 @@ object OnboardingPreference {
         context.onboardingDataStore.edit { prefs ->
             prefs[KEY_COMPLETED] = true
         }
+    }
+
+    /** Brings the first-run flow back, for a test that marked it done to see the screen behind it. */
+    @VisibleForTesting
+    internal suspend fun clearCompleted(context: Context) {
+        context.onboardingDataStore.edit { prefs -> prefs.remove(KEY_COMPLETED) }
     }
 
 }

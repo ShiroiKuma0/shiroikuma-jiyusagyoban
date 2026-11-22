@@ -22,6 +22,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
 import com.opentasker.ui.theme.OpenTaskerTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -39,6 +40,7 @@ class NeedsSetupPillNavigationTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var db: AppDatabase
     private var writeSettingsMode = "default"
+    private var onboardingDoneBefore = false
 
     @Before
     fun setUp() {
@@ -49,6 +51,7 @@ class NeedsSetupPillNavigationTest {
         shell("appops set ${context.packageName} WRITE_SETTINGS deny")
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         runBlocking {
+            onboardingDoneBefore = OnboardingPreference.hasCompleted(context).first()
             // The first-run flow would cover the screen.
             OnboardingPreference.markCompleted(context)
             db.taskDao().insert(
@@ -61,6 +64,8 @@ class NeedsSetupPillNavigationTest {
     fun tearDown() {
         db.close()
         shell("appops set ${context.packageName} WRITE_SETTINGS $writeSettingsMode")
+        // Leave the device as it was found, so a fresh install still gets the first-run flow.
+        if (!onboardingDoneBefore) runBlocking { OnboardingPreference.clearCompleted(context) }
     }
 
     @Test

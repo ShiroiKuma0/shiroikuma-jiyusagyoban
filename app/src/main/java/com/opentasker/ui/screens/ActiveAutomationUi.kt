@@ -213,10 +213,9 @@ fun ActiveAutomationUi(
     val context = LocalContext.current.applicationContext
     val blueprintCatalogStore = remember(context) { BlueprintCatalogStore(context) }
     val availableBlueprints = remember(blueprintCatalogStore) { blueprintCatalogStore.available() }
-    // Read here rather than in the dialog, so it has loaded by the time New profile opens.
-    val newProfilesEnabled by remember(context) { ProfileDefaultsPreference.newProfilesEnabled(context) }.collectAsState(initial = false)
     val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
+    val newProfilesEnabled by viewModel.newProfilesEnabled.collectAsState()
     val profiles by viewModel.profiles.collectAsState(); val contentLoaded by viewModel.contentLoaded.collectAsState(); val historyAvailability by viewModel.historyAvailability.collectAsState()
     val runBusy by viewModel.runActionBusy.collectAsState()
     val tasks by viewModel.tasks.collectAsState(); val invariants by viewModel.invariants.collectAsState()
