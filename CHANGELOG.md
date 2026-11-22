@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- Setting the phone's clock back could silence a profile with a cooldown for as long as the clock moved, a day back meant about a day of "on cooldown", and shortening a cooldown kept the old, longer one running. A cooldown now never has more than one of its current windows left. Shake triggers had the same problem with the clock and now time their one-second gap from the sensor.
 - Copy and Share on the Diagnostics screen built the report on the main thread. Its reads of engine health, settings and crash logs can stall, and the screen froze while they did. The report is built in the background now, as Refresh already does.
 - Clear in the run log filters only reset the date. The status, task and search stayed as they were. Clear now resets all four.
 - A task whose name is a number, like "2025", wasn't protected when you deleted it, and renaming it left every Perform Task or Stop Task step that named it pointing at nothing. Those steps run a task by its id when one has that number, and by its name otherwise. Delete, rename and import now read them the same way, so an imported call to a task named "1" keeps reaching it instead of whatever task already has id 1.

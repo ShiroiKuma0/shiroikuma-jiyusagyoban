@@ -16,7 +16,7 @@ class ShakeDetector(context: Context) {
     private val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val lifecycle = MonitorLifecycle()
 
-    private var lastShakeTime = 0L
+    private val debounce = Debounce()
 
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -28,9 +28,7 @@ class ShakeDetector(context: Context) {
             val gz = z / SensorManager.GRAVITY_EARTH
             val magnitude = sqrt((gx * gx + gy * gy + gz * gz).toDouble()).toFloat()
 
-            val now = System.currentTimeMillis()
-            if (!shouldPublishShake(magnitude, lastShakeTime, now)) return
-            lastShakeTime = now
+            if (!debounce.accept(magnitude, event.timestamp)) return
 
             AppLogger.info(TAG, "Shake detected: magnitude=${magnitude}g")
             ShakeContextEvents.publish(magnitude)
@@ -73,5 +71,20 @@ class ShakeDetector(context: Context) {
 
         internal fun shouldPublishShake(magnitudeG: Float, lastShakeAtMs: Long, nowMs: Long): Boolean =
             magnitudeG >= SHAKE_THRESHOLD_G && nowMs - lastShakeAtMs >= DEBOUNCE_MS
+    }
+
+    /**
+     * Debounces on the sensor event's own time, which counts from boot. On the wall clock, a clock
+     * set back an hour dropped every shake for that hour.
+     */
+    internal class Debounce {
+        private var lastShakeAtMs: Long? = null
+
+        fun accept(magnitudeG: Float, eventTimeNanos: Long): Boolean {
+            val nowMs = eventTimeNanos / 1_000_000L
+            if (!shouldPublishShake(magnitudeG, lastShakeAtMs ?: (nowMs - DEBOUNCE_MS), nowMs)) return false
+            lastShakeAtMs = nowMs
+            return true
+        }
     }
 }

@@ -44,7 +44,16 @@ class CooldownReservations(
      */
     fun reserve(profileId: Long, cooldownSec: Int): CooldownReservation = synchronized(deadlines) {
         val current = now()
-        val deadline = deadlines[profileId] ?: 0L
+        var deadline = deadlines[profileId] ?: 0L
+        // A deadline is a wall-clock time. One more than a current window away came from a clock
+        // since set back or a cooldown since shortened, and would hold the profile for the old
+        // span, so it's brought in to one window from now and saved that way.
+        val latest = current + cooldownSec.coerceAtLeast(0) * 1000L
+        if (deadline > latest) {
+            deadline = latest
+            deadlines[profileId] = latest
+            persist(profileId, latest)
+        }
         if (current < deadline) {
             return CooldownReservation(accepted = false, remainingMs = deadline - current)
         }

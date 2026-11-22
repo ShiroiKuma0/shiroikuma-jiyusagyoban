@@ -111,6 +111,26 @@ class CooldownReservationsTest {
         assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
     }
 
+    /**
+     * A deadline saved before the clock went back a day, or under a longer cooldown, held the
+     * profile for the old span. It counts for at most one current window.
+     */
+    @Test
+    fun aDeadlineCountsForAtMostOneCurrentWindow() {
+        val clock = FakeClock()
+        val cooldowns = CooldownReservations(now = clock)
+        cooldowns.seed(mapOf(1L to clock.millis + 86_400_000L, 2L to clock.millis + 3_600_000L))
+
+        val clockSetBack = cooldowns.reserve(profileId = 1, cooldownSec = 60)
+        assertFalse(clockSetBack.accepted)
+        assertEquals(60_000L, clockSetBack.remainingMs)
+        assertTrue("a cooldown since removed holds nothing", cooldowns.reserve(profileId = 2, cooldownSec = 0).accepted)
+
+        clock.millis += 60_000
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+        assertEquals(clock.millis + 60_000L, cooldowns.snapshot()[1L])
+    }
+
     /** The store puts the old deadline back only over the one this release gives back. */
     @Test
     fun aReleaseSavesThroughRestoreWithTheDeadlineItGivesBack() {
