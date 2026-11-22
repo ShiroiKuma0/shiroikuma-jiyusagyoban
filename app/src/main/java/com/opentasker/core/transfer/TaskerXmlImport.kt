@@ -1544,7 +1544,9 @@ object TaskerXmlImporter {
             element != null && elementName == null -> {
                 val (base, position) = element
                 when {
-                    position.isNotEmpty() && position.all { it in '0'..'9' } ->
+                    // Tasker takes any script's digits (TextUtils.isDigitsOnly, wp.z3) and fails the
+                    // step on a number too big for an int, which z3 gives back as null.
+                    position.isNotEmpty() && position.all(Char::isDigit) && position.toIntOrNull() != null ->
                         "Tasker Variable Clear clears element $position of $base, which this app can't name"
                     position.startsWith('>') || position.startsWith('<') || TASKER_ELEMENT_VARIABLE.matches(position) ->
                         "Tasker Variable Clear clears the element of $base that ($position) picks when the task runs, which has no match here"

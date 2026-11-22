@@ -3,6 +3,7 @@ package com.opentasker.core.transfer
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -105,6 +106,23 @@ class TaskerVariableClearTransferTest {
         assertTrue("""<Str sr="arg0" ve="3">%json.(1)</Str>""" in exported(mapOf("name" to "json[0]")))
         // The spaces and tabs a position here may have around it go too.
         assertTrue("""<Str sr="arg0" ve="3">%json.list(2)</Str>""" in exported(mapOf("name" to "%json.list[ ${'\t'}1 ]")))
+        // A line break isn't one of them, since the parser refuses it, so that name goes out as it is.
+        assertFalse("%json.list(2)" in exported(mapOf("name" to "%json.list[${'\n'}1]")))
+    }
+
+    @Test
+    fun aPositionPastWhatANumberHoldsSaysTheStepFails() {
+        // wp.z3 gives null for it, so Tasker leaves the name as it is and fails the step (dq.u1).
+        assertEquals(
+            "Tasker Variable Clear fails the step on %arr(99999999999), since that doesn't name one element",
+            action(clear("%arr(99999999999)")).args["summary"],
+        )
+        // Another script's digits Tasker reads as a number, which the plain clear here can't name.
+        val three = Char(0x663)
+        assertEquals(
+            "Tasker Variable Clear clears element $three of %arr, which this app can't name",
+            action(clear("%arr($three)")).args["summary"],
+        )
     }
 
     @Test
