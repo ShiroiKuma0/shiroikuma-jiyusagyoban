@@ -59,6 +59,17 @@ class TaskerIndexListFormTest {
     }
 
     @Test
+    fun onlyTaskersSearchesAsTypedAndThisAppsOwnOperatorsArentLists() {
+        // Tasker spots `#?` and `$...?` in the text as typed, before trimming (dq.X), so these are lists there.
+        assertEquals("beta", numbered().expand("%arr(#1,2)"))
+        assertEquals("alpha", numbered().expand("%arr(\$a,1)"))
+        assertEquals("alpha", numbered().expand("%arr( #?x,1)"))
+        // A letter keeps this app's operator only where it's typed: not one a variable fills in, nor a range after +sep+.
+        assertEquals("alpha", numbered().apply { set("i", "a") }.expand("%arr(%i,1)"))
+        assertEquals("alpha", numbered().expand("%arr(+;+a,1)"))
+    }
+
+    @Test
     fun aCommaListIsARangeAfterTheSecondPlus() {
         assertEquals("alpha;cat", numbered().expand("%arr(+;+1,3)"))
         // The stored array Split Text keeps has no list form, so that still joins with all of it.
