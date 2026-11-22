@@ -49,10 +49,10 @@ class TaskerVariableClearTransferTest {
     @Test
     fun whatTaskerWontClearStaysAPlaceholder() {
         listOf(
-            // An array element Tasker picks when the task runs, and forms it fails on.
-            clear("%arr(>)"),
-            clear("%arr(&lt;)"),
-            clear("%arr(%index)"),
+            // Forms Tasker fails the step on, a pick through a variable named from another, and a
+            // pick through a variable of fewer than three characters (dq.c1).
+            clear("%arr(%%index)"),
+            clear("%arr(%ix)"),
             clear("%arr(1:2)"),
             clear("%arr(#)"),
             clear("%arr()"),
@@ -83,6 +83,18 @@ class TaskerVariableClearTransferTest {
             // With Pattern Matching on too.
             clear("%arr(3)", pattern = 1, localOnly = 1) to mapOf("name" to "%arr3", "pattern" to "true", "local_only" to "true"),
         ).forEach { (xml, args) -> assertEquals(xml, "var.clear" to args, action(xml).let { it.type to it.args }) }
+    }
+
+    @Test
+    fun anElementTaskerPicksWhenTheTaskRunsComesOverAsWritten() {
+        // Variable Clear picks it the same way when the step runs (dq.i), and an export writes it back as is.
+        mapOf(
+            clear("%arr(>)") to mapOf("name" to "%arr(>)"),
+            clear("%arr(&lt;)") to mapOf("name" to "%arr(<)"),
+            clear("%arr(%index)") to mapOf("name" to "%arr(%index)"),
+            clear("%Arr(&lt;)", pattern = 1) to mapOf("name" to "%Arr(<)", "pattern" to "true"),
+        ).forEach { (xml, args) -> assertEquals(xml, "var.clear" to args, action(xml).let { it.type to it.args }) }
+        assertTrue("""<Str sr="arg0" ve="3">%arr(&lt;)</Str>""" in exported(mapOf("name" to "%arr(<)")))
     }
 
     @Test
