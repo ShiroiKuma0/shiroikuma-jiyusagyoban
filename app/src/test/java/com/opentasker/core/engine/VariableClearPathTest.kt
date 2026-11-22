@@ -8,6 +8,7 @@ import com.opentasker.core.registerCoreRuntime
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -84,9 +85,14 @@ class VariableClearPathTest {
 
     @Test
     fun aSecretVariableStaysSecret() {
-        val store = VariableStore().apply { set("Json", json, sensitive = true) }
-        assertTrue(run(store, "%Json.a").success)
-        assertTrue(store.isSensitive("Json"))
+        // A local, since a global's secret flag never drops whatever writes it.
+        val store = VariableStore().apply {
+            pushScope()
+            set("json", json, sensitive = true)
+        }
+        assertNull(store.clearAtPath("%json.a"))
+        assertEquals("""{"b":{"c":2,"d":null},"list":[10,20,30]}""", store.get("json"))
+        assertTrue(store.isSensitive("json"))
     }
 
     @Test
