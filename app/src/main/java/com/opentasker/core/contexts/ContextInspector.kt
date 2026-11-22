@@ -205,24 +205,25 @@ internal fun explainContextExpression(
             node.isLeaf() -> {
                 val check = node.contextIndex?.let(checks::getOrNull)
                 val state = when {
-                    check?.effectiveMatched == true -> "match"
-                    check?.valueUnknown == true -> "unknown"
-                    else -> "no match"
+                    check?.effectiveMatched == true -> "matches"
+                    check?.valueUnknown == true -> "is unknown"
+                    else -> "doesn't match"
                 }
-                "Context ${(node.contextIndex ?: -1) + 1}=$state"
+                "Context ${(node.contextIndex ?: -1) + 1} $state"
             }
             nodeOperator != null && node.children.isNotEmpty() -> {
                 val operator = when (nodeOperator) {
-                    ContextBooleanOperator.AND -> "ALL"
-                    ContextBooleanOperator.OR -> "ANY"
+                    ContextBooleanOperator.AND -> "all of"
+                    ContextBooleanOperator.OR -> "any of"
                 }
                 val body = node.children.joinToString(", ", transform = ::explain)
-                if (node.invert) "NOT($operator($body))" else "$operator($body)"
+                if (node.invert) "not $operator ($body)" else "$operator ($body)"
             }
             else -> "Invalid context group"
         }
     }
-    return explain(expression)
+    // "All of (Context 1 matches, Context 2 doesn't match)", in words rather than ALL(Context 1=match).
+    return explain(expression).replaceFirstChar { it.uppercaseChar() }
 }
 
 private fun inspectContextForProfile(
@@ -325,10 +326,16 @@ private val SUN_EVENT_KEYS = setOf("event", "elevation")
 private fun degreesText(value: Double): String =
     if (value == Math.rint(value)) value.toLong().toString() else value.toString()
 
+/** "battery_level" and "connectedCount" read as "Battery level" and "Connected count", so raw keys don't show as code. */
+internal fun readableFieldName(key: String): String =
+    key.replace(CAMEL_HUMP, "\$1 \$2").replace('_', ' ').trim().lowercase(Locale.ROOT).replaceFirstChar { it.uppercaseChar() }
+
+private val CAMEL_HUMP = Regex("([a-z0-9])([A-Z])")
+
 private fun configEntriesSummary(config: Map<String, String>): String =
     config.entries
         .sortedBy { it.key }
-        .joinToString { "${it.key}=${it.value}" }
+        .joinToString { "${readableFieldName(it.key)}: ${it.value}" }
         .ifBlank { "No configuration" }
 
 /** Reads as the check it makes, "Bluetooth device nearby = Car" rather than "key=bt_near, operator==, value=Car". */

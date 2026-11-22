@@ -103,7 +103,7 @@ class UnknownContextLogicTest {
         val unset = inspect(emptyMap())
         assertFalse(unset.matching)
         assertTrue(unset.contexts.single().valueUnknown)
-        assertEquals("NOT(ALL(Context 1=unknown))", unset.logicExplanation)
+        assertEquals("Not all of (Context 1 is unknown)", unset.logicExplanation)
         assertTrue(inspect(mapOf("Sunrise" to "6.42", "Sunset" to "16.51")).matching)
     }
 

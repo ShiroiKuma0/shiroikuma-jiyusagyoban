@@ -131,7 +131,7 @@ class ContextInspectorTest {
         val result = inspectProfiles(listOf(profile), listOf(source)).single()
 
         assertTrue(result.matching)
-        assertTrue(result.logicExplanation.startsWith("ANY("))
+        assertEquals("Any of (all of (Context 1 matches, Context 2 matches), Context 3 doesn't match)", result.logicExplanation)
         assertEquals(listOf(true, true, false), result.contexts.map { it.effectiveMatched })
     }
 
@@ -526,14 +526,14 @@ class ContextInspectorTest {
         assertEquals("battery level >= 80; inverted", summary("key" to "battery", "operator" to ">=", "value" to "80", invert = true))
         // Anything the condition doesn't cover still shows, so nothing is hidden.
         assertEquals(
-            "orientation = portrait, debounce=5",
+            "orientation = portrait, Debounce: 5",
             summary("key" to "orientation", "operator" to "=", "value" to "portrait", "debounce" to "5"),
         )
         // With no key there's no check to describe, so the raw entries stay.
-        assertEquals("predicate=nonsense", summary("predicate" to "nonsense"))
+        assertEquals("Predicate: nonsense", summary("predicate" to "nonsense"))
         // The engine checks only the predicate when one is set, so key fields beside a bad one aren't the check.
         assertEquals(
-            "key=screen, operator==, predicate=nonsense, value=on",
+            "Key: screen, Operator: =, Predicate: nonsense, Value: on",
             summary("predicate" to "nonsense", "key" to "screen", "operator" to "=", "value" to "on"),
         )
     }

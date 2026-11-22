@@ -76,6 +76,7 @@ import com.opentasker.core.contexts.STAND_IN_MARKER_PREFIX
 import com.opentasker.core.contexts.TimeContextBounds
 import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.observationStatus
+import com.opentasker.core.contexts.readableFieldName
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintFinding
 import com.opentasker.core.capabilities.AutomationLintReport
@@ -585,9 +586,9 @@ internal fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                     )
                 }
                 InspectorStatusPill(stringResource(source.status.resourceId), color)
-                // The freshness pill only means something while the source runs. Beside "Needs
-                // setup" it read as a second, contradicting status.
-                if (source.status == ContextSourceStatus.Active || source.status == ContextSourceStatus.Waiting) {
+                // The freshness pill only means something once the source has a reading. Beside "Needs
+                // setup" it read as a second, contradicting status, and beside "Waiting" it said it again.
+                if (source.status == ContextSourceStatus.Active) {
                     InspectorStatusPill(
                         stringResource(observationStatus.resourceId),
                         observationStatusColor(observationStatus),
@@ -620,6 +621,14 @@ internal fun ProfileInspectorCard(
     val platformBlocked = remember(profile.profile) {
         profile.profile?.let { PlatformSupport.blockedTriggers(listOf(it), Build.VERSION.SDK_INT) }.orEmpty()
     }
+    val statusLabel = when {
+        !profile.enabled -> stringResource(R.string.status_disabled)
+        profile.matching -> stringResource(R.string.status_matching)
+        // "Blocked" is kept for a profile something refuses to run. One whose contexts simply
+        // don't hold right now is only not matching.
+        platformBlocked.isNotEmpty() || profile.suppressionReason != null -> stringResource(R.string.status_blocked)
+        else -> stringResource(R.string.inspector_not_matching)
+    }
     val color = when {
         !profile.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
         profile.matching -> MaterialTheme.colorScheme.tertiary
@@ -641,7 +650,7 @@ internal fun ProfileInspectorCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = if (profile.matching) stringResource(R.string.status_matching) else stringResource(R.string.inspector_not_matching),
+                    contentDescription = statusLabel,
                     tint = color,
                     modifier = Modifier.size(22.dp),
                 )
@@ -649,17 +658,7 @@ internal fun ProfileInspectorCard(
                     Text(profile.profileName, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(profile.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                InspectorStatusPill(
-                    label = when {
-                        !profile.enabled -> stringResource(R.string.status_disabled)
-                        profile.matching -> stringResource(R.string.status_matching)
-                        // "Blocked" is kept for a profile something refuses to run. One whose
-                        // contexts simply don't hold right now is only not matching.
-                        platformBlocked.isNotEmpty() || profile.suppressionReason != null -> stringResource(R.string.status_blocked)
-                        else -> stringResource(R.string.inspector_not_matching)
-                    },
-                    color = color,
-                )
+                InspectorStatusPill(label = statusLabel, color = color)
             }
             // Outside the details: "Blocked" with no reason is the whole symptom of a trigger this
             // release can't deliver, so the reason has to be visible without digging.
@@ -907,7 +906,7 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
                 .sortedBy { it.key }
                 .forEach { (key, value) ->
                     Text(
-                        stringResource(R.string.inspector_metadata, metadataLabel(key), value),
+                        stringResource(R.string.inspector_metadata, readableFieldName(key), value),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -1228,10 +1227,6 @@ private val ContextObservationStatus.resourceId: Int
         ContextObservationStatus.Stale -> R.string.inspector_observation_stale
         ContextObservationStatus.Error -> R.string.inspector_observation_error
     }
-
-/** "battery_level" reads as "Battery level", so a source's raw keys don't show as code. */
-private fun metadataLabel(key: String): String =
-    key.replace('_', ' ').trim().replaceFirstChar { it.uppercaseChar() }
 
 private fun formatRelativeTime(context: Context, observedAtMs: Long, nowMs: Long): String {
     val seconds = ((nowMs - observedAtMs) / 1000L).coerceAtLeast(0)

@@ -5,11 +5,19 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.ContextEventObservation
 import com.opentasker.core.contexts.ContextInspectionSnapshot
 import com.opentasker.core.contexts.ContextSourceSnapshot
 import com.opentasker.core.contexts.ProfileInspection
+import com.opentasker.core.contexts.inspectProfiles
+import com.opentasker.core.model.ContextBooleanOperator
+import com.opentasker.core.model.ContextExpressionNode
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
+import com.opentasker.core.model.Profile
 import com.opentasker.ui.theme.OpenTaskerTheme
 import org.junit.Rule
 import org.junit.Test
@@ -73,6 +81,45 @@ class InspectorCopyComposeTest {
     }
 
     @Test
+    fun aWaitingSourceSaysSoOnce() {
+        val waiting = ContextSourceSnapshot(key = "application", label = "Application", registered = true)
+        composeTestRule.setContent { OpenTaskerTheme { ContextSourceCard(waiting, nowMs) } }
+
+        composeTestRule.onAllNodesWithText("Waiting").assertCountEquals(1)
+        // A waiting source has no reading by definition, so a freshness pill only repeated that.
+        composeTestRule.onAllNodesWithText("No reading yet").assertCountEquals(0)
+    }
+
+    @Test
+    fun aProfilesDetailsReadAsWords() {
+        val profile = Profile(
+            id = 9,
+            name = "Mail",
+            enabled = true,
+            enterTaskId = 1,
+            contexts = listOf(
+                ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example.mail")),
+                ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example.chat")),
+            ),
+            contextExpression = ContextExpressionNode.group(
+                ContextBooleanOperator.AND,
+                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1)),
+            ),
+        )
+        // Built the way the screen builds it, so the details show what the producers write.
+        val inspection = inspectProfiles(listOf(profile), emptyList(), nowMs).single()
+        composeTestRule.setContent {
+            OpenTaskerTheme { ProfileInspectorCard(inspection, nowMs, emptyList(), onSimulate = {}) }
+        }
+
+        composeTestRule.onNodeWithText("Show details").performClick()
+
+        composeTestRule.onNodeWithText("Package: com.example.mail").assertIsDisplayed()
+        composeTestRule.onNode(hasText("All of (Context 1", substring = true)).assertExists()
+        assertNoKeyValueText()
+    }
+
+    @Test
     fun theSummaryCountsSourcesNeedingAttentionInWords() {
         val needsSetup = source(setupReady = false, metadata = emptyMap(), matched = false)
         composeTestRule.setContent {
@@ -122,6 +169,8 @@ class InspectorCopyComposeTest {
         }
 
         composeTestRule.onNodeWithText("Blocked").assertIsDisplayed()
+        // The icon said "Not matching" to TalkBack while the pill said "Blocked".
+        composeTestRule.onNodeWithContentDescription("Blocked").assertExists()
     }
 
     private fun profile(summary: String, suppressionReason: String?) = ProfileInspection(

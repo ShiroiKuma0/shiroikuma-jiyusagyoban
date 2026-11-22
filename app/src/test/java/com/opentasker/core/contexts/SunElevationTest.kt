@@ -148,12 +148,12 @@ class SunElevationTest {
     @Test
     fun theInspectorNamesTheTwilight() {
         val spec = ContextSpec(ContextType.EVENT, mapOf("event" to "sunset", "elevation" to "civil", "latitude" to "51.5", "longitude" to "-0.12"))
-        assertEquals("Civil dusk (sun 6 degrees below the horizon), latitude=51.5, longitude=-0.12", contextConfigSummary(spec))
+        assertEquals("Civil dusk (sun 6 degrees below the horizon), Latitude: 51.5, Longitude: -0.12", contextConfigSummary(spec))
         assertEquals(
-            "Sun rising past 4.5 degrees above the horizon, latitude=51.5, longitude=-0.12; inverted",
+            "Sun rising past 4.5 degrees above the horizon, Latitude: 51.5, Longitude: -0.12; inverted",
             contextConfigSummary(spec.copy(invert = true).withConfig("event" to "sunrise", "elevation" to "4.5")),
         )
-        assertEquals("Sunset, latitude=51.5, longitude=-0.12", contextConfigSummary(spec.withConfig("elevation" to "")))
+        assertEquals("Sunset, Latitude: 51.5, Longitude: -0.12", contextConfigSummary(spec.withConfig("elevation" to "")))
     }
 
     private fun minute(place: Place, event: String, elevation: String): Int? = SunEventCalculator.eventMinuteOfDay(
