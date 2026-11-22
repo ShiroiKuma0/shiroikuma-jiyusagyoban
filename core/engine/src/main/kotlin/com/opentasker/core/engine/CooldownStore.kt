@@ -14,8 +14,20 @@ class CooldownStore(context: Context) {
     fun remaining(profileId: Long, nowMs: Long = System.currentTimeMillis()): Long =
         (get(profileId) - nowMs).coerceAtLeast(0L)
 
-    fun set(profileId: Long, deadlineMs: Long) {
+    fun set(profileId: Long, deadlineMs: Long) = synchronized(LOCK) {
         prefs.edit().putLong(key(profileId), deadlineMs).apply()
+    }
+
+    /**
+     * Puts [previousMs] back for a reservation whose run never started, but only while the store
+     * still holds [reservedMs]. A run that a service stop cancels gives its cooldown back when its
+     * job ends, which can be after the next service reserved a newer deadline; that one stays.
+     */
+    fun restore(profileId: Long, reservedMs: Long, previousMs: Long) = synchronized(LOCK) {
+        if (get(profileId) != reservedMs) return@synchronized
+        val editor = prefs.edit()
+        if (previousMs > 0L) editor.putLong(key(profileId), previousMs) else editor.remove(key(profileId))
+        editor.apply()
     }
 
     fun remove(profileId: Long) {
@@ -45,6 +57,8 @@ class CooldownStore(context: Context) {
     private fun key(profileId: Long) = "$KEY_PREFIX$profileId"
 
     companion object {
+        // Process-wide: an old service's late restore and the next service's reserve share the prefs.
+        private val LOCK = Any()
         private const val PREFS_NAME = "opentasker_cooldowns"
         internal const val KEY_PREFIX = "cd_"
     }

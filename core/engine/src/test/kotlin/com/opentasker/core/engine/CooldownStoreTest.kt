@@ -75,6 +75,29 @@ class CooldownStoreTest {
     // The store itself, over an in-memory SharedPreferences, so a slip in the key it writes, a
     // prune that writes when it shouldn't, or a read that prunes would show up here.
 
+    /**
+     * A run a service stop canceled gives its cooldown back when its job ends, which can be after
+     * the next service reserved a newer deadline. Only the deadline it reserved is put back.
+     */
+    @Test
+    fun aLateRestorePutsThePreviousDeadlineBackOnlyOverItsOwnReservation() {
+        val app = PrefsContext()
+        val oldService = CooldownStore(app)
+
+        oldService.set(1L, now + 60_000L)
+        oldService.restore(1L, reservedMs = now + 60_000L, previousMs = now + 10_000L)
+        assertEquals(now + 10_000L, CooldownStore(app).get(1L))
+
+        oldService.set(2L, now + 60_000L)
+        CooldownStore(app).set(2L, now + 90_000L)
+        oldService.restore(2L, reservedMs = now + 60_000L, previousMs = 0L)
+        assertEquals("the next service's deadline stays", now + 90_000L, CooldownStore(app).get(2L))
+
+        oldService.set(3L, now + 60_000L)
+        oldService.restore(3L, reservedMs = now + 60_000L, previousMs = 0L)
+        assertEquals(setOf("cd_1", "cd_2"), app.prefs.values.keys)
+    }
+
     @Test
     fun aDeadlineSetByOneStoreIsReadByTheNextAndCountsDownToZero() {
         val app = PrefsContext()

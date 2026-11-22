@@ -111,6 +111,22 @@ class CooldownReservationsTest {
         assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
     }
 
+    /** The store puts the old deadline back only over the one this release gives back. */
+    @Test
+    fun aReleaseSavesThroughRestoreWithTheDeadlineItGivesBack() {
+        val clock = FakeClock()
+        val restored = mutableListOf<Triple<Long, Long, Long>>()
+        val cooldowns = CooldownReservations(
+            now = clock,
+            restore = { id, reserved, previous -> restored += Triple(id, reserved, previous) },
+        )
+        val reservation = cooldowns.reserve(profileId = 1, cooldownSec = 60)
+
+        cooldowns.release(profileId = 1, reservation = reservation)
+
+        assertEquals(listOf(Triple(1L, 1_060_000L, 0L)), restored)
+    }
+
     @Test
     fun aReleaseAfterALaterReservationLeavesTheLaterWindow() {
         val clock = FakeClock()

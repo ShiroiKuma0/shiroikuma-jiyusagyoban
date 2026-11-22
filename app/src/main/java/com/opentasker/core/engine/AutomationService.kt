@@ -219,7 +219,10 @@ class AutomationService : Service() {
      * profile among them is used up when it goes off, even if an edit gave it an enter task meanwhile.
      */
     private val dispatchedWithoutEnterTask = mutableSetOf<Long>()
-    private val cooldowns = CooldownReservations(persist = { profileId, deadline -> cooldownStore.set(profileId, deadline) })
+    private val cooldowns = CooldownReservations(
+        persist = { profileId, deadline -> cooldownStore.set(profileId, deadline) },
+        restore = { profileId, reserved, previous -> cooldownStore.restore(profileId, reserved, previous) },
+    )
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     /** The profiles as last loaded. A matcher a reload kept acts on the edited profile through this. */
     private val registeredProfiles = Collections.synchronizedMap(mutableMapOf<Long, Profile>())

@@ -25,6 +25,9 @@ data class CooldownReservation(
 class CooldownReservations(
     private val now: () -> Long = System::currentTimeMillis,
     private val persist: (profileId: Long, deadlineMs: Long) -> Unit = { _, _ -> },
+    /** Saves a [release]: [previousMs] goes back only over [reservedMs], the deadline it gives back. */
+    private val restore: (profileId: Long, reservedMs: Long, previousMs: Long) -> Unit =
+        { profileId, _, previousMs -> persist(profileId, previousMs) },
 ) {
     private val deadlines = mutableMapOf<Long, Long>()
 
@@ -65,7 +68,7 @@ class CooldownReservations(
         } else {
             deadlines.remove(profileId)
         }
-        persist(profileId, reservation.previousDeadlineMs)
+        restore(profileId, reservation.deadlineMs, reservation.previousDeadlineMs)
     }
 }
 
