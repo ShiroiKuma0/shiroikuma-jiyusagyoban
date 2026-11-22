@@ -8,7 +8,10 @@ import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.expressions.TemplateScope
+import com.opentasker.core.data.JsonNesting
 import com.opentasker.core.storage.SUPER_GLOBAL_PROJECT_ID
+import com.opentasker.core.text.countOf
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -87,6 +90,8 @@ class VariableStore private constructor(
     /** Parallel to [localStack]: names [clearForTask] hid there, so a caller's value doesn't show through. */
     private val hiddenStack = java.util.Collections.synchronizedList(mutableListOf<MutableSet<String>>())
     private val sensitiveWriteDepth = AtomicInteger(0)
+    /** Globals [replaceNumberedItems] wrote as a whole array (upstream's commit-together set; see [globalArraysWritten]). */
+    private val globalArraysWritten = ConcurrentHashMap.newKeySet<String>()
     private val expander = VariableExpander()
 
     /**
@@ -326,18 +331,20 @@ class VariableStore private constructor(
 
     private fun itemsNumbered(base: String, index: (String, String) -> Int?): java.util.TreeMap<Int, String> {
         val items = java.util.TreeMap<Int, String>()
+        numberedNames(base, index).forEach { (number, name) -> get(name)?.let { items[number] = it } }
+        return items
+    }
+
+    /** The names in [base]'s scope that [index] gives a number, with that number. */
+    private fun numberedNames(base: String, index: (String, String) -> Int?): List<Pair<Int, String>> {
         val b = bare(base)
-        if (b.isEmpty()) return items
+        if (b.isEmpty()) return emptyList()
         val names = if (persistsGlobally(b)) {
             globalScope.snapshot(projectId).keys.toSet()
         } else {
             synchronized(localStack) { arrayScopes(b).flatMapTo(mutableSetOf()) { (values, _) -> values.keys } }
         }
-        names.forEach { name ->
-            val index = numberedIndex(b, name) ?: return@forEach
-            get(name)?.let { items[index] = it }
-        }
-        return items
+        return names.mapNotNull { name -> index(b, name)?.let { it to name } }
     }
 
     /**
@@ -345,10 +352,11 @@ class VariableStore private constructor(
      * elements are unset in every local scope [arrayScopes] covers, and the new ones go into the
      * outermost of those scopes that held an element, else the one [set] writes to.
      */
-    fun replaceNumberedItems(base: String, items: Map<Int, Pair<String, Boolean>>) {
+    fun replaceNumberedItems(base: String, items: Map<Int, Pair<String, Boolean>>, besideBase: Boolean = false) {
         val b = bare(base)
         if (b.isEmpty()) return
         if (persistsGlobally(b)) {
+            globalArraysWritten += b
             globalScope.snapshot(projectId).keys.filter { numberedIndex(b, it) != null }.forEach { remove(it) }
             items.forEach { (index, item) -> set("$b$index", item.first, sensitive = item.second) }
             return
@@ -358,7 +366,13 @@ class VariableStore private constructor(
             val scopes = arrayScopes(b)
             val (values, sensitiveNames) = scopes.firstOrNull { (values, _) ->
                 values.keys.any { numberedIndex(b, it) != null }
-            } ?: scopes.last()
+            } ?: if (besideBase) {
+                // A list with no base, like Wi-Fi Scan's %wifi_ssid, outlives any one task, so its
+                // elements go where a sub-task's return can't take them.
+                scopes.lastOrNull { (values, _) -> b in values } ?: scopes.first()
+            } else {
+                scopes.last()
+            }
             scopes.forEach { (scopeValues, scopeSensitiveNames) ->
                 scopeValues.keys.filter { numberedIndex(b, it) != null }.forEach { name ->
                     scopeValues.remove(name)
@@ -612,7 +626,13 @@ class VariableStore private constructor(
         }
     }
 
-    suspend fun <T> withSensitiveWrites(sensitive: Boolean, block: suspend () -> T): T {
+    suspend fun <T> withSensitiveWrites(sensitive: Boolean, block: suspend () -> T): T =
+        markingWritesSensitive(sensitive) { block() }
+
+    /** [withSensitiveWrites] for code that doesn't suspend, like Preflight playing a variable action. */
+    fun <T> withSensitiveWritesNow(sensitive: Boolean, block: () -> T): T = markingWritesSensitive(sensitive, block)
+
+    private inline fun <T> markingWritesSensitive(sensitive: Boolean, block: () -> T): T {
         if (!sensitive) return block()
         sensitiveWriteDepth.incrementAndGet()
         return try {
@@ -647,6 +667,7 @@ class VariableStore private constructor(
             sensitiveArrays = sensitiveArrayNames.toSet(),
             sensitiveEvent = event.keys.filterTo(mutableSetOf(), EventTaskVariables::isSensitive),
             builtIns = TaskerBuiltIns::value,
+            numberedArray = { base -> numberedItems(base).values.toList().ifEmpty { null }?.let { it to anyNumberedItemSensitive(base) } },
         )
     }
 

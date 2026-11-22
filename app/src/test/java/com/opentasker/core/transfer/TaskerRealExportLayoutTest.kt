@@ -1,5 +1,6 @@
 package com.opentasker.core.transfer
 
+import com.opentasker.core.actions.TASKER_TOGGLE_VALUE
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.model.ActionSpec

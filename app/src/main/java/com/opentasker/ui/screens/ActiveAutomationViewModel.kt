@@ -786,7 +786,7 @@ class ActiveAutomationViewModel(
                 defaultModal = defaultModal,
                 defaultDismissOnOutside = defaultDismissOnOutside,
             ).toEntity()
-        ).also { edited(EditHistoryDao.TYPE_SCENE, it) }
+        )
     }
 
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {

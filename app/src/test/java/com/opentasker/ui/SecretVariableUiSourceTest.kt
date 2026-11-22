@@ -26,7 +26,7 @@ class SecretVariableUiSourceTest {
         assertTrue(runner.contains("isSecretDerived"))
         // Secret-derived failures must still fail closed by scrubbing the secret from the message
         // rather than leaking it; the redactor replaced the old blanket SECRET_DERIVED_FAILURE.
-        assertTrue(runner.contains("expansionReport.redactSensitiveValues(rawResult.message)"))
+        assertTrue(runner.contains("redactSecretDerivedValues"))
         assertTrue(bundle.contains("filterNot { it.isSecret }"))
         assertTrue(taskerExport.contains("variables.filterNot { it.isSecret }"))
     }

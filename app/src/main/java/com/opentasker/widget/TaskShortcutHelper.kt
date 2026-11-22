@@ -7,6 +7,7 @@ import androidx.core.graphics.drawable.IconCompat
 import com.opentasker.app.R
 import androidx.core.content.pm.ShortcutManagerCompat
 import com.opentasker.core.icons.TaskIconStore
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Task
 
 object TaskShortcutHelper {

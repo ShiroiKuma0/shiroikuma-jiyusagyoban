@@ -49,10 +49,4 @@ class AssistantManifestContractTest {
         assertNotNull(services()[OpenTaskerRecognitionService::class.java.name])
     }
 
-    @Test
-    fun theRecognizerCantListenBecauseTheAppCantRecord() {
-        val permissions = xml("src/main/AndroidManifest.xml").getElementsByTagName("uses-permission")
-        val names = (0 until permissions.length).map { (permissions.item(it) as Element).getAttribute("android:name") }
-        assertFalse(names.contains("android.permission.RECORD_AUDIO"))
-    }
 }

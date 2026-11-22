@@ -284,12 +284,21 @@ class VariableExpander {
         return -1
     }
 
+    /** `+2`, `-1.5`, `*3`, `/4`, `//` and `/round`: the fork's arithmetic on a plain numeric value. */
+    private val FORK_ARITHMETIC_FORM = Regex("""//|/round|[+\-*/]-?\d+(\.\d+)?""")
+
     private fun evaluateVarOp(name: String, op: String, store: VariableStore, arrays: ArrayStore): String {
         val baseValue = store.get(name)
 
-        if (arrays.contains(name)) storedArrayValue(name, op, baseValue, store, arrays)?.let { return it }
-
-        taskerArrayValue(name, op, baseValue, store, arrays)?.let { return it }
+        // FORK: arithmetic on a plain number comes first. Upstream's Tasker join form (a415d8ce) reads
+        // `%k(+1)` as "every element joined by 1" whenever an array of the same name exists — a kept
+        // list or numbered elements alike; here `%k(+1)` on a numeric %k has always been k + 1, and
+        // 白い熊's tasks count that way.
+        val plainArithmetic = baseValue?.toDoubleOrNull() != null && FORK_ARITHMETIC_FORM.matches(op)
+        if (!plainArithmetic) {
+            if (arrays.contains(name)) storedArrayValue(name, op, baseValue, store, arrays)?.let { return it }
+            taskerArrayValue(name, op, baseValue, store, arrays)?.let { return it }
+        }
 
         if (baseValue == null) return ""
 

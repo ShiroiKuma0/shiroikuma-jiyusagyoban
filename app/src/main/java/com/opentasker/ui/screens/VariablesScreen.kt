@@ -100,8 +100,6 @@ fun VariablesScreen(
     deadGlobals: DeadGlobalsReport,
     onCleanupDeadGlobals: () -> Unit,
     contentLoaded: Boolean = true,
-    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
-    librarySort: LibrarySortControl = LibrarySortControl(),
 ) {
     // An unread database and an empty one look identical from here, so without this a cold start
     // with stored variables flashes the empty state before Room's first emission.
@@ -113,14 +111,11 @@ fun VariablesScreen(
     var editTarget by remember { mutableStateOf<Variable?>(null) }
     val selectionActive = selectedKeys.isNotEmpty()
 
-    val filtered = remember(variables, searchQuery, librarySort.order, historyAvailability) {
-        val matching = if (searchQuery.isBlank()) variables
+    val filtered = remember(variables, searchQuery) {
+        if (searchQuery.isBlank()) variables
         else variables.filter {
             it.name.contains(searchQuery, ignoreCase = true) ||
                 it.value.contains(searchQuery, ignoreCase = true)
-        }
-        sortLibrary(matching, librarySort.order, Variable::name) {
-            historyAvailability.lastEditedVariableAt(it.projectId, it.name)
         }
     }
 
@@ -138,8 +133,6 @@ fun VariablesScreen(
                 onClear = onClearVarSelection,
                 onDelete = onDeleteSelectedVars,
             )
-            LibrarySortButton(librarySort)
-            }
         }
         OutlinedTextField(
             value = searchQuery,

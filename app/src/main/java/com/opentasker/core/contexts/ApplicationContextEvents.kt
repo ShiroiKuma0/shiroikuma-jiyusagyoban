@@ -41,7 +41,6 @@ object ApplicationContextEvents {
         if (normalized.isBlank()) return false
         val normalizedComponent = className?.trim().orEmpty()
         latestForegroundPackage = normalized
-        latestForegroundComponent = normalizedComponent.ifBlank { null }
         // Fork: `current` is the package the state.get action reads; keep it in step with upstream's
         // component-aware tracking above.
         current = normalized

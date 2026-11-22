@@ -140,7 +140,6 @@ import com.opentasker.core.diagnostics.DiagnosticExport
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
-import com.opentasker.core.actions.editorEventVariablesFor
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.WorkspaceHealth

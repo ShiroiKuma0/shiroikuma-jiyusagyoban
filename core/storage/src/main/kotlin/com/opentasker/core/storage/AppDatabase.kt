@@ -16,7 +16,7 @@ import java.util.concurrent.CountDownLatch
 // v34 adds 言語島's uuids, English audio and Anki sync state, and gengoshima_tombstones.
 // v39 adds body_weight (健康's typed-in weighings), additive only.
 // v40 adds 言語島 語彙: gengoshima_vocab and gengoshima_sentences.vocabId, additive only.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 40
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 41
 
 @Database(
     entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiEcgEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class, GengoshimaTombstoneEntity::class, GengoshimaInboxEntity::class, GengoshimaVocabEntity::class, BodyWeightEntity::class],

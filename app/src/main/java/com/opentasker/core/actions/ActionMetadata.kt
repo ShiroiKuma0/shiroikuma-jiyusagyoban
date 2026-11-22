@@ -1804,6 +1804,77 @@ fun registerActionMetadata() {
         )
     )
 
+    // --- Upstream's new actions of the cb3b4c60 sync (2026-11-22), in the fork's inline-text form ---
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "calendar.event.add",
+            name = "Add Calendar Event",
+            description = "Add an event to a calendar and put the new event id in %event_id",
+            category = "App",
+            fields = listOf(
+                ActionField("calendar", "Calendar", required = true, hint = "Its name as your calendar app shows it, or its id"),
+                ActionField("title", "Title", required = true, sensitive = true),
+                ActionField("start", "Start", required = true, hint = "now, epoch milliseconds, 2026-11-22 or 2026-11-22 09:30"),
+                ActionField("end", "End", hint = "Written like Start. For an all-day event, the last day. Blank uses Duration"),
+                ActionField("duration", "Duration (minutes)", FieldType.NUMBER, hint = "60 by default. All-day events take an End day instead"),
+                ActionField("all_day", "All day", FieldType.CHECKBOX),
+                ActionField("description", "Description", FieldType.MULTILINE, sensitive = true),
+                ActionField("location", "Location", sensitive = true),
+                ActionField("var", "Variable prefix", hint = "event by default, so the new event id lands in %event_id"),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "calendar.event.query",
+            name = "Find Calendar Events",
+            description = "Read the events in a time window into %event_count, %event_titles, %event_starts and more",
+            category = "Variable",
+            fields = listOf(
+                ActionField("from", "From", hint = "now by default. Also epoch milliseconds, 2026-11-22 or 2026-11-22 09:30"),
+                ActionField("to", "To", hint = "A day after From by default, and at most a year after it"),
+                ActionField("calendar", "Calendar", hint = "A name or id to look in. Blank looks in every calendar"),
+                ActionField("max", "Most events", FieldType.NUMBER, hint = "10 by default, 50 at most"),
+                ActionField("var", "Variable prefix", hint = "event by default. Titles and locations are kept hidden in the run log"),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "settings.read",
+            name = "Read Setting",
+            description = "Read one Android setting by name into a variable. Reading needs no access, but Android hides some names from apps.",
+            category = "Settings",
+            fields = listOf(
+                ActionField(
+                    "table",
+                    "Table",
+                    FieldType.DROPDOWN,
+                    required = true,
+                    hint = "Where the setting lives. Most are Secure or Global.",
+                    options = listOf("global", "secure", "system"),
+                ),
+                ActionField(
+                    "key",
+                    "Setting name",
+                    FieldType.TEXT,
+                    required = true,
+                    hint = "location_mode, screen_off_timeout, etc.",
+                    sensitive = false,
+                ),
+                ActionField(
+                    "var",
+                    "Store in",
+                    FieldType.TEXT,
+                    required = true,
+                    hint = "A setting that isn't there is stored as empty, as in Tasker.",
+                ),
+            )
+        )
+    )
+
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "location.get",
@@ -2706,40 +2777,6 @@ fun registerActionMetadata() {
                     FieldType.TEXT,
                     required = true,
                     hint = "Read back after writing, so a value Android ignores reports a failure.",
-                ),
-            )
-        )
-    )
-
-    ActionMetadataRegistry.register(
-        ActionMetadata(
-            id = "settings.read",
-            nameRes = R.string.catalog_action_settings_read_name,
-            descriptionRes = R.string.catalog_action_settings_read_description,
-            categoryRes = R.string.catalog_category_settings,
-            fields = listOf(
-                ActionField(
-                    "table",
-                    R.string.catalog_action_settings_write_field_table_label,
-                    FieldType.DROPDOWN,
-                    required = true,
-                    hintRes = R.string.catalog_action_settings_write_field_table_hint,
-                    options = settingsTableOptions,
-                ),
-                ActionField(
-                    "key",
-                    R.string.catalog_action_settings_write_field_key_label,
-                    FieldType.TEXT,
-                    required = true,
-                    hintRes = R.string.catalog_action_settings_write_field_key_hint,
-                    sensitive = false,
-                ),
-                ActionField(
-                    "var",
-                    R.string.catalog_action_settings_read_field_var_label,
-                    FieldType.TEXT,
-                    required = true,
-                    hintRes = R.string.catalog_action_settings_read_field_var_hint,
                 ),
             )
         )

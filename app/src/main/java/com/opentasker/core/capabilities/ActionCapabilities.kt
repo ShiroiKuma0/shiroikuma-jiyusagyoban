@@ -164,6 +164,9 @@ object ActionCapabilityRegistry {
         "vpn.tunnel" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on."),
         "wifi.scan" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires location access, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so results may be a cached scan."),
         "sun.times" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs location access only when latitude or longitude is left blank."),
+        // Upstream 4568ede0 (cb3b4c60 sync): the two calendar actions.
+        "calendar.event.add" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Calendar editing row in Setup, and a calendar that takes new events."),
+        "calendar.event.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Calendar access row in Setup."),
         "sms.send" to smsCapability(),
         "screenshot.take" to shizukuCapability("Screenshot"),
         "window.mode" to shizukuCapability("Window mode"),

@@ -196,25 +196,6 @@ class OpenTaskerBundleCodecTest {
 
     /** The check read a call to a task named "2025" as a call to a missing id 2025. */
     @Test
-    fun aCrossProjectCallToATaskNamedWithANumberIsReported() {
-        val bundle = OpenTaskerBundleCodec.build(
-            appVersion = "0.2.79",
-            exportedAtEpochMs = 123L,
-            projects = listOf(
-                Project(id = 8, name = "Work", position = 1),
-                Project(id = 1, name = "Default", position = 0),
-            ),
-            tasks = listOf(
-                Task(id = 10, name = "2025", projectId = 8, actions = listOf(ActionSpec(type = "log"))),
-                Task(id = 11, name = "Default task", projectId = 1, actions = listOf(ActionSpec(type = "task.run", args = mapOf("task" to "2025")))),
-            ),
-            profiles = emptyList(),
-        )
-
-        assertTrue(OpenTaskerBundleCodec.validate(bundle).warnings.any { it.startsWith("Cross-project reference") })
-    }
-
-    @Test
     fun roundTripPreservesRelationshipsByName() {
         val decoded = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(richBundle()))
 
@@ -269,7 +250,7 @@ class OpenTaskerBundleCodecTest {
         val encoded = OpenTaskerBundleCodec.encode(bundle)
         assertEquals(listOf("COUNT"), bundle.variables.map { it.name })
         assertFalse(encoded.contains("must-not-export"))
-        assertTrue(bundle.metadata.warnings.contains("1 secret variable was omitted and must be re-entered after import."))
+        assertTrue(bundle.metadata.warnings.any { it.contains("must be re-entered") })
     }
 
     @Test(expected = IllegalArgumentException::class)

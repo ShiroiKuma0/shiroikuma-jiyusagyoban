@@ -70,8 +70,10 @@ object ActionCatalog {
         // IDEMPOTENT: a retry works the same day out again. Without coordinates it asks for a fix,
         // which only reads.
         define("sun.times", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::SunTimesAction),
-        // IDEMPOTENT: it only reads where the phone is, and a retry reads it again.
-        define("location.get", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::LocationGetAction),
+        // FORK: upstream's own Get Location (6f3a541c, LocationGetAction — args mode/accuracy/timeout/var,
+        // writing %location_lat …) is NOT defined here. The id `location.get` has been the fork's
+        // GetLocationAction since before upstream had one (prefix/max_age_ms/timeout_ms, writing
+        // <prefix>Lat …), and 白い熊's tasks are written against that one; it is defined further down.
         define("tts.speak", ActionCategory.NOTIFICATION, ActionRetrySafety.NEVER, ::SayAction),
         define("flow.wait", ActionCategory.FLOW, ActionRetrySafety.NEVER, ::WaitAction),
         // NEVER, not IDEMPOTENT: "toggle" reads the profile again, so a retry flips it back.

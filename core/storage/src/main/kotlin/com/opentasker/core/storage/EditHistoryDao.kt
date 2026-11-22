@@ -34,6 +34,14 @@ interface EditHistoryDao {
     @Insert
     suspend fun insert(entry: EditHistoryEntity): Long
 
+    // Fork: upstream dropped getLatest and deleteFor as dead (5060a847); the fork's task and profile
+    // revert paths in ActiveAutomationViewModel still call both.
+    @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC, id DESC LIMIT 1")
+    suspend fun getLatest(type: String, entityId: Long): EditHistoryEntity?
+
+    @Query("DELETE FROM edit_history WHERE entityType = :type AND entityId = :entityId")
+    suspend fun deleteFor(type: String, entityId: Long)
+
     @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId AND isUndone = 0 ORDER BY timestamp DESC, id DESC LIMIT 1")
     suspend fun getUndoCandidate(type: String, entityId: Long): EditHistoryEntity?
 
