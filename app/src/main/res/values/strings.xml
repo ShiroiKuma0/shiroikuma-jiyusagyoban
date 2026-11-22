@@ -1066,7 +1066,6 @@
     <string name="inspector_broadcast_listening">Listening for %1$d broadcast action(s): %2$s</string>
     <string name="inspector_broadcast_idle">No enabled profile is waiting for a broadcast.</string>
     <string name="context_sms_received_android_17_note">On Android 17+, standard SMS messages containing OTPs may be withheld for up to three hours for non-default-SMS apps. Connected-device and other exempt apps can receive them sooner; use SMS Retriever or User Consent when OTP timing matters.</string>
-    <string name="context_sms_received_unavailable_note">The SMS/MMS trigger is omitted from Play builds. Use a standard or F-Droid build for this event.</string>
 
     <string name="empty_first_automation_title">Build your first automation</string>
     <string name="empty_first_automation_body">Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.</string>

@@ -14,6 +14,7 @@
 
 ### Changed
 
+- The Play build profile is gone, since this app isn't heading to Google Play. Building with `-PopenTaskerDistribution=play` now stops and says so, and the standard and F-Droid builds keep their SMS and phone-state permissions as before.
 - Report a problem now asks for both diagnostic exports: the Diagnostics report (engine health, permissions and any crash log) and, for a problem with a run, the Run Log's JSON export. Each screen also says in one line what its export holds and that secrets are hidden. The Run Log's Share button sends the Diagnostics report, which wasn't obvious before.
 - Bluetooth nearby can now find a paired phone that isn't advertising, which most phones don't do with the screen off. Every other scan cycle (every third while Bluetooth audio is playing) it asks up to three paired devices from the profile's list to answer, which brings up a short link the scan already counts as a sighting. A paired device that only speaks Bluetooth Low Energy, or one that's already connected, is left alone, and no cycle that runs a full discovery scan asks.
 - Send Intent can name a component whose class sits outside the app's package name, which is common when an app's id differs from its code's (AutoJs6 is `org.autojs.autojs6` with `org.autojs.autojs` classes). A Tasker Send Intent like that imports now. Written as `package/class`, the package part has to match the step's app. Inside OpenTasker itself, a step can still name only classes under `com.opentasker.app`, as before.

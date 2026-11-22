@@ -1,7 +1,6 @@
 package com.opentasker.core.capabilities
 
 import androidx.annotation.StringRes
-import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionCatalog
 import com.opentasker.core.platform.AndroidAudioHardening
@@ -237,11 +236,7 @@ object ActionCapabilityRegistry {
         }
 
     private fun smsCapability(): ActionCapability =
-        if (BuildConfig.SMS_ACTION_AVAILABLE) {
-            ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission; Play builds omit SMS actions for policy compliance.", R.string.capability_sms_permission)
-        } else {
-            ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.", R.string.capability_sms_distribution_unsupported)
-        }
+        ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission.", R.string.capability_sms_permission)
 
     internal fun hotspotCapabilityForSdk(sdkInt: Int): ActionCapability =
         if (sdkInt < WifiHotspotPolicy.MIN_SDK) {

@@ -214,16 +214,6 @@ if ($untrackedSchemas.Count -gt 0) {
     throw "Room schema generation created untracked files: $($untrackedSchemas -join ', ')"
 }
 
-# This lane exists to check the merged Play manifest, and its APK is discarded, so it opts out of
-# the packaging-time signing guard rather than requiring the release keystore on every machine that
-# runs the gate. Nothing is staged or published from here.
-Invoke-Gradle -Arguments (@(
-    "-PopenTaskerDistribution=play",
-    "-PopenTaskerAllowUnsignedRelease=true",
-    ":app:assembleRelease",
-    ":app:verifyPlayManifestPolicy"
-) + $CommonGradleArguments)
-
 Invoke-Gradle -Arguments (@(
     "-PopenTaskerDistribution=fdroid",
     ":app:assembleRelease",

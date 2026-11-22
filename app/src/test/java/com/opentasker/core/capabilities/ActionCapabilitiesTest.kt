@@ -1,6 +1,5 @@
 package com.opentasker.core.capabilities
 
-import com.opentasker.app.BuildConfig
 import com.opentasker.core.power.ShizukuPowerBackend
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
@@ -50,13 +49,8 @@ class ActionCapabilitiesTest {
     fun smsCapabilityFollowsDistributionPolicy() {
         val capability = ActionCapabilityRegistry.get("sms.send")
 
-        if (BuildConfig.SMS_ACTION_AVAILABLE) {
-            assertTrue(capability.canAdd)
-            assertTrue("SMS permission" in capability.reason)
-        } else {
-            assertFalse(capability.canAdd)
-            assertTrue("Play policy" in capability.reason)
-        }
+        assertTrue(capability.canAdd)
+        assertTrue("SMS permission" in capability.reason)
     }
 
     @Test

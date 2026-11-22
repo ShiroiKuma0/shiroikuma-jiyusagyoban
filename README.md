@@ -174,7 +174,6 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 
 - F-Droid readiness profile with dependency-policy and metadata verification
 - Non-F-Droid builds can opt into a daily HTTPS-only GitHub release check from Setup. It sends no identifying data, stores only a newer-release link, and never downloads or installs updates. F-Droid builds omit this check because F-Droid supplies their updates.
-- Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
 - Environment-driven release signing kept outside the repository. F-Droid's own source build of the F-Droid distribution is unsigned, and each release also attaches that build signed with the release key, so F-Droid can ship this project's signature once its rebuild matches byte for byte
 - SQLite database backup/restore with WAL-safe validation and atomic staged restore, reviewed before staging (source, schema version, compatibility, entity counts) and cancellable afterwards. Encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
@@ -313,11 +312,6 @@ publishes our APK when the two match, so F-Droid, GitHub and Obtainium installs 
 It stages `OpenTasker-v<versionName>-fdroid.apk` to `app/build/outputs/release-assets-fdroid/` with
 the same name and certificate checks as the standard asset. Upload it next to the standard APK. The
 `Binaries:` URL in `fdroid/metadata/com.opentasker.app.yml` expects that exact name.
-
-Play manifest policy check:
-```bash
-./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
-```
 
 Full local release gate (pinned Gradle bootstrap verification, blocking lint, the configured JVM test floor, JaCoCo coverage floors for scheduling, engine variable expansion, receivers and UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
 

@@ -159,13 +159,14 @@ val FDROID_CHANGELOG_MAX_CHARS = 500
 val FDROID_MIN_SCREENSHOTS = 4
 /** Store metadata files are LF regardless of the build host. */
 val NEWLINE = 10.toChar().toString()
-val allowedDistributions = setOf("standard", "fdroid", "play")
+val allowedDistributions = setOf("standard", "fdroid")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
     .get()
     .lowercase()
 require(selectedDistribution in allowedDistributions) {
-    "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}."
+    "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}. " +
+        "The Play profile was retired on 2026-08-31, when Play distribution was dropped."
 }
 /**
  * F-Droid's build server has no signing material, so the F-Droid distribution packages unsigned by
@@ -204,25 +205,12 @@ val releaseAssetDirectoryName = if (selectedDistribution == "fdroid") {
 } else {
     "outputs/release-assets"
 }
-val smsActionAvailable = selectedDistribution != "play"
-val smsReceiveAvailable = selectedDistribution != "play"
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
     releaseKeyAlias,
     releaseKeyPassword
 ).all { !it.isNullOrBlank() }
-/**
- * Opt out of the packaging-time signing guard for a build whose APK is thrown away, which is what
- * the local gate's Play lane does when it only wants the merged manifest checked. This never
- * reaches a release page: `stageReleaseAsset` verifies the artifact really is signed and has no
- * corresponding opt-out.
- */
-val allowUnsignedRelease = providers.gradleProperty("openTaskerAllowUnsignedRelease")
-    .orElse("false")
-    .get()
-    .toBoolean()
-
 android {
     namespace = "com.opentasker.app"
     compileSdk = 37
@@ -237,15 +225,6 @@ android {
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
-        buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
-        buildConfigField("Boolean", "SMS_RECEIVE_AVAILABLE", smsReceiveAvailable.toString())
-        manifestPlaceholders["smsPermissionName"] = if (smsActionAvailable) "android.permission.SEND_SMS" else "android.permission.INTERNET"
-        manifestPlaceholders["smsReceivePermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_SMS" else "android.permission.INTERNET"
-        manifestPlaceholders["smsMmsPermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_MMS" else "android.permission.INTERNET"
-        manifestPlaceholders["smsWapPushPermissionName"] = if (smsReceiveAvailable) "android.permission.RECEIVE_WAP_PUSH" else "android.permission.INTERNET"
-        manifestPlaceholders["smsTriggerEnabled"] = smsReceiveAvailable.toString()
-        manifestPlaceholders["phoneStatePermissionName"] = if (smsActionAvailable) "android.permission.READ_PHONE_STATE" else "android.permission.ACCESS_NETWORK_STATE"
-        manifestPlaceholders["callLogPermissionName"] = if (smsActionAvailable) "android.permission.READ_CALL_LOG" else "android.permission.ACCESS_NETWORK_STATE"
     }
 
     signingConfigs {
@@ -1861,36 +1840,6 @@ tasks.register("verifyFdroidMetadata") {
     }
 }
 
-tasks.register("verifyPlayManifestPolicy") {
-    group = "verification"
-    description = "Checks that the Play distribution merged manifest omits SMS and phone-state permissions."
-    dependsOn("processReleaseMainManifest")
-
-    doLast {
-        check(selectedDistribution == "play") {
-            "Run this task with -PopenTaskerDistribution=play"
-        }
-        val manifest = layout.buildDirectory
-            .file("intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml")
-            .get()
-            .asFile
-        check(manifest.isFile) {
-            "Release merged manifest not found at ${manifest.relativeTo(projectDir)}"
-        }
-        val manifestText = manifest.readText()
-        check("android.permission.SEND_SMS" !in manifestText) {
-            "Play distribution merged manifest must not contain SEND_SMS"
-        }
-        check("android.permission.READ_PHONE_STATE" !in manifestText) {
-            "Play distribution merged manifest must not contain READ_PHONE_STATE"
-        }
-        check("android.permission.READ_CALL_LOG" !in manifestText) {
-            "Play distribution merged manifest must not contain READ_CALL_LOG"
-        }
-        println("Play manifest policy check passed: SMS/phone-state permissions are absent.")
-    }
-}
-
 val verifyPackagedTypeCompleteness = tasks.register<VerifyPackagedTypeCompletenessTask>(
     "verifyPackagedTypeCompleteness",
 ) {
@@ -1945,7 +1894,7 @@ val stageReleaseAsset = tasks.register<StageReleaseAssetTask>("stageReleaseAsset
  * lane discover this later as a confusing missing-artifact error.
  */
 tasks.matching { it.name == "packageRelease" }.configureEach {
-    val signingRequired = !releaseBuildIsUnsigned && !allowUnsignedRelease
+    val signingRequired = !releaseBuildIsUnsigned
     val signingConfigured = hasReleaseSigning
     val distribution = selectedDistribution
     doFirst {

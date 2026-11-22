@@ -54,7 +54,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionFieldPolicy
@@ -316,13 +315,7 @@ internal fun ContextConfigDialog(
                     if (state.type == ContextType.EVENT && config["event"].equals("sms_received", ignoreCase = true)) {
                         item("sms-api-37-note") {
                             Text(
-                                text = stringResource(
-                                    if (BuildConfig.SMS_RECEIVE_AVAILABLE) {
-                                        R.string.context_sms_received_android_17_note
-                                    } else {
-                                        R.string.context_sms_received_unavailable_note
-                                    },
-                                ),
+                                text = stringResource(R.string.context_sms_received_android_17_note),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -781,28 +774,16 @@ internal data class StateContextPreset(
 )
 
 internal object StateContextPresets {
-    /**
-     * Roaming and call state need READ_PHONE_STATE, which the Play distribution deliberately does
-     * not declare - and its Setup screen has no Phone row either. Offering those presets there
-     * produced a context that fails closed while telling the user to grant a permission that can
-     * never appear in Setup, the same trap as the missing DND declaration.
-     */
-    private val phoneStateAvailable: Boolean get() = BuildConfig.SMS_ACTION_AVAILABLE
-
     val all: List<StateContextPreset>
         get() = buildList {
             add(StateContextPreset("orientation", R.string.context_state_preset_orientation, mapOf("key" to "orientation", "operator" to "=", "value" to "portrait")))
             add(StateContextPreset("proximity", R.string.context_state_preset_proximity, mapOf("key" to "proximity", "operator" to "=", "value" to "near")))
             add(StateContextPreset("activity", R.string.context_state_preset_activity, mapOf("key" to "activity", "operator" to "=", "value" to "walking")))
             add(StateContextPreset("speed", R.string.context_state_preset_speed, mapOf("key" to "speed", "operator" to ">=", "value" to "10")))
-            if (phoneStateAvailable) {
-                add(StateContextPreset("roaming", R.string.context_state_preset_roaming, mapOf("key" to "roaming", "operator" to "=", "value" to "true")))
-            }
+            add(StateContextPreset("roaming", R.string.context_state_preset_roaming, mapOf("key" to "roaming", "operator" to "=", "value" to "true")))
             add(StateContextPreset("bt_near", R.string.context_state_preset_bt_near, mapOf("key" to BT_NEAR_STATE_KEY, "operator" to "=", "value" to "")))
             add(StateContextPreset("tethering", R.string.context_state_preset_tethering, mapOf("key" to "tethering", "operator" to "=", "value" to "true")))
-            if (phoneStateAvailable) {
-                add(StateContextPreset("call", R.string.context_state_preset_call, mapOf("key" to "call_state", "operator" to "=", "value" to "ringing")))
-            }
+            add(StateContextPreset("call", R.string.context_state_preset_call, mapOf("key" to "call_state", "operator" to "=", "value" to "ringing")))
             add(StateContextPreset("health_steps", R.string.context_state_preset_health_steps, mapOf("key" to HealthMetric.STEPS.stateKey, "operator" to ">=", "value" to "10000")))
             add(StateContextPreset("health_heart_rate", R.string.context_state_preset_health_heart_rate, mapOf("key" to HealthMetric.HEART_RATE.stateKey, "operator" to ">", "value" to "100")))
             add(StateContextPreset("health_sleep", R.string.context_state_preset_health_sleep, mapOf("key" to HealthMetric.SLEEP.stateKey, "operator" to "<", "value" to "360")))

@@ -38,7 +38,8 @@ class LocalReleaseGateContractTest {
             "verifyPackagedTypeCompleteness",
         ).forEach { task -> assertTrue("Local gate must include $task", build.contains(task)) }
 
-        assertTrue(script.contains("openTaskerDistribution=play"))
+        // The Play profile was retired on 2026-08-31, so the gate has no Play lane.
+        assertFalse(script.contains("openTaskerDistribution=play"))
         assertTrue(script.contains("openTaskerDistribution=fdroid"))
         assertTrue(script.contains("Reusing configuration cache"))
         assertTrue(script.contains("https://api.osv.dev/v1/querybatch"))
@@ -148,17 +149,16 @@ class LocalReleaseGateContractTest {
             build.contains("APK Sig Block 42"),
         )
 
-        // The Play lane discards its APK, so it is allowed to skip the packaging guard. That
-        // exemption has to stay visible at the call site, and it must not exist for staging.
+        // The retired Play lane was the only one allowed to skip the packaging guard, so no lane may
+        // now, and the opt-out property is gone from the build.
         val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
-        assertTrue(
-            "The Play manifest lane must opt out explicitly rather than require a keystore",
-            script.contains("-PopenTaskerAllowUnsignedRelease=true"),
+        assertFalse(
+            "No lane may opt out of the signing guard",
+            script.contains("openTaskerAllowUnsignedRelease"),
         )
-        assertEquals(
-            "Only the Play lane may opt out of the signing guard",
-            1,
-            Regex("openTaskerAllowUnsignedRelease=true").findAll(script).count(),
+        assertFalse(
+            "The unsigned opt-out must not come back",
+            build.contains("openTaskerAllowUnsignedRelease"),
         )
         assertFalse(
             "Staging must not honour the unsigned opt-out",

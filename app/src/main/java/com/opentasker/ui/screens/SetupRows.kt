@@ -16,7 +16,6 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.core.content.ContextCompat
-import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.apps.TargetSignerGuard
 import com.opentasker.core.assistant.AssistantAirplane
@@ -440,7 +439,7 @@ internal fun buildPermissionItems(
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.LOCAL_NETWORK),
         ) else null,
-        if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
+        PermissionSetupItem(
             title = context.getString(R.string.setup_sms_title),
             body = context.getString(R.string.setup_sms_body),
             granted = hasPermission(context, Manifest.permission.SEND_SMS),
@@ -449,8 +448,8 @@ internal fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_sms_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.SMS),
-        ) else null,
-        if (BuildConfig.SMS_RECEIVE_AVAILABLE) PermissionSetupItem(
+        ),
+        PermissionSetupItem(
             title = context.getString(R.string.setup_sms_receive_title),
             body = context.getString(R.string.setup_sms_receive_body),
             granted = hasPermission(context, Manifest.permission.RECEIVE_SMS),
@@ -459,8 +458,8 @@ internal fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_sms_receive_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.SMS_RECEIVE),
-        ) else null,
-        if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
+        ),
+        PermissionSetupItem(
             title = context.getString(R.string.setup_phone_state_title),
             body = context.getString(R.string.setup_phone_state_body),
             granted = hasPermission(context, Manifest.permission.READ_PHONE_STATE),
@@ -469,8 +468,8 @@ internal fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_phone_state_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.PHONE_STATE),
-        ) else null,
-        if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
+        ),
+        PermissionSetupItem(
             title = context.getString(R.string.setup_call_log_title),
             body = context.getString(R.string.setup_call_log_body),
             granted = hasPermission(context, Manifest.permission.READ_CALL_LOG),
@@ -479,7 +478,7 @@ internal fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_call_log_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.CALL_LOG),
-        ) else null,
+        ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_dnd_title),
             body = context.getString(R.string.setup_dnd_body),

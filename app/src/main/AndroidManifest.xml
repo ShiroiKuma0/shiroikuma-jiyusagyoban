@@ -46,19 +46,19 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission
-        android:name="${smsPermissionName}" />
+        android:name="android.permission.SEND_SMS" />
     <uses-permission
-        android:name="${smsReceivePermissionName}" />
+        android:name="android.permission.RECEIVE_SMS" />
     <uses-permission
-        android:name="${smsMmsPermissionName}"
+        android:name="android.permission.RECEIVE_MMS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission
-        android:name="${smsWapPushPermissionName}"
+        android:name="android.permission.RECEIVE_WAP_PUSH"
         tools:ignore="ProtectedPermissions" />
     <uses-permission
-        android:name="${phoneStatePermissionName}" />
+        android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission
-        android:name="${callLogPermissionName}" />
+        android:name="android.permission.READ_CALL_LOG" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
@@ -358,7 +358,6 @@
 
         <receiver
             android:name="com.opentasker.core.contexts.SmsReceivedReceiver"
-            android:enabled="${smsTriggerEnabled}"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter>

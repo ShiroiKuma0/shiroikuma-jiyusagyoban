@@ -1019,7 +1019,6 @@
     <string name="inspector_broadcast_listening">正在监听 %1$d 个广播动作：%2$s</string>
     <string name="inspector_broadcast_idle">没有已启用的配置文件在等待广播。</string>
     <string name="context_sms_received_android_17_note">在Android 17及以上，包含OTP的标准短信可能被非默认短信应用扣留最多三小时。已连接设备和其他豁免应用可以更早收到；当OTP时间很关键时，请使用短信检索或用户同意。</string>
-    <string name="context_sms_received_unavailable_note">短信/彩信触发器已从Play版本中省略。请为此事件使用标准版或F-Droid版构建。</string>
 
     <string name="empty_first_automation_title">构建你的第一个自动化</string>
     <string name="empty_first_automation_body">从引导模板开始以最快路径完成，导入现有工作，或在你知道确切步骤时创建空白任务。</string>
