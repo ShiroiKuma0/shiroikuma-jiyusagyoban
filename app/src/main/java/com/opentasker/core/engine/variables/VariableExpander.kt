@@ -500,15 +500,14 @@ class VariableExpander {
             TaskerJoinOrPick.AtRandom -> null
         }
         if (pick == null && search == null && !TASKER_ARRAY_FORM.matches(form) && !isTaskerIndexList(op, expanded)) return null
-        // A search finds `%arr0` and `%arr07` too (`dq.c0`), where the other forms don't.
-        val items = if (search != null) store.taskerElements(name) else store.numberedItems(name)
+        val items = store.numberedItems(name)
         // The parts Split Text keeps don't search yet, so they read as before.
         if (search != null && items.isEmpty() && arrays.contains(name)) return null
         // A plain variable with no elements keeps its own operators, like `%n(+5)` adding 5. Tasker's
         // counts and searches aren't among them: they read the elements whatever the base holds
         // (`dq.V`, `dq.c0`), so 0.
         if (items.isEmpty() && baseValue != null && form !in TASKER_COUNT_FORMS && search == null) return null
-        search?.let { return readTaskerSearch(it, items, joiner = (pick as? TaskerJoinOrPick.Join)?.separator ?: ",") }
+        search?.let { return readTaskerSearch(it, store.taskerElements(name), items, joiner = (pick as? TaskerJoinOrPick.Join)?.separator ?: ",") }
         when (pick) {
             TaskerJoinOrPick.AtRandom -> return items.values.randomOrNull().orEmpty()
             is TaskerJoinOrPick.Join -> return numberedRange(items, pick.range)?.joinToString(pick.separator).orEmpty()
@@ -588,14 +587,22 @@ class VariableExpander {
     }
 
     /**
-     * What [search] reads over [items], in element order, joined by its own joiner or [joiner]. An
-     * element matches when it equals the pattern or Tasker's Matches says so; none matching reads 0.
+     * What [search] reads, joined by its own joiner or [joiner]. It looks through [elements] the way
+     * `dq.c0` does, `%arr0` and `%arr07` included, and an element matches when it equals the pattern
+     * or Tasker's Matches says so; none matching reads 0. A value search reads each value back by its
+     * number from the [numbered] elements (`fr.i0`), so `%arr07` reads `%arr7`'s value, and `%arr0`
+     * or a number with no element, which Tasker shows as a name like `%arr0`, reads as nothing.
      */
-    private fun readTaskerSearch(search: TaskerSearch, items: java.util.NavigableMap<Int, String>, joiner: String): String {
+    private fun readTaskerSearch(
+        search: TaskerSearch,
+        elements: List<Pair<Int, String>>,
+        numbered: java.util.NavigableMap<Int, String>,
+        joiner: String,
+    ): String {
         val pattern = search.pattern ?: return "0"
-        val hits = items.filterValues { value -> value == pattern || matches(value, pattern) }
+        val hits = elements.filter { (_, value) -> value == pattern || matches(value, pattern) }.map { it.first }
         if (hits.isEmpty()) return "0"
-        val parts = if (search.values) hits.values else hits.keys.map(Int::toString)
+        val parts = if (search.values) hits.mapNotNull { numbered[it] } else hits.map(Int::toString)
         return parts.joinToString(search.joiner ?: joiner)
     }
 

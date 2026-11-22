@@ -71,7 +71,34 @@ class TaskerArraySearchTest {
         }
         assertEquals("0,2", variables.expand("%arr(#?cat)"))
         assertEquals("7", variables.expand("%arr(#?dog)"))
+        // A value search reads each value back by its number (`fr.i0`). Tasker has none for 0 and
+        // shows the name `%arr0`, which reads as nothing here, like any element that isn't set.
+        assertEquals("cat", variables.expand("%arr(\$?cat)"))
+    }
+
+    @Test
+    fun aValueSearchReadsTheElementItsNumberNames() {
+        val variables = VariableStore().apply {
+            set("arr7", "cat")
+            set("arr07", "dog")
+        }
+        // %arr07 matches as number 7, and the value read back for 7 is %arr7's.
+        assertEquals("7", variables.expand("%arr(#?dog)"))
+        assertEquals("cat", variables.expand("%arr(\$?dog)"))
+        variables.set("arr07", "cat")
+        // Both are number 7 to Tasker, so both count.
+        assertEquals("7,7", variables.expand("%arr(#?cat)"))
         assertEquals("cat,cat", variables.expand("%arr(\$?cat)"))
+    }
+
+    @Test
+    fun aKeptListWithAnElementZeroReadsAsItDidBeforeSearches() {
+        fun kept() = VariableStore().apply {
+            setArray("parts", listOf("cat", "bat"))
+            set("parts", "cat")
+        }
+        val withZero = kept().apply { set("parts0", "cat") }
+        assertEquals(kept().expand("%parts(#?cat)"), withZero.expand("%parts(#?cat)"))
     }
 
     @Test

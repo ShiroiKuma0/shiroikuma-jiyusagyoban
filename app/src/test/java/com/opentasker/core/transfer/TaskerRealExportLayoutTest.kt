@@ -973,6 +973,12 @@ class TaskerRealExportLayoutTest {
         val set = action("""<code>354</code><Str sr="arg0" ve="3">%%List</Str><Str sr="arg1" ve="3">1,2</Str><Str sr="arg2" ve="3">,</Str>""")
         val clear = action("""<code>357</code><Str sr="arg0" ve="3">%%List</Str>""")
         assertEquals(listOf("var.split", "array.clear"), listOf(set.type, clear.type))
+
+        // Only one level through one plain variable, as in Tasker.
+        val partsAfter = """<code>590</code><Str sr="arg0" ve="3">%%list%n</Str><Str sr="arg1" ve="3">,</Str><Int sr="arg2" val="0"/>"""
+        assertEquals(placeholder, action(partsAfter).type)
+        assertWarns(partsAfter, "Variable Split's name %%list%n isn't one plain variable")
+        assertEquals(placeholder, action("""<code>357</code><Str sr="arg0" ve="3">%%%list</Str>""").type)
     }
 
     @Test

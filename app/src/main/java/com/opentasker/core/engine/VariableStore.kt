@@ -218,26 +218,29 @@ class VariableStore {
 
     /**
      * The elements set under [base] the way Tasker's Variable Clear and array searches find them
-     * (`dq.V`, `dq.c0`): whatever follows the base read as a whole number, so `arr0` is 0 and
-     * `arr07` is 7.
+     * (`dq.V`, `dq.c0`), in number order: whatever follows the base read as a whole number, so
+     * `arr0` is 0 and `arr07` is 7, and with `arr7` set too there are two numbered 7.
      */
-    fun taskerElements(base: String): java.util.NavigableMap<Int, String> = itemsNumbered(base) { normalizedBase, name ->
-        name.takeIf { it.length > normalizedBase.length && it.startsWith(normalizedBase) }?.substring(normalizedBase.length)?.toIntOrNull()
-    }
+    fun taskerElements(base: String): List<Pair<Int, String>> =
+        numberedNames(base) { normalizedBase, name ->
+            name.takeIf { it.length > normalizedBase.length && it.startsWith(normalizedBase) }?.substring(normalizedBase.length)?.toIntOrNull()
+        }.mapNotNull { (number, name) -> get(name)?.let { number to it } }.sortedBy { it.first }
 
     private fun itemsNumbered(base: String, index: (String, String) -> Int?): java.util.TreeMap<Int, String> {
         val items = java.util.TreeMap<Int, String>()
-        val normalizedBase = VariableNamePolicy.normalize(base) ?: return items
+        numberedNames(base, index).forEach { (number, name) -> get(name)?.let { items[number] = it } }
+        return items
+    }
+
+    /** The names in [base]'s scope that [index] gives a number, with that number. */
+    private fun numberedNames(base: String, index: (String, String) -> Int?): List<Pair<Int, String>> {
+        val normalizedBase = VariableNamePolicy.normalize(base) ?: return emptyList()
         val names = if (VariableNamePolicy.isGlobal(normalizedBase)) {
             globals.keys.toSet()
         } else {
             synchronized(localStack) { arrayScopes(normalizedBase).flatMapTo(mutableSetOf()) { (values, _) -> values.keys } }
         }
-        names.forEach { name ->
-            val number = index(normalizedBase, name) ?: return@forEach
-            get(name)?.let { items[number] = it }
-        }
-        return items
+        return names.mapNotNull { name -> index(normalizedBase, name)?.let { it to name } }
     }
 
     /**
