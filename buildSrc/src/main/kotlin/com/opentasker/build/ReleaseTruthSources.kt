@@ -3,8 +3,9 @@ package com.opentasker.build
 /**
  * How release truth counts actions and context families from source. The documentation check and
  * `verifyReleaseTruth` both count through here, so they can't drift apart.
- * `tools/generate-release-truth.ps1` and `ReleaseTruthContractTest` count with their own copies of
- * these patterns, and each result is checked against `tools/release-truth.json`.
+ * Two places count with their own copies of these patterns: `tools/generate-release-truth.ps1`,
+ * which writes `tools/release-truth.json`, and `ReleaseTruthContractTest`, which checks that file
+ * against the source. A drifted copy in the script writes a wrong count that those checks then catch.
  */
 object ReleaseTruthSources {
     private val actionDefinition = Regex("(?m)^\\s*define\\(\\\"")
