@@ -1676,7 +1676,7 @@
     <string name="dialog_macrodroid_password_wrong">That password doesn\'t open this file.</string>
     <string name="dialog_macrodroid_password_open">Open</string>
     <string name="dialog_backup_passphrase_title">Encrypted snapshot</string>
-    <string name="dialog_backup_passphrase_body">This is an encrypted OpenTasker snapshot. Enter the passphrase you set for snapshots in Setup. OpenTasker doesn\'t save it.</string>
+    <string name="dialog_backup_passphrase_body">This is an encrypted OpenTasker snapshot. Enter the passphrase you set for snapshots in Settings. OpenTasker doesn\'t save it.</string>
     <string name="dialog_backup_passphrase_label">Snapshot passphrase</string>
     <string name="dialog_backup_passphrase_wrong">That passphrase doesn\'t open this file. If it\'s the right one, the file may be damaged.</string>
     <string name="ui_error_write_settings_required">This automation needs Modify system settings. Open Setup, grant it, then try again.</string>
