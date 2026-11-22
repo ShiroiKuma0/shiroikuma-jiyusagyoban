@@ -1051,7 +1051,9 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         composeTestRule.performAccessibilityChecks()
 
         scrollToText("Dashboard")
-        composeTestRule.onNodeWithText("Dashboard").performClick()
+        // The name itself: with overlays allowed the header grows a Show button, and a tap at the
+        // middle of the merged header row lands on it instead of expanding the card.
+        composeTestRule.onNodeWithText("Dashboard", useUnmergedTree = true).performClick()
         val list = composeTestRule.onAllNodes(hasScrollAction()).onFirst()
         list.performSemanticsAction(SemanticsActions.ScrollBy) { scroll -> scroll(0f, 100_000f) }
         composeTestRule.waitForIdle()
@@ -1100,7 +1102,8 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Dashboard").performClick()
+        // The name, not the header's middle, which is the Show button once overlays are allowed.
+        composeTestRule.onNodeWithText("Dashboard", useUnmergedTree = true).performClick()
         composeTestRule.performAccessibilityChecks()
         scrollToText("Add Element")
         composeTestRule.performAccessibilityChecks()
