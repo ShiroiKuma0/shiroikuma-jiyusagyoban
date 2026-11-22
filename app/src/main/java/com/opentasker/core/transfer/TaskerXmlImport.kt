@@ -1556,13 +1556,15 @@ object TaskerXmlImporter {
 
     /**
      * A Tasker JSON path (decompiled 6.7.8, `fr.R`, `lt.g.f`, `kt.c0`) the way this app writes one.
-     * The variable runs to the first `.` or `[`, then `.key` and `[key]` (with `\` escapes) name
-     * fields and `(n)` is the nth list item, `[n-1]` here. Null when a path here can't say it: a
-     * variable in the path (Tasker fills it in), a key with other than letters, digits, `_` or `-`,
-     * a position that isn't a whole number from 1, or nothing after the variable.
+     * The variable runs to the first `[` when the name holds both `[` and `]`, else to the first `.`
+     * (`fr.S`); then `.key` and `[key]` (with `\` escapes) name fields and `(n)` is the nth list
+     * item, `[n-1]` here. Null when a path here can't say it: a variable that isn't a plain name
+     * (`%json.a` in `%json.a[b]`), a variable in the path (Tasker fills it in), a key with other
+     * than letters, digits, `_` or `-`, a position that isn't a whole number from 1, or nothing
+     * after the variable.
      */
     private fun taskerJsonPath(name: String): String? {
-        val baseEnd = name.indexOfFirst { it == '.' || it == '[' }.takeIf { it > 0 } ?: return null
+        val baseEnd = (if ('[' in name && ']' in name) name.indexOf('[') else name.indexOf('.')).takeIf { it > 0 } ?: return null
         val base = name.substring(0, baseEnd)
         if (!TASKER_PLAIN_VARIABLE.matches(base)) return null
         val path = name.substring(baseEnd).removePrefix(".")

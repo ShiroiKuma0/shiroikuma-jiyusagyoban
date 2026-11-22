@@ -55,6 +55,9 @@ class TaskerVariableClearTransferTest {
             clear("%json[my key]"),
             clear("%json.list(0)"),
             clear("%json."),
+            // With [ and ] in it, Tasker's variable runs to the first [, here %json.a and %json. (fr.S).
+            clear("%json.a[b]"),
+            clear("%json.[a]"),
             // The name to clear is held in %which.
             clear("%%which"),
             clear("%%which", pattern = 1),
