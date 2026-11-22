@@ -222,8 +222,56 @@ class CalendarActionsTest {
 
         assertEquals(listOf("Today"), variables.getArrayItems("event_titles"))
         assertEquals(at(2026, 11, 22, 0, 0).toString(), variables.get("event_start"))
-        assertEquals(at(2026, 11, 23, 0, 0).toString(), variables.get("event_end"))
+        // A one-day event ends on the day it starts, the end day Add Calendar Event takes.
+        assertEquals(at(2026, 11, 22, 0, 0).toString(), variables.get("event_end"))
         assertEquals("true", variables.get("event_all_day"))
+    }
+
+    @Test
+    fun aFoundAllDayEventAddedBackCoversTheSameDays() {
+        val original = CalendarEventRow(1, 3, "Trip", utcMidnight(2026, 11, 23), utcMidnight(2026, 11, 26), allDay = true, location = "")
+
+        assertEquals(ActionResult.Success, query(FakeStore(calendars, listOf(original)), "from" to "2026-11-22", "to" to "2026-11-30"))
+        assertEquals(at(2026, 11, 25, 0, 0).toString(), variables.get("event_end"))
+
+        val store = FakeStore(calendars, emptyList())
+        val copied = add(
+            store,
+            "calendar" to "3",
+            "title" to "Trip",
+            "start" to variables.get("event_start")!!,
+            "end" to variables.get("event_end")!!,
+            "all_day" to "true",
+        )
+
+        assertEquals(ActionResult.Success, copied)
+        assertEquals(original.startMs to original.endMs, store.inserted.single().let { it.startMs to it.endMs })
+    }
+
+    @Test
+    fun aTimePastTheYear9999IsRefusedInsteadOfOverflowingTheWindow() {
+        val rows = listOf(CalendarEventRow(1, 2, "Standup", now + 60_000L, now + 120_000L, allDay = false, location = ""))
+        val store = FakeStore(calendars, rows)
+
+        val result = query(store, "from" to "-5000000000000000000", "to" to "5000000000000000000")
+
+        assertTrue(result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.startsWith("from must be now, epoch milliseconds"))
+        assertTrue(store.asked.isEmpty())
+        // The last moment of 9999 still counts.
+        assertEquals(253402300799999L, parseCalendarTime("253402300799999", java.time.ZoneOffset.UTC, now))
+        assertEquals(null, parseCalendarTime("253402300800000", java.time.ZoneOffset.UTC, now))
+    }
+
+    @Test
+    fun aFoundTitleOrLocationIsCutAt1024Characters() {
+        val long = "x".repeat(5000)
+        val rows = listOf(CalendarEventRow(1, 2, long, now + 60_000L, now + 120_000L, allDay = false, location = long))
+
+        assertEquals(ActionResult.Success, query(FakeStore(calendars, rows)))
+
+        assertEquals(1024, variables.get("event_title")?.length)
+        assertEquals(1024, variables.get("event_location")?.length)
     }
 
     @Test

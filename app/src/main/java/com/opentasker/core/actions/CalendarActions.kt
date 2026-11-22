@@ -143,7 +143,7 @@ class CalendarEventAddAction internal constructor(
     companion object {
         const val MAX_DURATION_MINUTES = 366L * 24L * 60L
         private const val DEFAULT_DURATION_MINUTES = 60L
-        private const val MAX_TITLE_CHARS = 1024
+        internal const val MAX_TITLE_CHARS = 1024
         private const val MAX_DESCRIPTION_CHARS = 8192
         internal const val ADD_PERMISSION_MISSING =
             "calendar.event.add needs calendar editing, so nothing was added. Grant it on the Calendar editing row in Setup."
@@ -157,7 +157,9 @@ class CalendarEventAddAction internal constructor(
  * `_ids`. Args: `from`, `to`, `calendar` (a name or id to look in, every calendar otherwise),
  * `max` (10 by default, 50 at most) and `var`, the prefix. Repeating events count once for each
  * time they happen in the window. Times come out as epoch milliseconds, so Format Date-Time reads
- * them, and an all-day event's are midnight where the phone is.
+ * them. An all-day event starts at midnight where the phone is on its first day and ends at
+ * midnight on its last day, the end day Add Calendar Event takes. Titles and locations past 1024
+ * characters are cut there, as Add Calendar Event won't write longer ones.
  *
  * Titles and locations are stored as sensitive, the way contact lookups are, so the run log and
  * previews never show them.
@@ -206,13 +208,13 @@ class CalendarEventQueryAction internal constructor(
         ctx.variables.set("${prefix}_calendar_id", first?.calendarId?.toString().orEmpty())
         ctx.variables.set("${prefix}_title", first?.title.orEmpty(), sensitive = true)
         ctx.variables.set("${prefix}_start", first?.startMs?.toString().orEmpty())
-        ctx.variables.set("${prefix}_end", first?.endMs?.toString().orEmpty())
+        ctx.variables.set("${prefix}_end", first?.let { lastDayEnd(it, zone) }?.toString().orEmpty())
         ctx.variables.set("${prefix}_all_day", first?.allDay?.toString().orEmpty())
         ctx.variables.set("${prefix}_location", first?.location.orEmpty(), sensitive = true)
         ctx.variables.setArray("${prefix}_ids", events.map { it.eventId.toString() })
         ctx.variables.setArray("${prefix}_titles", events.map(CalendarEventRow::title), sensitive = true)
         ctx.variables.setArray("${prefix}_starts", events.map { it.startMs.toString() })
-        ctx.variables.setArray("${prefix}_ends", events.map { it.endMs.toString() })
+        ctx.variables.setArray("${prefix}_ends", events.map { lastDayEnd(it, zone).toString() })
         ctx.variables.setArray("${prefix}_locations", events.map(CalendarEventRow::location), sensitive = true)
         ctx.logger("Calendar query found ${countOf(events.size, "event")}")
         return ActionResult.Success
@@ -249,21 +251,45 @@ internal fun selectCalendarEvents(
     .filter { it.startMs < toMs && (it.endMs > fromMs || it.startMs >= fromMs) }
     .sortedWith(compareBy(CalendarEventRow::startMs, CalendarEventRow::eventId))
     .take(limit)
+    .map {
+        it.copy(
+            title = it.title.take(CalendarEventAddAction.MAX_TITLE_CHARS),
+            location = it.location.take(CalendarEventAddAction.MAX_TITLE_CHARS),
+        )
+    }
     .toList()
+
+/**
+ * The end to report for [row] once [selectCalendarEvents] has it in local time: an all-day event
+ * ends at the start of its last day rather than the midnight after it, so passing a found event's
+ * start and end back to Add Calendar Event makes the same days.
+ */
+internal fun lastDayEnd(row: CalendarEventRow, zone: ZoneId): Long {
+    if (!row.allDay) return row.endMs
+    val lastDay = Instant.ofEpochMilli(row.endMs).atZone(zone).toLocalDate().minusDays(1)
+    return maxOf(row.startMs, lastDay.atStartOfDay(zone).toInstant().toEpochMilli())
+}
 
 /** `now`, epoch milliseconds, a date (2026-11-22) or a date and time (2026-11-22 09:30) in [zone]. */
 internal fun parseCalendarTime(raw: String, zone: ZoneId, nowMs: Long): Long? {
     val text = raw.trim()
     if (text.equals("now", ignoreCase = true)) return nowMs
-    text.toLongOrNull()?.let { return it }
-    return runCatching { LocalDateTime.parse(text.replaceFirst(' ', 'T')).atZone(zone).toInstant().toEpochMilli() }.getOrNull()
+    val parsed = text.toLongOrNull()
+        ?: runCatching { LocalDateTime.parse(text.replaceFirst(' ', 'T')).atZone(zone).toInstant().toEpochMilli() }.getOrNull()
         ?: runCatching { LocalDate.parse(text).atStartOfDay(zone).toInstant().toEpochMilli() }.getOrNull()
+    // Years 1 to 9999 only. A time far past them overflowed the window check and the day added
+    // on each side of a query.
+    return parsed?.takeIf { it in EARLIEST_CALENDAR_MS..LATEST_CALENDAR_MS }
 }
+
+private val EARLIEST_CALENDAR_MS = LocalDate.of(1, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private val LATEST_CALENDAR_MS = LocalDate.of(10_000, 1, 1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() - 1
 
 private fun readTime(args: Map<String, String>, key: String, zone: ZoneId, nowMs: Long): Long? =
     args[key]?.takeIf(String::isNotBlank)?.let { parseCalendarTime(it, zone, nowMs) }
 
-private fun timeFormatMessage(key: String) = "$key must be now, epoch milliseconds, a date like 2026-11-22 or a date and time like 2026-11-22 09:30"
+private fun timeFormatMessage(key: String) =
+    "$key must be now, epoch milliseconds, a date like 2026-11-22 or a date and time like 2026-11-22 09:30, in the years 1 to 9999"
 
 private const val NO_SUCH_CALENDAR = "no calendar has that name or id"
 
