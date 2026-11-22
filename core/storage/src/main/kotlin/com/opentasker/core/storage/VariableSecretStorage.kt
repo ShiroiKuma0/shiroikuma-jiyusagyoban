@@ -579,9 +579,10 @@ class VariableRepository(
                     )
                 }.onFailure { error ->
                     // Logging must never replace the encryption failure (notably in host-side
-                    // migration tests where android.util.Log is unavailable).
+                    // migration tests where android.util.Log is unavailable). No name: one built from
+                    // a secret, like Cache_4831 from %Cache_%Pin, would put the secret in the log.
                     runCatching {
-                        AppLogger.error(TAG, "Failed to encrypt legacy masked variable ${entity.name}", error)
+                        AppLogger.error(TAG, "Failed to encrypt a legacy secret variable", error)
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.opentasker.core.storage
 
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import javax.crypto.KeyGenerator
@@ -273,6 +274,29 @@ class VariableSecretStorageTest {
 
         assertTrue(failure is IllegalStateException)
         assertEquals("legacy-plaintext", dao.get("API_TOKEN")!!.value)
+    }
+
+    @Test
+    fun aLegacySecretThatCantBeEncryptedIsntNamedInTheAppLog() = runBlocking {
+        // A global named from a secret (%Cache_%Pin stores Cache_4831) is saved as secret too.
+        val dao = FakeVariableDao(VariableEntity("Cache_4831", "legacy-plaintext", isGlobal = true, isSecret = true))
+        val repository = VariableRepository(
+            dao,
+            object : VariableSecretCodec {
+                override fun encrypt(projectId: Long, variableName: String, plaintext: String): String =
+                    error("Keystore unavailable")
+
+                override fun decrypt(projectId: Long, variableName: String, envelope: String): Result<String> =
+                    Result.failure(IllegalStateException("Keystore unavailable"))
+            },
+        )
+        val before = AppLogger.snapshot().maxOfOrNull { it.sequence } ?: -1L
+
+        repository.migrateLegacySensitiveVariables()
+
+        val logged = AppLogger.snapshot().filter { it.sequence > before }.map { it.message }
+        assertTrue(logged.toString(), logged.any { "legacy secret" in it })
+        assertFalse(logged.toString(), logged.any { "4831" in it })
     }
 
     @Test
