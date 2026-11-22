@@ -5,7 +5,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -75,12 +74,11 @@ class SaveBeforeCloseTest {
         }
 
         composeTestRule.onNodeWithContentDescription("Manage projects").performClick()
-        val up = composeTestRule.onAllNodesWithContentDescription("Move project up")
-        val down = composeTestRule.onAllNodesWithContentDescription("Move project down")
-        up[0].assertIsNotEnabled()
-        down[1].assertIsNotEnabled()
-        up[1].assertIsEnabled().performClick()
-        down[0].assertIsEnabled().performClick()
+        // Each move button names its project (A-339).
+        composeTestRule.onNodeWithContentDescription("Move project Home up").assertIsNotEnabled()
+        composeTestRule.onNodeWithContentDescription("Move project Work down").assertIsNotEnabled()
+        composeTestRule.onNodeWithContentDescription("Move project Work up").assertIsEnabled().performClick()
+        composeTestRule.onNodeWithContentDescription("Move project Home down").assertIsEnabled().performClick()
 
         assertEquals(listOf("Work" to -1, "Home" to 1), moves)
     }

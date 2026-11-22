@@ -145,6 +145,12 @@ class EventVariableReferenceTest {
         assertEquals(emptyList<Any>(), editorEventVariablesFor(30, profiles))
         assertEquals(emptyList<Any>(), editorEventVariablesFor(40, profiles))
         assertEquals("a fallback run gets the failure, not the event", emptyList<Any>(), editorEventVariablesFor(50, profiles))
+        val alsoAnEventsEnterTask = profiles + Profile(id = 3, name = "Shares", contexts = listOf(eventSpec("share")), enterTaskId = 50)
+        assertEquals(
+            "the event that starts it still lists its chips",
+            listed("share"),
+            editorEventVariablesFor(50, alsoAnEventsEnterTask).map { it.name }.toSet(),
+        )
     }
 
     @Test
