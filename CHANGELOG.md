@@ -23,6 +23,7 @@
 
 ### Fixed
 
+- The `{{ array.found }}` chip that Variable Split, the array actions and Replace Text offer now fills in with their elements (`%found1`, `%found2` and so on) in any field. It only worked in Join Text and For Each before, and came out empty everywhere else. A secret element still marks the value as secret.
 - When a saved secret can't be read back (after a restore, or a lost Keystore key), the app log now says how many need entering again instead of naming them. A name built from a secret, like `%Cache_%Pin`, held the PIN. The Variables screen still marks each one.
 - A list position in a variable path, like `%items[1]`, is only the digits 0 to 9 now, with spaces around them if you like. Set Variable and Variable Clear used to read `%items[+1]` as item 1 too, and a Tasker export then wrote it out as a field named `+1`.
 - When a run's global variables can't be saved, or another run saved them first, the run log and app log count a secret global instead of naming it. A name built from a secret, like `%Cache_%Pin`, put the PIN in both logs.

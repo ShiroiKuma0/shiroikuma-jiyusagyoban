@@ -26,9 +26,17 @@ data class TemplateScope(
     val sensitiveEvent: Set<String> = emptySet(),
     /** Read last, and in place of an empty stored value: Tasker's built-ins like `TIMES`. */
     val builtIns: (String) -> String? = NoBuiltIns,
+    /**
+     * Read for `{{ array.x }}` when [arrays] keeps no list named x: the numbered elements Variable
+     * Split and the array actions write (`%x1`, `%x2`, ...) in index order, and whether any is a
+     * secret, the way For Each reads that chip.
+     */
+    val numberedArray: (String) -> Pair<List<String>, Boolean>? = NoNumberedArray,
 )
 
 private val NoBuiltIns: (String) -> String? = { null }
+
+private val NoNumberedArray: (String) -> Pair<List<String>, Boolean>? = { null }
 
 data class TemplateExpressionLimits(
     val maxTemplateLength: Int = 20_000,
@@ -250,6 +258,7 @@ class TemplateExpressionEngine(
                 normalized.removePrefix("array."),
                 scope.arrays,
                 scope.sensitiveArrays,
+                scope.numberedArray,
             )
             else -> (
                 resolveInMap(normalized, scope.task, TemplateValueSource.TASK, scope.sensitiveTask).takeIfResolved()
@@ -329,6 +338,7 @@ class TemplateExpressionEngine(
         referenceText: String,
         arrays: Map<String, List<String>>,
         sensitiveNames: Set<String>,
+        numberedArray: (String) -> Pair<List<String>, Boolean>? = NoNumberedArray,
     ): ResolvedValue {
         val reference = parseReference(referenceText) ?: return ResolvedValue(
             value = "",
@@ -336,19 +346,21 @@ class TemplateExpressionEngine(
             path = referenceText,
             missing = true,
         )
-        val values = arrays[reference.base] ?: return ResolvedValue(
-            value = "",
-            source = TemplateValueSource.MISSING,
-            path = referenceText,
-            missing = true,
-        )
+        val (values, secret) = arrays[reference.base]?.let { it to (reference.base in sensitiveNames) }
+            ?: numberedArray(reference.base)
+            ?: return ResolvedValue(
+                value = "",
+                source = TemplateValueSource.MISSING,
+                path = referenceText,
+                missing = true,
+            )
         if (reference.selectors.isEmpty()) {
             return ResolvedValue(
                 value = values.joinToString(","),
                 source = TemplateValueSource.ARRAY,
                 path = reference.base,
                 array = values,
-                isSecretDerived = reference.base in sensitiveNames,
+                isSecretDerived = secret,
             )
         }
 
@@ -369,7 +381,7 @@ class TemplateExpressionEngine(
                 TemplateValueSource.ARRAY,
                 referenceText,
                 array = values,
-                isSecretDerived = reference.base in sensitiveNames,
+                isSecretDerived = secret,
             )
         }
         return resolveJsonSelectors(
@@ -377,7 +389,7 @@ class TemplateExpressionEngine(
             selectors = reference.selectors.drop(1),
             source = TemplateValueSource.ARRAY,
             path = referenceText,
-            isSecretDerived = reference.base in sensitiveNames,
+            isSecretDerived = secret,
         )
     }
 

@@ -503,6 +503,7 @@ class VariableStore {
             sensitiveArrays = sensitiveArrayNames.toSet(),
             sensitiveEvent = event.keys.filterTo(mutableSetOf(), EventTaskVariables::isSensitive),
             builtIns = TaskerBuiltIns::value,
+            numberedArray = { base -> numberedItems(base).values.toList().ifEmpty { null }?.let { it to anyNumberedItemSensitive(base) } },
         )
     }
 
