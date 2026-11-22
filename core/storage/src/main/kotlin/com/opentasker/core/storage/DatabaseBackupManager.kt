@@ -155,7 +155,8 @@ class DatabaseBackupManager(
                 val operationContext = currentCoroutineContext()
                 val pending = pendingRestoreFile(context, databaseName)
                 val temp = File(backupDir, "${pending.name}.decrypt.tmp")
-                if (temp.exists() && !temp.delete()) {
+                shredFile(temp)
+                if (temp.exists()) {
                     throw IOException("Could not clear interrupted encrypted-restore staging file")
                 }
                 val input = context.contentResolver.openInputStream(uri)
@@ -175,7 +176,7 @@ class DatabaseBackupManager(
                     validateDatabaseFile(temp)
                     replaceFileAtomically(temp, pending, "pending encrypted restore")
                 } catch (error: Throwable) {
-                    temp.delete()
+                    shredFile(temp)
                     deleteDatabaseSidecars(temp)
                     throw error
                 }
@@ -305,7 +306,7 @@ class DatabaseBackupManager(
             validateDatabaseFile(temp)
             replaceFileAtomically(temp, destination, description)
         } catch (error: Exception) {
-            temp.delete()
+            shredFile(temp)
             deleteDatabaseSidecars(temp)
             throw error
         }
@@ -445,7 +446,7 @@ class DatabaseBackupManager(
             validateDatabaseFile(temp)
             replaceFileAtomically(temp, pending, "pending restore")
         } catch (error: Exception) {
-            temp.delete()
+            shredFile(temp)
             deleteDatabaseSidecars(temp)
             throw error
         }
@@ -522,7 +523,8 @@ class DatabaseBackupManager(
                 }
 
                 temp = File(requireNotNull(dbFile.parentFile), "$databaseName.restore.tmp")
-                if (temp.exists() && !temp.delete()) {
+                shredFile(temp)
+                if (temp.exists()) {
                     throw IOException("Could not clear interrupted restore staging file")
                 }
                 pending.inputStream().use { source ->
@@ -539,7 +541,7 @@ class DatabaseBackupManager(
                 replaceFileAtomically(temp, dbFile, "live database restore")
                 replacementPublished = true
                 deleteDatabaseSidecars(dbFile)
-                retireRestoreJournal(pending)
+                val spent = retireRestoreJournal(pending)
                 context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit(commit = true) {
                     if (rollback != null) {
                         putString(restoreRollbackKey(databaseName), rollback.name)
@@ -549,6 +551,8 @@ class DatabaseBackupManager(
                         remove(restoredAtKey(databaseName))
                     }
                 }
+                // Only once the rollback is recorded, so a death while it shreds can't lose that.
+                shredFile(spent)
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
             } catch (error: Exception) {
                 temp?.let(::shredFile)
@@ -574,10 +578,12 @@ class DatabaseBackupManager(
                     }
                 }
                 val failed = File(backupDir(context), "${databaseName.removeSuffix(".db")}_restore_failed_${timestamp()}.db")
-                val failedBackup = if (runCatching { pending.renameTo(failed) }.getOrDefault(false)) {
+                // The journal may already be off its name if recording the rollback is what failed.
+                val journal = pending.takeIf { it.exists() } ?: spentRestoreJournal(pending)
+                val failedBackup = if (runCatching { journal.renameTo(failed) }.getOrDefault(false)) {
                     failed
                 } else {
-                    shredFile(pending)
+                    shredFile(journal)
                     null
                 }
                 PendingRestoreApplyResult.Failed(error, failedBackup)
@@ -846,7 +852,8 @@ internal fun shredFile(file: File) {
     if (!file.exists()) return
     runCatching {
         val length = file.length()
-        RandomAccessFile(file, "rws").use { handle ->
+        // One sync at the end. "rws" synced every 8 KiB write, so a large database took seconds.
+        RandomAccessFile(file, "rw").use { handle ->
             val zeroes = ByteArray(DEFAULT_BUFFER_SIZE)
             var written = 0L
             while (written < length) {
@@ -861,14 +868,15 @@ internal fun shredFile(file: File) {
 }
 
 /**
- * Takes an applied restore journal off its name, then shreds it, so the plaintext a portable
- * backup was staged as doesn't stay in `files/backups`. Renamed first, so a death mid-shred
- * leaves a [spentRestoreJournal] the next start shreds, never a zeroed journal it would apply.
+ * Takes an applied restore journal off its name, so the next start won't apply it again, and
+ * returns where it went for [shredFile], which keeps the plaintext a portable backup was staged as
+ * from staying in `files/backups`. A death before that shred leaves a [spentRestoreJournal] the
+ * next start shreds, never a zeroed journal it would try to apply.
  */
-internal fun retireRestoreJournal(pending: File) {
+internal fun retireRestoreJournal(pending: File): File {
     val spent = spentRestoreJournal(pending)
     if (!pending.renameTo(spent)) throw IOException("Could not finalize the pending restore journal")
-    shredFile(spent)
+    return spent
 }
 
 /** Where [retireRestoreJournal] moves an applied journal while it shreds it. */

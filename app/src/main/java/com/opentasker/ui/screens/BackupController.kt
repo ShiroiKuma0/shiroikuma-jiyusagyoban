@@ -108,9 +108,10 @@ internal class BackupController(
     }
 
     fun dismissRestoreReview() {
-        scope.launch {
+        // Closed first and held busy, so Stage or a new inspection can't reach the candidate mid-shred.
+        _restoreReview.value = null
+        launchBackupOperation {
             withContext(Dispatchers.IO) { databaseBackupManager.discardInspectedRestore() }
-            _restoreReview.value = null
         }
     }
 

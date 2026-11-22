@@ -26,7 +26,10 @@ class RestoreJournalShredTest {
     @Test
     fun anAppliedJournalLeavesNothingBehind() = inTempDir { dir ->
         val pending = File(dir, "opentasker_restore_pending.db").apply { writeBytes(plaintext) }
-        retireRestoreJournal(pending)
+        val spent = retireRestoreJournal(pending)
+        // Off the journal name first, so the next start won't apply it again.
+        assertFalse(pending.exists())
+        shredFile(spent)
         assertEquals(emptyList<String>(), dir.list()!!.toList())
     }
 

@@ -33,7 +33,8 @@ object LocalePluginRequestQueryEvents {
 
     /** `REQUEST_QUERY` events through one exported receiver for the whole process, however many matchers listen. */
     fun events(app: Context): Flow<ContextEvent> = synchronized(sharedLock) {
-        shared ?: receiverEvents(app)
+        // The application context: the first caller can be the service, and a stop unregisters its receivers.
+        shared ?: receiverEvents(app.applicationContext ?: app)
             .shareIn(
                 scope = sharedScope,
                 // Unregisters once the last matcher stops, and rides out a profile reload's brief gap.

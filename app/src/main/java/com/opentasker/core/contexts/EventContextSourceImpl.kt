@@ -69,7 +69,7 @@ class EventContextSourceImpl : EventDemandContextSource {
         BootContextEvents.events,
         CalendarSunContextEvents.events(app, requestedEvent = requestedEvent),
         // Exported, so only a matcher that can fire on it holds it open.
-        LocalePluginRequestQueryEvents.events(app).takeIf { LocalePluginRequestQueryEvents.isRequested(requestedEvent) },
+        if (LocalePluginRequestQueryEvents.isRequested(requestedEvent)) LocalePluginRequestQueryEvents.events(app) else null,
         QuickSettingsTileContextEvents.events,
         PushContextEvents.events,
         ShareContextEvents.events,

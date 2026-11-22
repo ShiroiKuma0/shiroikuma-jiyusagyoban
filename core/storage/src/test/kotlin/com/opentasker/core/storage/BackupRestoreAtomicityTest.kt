@@ -61,6 +61,11 @@ class BackupRestoreAtomicityTest {
         assertTrue(atomicPublish > transactionStart)
         assertTrue(sidecarCleanup > atomicPublish)
         assertTrue(journalDelete > sidecarCleanup)
+        // The spent journal is shredded only after the rollback is recorded.
+        val rollbackRecorded = source.indexOf("edit(commit = true)", journalDelete)
+        val journalShred = source.indexOf("shredFile(spent)", rollbackRecorded)
+        assertTrue(rollbackRecorded > journalDelete)
+        assertTrue(journalShred > rollbackRecorded)
         assertFalse(
             "The live database must never be deleted before its replacement is ready",
             source.substring(transactionStart, journalDelete).contains("dbFile.delete()"),

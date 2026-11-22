@@ -1,6 +1,7 @@
 package com.opentasker.core.plugins.locale
 
 import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
@@ -43,7 +44,8 @@ class LocalePluginRequestQueryEventsTest {
     fun everyListenerSharesOneExportedReceiver() = runBlocking {
         val registered = AtomicInteger()
         val unregistered = AtomicInteger()
-        val app = object : ContextWrapper(null) {
+        val application = object : ContextWrapper(null) {
+            override fun getApplicationContext(): Context = this
             override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter?): Intent? = null.also { registered.incrementAndGet() }
             override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter?, flags: Int): Intent? = null.also { registered.incrementAndGet() }
             override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter?, broadcastPermission: String?, scheduler: Handler?): Intent? =
@@ -54,8 +56,12 @@ class LocalePluginRequestQueryEventsTest {
                 unregistered.incrementAndGet()
             }
         }
+        // The service a matcher runs in: a stop unregisters what was registered on it, so nothing should be.
+        val service = object : ContextWrapper(null) {
+            override fun getApplicationContext(): Context = application
+        }
         // One event matcher per profile used to mean one exported receiver each.
-        val listeners = List(3) { launch(Dispatchers.Default) { LocalePluginRequestQueryEvents.events(app).collect {} } }
+        val listeners = List(3) { launch(Dispatchers.Default) { LocalePluginRequestQueryEvents.events(service).collect {} } }
         withTimeout(5_000) { while (registered.get() == 0) delay(10) }
         delay(300)
         assertEquals(1, registered.get())
