@@ -1,5 +1,6 @@
 package com.opentasker.core.transfer
 
+import com.opentasker.core.actions.TASKER_TOGGLE_VALUE
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
@@ -11,9 +12,8 @@ import org.junit.Test
 /**
  * Tasker's Auto Brightness (808) and Display AutoRotate (822) each switch one system setting,
  * screen_brightness_mode and accelerometer_rotation, which is what Tasker's own action table names
- * for them. Off and on land on the settings write step. Toggle flips whatever the setting holds,
- * which a step that writes one value can't do, so it stays a placeholder. The steps are copied from
- * real exports.
+ * for them. Off, on and toggle land on the settings write step, toggle through Tasker's own toggle
+ * value. The steps are copied from real exports.
  */
 class TaskerSystemSwitchImportTest {
 
@@ -76,12 +76,13 @@ class TaskerSystemSwitchImportTest {
     }
 
     @Test
-    fun toggleStaysAPlaceholderThatSaysWhy() {
-        val toggle = step("808", """<Int sr="arg0" val="2"/>""")
+    fun toggleFlipsTheSettingThroughTaskersToggleValue() {
+        val brightness = step("808", """<Int sr="arg0" val="2"/>""")
+        val rotate = step("822", """<Int sr="arg0" val="2"/>""")
 
-        assertEquals(TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, toggle.type)
-        val note = toggle.args.getValue("summary")
-        assertTrue(note, "Toggle" in note && "Auto Brightness" in note)
+        assertEquals("settings.write", brightness.type)
+        assertEquals(mapOf("table" to "system", "key" to "screen_brightness_mode", "value" to TASKER_TOGGLE_VALUE), brightness.args)
+        assertEquals(mapOf("table" to "system", "key" to "accelerometer_rotation", "value" to TASKER_TOGGLE_VALUE), rotate.args)
     }
 
     @Test

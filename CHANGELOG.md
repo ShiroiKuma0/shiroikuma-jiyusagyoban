@@ -28,7 +28,7 @@
 
 ### Fixed
 
-- A Tasker Custom Setting that flips a setting (its value is `=:=toggle=:=`) used to write that text into the setting itself. Write Setting now does what Tasker does: it reads the setting and writes 1 over 0 or 0 over 1, and fails without writing when the setting holds anything else.
+- A Tasker Custom Setting that flips a setting (its value is `=:=toggle=:=`) used to write that text into the setting itself. Write Setting now does what Tasker does: it reads the setting and writes 1 over 0 or 0 over 1, and fails without writing when the setting holds anything else. A Tasker Auto Brightness or Display AutoRotate set to Toggle imports now too, the same way.
 - Every event profile used to open its own receiver for Locale plugin query requests, one that other apps can send to. Now the whole app shares one, and it only listens while a profile that can react to those requests is running.
 - Stopping a profile while its orientation, proximity or activity sensor was still starting could leave the sensor running with nothing reading it. Stopping now waits for that start to finish and then turns the sensor off.
 - Tapping Cancel on a restore review while Stage was still saving could wipe the restore it was staging. Backup steps now run one after another, and the Setup card stays busy until the last one is done.

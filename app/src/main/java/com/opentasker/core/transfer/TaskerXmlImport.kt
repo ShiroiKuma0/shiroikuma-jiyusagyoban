@@ -3,6 +3,7 @@ package com.opentasker.core.transfer
 import com.opentasker.core.actions.ArrayProcessAction
 import com.opentasker.core.actions.IntentDispatchParseResult
 import com.opentasker.core.actions.IntentDispatchPolicy
+import com.opentasker.core.actions.TASKER_TOGGLE_VALUE
 import com.opentasker.core.actions.WaitAction
 import com.opentasker.core.actions.isTaskerPickedElement
 import com.opentasker.core.actions.multipleVariablesNamesCarryValues
@@ -2083,8 +2084,8 @@ object TaskerXmlImporter {
 
     /**
      * Auto Brightness and Display AutoRotate each switch one system setting, the one Tasker's action
-     * table names for the code, so off and on land on the settings write step. Toggle flips whatever
-     * the setting holds, which a step that writes one value can't do.
+     * table names for the code, so off and on land on the settings write step. Toggle flips the
+     * setting between 0 and 1, which the write step does with Tasker's toggle value.
      */
     private fun taskerSystemSwitch(code: String, ints: Map<Int, Int>, variables: Map<Int, String>): ActionWithLoss {
         val (actionName, key) = TASKER_SYSTEM_SWITCHES.getValue(code)
@@ -2093,8 +2094,7 @@ object TaskerXmlImporter {
         val refusal = when {
             variables[0] != null -> "Tasker $actionName takes its Set value from ${variables[0]}, which has no match here"
             set == null -> "Tasker $actionName has no Set value"
-            set == 2 -> "Tasker $actionName's Toggle flips the setting, and the settings write step only writes the value it's given"
-            set != 0 && set != 1 -> "Tasker $actionName's Set value $set isn't off, on or toggle"
+            set !in 0..2 -> "Tasker $actionName's Set value $set isn't off, on or toggle"
             else -> null
         }
         if (refusal != null || set == null) return taskerPlaceholder(code, refusal.orEmpty())
@@ -2102,7 +2102,7 @@ object TaskerXmlImporter {
             ActionSpec(
                 type = "settings.write",
                 label = "Tasker ${actionName.lowercase()}",
-                args = mapOf("table" to "system", "key" to key, "value" to set.toString()),
+                args = mapOf("table" to "system", "key" to key, "value" to if (set == 2) TASKER_TOGGLE_VALUE else set.toString()),
             ),
         )
     }
