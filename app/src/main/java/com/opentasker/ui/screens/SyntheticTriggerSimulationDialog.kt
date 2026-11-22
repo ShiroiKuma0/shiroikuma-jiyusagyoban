@@ -57,9 +57,7 @@ internal fun SyntheticTriggerSimulationDialog(
     val simulation by produceState<SyntheticTriggerSimulation?>(initialValue = null, profile) {
         value = withContext(Dispatchers.IO) {
             val nowMs = System.currentTimeMillis()
-            // Capped like the engine's check: never more than one current window.
-            val remainingCooldownMs = CooldownStore(context).remaining(profile.id, nowMs)
-                .coerceAtMost(profile.cooldownSec.coerceAtLeast(0) * 1000L)
+            val remainingCooldownMs = CooldownStore(context).remaining(profile.id, profile.cooldownSec, nowMs)
             val cooldown = if (profile.cooldownSec <= 0 || remainingCooldownMs == 0L) {
                 SyntheticGateResult.pass(cooldownClear)
             } else {

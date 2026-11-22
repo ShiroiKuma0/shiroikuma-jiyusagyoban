@@ -31,6 +31,9 @@ class CooldownReservations(
 ) {
     private val deadlines = mutableMapOf<Long, Long>()
 
+    /** For a deadline [reserve] brought in, the one it replaced, so [release] still knows it as its own. */
+    private val clampedFrom = mutableMapOf<Long, Long>()
+
     /** Restores persisted deadlines after a process restart. */
     fun seed(persisted: Map<Long, Long>) = synchronized(deadlines) {
         deadlines.putAll(persisted)
@@ -50,6 +53,7 @@ class CooldownReservations(
         // span, so it's brought in to one window from now and saved that way.
         val latest = current + cooldownSec.coerceAtLeast(0) * 1000L
         if (deadline > latest) {
+            clampedFrom.getOrPut(profileId) { deadline }
             deadline = latest
             deadlines[profileId] = latest
             persist(profileId, latest)
@@ -59,6 +63,7 @@ class CooldownReservations(
         }
         if (cooldownSec > 0) {
             val next = current + cooldownSec * 1000L
+            clampedFrom.remove(profileId)
             deadlines[profileId] = next
             persist(profileId, next)
             return CooldownReservation(accepted = true, deadlineMs = next, previousDeadlineMs = deadline)
@@ -68,16 +73,20 @@ class CooldownReservations(
 
     /**
      * Puts back the deadline [reservation] replaced, for a run that never started. Does nothing
-     * once a later reservation has replaced it, so it can't undo someone else's window.
+     * once a later reservation has replaced it, so it can't undo someone else's window. A deadline
+     * a shortened cooldown brought in is still this reservation's.
      */
     fun release(profileId: Long, reservation: CooldownReservation) = synchronized(deadlines) {
-        if (reservation.deadlineMs == 0L || deadlines[profileId] != reservation.deadlineMs) return@synchronized
+        if (reservation.deadlineMs == 0L) return@synchronized
+        val held = deadlines[profileId] ?: return@synchronized
+        if (held != reservation.deadlineMs && clampedFrom[profileId] != reservation.deadlineMs) return@synchronized
+        clampedFrom.remove(profileId)
         if (reservation.previousDeadlineMs > 0L) {
             deadlines[profileId] = reservation.previousDeadlineMs
         } else {
             deadlines.remove(profileId)
         }
-        restore(profileId, reservation.deadlineMs, reservation.previousDeadlineMs)
+        restore(profileId, held, reservation.previousDeadlineMs)
     }
 }
 

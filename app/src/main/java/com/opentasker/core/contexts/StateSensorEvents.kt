@@ -17,6 +17,7 @@ import android.net.TetheringInterface
 import android.net.TetheringManager
 import android.os.Build
 import android.os.Looper
+import android.os.SystemClock
 import android.telephony.TelephonyManager
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
@@ -244,9 +245,10 @@ object StateSensorEvents {
         val stepTimes = ArrayDeque<Long>()
 
         // The sensor's thread and the recheck both get here, so the readings' lock guards them,
-        // the step times and the last motion.
+        // the step times and the last motion. Those are times since boot: on the wall clock a clock
+        // set back kept old steps in the minute's count and held off "stationary" until it caught up.
         fun emitActivity(activity: String, stepsPerMinute: Int? = null, measured: Boolean = true) = synchronized(readings) {
-            if (activity == "walking" || activity == "running") lastMotionAt = System.currentTimeMillis()
+            if (activity == "walking" || activity == "running") lastMotionAt = SystemClock.elapsedRealtime()
             readings.next(activity, stepsPerMinute, measured)?.let { emitValues(emit, "activity", it, measured) }
         }
 
@@ -270,7 +272,7 @@ object StateSensorEvents {
                 // No motion for that long while listening is a measured "stationary", which also
                 // replaces the stand-in below when a step detector never saw a step.
                 synchronized(readings) {
-                    if (lastMotionAt > 0L && System.currentTimeMillis() - lastMotionAt > ACTIVITY_IDLE_MS) {
+                    if (lastMotionAt > 0L && SystemClock.elapsedRealtime() - lastMotionAt > ACTIVITY_IDLE_MS) {
                         emitActivity("stationary", 0)
                     }
                 }
@@ -283,12 +285,12 @@ object StateSensorEvents {
                 emitSetup(emit, "activity", "Open Setup to review activity sensor support; this device has no step detector or accelerometer.")
                 return
             }
-            synchronized(readings) { lastMotionAt = System.currentTimeMillis() }
+            synchronized(readings) { lastMotionAt = SystemClock.elapsedRealtime() }
             // Nothing has been sensed yet, so this is a stand-in until the sensor or the idle check reports.
             emitActivity("stationary", 0, measured = false)
             val candidate = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    val now = System.currentTimeMillis()
+                    val now = SystemClock.elapsedRealtime()
                     if (sensor.type == Sensor.TYPE_STEP_DETECTOR) {
                         synchronized(readings) {
                             stepTimes.addLast(now)

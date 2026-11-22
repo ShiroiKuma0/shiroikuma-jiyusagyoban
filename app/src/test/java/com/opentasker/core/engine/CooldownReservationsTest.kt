@@ -118,17 +118,41 @@ class CooldownReservationsTest {
     @Test
     fun aDeadlineCountsForAtMostOneCurrentWindow() {
         val clock = FakeClock()
-        val cooldowns = CooldownReservations(now = clock)
+        val persisted = mutableMapOf<Long, Long>()
+        val cooldowns = CooldownReservations(now = clock, persist = { id, deadline -> persisted[id] = deadline })
         cooldowns.seed(mapOf(1L to clock.millis + 86_400_000L, 2L to clock.millis + 3_600_000L))
 
         val clockSetBack = cooldowns.reserve(profileId = 1, cooldownSec = 60)
         assertFalse(clockSetBack.accepted)
         assertEquals(60_000L, clockSetBack.remainingMs)
+        assertEquals("brought in once and saved, so the next start doesn't load the day", clock.millis + 60_000L, persisted[1L])
         assertTrue("a cooldown since removed holds nothing", cooldowns.reserve(profileId = 2, cooldownSec = 0).accepted)
 
         clock.millis += 60_000
         assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
         assertEquals(clock.millis + 60_000L, cooldowns.snapshot()[1L])
+    }
+
+    /**
+     * A queued run's ten-minute window, brought in to one minute by a trigger after the cooldown
+     * was shortened, is still that run's to give back when admission then refuses it.
+     */
+    @Test
+    fun aRunRefusedAfterItsCooldownWasShortenedStillGivesItBack() {
+        val clock = FakeClock()
+        val restored = mutableListOf<Triple<Long, Long, Long>>()
+        val cooldowns = CooldownReservations(
+            now = clock,
+            restore = { id, reserved, previous -> restored += Triple(id, reserved, previous) },
+        )
+        val queued = cooldowns.reserve(profileId = 1, cooldownSec = 600)
+        clock.millis += 1_000
+        assertFalse(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+
+        cooldowns.release(profileId = 1, reservation = queued)
+
+        assertEquals(listOf(Triple(1L, clock.millis + 60_000L, 0L)), restored)
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
     }
 
     /** The store puts the old deadline back only over the one this release gives back. */

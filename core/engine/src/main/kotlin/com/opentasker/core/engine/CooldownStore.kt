@@ -11,8 +11,8 @@ class CooldownStore(context: Context) {
         prefs.getLong(key(profileId), 0L)
 
     /** Returns the persisted cooldown time left without pruning or writing preferences. */
-    fun remaining(profileId: Long, nowMs: Long = System.currentTimeMillis()): Long =
-        (get(profileId) - nowMs).coerceAtLeast(0L)
+    fun remaining(profileId: Long, cooldownSec: Int, nowMs: Long = System.currentTimeMillis()): Long =
+        cooldownRemainingMs(get(profileId), cooldownSec, nowMs)
 
     fun set(profileId: Long, deadlineMs: Long) = synchronized(LOCK) {
         prefs.edit().putLong(key(profileId), deadlineMs).apply()
@@ -30,11 +30,13 @@ class CooldownStore(context: Context) {
         editor.apply()
     }
 
-    fun remove(profileId: Long) {
+    fun remove(profileId: Long) = synchronized(LOCK) {
         prefs.edit().remove(key(profileId)).apply()
     }
 
-    fun loadAll(): Map<Long, Long> {
+    // Reading and removing happen under the lock set and restore use, so a deadline written in
+    // between isn't removed for being expired, and a late restore can't bring back a deleted one.
+    fun loadAll(): Map<Long, Long> = synchronized(LOCK) {
         val stored = prefs.all
         val now = System.currentTimeMillis()
         val expired = expiredCooldownKeys(stored, now)
@@ -43,12 +45,12 @@ class CooldownStore(context: Context) {
             expired.forEach { editor.remove(it) }
             editor.apply()
         }
-        return liveCooldowns(stored, now)
+        liveCooldowns(stored, now)
     }
 
-    fun pruneDeleted(activeProfileIds: Set<Long>) {
+    fun pruneDeleted(activeProfileIds: Set<Long>) = synchronized(LOCK) {
         val stale = staleCooldownKeys(prefs.all.keys, activeProfileIds)
-        if (stale.isEmpty()) return
+        if (stale.isEmpty()) return@synchronized
         val editor = prefs.edit()
         stale.forEach { editor.remove(it) }
         editor.apply()
@@ -75,6 +77,13 @@ internal fun profileIdForCooldownKey(key: String): Long? =
     } else {
         null
     }
+
+/**
+ * Time left before [deadlineMs], counted the way [CooldownReservations.reserve] holds a profile:
+ * never more than one current [cooldownSec] window, and nothing once there's no cooldown.
+ */
+internal fun cooldownRemainingMs(deadlineMs: Long, cooldownSec: Int, nowMs: Long): Long =
+    (deadlineMs - nowMs).coerceIn(0L, cooldownSec.coerceAtLeast(0) * 1000L)
 
 /** Deadlines that have passed, so they can be dropped from storage. */
 internal fun expiredCooldownKeys(stored: Map<String, Any?>, nowMs: Long): List<String> =

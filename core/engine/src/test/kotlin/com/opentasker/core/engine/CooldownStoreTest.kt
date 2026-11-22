@@ -105,8 +105,8 @@ class CooldownStoreTest {
 
         val afterRestart = CooldownStore(app)
         assertEquals("a new process must see the same deadline", now + 60_000L, afterRestart.get(5L))
-        assertEquals(60_000L, afterRestart.remaining(5L, nowMs = now))
-        assertEquals("time left never goes negative", 0L, afterRestart.remaining(5L, nowMs = now + 70_000L))
+        assertEquals(60_000L, afterRestart.remaining(5L, cooldownSec = 60, nowMs = now))
+        assertEquals("time left never goes negative", 0L, afterRestart.remaining(5L, cooldownSec = 60, nowMs = now + 70_000L))
         assertEquals("a profile without a cooldown has none", 0L, afterRestart.get(6L))
         assertEquals(setOf("cd_5"), app.prefs.values.keys)
 
@@ -115,13 +115,23 @@ class CooldownStoreTest {
         assertTrue(app.prefs.values.isEmpty())
     }
 
+    /** What the trigger simulation shows, counted the way a trigger is held. */
+    @Test
+    fun theTimeLeftIsAtMostOneCurrentWindow() {
+        val app = PrefsContext()
+        CooldownStore(app).set(1L, now + 86_400_000L)
+
+        assertEquals("a clock set back a day", 60_000L, CooldownStore(app).remaining(1L, cooldownSec = 60, nowMs = now))
+        assertEquals("a cooldown since removed", 0L, CooldownStore(app).remaining(1L, cooldownSec = 0, nowMs = now))
+    }
+
     @Test
     fun askingHowLongIsLeftNeverWritesEvenForAPassedDeadline() {
         val app = PrefsContext()
         CooldownStore(app).set(1L, now - 1_000L)
         val writesBefore = app.prefs.writes
 
-        assertEquals(0L, CooldownStore(app).remaining(1L, nowMs = now))
+        assertEquals(0L, CooldownStore(app).remaining(1L, cooldownSec = 60, nowMs = now))
         assertEquals(writesBefore, app.prefs.writes)
         assertTrue("only loadAll prunes", "cd_1" in app.prefs.values)
     }
