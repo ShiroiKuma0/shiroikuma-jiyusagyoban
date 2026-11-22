@@ -17,10 +17,13 @@ import org.junit.runner.RunWith
 class DatabaseSecurityInstrumentedTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
+    // Taken before each test, since the key these tests use is the app's own database key.
+    private val appKey = KeptDatabaseKey(context)
+
     @After
     fun cleanup() {
         context.deleteDatabase(TEST_DATABASE)
-        context.getSharedPreferences("database_security", 0).edit().clear().commit()
+        appKey.putBack()
     }
 
     @Test

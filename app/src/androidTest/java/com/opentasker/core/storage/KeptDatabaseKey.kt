@@ -1,0 +1,29 @@
+package com.opentasker.core.storage
+
+import android.content.Context
+
+/**
+ * The app keeps one wrapped SQLCipher key for every database, in `database_security`. A test that
+ * clears it to act out a reinstall leaves the app's own database unreadable on a phone with real
+ * data, so it takes this snapshot first and puts it back when it's done.
+ */
+internal class KeptDatabaseKey(private val context: Context) {
+    private val saved: Map<String, Any?> = preferences().all.toMap()
+
+    private fun preferences() = context.getSharedPreferences("database_security", Context.MODE_PRIVATE)
+
+    fun putBack() {
+        val editor = preferences().edit().clear()
+        saved.forEach { (key, value) ->
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                else -> error("database_security holds a $key this test can't put back")
+            }
+        }
+        check(editor.commit()) { "Could not put the app's database key back" }
+    }
+}

@@ -209,6 +209,7 @@ class DatabaseBackupManagerInstrumentedTest {
     @Test
     fun encryptedExportRestoresAfterTheDatabaseKeyIsLost() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val appKey = KeptDatabaseKey(context)
         cleanupEncrypted(context)
 
         val exported = context.cacheDir.resolve("opentasker-portable-export.otbackup")
@@ -252,6 +253,7 @@ class DatabaseBackupManagerInstrumentedTest {
             db.close()
             exported.delete()
             cleanupEncrypted(context)
+            appKey.putBack()
         }
     }
 
@@ -524,7 +526,8 @@ class DatabaseBackupManagerInstrumentedTest {
         context.filesDir.resolve("backups")
             .listFiles { file -> file.name.startsWith(ENCRYPTED_TEST_DATABASE.removeSuffix(".db")) }
             ?.forEach { it.delete() }
-        context.getSharedPreferences("database_security", 0).edit().clear().commit()
+        // The database key isn't cleared here: it's the app's own key too. The one test that
+        // clears it puts it back through [KeptDatabaseKey].
     }
 
     private fun cleanup(context: android.content.Context) {
