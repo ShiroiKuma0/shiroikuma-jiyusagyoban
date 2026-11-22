@@ -149,10 +149,16 @@ class TaskShortcutPlanTest {
         assertEquals(listOf("task_4"), delete.disable)
         val deleted = held.after(ReconcileOutcome.APPLIED, emptyMap(), delete.heldBack(applied = true))
 
-        val undo = TaskShortcutHelper.plan(listOf(shortcut.copy(enabled = false)), renamed, deleted.previous, heldBack = deleted.heldBack)
+        // Another task's rename held back while this one is gone keeps the name too.
+        val off = shortcut.copy(enabled = false)
+        val other = TaskShortcutHelper.plan(listOf(off, pinned(5, "C")), mapOf(5L to "D"), deleted.previous, heldBack = deleted.heldBack)
+        val stillGone = deleted.after(ReconcileOutcome.CHECKED, mapOf(5L to "D"), other.heldBack(applied = false))
+        assertEquals(mapOf("task_4" to "B", "task_5" to "D"), stillGone.heldBack)
+
+        val undo = TaskShortcutHelper.plan(listOf(off), renamed, stillGone.previous, heldBack = stillGone.heldBack)
         assertEquals(listOf("task_4"), undo.enable)
         assertEquals(listOf(pinned(4, "B", enabled = false)), undo.update)
-        assertEquals(emptyMap<String, String>(), undo.heldBack(applied = true))
+        assertEquals(emptyMap<String, String>(), stillGone.after(ReconcileOutcome.APPLIED, renamed, undo.heldBack(applied = true)).heldBack)
     }
 
     /**
