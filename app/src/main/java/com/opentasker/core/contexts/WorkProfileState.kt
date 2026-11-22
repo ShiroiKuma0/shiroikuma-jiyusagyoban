@@ -71,11 +71,16 @@ internal object WorkProfileState {
         return stateOf(profiles)
     }
 
-    /**
-     * Android 15 describes every profile it lets this app see. One it won't describe is hidden from
-     * this app, which is Private Space, never the work profile.
-     */
     @RequiresApi(35)
-    private fun isWorkProfile(apps: LauncherApps, handle: UserHandle): Boolean =
-        runCatching { apps.getLauncherUserInfo(handle)?.userType == UserManager.USER_TYPE_PROFILE_MANAGED }.getOrDefault(false)
+    private fun isWorkProfile(apps: LauncherApps, handle: UserHandle): Boolean? = runCatching {
+        val described = apps.getLauncherUserInfo(handle)?.let { it.userType == UserManager.USER_TYPE_PROFILE_MANAGED }
+        kindOf(described, listed = handle in apps.profiles)
+    }.getOrNull()
+
+    /**
+     * Android 15 says what kind each profile it lets this app see is, unless the build leaves out
+     * Private Space, when it says nothing, so a profile [LauncherApps] lists but doesn't describe
+     * stays unknown. One hidden from that list is Private Space, never the work profile.
+     */
+    fun kindOf(described: Boolean?, listed: Boolean): Boolean? = described ?: if (listed) null else false
 }

@@ -48,6 +48,18 @@ class WorkProfileStateTest {
     }
 
     @Test
+    fun onAndroid15AProfileAndroidListsButWontDescribeStillCounts() {
+        // A build without Private Space describes no profile at all, the work profile included.
+        val undescribed = WorkProfileState.kindOf(described = null, listed = true)
+        assertEquals(null, undescribed)
+        assertEquals("available", WorkProfileState.stateOf(listOf(OtherProfile(managed = undescribed, quietMode = false))))
+        // Private Space is the one Android hides from the list, and it never counts.
+        assertEquals(false, WorkProfileState.kindOf(described = null, listed = false))
+        assertEquals(true, WorkProfileState.kindOf(described = true, listed = false))
+        assertEquals(false, WorkProfileState.kindOf(described = false, listed = true))
+    }
+
+    @Test
     fun aStateContextMatchesTheThreeValuesInAnyCase() {
         val paused = mapOf("work_profile" to "paused")
 

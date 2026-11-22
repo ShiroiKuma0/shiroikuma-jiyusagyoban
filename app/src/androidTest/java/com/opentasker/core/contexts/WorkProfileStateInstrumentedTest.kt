@@ -3,6 +3,7 @@ package com.opentasker.core.contexts
 import android.os.Build
 import android.os.Process
 import android.os.UserManager
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
@@ -24,12 +25,17 @@ class WorkProfileStateInstrumentedTest {
     fun aWorkProfileReadsAvailableThenPausedAndPrivateSpaceNeverCounts() {
         assumeTrue("creates Android users, so emulators only", Build.PRODUCT.startsWith("sdk_gphone") || Build.FINGERPRINT.startsWith("generic"))
         assumeTrue(WorkProfileState.supported(context))
+        // A run killed part way leaves its users behind, and they'd skip every later run.
+        Regex("""UserInfo\{(\d+):$PROBE:""").findAll(shell("pm list users")).forEach { shell("pm remove-user ${it.groupValues[1]}") }
         assumeTrue("starts from a device with no other profile", WorkProfileState.read(context) == WorkProfileState.NONE)
         val parent = shell("am get-current-user").trim()
         val created = mutableListOf<String>()
         try {
             if (Build.VERSION.SDK_INT >= 35) {
-                createProfile("--user-type android.os.usertype.profile.PRIVATE --profileOf $parent")?.let { privateSpace ->
+                val privateSpace = createProfile("--user-type android.os.usertype.profile.PRIVATE --profileOf $parent")
+                if (privateSpace == null) {
+                    Log.w(TAG, "This image can't create Private Space, so that half went unchecked")
+                } else {
                     created += privateSpace
                     assertEquals("Private Space isn't the work profile", WorkProfileState.NONE, WorkProfileState.read(context))
                 }
@@ -55,7 +61,7 @@ class WorkProfileStateInstrumentedTest {
     }
 
     private fun createProfile(options: String): String? =
-        Regex("""created user id (\d+)""").find(shell("pm create-user $options OpenTaskerProbe"))?.groupValues?.get(1)
+        Regex("""created user id (\d+)""").find(shell("pm create-user $options $PROBE"))?.groupValues?.get(1)
 
     private fun waitFor(expected: String): String {
         val deadline = System.currentTimeMillis() + 10_000
@@ -65,6 +71,11 @@ class WorkProfileStateInstrumentedTest {
             latest = WorkProfileState.read(context)
         }
         return latest
+    }
+
+    private companion object {
+        const val PROBE = "OpenTaskerProbe"
+        const val TAG = "WorkProfileStateTest"
     }
 
     private fun shell(command: String): String {
