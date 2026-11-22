@@ -139,7 +139,11 @@ class ProjectLinksTest {
             "fun copyDiagnosticReport()",
             "fun shareDiagnosticReport()",
         )
-        assertTrue("copy must build the same redacted report Share sends", "DiagnosticExport.buildReport(" in body)
+        // Both build through report(), which moves the redacted report's reads to IO.
+        val controller = ProductionSources.read("com/opentasker/ui/screens/DiagnosticsController.kt")
+        val share = controller.substringAfter("fun shareDiagnosticReport()").substringBefore("private suspend fun report()")
+        assertTrue("the report must be the redacted export", "{ DiagnosticExport.buildReport(appContext, db) }" in controller)
+        assertTrue("copy must build the same redacted report Share sends", "= report()" in body && "= report()" in share)
         assertTrue("copy must reach the clipboard", "setPrimaryClip(" in body)
         assertTrue("copy must confirm to the user", "R.string.ui_message_diagnostics_copied" in body)
     }
