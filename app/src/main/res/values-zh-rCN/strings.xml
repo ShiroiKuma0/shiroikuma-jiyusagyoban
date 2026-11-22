@@ -1446,7 +1446,7 @@
     <string name="diagnostics_work_outcome_stopped">被Android停止：%1$s</string>
     <string name="diagnostics_work_outcome_at">%1$s · %2$s</string>
     <!-- %1$s is why Android stopped an earlier run, %2$s when. Appended after the latest outcome. -->
-    <string name="diagnostics_work_outcome_also_stopped">\n 更早的一次运行被Android停止：%1$s · %2$s</string>
+    <string name="diagnostics_work_outcome_also_stopped">\n更早的一次运行被Android停止：%1$s · %2$s</string>
     <string name="diagnostics_stop_reason_not_stopped">未停止</string>
     <string name="diagnostics_stop_reason_cancelled_by_app">被OpenTasker取消</string>
     <string name="diagnostics_stop_reason_preempt">被更高优先级的任务抢占</string>

@@ -1472,7 +1472,7 @@
     <string name="diagnostics_work_outcome_stopped">Stopped by Android: %1$s</string>
     <string name="diagnostics_work_outcome_at">%1$s · %2$s</string>
     <!-- %1$s is why Android stopped an earlier run, %2$s when. Appended after the latest outcome. -->
-    <string name="diagnostics_work_outcome_also_stopped">\n Earlier run stopped by Android: %1$s · %2$s</string>
+    <string name="diagnostics_work_outcome_also_stopped">\nEarlier run stopped by Android: %1$s · %2$s</string>
     <string name="diagnostics_stop_reason_not_stopped">not stopped</string>
     <string name="diagnostics_stop_reason_cancelled_by_app">canceled by OpenTasker</string>
     <string name="diagnostics_stop_reason_preempt">preempted by a higher-priority job</string>

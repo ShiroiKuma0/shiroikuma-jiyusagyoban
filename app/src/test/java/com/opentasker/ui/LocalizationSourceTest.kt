@@ -588,8 +588,9 @@ class LocalizationSourceTest {
      */
     @Test
     fun userVisibleStringsUseTheAppsSeparatorsAndPlainWords() {
-        // Matched as written, since "run log" and a word holding "zen", like "frozen", are fine.
-        val bannedAsWritten = listOf(" - ", "->", "...", "DND", "Zen", "Run Log", "RUN_COMMAND", "PUBACK")
+        // Matched as written, since "run log" and a word holding "zen", like "frozen", are fine. A
+        // line break followed by a space starts the next line with that space.
+        val bannedAsWritten = listOf(" - ", "->", "...", "DND", "Zen", "Run Log", "RUN_COMMAND", "PUBACK", "\\n ")
         // Matched in any case, so a word can't come back capitalized differently. British spellings
         // are here too, since the app writes American English.
         val bannedAnyCase = listOf(
