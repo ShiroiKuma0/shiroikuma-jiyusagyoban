@@ -277,7 +277,7 @@ object ProfileTemplateCatalog {
             summary = "Lower notification volume and log when the work window starts.",
             category = "Focus",
             availability = TemplateAvailability.RequiresSetup,
-            safetyNote = "Creates a disabled profile. Review DND/volume access before enabling.",
+            safetyNote = "Creates a disabled profile. Review Do Not Disturb and volume access before enabling.",
             inputs = listOf(
                 TemplateSlot("start", "Start time", "09:00", hint = "HH:mm", selector = BlueprintSelectorKind.TIME),
                 TemplateSlot("end", "End time", "17:00", hint = "HH:mm", selector = BlueprintSelectorKind.TIME),
@@ -297,7 +297,7 @@ object ProfileTemplateCatalog {
             summary = "Set a safe media volume when headphones connect.",
             category = "Media",
             availability = TemplateAvailability.RequiresSetup,
-            safetyNote = "Creates a disabled profile and may need DND/volume access.",
+            safetyNote = "Creates a disabled profile and may need Do Not Disturb and volume access.",
             inputs = listOf(
                 TemplateSlot("level", "Media volume", "55", hint = "0-100", selector = BlueprintSelectorKind.INTEGER, minimum = 0.0, maximum = 100.0),
             ),
@@ -334,7 +334,7 @@ object ProfileTemplateCatalog {
             summary = "Run a notification/log pattern when a trusted SSID is detected.",
             category = "Location-lite",
             availability = TemplateAvailability.RequiresSetup,
-            safetyNote = "Creates a disabled profile and may need nearby WiFi/location permission.",
+            safetyNote = "Creates a disabled profile and may need nearby Wi-Fi or location permission.",
             inputs = listOf(
                 TemplateSlot("ssid", "WiFi SSID", "Home WiFi", hint = "Exact SSID", selector = BlueprintSelectorKind.WIFI_SSID),
                 TemplateSlot("message", "Message", "Arrived on {ssid}"),
@@ -426,7 +426,7 @@ object ProfileTemplateCatalog {
             summary = "Lower notification volume while a named calendar has a busy event.",
             category = "Calendar",
             availability = TemplateAvailability.RequiresSetup,
-            safetyNote = "Creates a disabled profile. Requires Calendar access plus DND/volume access before enabling.",
+            safetyNote = "Creates a disabled profile. Requires Calendar access plus Do Not Disturb and volume access before enabling.",
             inputs = listOf(
                 TemplateSlot("calendar", "Calendar name", "Work", selector = BlueprintSelectorKind.TEXT, section = "Calendar"),
             ),

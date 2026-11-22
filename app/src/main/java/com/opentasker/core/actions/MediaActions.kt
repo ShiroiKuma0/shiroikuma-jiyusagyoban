@@ -225,7 +225,7 @@ class MuteAction : DeclaredAction(ActionCatalog.require("media.mute")) {
             ctx.logger("Mute $stream")
             ActionResult.Success
         } catch (ex: SecurityException) {
-            ActionResult.Failure("mute blocked by DND policy: ${ex.message}", ex)
+            ActionResult.Failure("mute blocked by Do Not Disturb: ${ex.message}", ex)
         }
     }
 }

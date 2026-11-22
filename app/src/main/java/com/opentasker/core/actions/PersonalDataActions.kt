@@ -135,7 +135,7 @@ class ContactsLookupAction : DeclaredAction(ActionCatalog.require("contacts.look
         return try {
             ContactPickerCoordinator.launch(ctx.app, requestId, query)
             val sessionUri = withTimeoutOrNull(CONTACT_PICKER_TIMEOUT_MS) { result.await() }
-                ?: throw IllegalStateException("contact picker timed out or was cancelled")
+                ?: throw IllegalStateException("contact picker timed out or was canceled")
             ContactLookupRepository(ctx.app.contentResolver)
                 .findPickerSession(sessionUri)
                 .filter { it.matches(query) }

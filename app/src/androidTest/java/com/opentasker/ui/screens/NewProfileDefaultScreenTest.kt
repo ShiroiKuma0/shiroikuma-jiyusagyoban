@@ -78,7 +78,7 @@ class NewProfileDefaultScreenTest {
 
         composeTestRule.onAllNodes(newProfile).onFirst().performClick()
 
-        val enableSwitch = hasText("Enable after saving") and isToggleable()
+        val enableSwitch = hasText("Turn on after saving") and isToggleable()
         composeTestRule.waitUntil(TIMEOUT_MS) { composeTestRule.onAllNodes(enableSwitch).fetchSemanticsNodes().isNotEmpty() }
         composeTestRule.onNode(enableSwitch).performScrollTo().assertIsOn()
     }

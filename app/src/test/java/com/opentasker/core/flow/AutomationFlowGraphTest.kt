@@ -72,7 +72,7 @@ class AutomationFlowGraphTest {
 
         val graph = AutomationFlowGraphBuilder.build(profile, listOf(enterTask))
 
-        assertEquals("Enabled · Mode single · Cooldown 0s", graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }.detail)
+        assertEquals("Enabled · Mode single · 0 sec cooldown", graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }.detail)
         assertEquals("1 action · priority 5", graph.enterTaskNode?.detail)
         assertTrue(graph.contextNodes.single().detail.orEmpty().startsWith("Inverted · "))
         val actionDetail = graph.actionNodesFor("enter-task:30").single().detail.orEmpty()

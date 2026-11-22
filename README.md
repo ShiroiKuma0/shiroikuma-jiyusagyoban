@@ -87,8 +87,8 @@
 
 | Category | Count | Examples |
 |----------|------:|---------|
-| Settings | 22 | Wi-Fi, Wi-Fi scan, Bluetooth, brightness, volume, airplane, mobile data, Wi-Fi hotspot, always-on display, screen timeout, write and read setting, Do Not Disturb, Do Not Disturb rule set and clear, ringer mode, torch, tile state, wallpaper, temporary state, keyboard info, keyboard picker |
-| App | 11 | launch intent, launch app, publish shortcut, kill, archive, unarchive, go home, open URL, SMS, screenshot, add calendar event |
+| Settings | 22 | Wi-Fi, Wi-Fi scan, Bluetooth, brightness, volume, airplane, mobile data, Wi-Fi hotspot, always-on display, screen timeout, write and read setting, Do Not Disturb, Do Not Disturb rule set and clear, ringer mode, flashlight, tile state, wallpaper, temporary state, keyboard info, keyboard picker |
+| App | 11 | launch intent, launch app, publish shortcut, force stop, archive, unarchive, go home, open URL, SMS, screenshot, add calendar event |
 | File | 5 | read, write, append, delete, list |
 | Network | 9 | HTTP Request, Home Assistant webhook, MQTT publish, legacy GET/POST aliases, ping, download, Wake-on-LAN, WireGuard and Tailscale tunnels |
 | Media | 11 | play, beep, stop, pause, resume, play/pause, next, previous, rewind, fast forward, mute |
@@ -128,7 +128,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
 - Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, physical activity, Bluetooth, SMS, phone state, call log, Do Not Disturb, modify system settings, Health Connect, Shizuku, and Termux
 - Optional Android 16+ promoted ongoing notifications for active tasks, with standard foreground-notification fallback when promotion is unavailable or denied
-- Context inspector with live source health, latest values, per-profile match explanations, and
+- Inspector with live source health, latest values, per-profile match explanations, and
   Loading/Ready/Stale/Error observation status with age-aware reporting
 - Keyset-paged run logs with SQL-backed task/status/date/search filters, complete expandable action traces, redacted JSON/CSV export, per-step diagnostics and variable writes, reviewed retention reductions, held admission rows with safe manual replay, and user-pinned history
 - Live view of in-flight automations (task, origin, current step and elapsed time) with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome. While a task runs, on its own or as a sub-task, its card and the cards of profiles that run it say Running

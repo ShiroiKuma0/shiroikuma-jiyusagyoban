@@ -520,7 +520,7 @@ object EngineHealthReader {
 
     internal fun workerStopReasonLabel(reason: Int): String = when (reason) {
         WorkInfo.STOP_REASON_NOT_STOPPED -> "Not stopped"
-        WorkInfo.STOP_REASON_CANCELLED_BY_APP -> "Cancelled by app"
+        WorkInfo.STOP_REASON_CANCELLED_BY_APP -> "Canceled by app"
         WorkInfo.STOP_REASON_PREEMPT -> "Preempted by a higher-priority job"
         WorkInfo.STOP_REASON_TIMEOUT -> "Timed out"
         STOP_REASON_TIMEOUT_ABANDONED -> "Timed out; job was abandoned after the app did not respond"

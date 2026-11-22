@@ -50,7 +50,7 @@ internal object ZenRuleActionSupport {
         }
         val mode = args["mode"]?.trim()?.lowercase().orEmpty().ifEmpty { "total_silence" }
         val filter = interruptionFilterFor(mode)
-            ?: return Result.failure(IllegalArgumentException("invalid Zen mode: $mode (use off/priority/alarms/total_silence)"))
+            ?: return Result.failure(IllegalArgumentException("invalid Do Not Disturb mode: $mode (use off/priority/alarms/total_silence)"))
         val enabled = args.booleanValue("enabled", true)
             ?: return Result.failure(IllegalArgumentException("enabled must be true or false"))
         val grayscale = args.booleanValue("grayscale", false)
@@ -108,7 +108,7 @@ class ZenRuleSetAction(
                 ctx.logger("Do Not Disturb rule ${spec.id}: ${spec.mode} (plain Do Not Disturb, as rules need Android 15)")
                 ActionResult.Success
             } catch (ex: SecurityException) {
-                ActionResult.Failure("DND change blocked: ${ex.message}", ex)
+                ActionResult.Failure("Do Not Disturb change blocked: ${ex.message}", ex)
             }
         }
         return applyAutomaticRule(ctx, nm, spec)
@@ -190,7 +190,7 @@ class ZenRuleClearAction(
                 ctx.logger("Do Not Disturb rule $id: cleared (plain Do Not Disturb, as rules need Android 15)")
                 ActionResult.Success
             } catch (ex: SecurityException) {
-                ActionResult.Failure("DND change blocked: ${ex.message}", ex)
+                ActionResult.Failure("Do Not Disturb change blocked: ${ex.message}", ex)
             }
         }
         return clearAutomaticRule(ctx, nm, id)

@@ -588,10 +588,14 @@ class LocalizationSourceTest {
      */
     @Test
     fun userVisibleStringsUseTheAppsSeparatorsAndPlainWords() {
-        val banned = listOf(
-            " - ", "->", "...", "DND", "Zen rule", "run-log", "Run Log", "licence", "recognis", "Context inspector",
-            "predicate", "privileged", "user-service", "foreground-service", "flow.catch", "task.run", "event=",
-            "RUN_COMMAND", "PUBACK", "idempot", "interruption filter", "matcher",
+        // Matched as written, since "run log" and a word holding "zen", like "frozen", are fine.
+        val bannedAsWritten = listOf(" - ", "->", "...", "DND", "Zen", "Run Log", "RUN_COMMAND", "PUBACK")
+        // Matched in any case, so a word can't come back capitalized differently. British spellings
+        // are here too, since the app writes American English.
+        val bannedAnyCase = listOf(
+            "zen rule", "run-log", "context inspector", "predicate", "privileged", "user-service",
+            "foreground-service", "flow.catch", "task.run", "event=", "idempot", "interruption filter", "matcher",
+            "licence", "recognis", "cancelled", "cancelling", "colour", "behaviour", "favourite", "centre", "organis",
         )
         val files = Files.list(resRoot.resolve("values")).use { paths ->
             paths.filter { it.fileName.toString().endsWith(".xml") }.toList()
@@ -605,9 +609,8 @@ class LocalizationSourceTest {
                 val text = node.textContent
                 val name = node.attributes?.getNamedItem("name")?.nodeValue
                     ?: node.parentNode?.attributes?.getNamedItem("name")?.nodeValue
-                banned.filter { term ->
-                    if (term.first().isLowerCase()) text.contains(term, ignoreCase = true) else term in text
-                }.map { term -> "${file.fileName}: $name has \"$term\"" }
+                (bannedAsWritten.filter { it in text } + bannedAnyCase.filter { text.contains(it, ignoreCase = true) })
+                    .map { term -> "${file.fileName}: $name has \"$term\"" }
             }
         }
         assertTrue("Separators or jargon in user-visible strings: $offenders", offenders.isEmpty())

@@ -139,6 +139,6 @@ class NewProfileDefaultComposeTest {
     }
 
     private companion object {
-        const val ENABLE_AFTER_SAVE = "Enable after saving"
+        const val ENABLE_AFTER_SAVE = "Turn on after saving"
     }
 }

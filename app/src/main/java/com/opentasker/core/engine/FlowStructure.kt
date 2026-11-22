@@ -56,7 +56,7 @@ object FlowControl {
         val name = label?.trim().orEmpty()
         if (name.isNotEmpty()) {
             val index = actions.indexOfFirst { it.label?.trim() == name }
-            return if (index >= 0) GotoTarget(index) else GotoTarget(null, "goto: no step is labelled \"$name\"")
+            return if (index >= 0) GotoTarget(index) else GotoTarget(null, "goto: no step is labeled \"$name\"")
         }
         val raw = step?.trim().orEmpty()
         if (raw.isEmpty()) return GotoTarget(null, "goto needs a step number or a label")

@@ -23,6 +23,9 @@ object RunLogSource {
     const val SCHEDULER = "scheduler"
     const val OTHER = "other"
 
+    /** The [SCHEDULER] label a missed scheduled trigger is stored with, shown in the app's language. */
+    const val MISSED_TRIGGER = "Missed trigger"
+
     data class Classified(val key: String, val label: String?)
 
     fun classify(source: String): Classified {
@@ -54,7 +57,7 @@ object RunLogSource {
             trimmed.equals("App function", ignoreCase = true) ->
                 Classified(APP_FUNCTION, null)
             trimmed.equals("Scheduled trigger", ignoreCase = true) ->
-                Classified(SCHEDULER, "Missed trigger")
+                Classified(SCHEDULER, MISSED_TRIGGER)
             trimmed.isBlank() ->
                 Classified(OTHER, null)
             else ->

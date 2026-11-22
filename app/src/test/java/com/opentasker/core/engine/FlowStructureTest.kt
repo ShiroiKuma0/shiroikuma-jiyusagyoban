@@ -108,7 +108,7 @@ class FlowStructureTest {
         assertEquals(2, FlowControl.gotoTarget(actions, null, "3").index)
         assertEquals(2, FlowControl.gotoTarget(actions, " ", " 3.0 ").index)
         listOf(
-            Triple("top", null, "no step is labelled \"top\""),
+            Triple("top", null, "no step is labeled \"top\""),
             Triple(null, "4", "has no step 4 (it has 3)"),
             Triple(null, "-2.0", "has no step -2"),
             Triple(null, "2.5", "\"2.5\" isn't a step number"),

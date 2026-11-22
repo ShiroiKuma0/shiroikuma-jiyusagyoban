@@ -115,5 +115,5 @@ object ActiveExecutionRegistry {
         nested.value = emptyList()
     }
 
-    const val CANCELLED_BY_USER = "Cancelled by user"
+    const val CANCELLED_BY_USER = "Canceled by user"
 }

@@ -159,7 +159,7 @@ private object EnglishAutomationFlowStrings : AutomationFlowStrings {
         outputs.takeIf { it.isNotEmpty() }?.let { "outputs ${it.joinToString(", ")}" },
     ).joinToString(". ")
     override fun profileDetail(enabled: Boolean, mode: String, cooldownSeconds: Int) =
-        listOf(if (enabled) "Enabled" else "Disabled", "Mode $mode", "Cooldown ${cooldownSeconds}s").joinToString(FLOW_DETAIL_SEPARATOR)
+        listOf(if (enabled) "Enabled" else "Disabled", "Mode $mode", "$cooldownSeconds sec cooldown").joinToString(FLOW_DETAIL_SEPARATOR)
     override fun noContextsWarning() = "Profile has no contexts."
     override fun contextEdge(inverted: Boolean) = if (inverted) "must not match" else "must match"
     override fun taskEdge(label: String) = label

@@ -11,7 +11,7 @@
     <string name="catalog_action_notify_show_field_channel_label" formatted="false">Channel</string>
     <string name="catalog_action_notify_show_field_channel_hint" formatted="false">quiet / default / urgent</string>
     <string name="catalog_action_notify_show_field_persistent_label" formatted="false">Persistent</string>
-    <string name="catalog_action_notify_show_field_persistent_hint" formatted="false">Keep until cancelled</string>
+    <string name="catalog_action_notify_show_field_persistent_hint" formatted="false">Keep until canceled</string>
     <string name="catalog_action_notify_show_field_tag_label" formatted="false">Tag</string>
     <string name="catalog_action_notify_show_field_tag_hint" formatted="false">Replacement tag (same tag replaces)</string>
     <string name="catalog_action_notify_show_field_id_label" formatted="false">ID</string>
@@ -398,7 +398,7 @@
     <string name="catalog_action_plugin_locale_fire_field_bundlejson_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
     <string name="catalog_action_plugin_locale_fire_field_blurb_label" formatted="false">Blurb</string>
     <string name="catalog_action_plugin_locale_fire_field_blurb_hint" formatted="false">Short user-visible summary</string>
-    <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
+    <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">Timeout (ms)</string>
     <string name="catalog_action_plugin_locale_fire_field_timeoutms_hint" formatted="false">5000</string>
     <string name="catalog_action_plugin_locale_query_name" formatted="false">Locale Plugin Condition</string>
     <string name="catalog_action_plugin_locale_query_description" formatted="false">Query an explicit Locale/Tasker-compatible condition plugin and store its state</string>
@@ -408,7 +408,7 @@
     <string name="catalog_action_plugin_locale_query_field_bundlejson_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
     <string name="catalog_action_plugin_locale_query_field_blurb_label" formatted="false">Blurb</string>
     <string name="catalog_action_plugin_locale_query_field_blurb_hint" formatted="false">Short user-visible summary</string>
-    <string name="catalog_action_plugin_locale_query_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
+    <string name="catalog_action_plugin_locale_query_field_timeoutms_label" formatted="false">Timeout (ms)</string>
     <string name="catalog_action_plugin_locale_query_field_timeoutms_hint" formatted="false">5000</string>
     <string name="catalog_action_plugin_locale_query_field_resultvariable_label" formatted="false">Result variable</string>
     <string name="catalog_action_plugin_locale_query_field_resultvariable_hint" formatted="false">%plugin_state</string>
@@ -421,7 +421,7 @@
     <string name="catalog_action_script_shizuku_run_field_arguments_hint" formatted="false">Optional shell-style arguments</string>
     <string name="catalog_action_script_shizuku_run_field_captureprefix_label" formatted="false">Output variable prefix</string>
     <string name="catalog_action_script_shizuku_run_field_captureprefix_hint" formatted="false">%script</string>
-    <string name="catalog_action_script_shizuku_run_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
+    <string name="catalog_action_script_shizuku_run_field_timeoutms_label" formatted="false">Timeout (ms)</string>
     <string name="catalog_action_script_shizuku_run_field_timeoutms_hint" formatted="false">30000 (1000 to 120000)</string>
     <string name="catalog_action_script_termux_run_name" formatted="false">Run Termux Script</string>
     <string name="catalog_action_script_termux_run_description" formatted="false">Run an approved Termux script and optionally capture bounded output</string>
@@ -436,7 +436,7 @@
     <string name="catalog_action_script_termux_run_field_stdin_hint" formatted="false">Optional text sent to the command\'s input</string>
     <string name="catalog_action_script_termux_run_field_captureprefix_label" formatted="false">Output variable prefix</string>
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
-    <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">Timeout (milliseconds)</string>
+    <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">Timeout (ms)</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000 (1000 to 120000)</string>
     <string name="catalog_action_tasker_unsupported_name" formatted="false">Unsupported Tasker Action</string>
     <string name="catalog_action_tasker_unsupported_description" formatted="false">Placeholder for a Tasker action that could not be safely mapped during import</string>
@@ -466,7 +466,7 @@
     <string name="catalog_action_state_temporary_field_target_args_label" formatted="false">Setting arguments (JSON)</string>
     <string name="catalog_action_state_temporary_field_target_args_hint" formatted="false">Example: {&quot;brightness&quot;:&quot;80&quot;}</string>
     <string name="catalog_action_state_temporary_field_key_label" formatted="false">Revert key</string>
-    <string name="catalog_action_state_temporary_field_key_hint" formatted="false">Unique channel, e.g. quiet-hours</string>
+    <string name="catalog_action_state_temporary_field_key_hint" formatted="false">Unique channel, such as quiet-hours</string>
     <string name="catalog_action_state_temporary_field_duration_label" formatted="false">Duration (seconds)</string>
     <string name="catalog_action_state_temporary_field_duration_hint" formatted="false">1 to 604800 seconds</string>
     <string name="catalog_action_ime_info_name" formatted="false">Get Keyboard Info</string>
@@ -662,7 +662,7 @@
     <string name="catalog_action_http_request_field_headers_var_hint" formatted="false">Optional variable; one Name: Value per line</string>
     <string name="catalog_action_http_request_field_output_file_label" formatted="false">Response output file</string>
     <string name="catalog_action_http_request_field_output_file_hint" formatted="false">Relative path inside OpenTasker Files; published atomically</string>
-    <string name="catalog_action_http_request_field_max_response_bytes_label" formatted="false">Maximum response bytes</string>
+    <string name="catalog_action_http_request_field_max_response_bytes_label" formatted="false">Maximum response size (bytes)</string>
     <string name="catalog_action_http_request_field_max_response_bytes_hint" formatted="false">Up to 1 MiB for a variable or 50 MiB for a file</string>
     <string name="catalog_action_http_request_field_redirects_label" formatted="false">Redirect policy</string>
     <string name="catalog_action_http_request_field_redirects_hint" formatted="false">none (default) or same_origin; cross-origin redirects are never followed</string>
@@ -717,7 +717,7 @@
     <string name="catalog_action_mqtt_publish_field_port_label" formatted="false">Broker port</string>
     <string name="catalog_action_mqtt_publish_field_port_hint" formatted="false">Default: 8883 with TLS, 1883 without TLS</string>
     <string name="catalog_action_mqtt_publish_field_tls_label" formatted="false">Use TLS</string>
-    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">Enabled by default; cleartext is limited to private/local hosts</string>
+    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">On by default. With it off, OpenTasker connects only to private or local hosts.</string>
     <string name="catalog_action_mqtt_publish_field_topic_label" formatted="false">Topic</string>
     <string name="catalog_action_mqtt_publish_field_topic_hint" formatted="false">Publish topic, without + or # wildcards</string>
     <string name="catalog_action_mqtt_publish_field_payload_label" formatted="false">Payload</string>

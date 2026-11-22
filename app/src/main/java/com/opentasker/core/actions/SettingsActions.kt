@@ -163,7 +163,7 @@ class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
             ctx.logger("Volume ${args["stream"] ?: "music"}: $levelArg")
             ActionResult.Success
         } catch (ex: SecurityException) {
-            ActionResult.Failure("volume change blocked by DND policy: ${ex.message}", ex)
+            ActionResult.Failure("volume change blocked by Do Not Disturb: ${ex.message}", ex)
         }
     }
 }
@@ -315,14 +315,14 @@ class DoNotDisturbAction : DeclaredAction(ActionCatalog.require("dnd.set")) {
             "priority", "priority_only" -> NotificationManager.INTERRUPTION_FILTER_PRIORITY
             "alarms", "alarms_only" -> NotificationManager.INTERRUPTION_FILTER_ALARMS
             "total_silence", "none" -> NotificationManager.INTERRUPTION_FILTER_NONE
-            else -> return ActionResult.Failure("invalid DND mode: $mode (use off/priority/alarms/total_silence)")
+            else -> return ActionResult.Failure("invalid Do Not Disturb mode: $mode (use off/priority/alarms/total_silence)")
         }
         return try {
             nm.setInterruptionFilter(filter)
-            ctx.logger("DND: $mode")
+            ctx.logger("Do Not Disturb: $mode")
             ActionResult.Success
         } catch (ex: SecurityException) {
-            ActionResult.Failure("DND change blocked: ${ex.message}", ex)
+            ActionResult.Failure("Do Not Disturb change blocked: ${ex.message}", ex)
         }
     }
 }
@@ -345,7 +345,7 @@ class RingerModeAction : DeclaredAction(ActionCatalog.require("ringer.set")) {
             ctx.logger("Ringer: $mode")
             ActionResult.Success
         } catch (ex: SecurityException) {
-            ActionResult.Failure("ringer change blocked by DND policy: ${ex.message}", ex)
+            ActionResult.Failure("ringer change blocked by Do Not Disturb: ${ex.message}", ex)
         }
     }
 }

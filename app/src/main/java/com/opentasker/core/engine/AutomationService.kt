@@ -380,7 +380,7 @@ class AutomationService : Service() {
                 timestamp = System.currentTimeMillis(),
                 durationMs = 0,
                 success = false,
-                message = "Android stopped the engine because its time running in the background ran out",
+                message = "Android stopped the engine at its time limit for running services",
                 source = RunLogSource.OTHER,
                 sourceLabel = null,
             )
@@ -1045,7 +1045,7 @@ class AutomationService : Service() {
                 },
             )
         } catch (e: CancellationException) {
-            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was cancelled.")
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was canceled.")
             throw e
         } catch (e: Exception) {
             fail(e.message ?: "The run threw an unexpected error.")

@@ -76,7 +76,7 @@ class EngineWatchdogWorker(
                 append("Remediation: Open Setup, exempt OpenTasker from battery optimization, and allow exact alarms.")
             },
             source = RunLogSource.SCHEDULER,
-            sourceLabel = "Missed trigger",
+            sourceLabel = RunLogSource.MISSED_TRIGGER,
         )
         return insertRunLog(OpenTaskerApp_NoHilt.db, entry)
     }

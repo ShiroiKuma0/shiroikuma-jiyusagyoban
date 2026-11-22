@@ -141,7 +141,7 @@ class TaskRunnerGotoTest {
     @Test
     fun aMissingLabelAStepPastTheEndOrANonNumberStopsTheTask() {
         listOf(
-            goto(label = "nowhere") to "no step is labelled \"nowhere\"",
+            goto(label = "nowhere") to "no step is labeled \"nowhere\"",
             goto(step = "9") to "has no step 9",
             goto(step = "0") to "has no step 0",
             goto(step = "%target") to "\"soon\" isn't a step number",

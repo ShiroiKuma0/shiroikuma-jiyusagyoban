@@ -600,10 +600,7 @@ private fun RunLogCard(
         RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
         RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
     }
-    val sourceText = entry.source?.let { key ->
-        val name = runLogSourceName(key)
-        entry.sourceLabel?.let { "$name: $it" } ?: name
-    } ?: diagnostics.source
+    val sourceText = entry.source?.let { key -> runLogSourceText(key, entry.sourceLabel) } ?: diagnostics.source
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1095,12 +1092,11 @@ private fun ActiveExecutionsCard(
                         Text(
                             stringResource(
                                 R.string.run_log_active_execution_detail,
-                                RunLogSource.classify(execution.source).let { source ->
-                                    val name = runLogSourceName(source.key)
-                                    source.label?.let { "$name: $it" } ?: name
-                                },
+                                RunLogSource.classify(execution.source).let { source -> runLogSourceText(source.key, source.label) },
                                 execution.stepIndex + 1,
-                                execution.stepLabel ?: stringResource(R.string.run_log_active_execution_starting),
+                                // A step with no label of its own runs under its type id, like the run log's traces.
+                                execution.stepLabel?.let { label -> ActionMetadataRegistry.get(label)?.nameRes?.let { stringResource(it) } ?: label }
+                                    ?: stringResource(R.string.run_log_active_execution_starting),
                                 elapsedSeconds,
                             ),
                             style = MaterialTheme.typography.bodySmall,
@@ -1136,8 +1132,20 @@ private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<
         .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
 }
 
+/** What started a run, with its label, such as the profile's name. */
 @Composable
-private fun runLogSourceName(key: String): String = stringResource(
+private fun runLogSourceText(key: String, label: String?): String {
+    val name = stringResource(runLogSourceNameRes(key))
+    // The watchdog stores this label in English.
+    val shownLabel = if (key == RunLogSource.SCHEDULER && label == RunLogSource.MISSED_TRIGGER) {
+        stringResource(R.string.run_log_source_missed_trigger)
+    } else {
+        label
+    }
+    return shownLabel?.let { "$name: $it" } ?: name
+}
+
+private fun runLogSourceNameRes(key: String): Int =
     when (key) {
         RunLogSource.PROFILE -> R.string.run_log_source_profile
         RunLogSource.SINGLE_ACTION -> R.string.run_log_source_single_action
@@ -1153,8 +1161,7 @@ private fun runLogSourceName(key: String): String = stringResource(
         RunLogSource.SCHEDULER -> R.string.run_log_source_scheduler
         RunLogSource.OTHER -> R.string.run_log_source_other
         else -> R.string.run_log_source_unknown
-    },
-)
+    }
 
 @Composable
 private fun RunLogOutcome.localizedLabel(): String = stringResource(

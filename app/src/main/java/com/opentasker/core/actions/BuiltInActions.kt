@@ -245,7 +245,7 @@ class NotifyCancelAction : DeclaredAction(ActionCatalog.require("notify.cancel")
                 val mgr = ctx.app.getSystemService(NotificationManager::class.java)
                 val cancelled = mgr.activeNotifications.filter { it.tag == tag }
                 cancelled.forEach { nm.cancel(it.tag, it.id) }
-                ctx.logger("Cancel notification: tag=$tag (${cancelled.size} cancelled)")
+                ctx.logger("Cancel notification: tag=$tag (${cancelled.size} canceled)")
                 ActionResult.Success
             }
             else -> ActionResult.Failure("Specify at least one of 'tag' or 'id' to cancel")

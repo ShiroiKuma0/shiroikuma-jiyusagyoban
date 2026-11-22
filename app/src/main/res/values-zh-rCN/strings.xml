@@ -1641,6 +1641,7 @@
     <string name="run_log_source_app_function">应用功能</string>
     <string name="run_log_source_scheduler">调度器</string>
     <string name="run_log_source_other">其他</string>
+    <string name="run_log_source_missed_trigger">错过的触发</string>
     <string name="run_log_source_unknown">未知</string>
     <string name="ui_error_backup">数据库备份失败</string>
     <string name="ui_error_backup_export">数据库备份导出失败</string>

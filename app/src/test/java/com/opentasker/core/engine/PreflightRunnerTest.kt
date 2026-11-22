@@ -184,7 +184,7 @@ class PreflightRunnerTest {
         val (blocked, afterBlocked) = missing.tasks.single().steps
         assertFalse(missing.canPreflight)
         assertEquals(PreflightStepStatus.BLOCKED, blocked.status)
-        assertTrue(blocked.warnings.toString(), blocked.warnings.any { "no step is labelled \"nowhere\"" in it })
+        assertTrue(blocked.warnings.toString(), blocked.warnings.any { "no step is labeled \"nowhere\"" in it })
         assertEquals(PreflightStepStatus.SKIPPED, afterBlocked.status)
 
         val unresolved = preview(ActionSpec(type = FlowControl.GOTO, args = mapOf("step" to "%later")), set("a"))

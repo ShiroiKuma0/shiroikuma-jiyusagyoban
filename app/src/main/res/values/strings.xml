@@ -150,12 +150,12 @@
     <string name="status_failed">Failed</string>
     <string name="status_skipped">Skipped</string>
     <string name="status_held">Held</string>
-    <string name="status_cancelled">Cancelled</string>
+    <string name="status_cancelled">Canceled</string>
     <string name="status_interrupted">Interrupted</string>
     <string name="status_timeout">Timed out</string>
-    <string name="run_log_active_execution_detail">%1$s · step %2$d: %3$s · %4$ds elapsed</string>
+    <string name="run_log_active_execution_detail">%1$s · step %2$d: %3$s · %4$d sec elapsed</string>
     <string name="run_log_active_execution_starting">starting</string>
-    <string name="run_log_active_execution_cancelling">Cancelling…</string>
+    <string name="run_log_active_execution_cancelling">Canceling…</string>
     <string name="status_detected">Detected</string>
     <string name="status_optional">Optional</string>
     <string name="status_needs_setup">Needs setup</string>
@@ -240,7 +240,7 @@
     <string name="profile_group_label">Group</string>
     <string name="profile_group_hint">Work, Home, Travel</string>
     <string name="profile_group_helper">Optional. Groups profiles in the list for easier browsing.</string>
-    <string name="profile_enable_after_save">Enable after saving</string>
+    <string name="profile_enable_after_save">Turn on after saving</string>
     <string name="profile_enter_task">Enter task</string>
     <string name="profile_enter_task_none_helper">Nothing runs when the profile\'s contexts match. Pick an exit task below to run when they stop matching.</string>
     <string name="profile_exit_task">Exit task</string>
@@ -403,7 +403,7 @@
     <string name="setup_snapshots_passphrase_save">Save and use folder</string>
     <string name="setup_snapshots_destination_save_failed">The snapshot folder grant or recovery passphrase could not be saved.</string>
     <string name="setup_global_fallback_title">Global failure fallback</string>
-    <string name="setup_global_fallback_body">When a task fails and neither a Catch step nor a profile fallback handles it, run this task once. It gets the error details in %FLOW_ERROR_JSON.</string>
+    <string name="setup_global_fallback_body" formatted="false">When a task fails and neither a Catch step nor a profile fallback handles it, run this task once. It gets the error details in %FLOW_ERROR_JSON.</string>
     <string name="setup_global_fallback_label">Global fallback task</string>
     <string name="restore_review_title">Review restore</string>
     <string name="restore_review_summary">%1$s · %2$s · schema v%3$d</string>
@@ -819,7 +819,7 @@
     </plurals>
     <string name="inspector_profile_selector">Profile</string>
     <string name="inspector_profile_selector_content_description">Choose profile</string>
-    <string name="inspector_profile_policy">Priority %1$d · Grace %2$ds · Lifetime: %3$s</string>
+    <string name="inspector_profile_policy">Priority %1$d · %2$d sec grace · Lifetime: %3$s</string>
     <string name="inspector_profile_concurrency">Running at once %1$s · Rapid starts %2$s · Over the limit: %3$s</string>
     <string name="profile_concurrency_default">default</string>
     <string name="inspector_profile_expiry">Expires after %1$s</string>
@@ -1292,7 +1292,7 @@
     <string name="semantic_diff_value_wait">Wait</string>
     <string name="flow_node_accessibility">%1$s</string>
     <string name="flow_outputs_accessibility">Outputs: %1$s</string>
-    <string name="flow_profile_detail">%1$s · Mode %2$s · Cooldown %3$ds</string>
+    <string name="flow_profile_detail">%1$s · Mode %2$s · %3$d sec cooldown</string>
     <string name="flow_warning_no_contexts">Profile has no contexts.</string>
     <string name="flow_edge_match">must match</string>
     <string name="flow_edge_not_match">must not match</string>
@@ -1474,7 +1474,7 @@
     <!-- %1$s is why Android stopped an earlier run, %2$s when. Appended after the latest outcome. -->
     <string name="diagnostics_work_outcome_also_stopped">\n Earlier run stopped by Android: %1$s · %2$s</string>
     <string name="diagnostics_stop_reason_not_stopped">not stopped</string>
-    <string name="diagnostics_stop_reason_cancelled_by_app">cancelled by OpenTasker</string>
+    <string name="diagnostics_stop_reason_cancelled_by_app">canceled by OpenTasker</string>
     <string name="diagnostics_stop_reason_preempt">preempted by a higher-priority job</string>
     <string name="diagnostics_stop_reason_timeout">ran out of time</string>
     <string name="diagnostics_stop_reason_timeout_abandoned">abandoned after running too long</string>
@@ -1490,7 +1490,7 @@
     <string name="diagnostics_stop_reason_user">stopped by you</string>
     <string name="diagnostics_stop_reason_system_processing">system processing</string>
     <string name="diagnostics_stop_reason_estimated_app_launch_time_changed">estimated app launch time changed</string>
-    <string name="diagnostics_stop_reason_foreground_service_timeout">background service time limit</string>
+    <string name="diagnostics_stop_reason_foreground_service_timeout">Android\'s time limit for running services</string>
     <string name="diagnostics_stop_reason_unknown">reason not reported</string>
     <string name="diagnostics_pending_jobs">Scheduled jobs blocked by</string>
     <string name="diagnostics_pending_jobs_none">Nothing blocking</string>
@@ -1645,7 +1645,7 @@
     <string name="setup_update_enabled">Release update checks on</string>
     <string name="setup_update_disabled">Release update checks off</string>
     <string name="setup_update_status_off">Off</string>
-    <string name="setup_update_status_pending">Enabled; the next scheduled check has not run yet</string>
+    <string name="setup_update_status_pending">On, and the next scheduled check hasn\'t run yet</string>
     <string name="setup_update_status_current">No newer release found at the last check</string>
     <string name="setup_update_status_available">Newer release available: %1$s</string>
     <string name="setup_update_open_release">Open release page</string>
@@ -1731,6 +1731,7 @@
     <string name="run_log_source_app_function">App function</string>
     <string name="run_log_source_scheduler">Scheduler</string>
     <string name="run_log_source_other">Other</string>
+    <string name="run_log_source_missed_trigger">Missed trigger</string>
     <string name="run_log_source_unknown">Unknown</string>
     <string name="ui_error_backup">The database backup failed. Diagnostics has the details.</string>
     <string name="ui_error_backup_export">The database backup couldn\'t be exported. Diagnostics has the details.</string>
@@ -1744,7 +1745,7 @@
     <string name="ui_error_variable_save">Variable could not be saved</string>
     <string name="ui_error_variable_delete">Variable could not be deleted</string>
     <string name="ui_error_invalid_variable_name">Invalid variable name</string>
-    <string name="ui_message_cancelling_automation">Cancelling automation</string>
+    <string name="ui_message_cancelling_automation">Canceling automation</string>
     <string name="ui_message_automation_finished">That automation already finished</string>
     <string name="ui_message_task_created">Task created</string>
     <string name="ui_message_task_duplicated">Task duplicated</string>
@@ -1808,7 +1809,7 @@
     <string name="ui_message_tasker_xml_exported">Tasker XML exported: %1$s, %2$s, %3$s</string>
     <string name="ui_message_tasker_xml_export_warnings">Check before using this file (%1$d): %2$s</string>
     <string name="ui_message_restore_staged">Restore staged. Restart OpenTasker to apply it.</string>
-    <string name="ui_message_restore_cancelled">Staged restore cancelled</string>
+    <string name="ui_message_restore_cancelled">Staged restore canceled</string>
     <string name="ui_message_no_staged_restore">There is no staged restore to cancel</string>
     <string name="ui_message_no_restore_rollback">There\'s no earlier database to go back to.</string>
     <string name="ui_message_run_status">%1$s %2$s (%3$dms)</string>
@@ -1841,7 +1842,7 @@
     <string name="run_log_filter_failed">Failed</string>
     <string name="run_log_filter_skipped">Skipped</string>
     <string name="run_log_filter_held">Held</string>
-    <string name="run_log_filter_cancelled">Cancelled</string>
+    <string name="run_log_filter_cancelled">Canceled</string>
     <string name="run_log_filter_interrupted">Interrupted</string>
     <string name="run_log_date_any">Any date</string>
     <string name="run_log_date_day">24 hours</string>
