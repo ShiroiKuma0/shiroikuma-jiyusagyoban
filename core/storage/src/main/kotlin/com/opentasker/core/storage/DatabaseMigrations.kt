@@ -347,6 +347,9 @@ object DatabaseMigrations {
  *   - execution_journal: persists admitted execution identity, source/lineage, last known step,
  *     terminal state, and whether the corresponding run-log row was written
  *
+ * Version 16:
+ *   - run_logs: indexes taskId and executionId for the run log's task filter and startup recovery
+ *
  * To add a migration:
  * 1. Increment database version in @Database annotation
  * 2. Add new MIGRATION_X_Y class here
