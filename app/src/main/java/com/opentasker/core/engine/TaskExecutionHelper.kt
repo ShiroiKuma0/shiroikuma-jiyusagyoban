@@ -525,12 +525,22 @@ private suspend fun persistChangedGlobals(
             "Failed to persist ${changed.size + removed.size} global variable change(s) atomically",
             error,
         )
-        return listOf("Global commit failed: ${(changed.map(RuntimeVariableValue::name) + removed).joinToString()}")
+        val secretNames = beforeSensitive + afterSensitive
+        return listOf("Global commit failed: ${loggableGlobalNames(changed.map(RuntimeVariableValue::name) + removed, secretNames)}")
     }
     if (commit.conflictedNames.isEmpty()) return emptyList()
-    val names = commit.conflictedNames.joinToString()
+    val names = loggableGlobalNames(commit.conflictedNames, beforeSensitive + afterSensitive)
     AppLogger.warn(logTag, "Global commit preserved newer concurrent value(s): $names")
     return listOf("Global write conflict (newer value kept): $names")
+}
+
+/**
+ * [names] as the run log and app log show them: a secret global is counted, not named, since its
+ * name can be built from a secret, as `%Cache_%Pin` is. Pure for testability.
+ */
+internal fun loggableGlobalNames(names: Collection<String>, secretNames: Set<String>): String {
+    val (hidden, shown) = names.partition { it in secretNames }
+    return (shown + listOfNotNull(hidden.size.takeIf { it > 0 }?.let { "$it hidden name(s)" })).joinToString()
 }
 
 suspend fun logSkippedRun(

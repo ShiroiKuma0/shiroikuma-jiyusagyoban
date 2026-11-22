@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- When a run's global variables can't be saved, or another run saved them first, the run log and app log count a secret global instead of naming it. A name built from a secret, like `%Cache_%Pin`, put the PIN in both logs.
 - `%arr(+sep+range)` reads a range only when Tasker would. `%arr(+;+2)` is still element 2, but `%arr(+;+12)` and `%arr(+x+:)` now join with `;+12` and `x+:`, as they do in Tasker, instead of reading element 12 or every element.
 - `%found(#)` reads 0 when `%found` is set but has no elements, as it does in Tasker, and so do `(#<)` and `(#>)`. After Split Text into `%found` and then an Array Clear, or a Replace Text that found nothing, it used to read the first part. On a list Split Text kept, `(#>)` and `(#<)` read 1 and the count, the numbers Array Push and Pop use for it.
 - Array Push, Array Pop and Array Process now work on a list Split Text or Match Text kept. They read it as elements 1, 2, 3 and so on, and what they leave is what Join Text, For Each and `%parts(#)` read next. Before, they changed only numbered elements, so Join Text and For Each kept reading the old list. A task run from another one can change its caller's list this way too, and a list too long to number (more than 10,000 items, or a name so long the element names would pass 64 characters) fails the step and stays as it was.
