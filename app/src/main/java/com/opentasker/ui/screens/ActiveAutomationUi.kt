@@ -80,6 +80,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -228,6 +229,7 @@ fun ActiveAutomationUi(
     val runLogRetentionPreview by viewModel.runLog.runLogRetentionPreview.collectAsState()
     val backupSetupState by viewModel.backup.backupSetupState.collectAsState()
     val restoreReview by viewModel.backup.restoreReview.collectAsState()
+    val encryptedRestorePrompt by viewModel.backup.encryptedRestorePrompt.collectAsState()
     val diagnosticsState by viewModel.diagnostics.diagnosticsState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -939,6 +941,18 @@ fun ActiveAutomationUi(
                 clearPendingTaskDelete()
             },
         )
+    }
+
+    encryptedRestorePrompt?.let { prompt ->
+        // Keyed on the file, so a second snapshot picked later starts with an empty field.
+        key(prompt.uri) {
+            BackupPassphraseDialog(
+                wrongPassphrase = prompt.wrongPassphrase,
+                busy = backupSetupState.busy,
+                onSubmit = viewModel.backup::openEncryptedBackup,
+                onDismiss = viewModel.backup::clearEncryptedRestorePrompt,
+            )
+        }
     }
 
     restoreReview?.let { review ->

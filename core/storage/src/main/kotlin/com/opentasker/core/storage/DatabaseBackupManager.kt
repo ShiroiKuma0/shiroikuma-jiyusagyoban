@@ -148,12 +148,28 @@ class DatabaseBackupManager(
             }
         }
 
-    suspend fun stageEncryptedRestore(uri: Uri, passphrase: CharArray): Result<File> =
+    /** Whether [uri] starts with the encrypted `.otbackup` header. Unreadable reads as no. */
+    suspend fun isEncryptedBackup(uri: Uri): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use(BackupEncryption::hasEncryptedHeader) ?: false
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Decrypts an encrypted `.otbackup` into the same candidate [inspectRestore] parks, so a
+     * snapshot gets the same review and Stage steps as a plain database (A-439). Nothing is
+     * staged here, and a failure leaves no candidate behind.
+     */
+    suspend fun inspectEncryptedRestore(
+        uri: Uri,
+        passphrase: CharArray,
+        sourceLabel: String? = null,
+    ): Result<RestoreCandidate> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val operationContext = currentCoroutineContext()
-                val pending = pendingRestoreFile(context, databaseName)
-                val temp = File(backupDir, "${pending.name}.decrypt.tmp")
+                val candidate = candidateRestoreFile(context, databaseName)
+                val temp = File(backupDir, "${candidate.name}.decrypt.tmp")
                 shredFile(temp)
                 if (temp.exists()) {
                     throw IOException("Could not clear interrupted encrypted-restore staging file")
@@ -173,17 +189,17 @@ class DatabaseBackupManager(
                         }
                     }
                     validateDatabaseFile(temp)
-                    replaceFileAtomically(temp, pending, "pending encrypted restore")
+                    replaceFileAtomically(temp, candidate, "encrypted restore candidate")
                 } catch (error: Throwable) {
                     shredFile(temp)
                     deleteDatabaseSidecars(temp)
                     throw error
                 }
-                AppLogger.warn(tag, "Encrypted restore staged; restart OpenTasker to apply it")
-                pending
+                summarize(candidate, sourceLabel ?: uri.lastPathSegment ?: candidate.name)
             }.onFailure { error ->
+                shredFile(candidateRestoreFile(context, databaseName))
                 if (error is CancellationException) throw error
-                AppLogger.error(tag, "Encrypted restore failed: ${error.message}", error)
+                AppLogger.error(tag, "Encrypted restore inspection failed: ${error.message}", error)
             }
         }
 

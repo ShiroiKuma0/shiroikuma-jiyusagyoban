@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -573,10 +574,7 @@ internal fun automationPowerLabel(power: AutomationPower): String = stringResour
     },
 )
 
-/**
- * Asks for the password a MacroDroid `.emdr` was exported with. It lives in plain `remember` so it
- * never lands in saved instance state, and it goes when the dialog does.
- */
+/** Asks for the password a MacroDroid `.emdr` was exported with. */
 @Composable
 internal fun MacroDroidPasswordDialog(
     wrongPassword: Boolean,
@@ -585,25 +583,78 @@ internal fun MacroDroidPasswordDialog(
     onSubmit: (String) -> Unit,
     onDismiss: () -> Unit,
     onCancel: () -> Unit,
+) = FilePasswordDialog(
+    title = R.string.dialog_macrodroid_password_title,
+    body = R.string.dialog_macrodroid_password_body,
+    label = R.string.dialog_macrodroid_password_label,
+    wrongText = R.string.dialog_macrodroid_password_wrong,
+    wrongPassword = wrongPassword,
+    busy = busy,
+    progress = progress,
+    onSubmit = onSubmit,
+    onDismiss = onDismiss,
+    onCancel = onCancel,
+)
+
+/**
+ * Asks for the passphrase an encrypted `.otbackup` snapshot was written with. The backup lane
+ * can't be stopped partway, so while it works the dialog only waits.
+ */
+@Composable
+internal fun BackupPassphraseDialog(
+    wrongPassphrase: Boolean,
+    busy: Boolean,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+) = FilePasswordDialog(
+    title = R.string.dialog_backup_passphrase_title,
+    body = R.string.dialog_backup_passphrase_body,
+    label = R.string.dialog_backup_passphrase_label,
+    wrongText = R.string.dialog_backup_passphrase_wrong,
+    wrongPassword = wrongPassphrase,
+    busy = busy,
+    progress = null,
+    onSubmit = onSubmit,
+    onDismiss = onDismiss,
+    onCancel = null,
+)
+
+/**
+ * Asks for the password a file was encrypted with. It lives in plain `remember` so it never lands
+ * in saved instance state, and it goes when the dialog does. With no [onCancel] there is no Stop,
+ * and Cancel waits until the work is done.
+ */
+@Composable
+private fun FilePasswordDialog(
+    @StringRes title: Int,
+    @StringRes body: Int,
+    @StringRes label: Int,
+    @StringRes wrongText: Int,
+    wrongPassword: Boolean,
+    busy: Boolean,
+    progress: TransferProgress?,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onCancel: (() -> Unit)?,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.dialog_macrodroid_password_title)) },
+        title = { Text(stringResource(title)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.dialog_macrodroid_password_body))
+                Text(stringResource(body))
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text(stringResource(R.string.dialog_macrodroid_password_label)) },
+                    label = { Text(stringResource(label)) },
                     singleLine = true,
                     isError = wrongPassword,
                     supportingText = if (wrongPassword) {
-                        { Text(stringResource(R.string.dialog_macrodroid_password_wrong)) }
+                        { Text(stringResource(wrongText)) }
                     } else {
                         null
                     },
@@ -623,8 +674,9 @@ internal fun MacroDroidPasswordDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = if (busy) onCancel else onDismiss) {
-                Text(stringResource(if (busy) R.string.action_stop else R.string.action_cancel))
+            val stop = onCancel.takeIf { busy }
+            TextButton(enabled = !busy || stop != null, onClick = stop ?: onDismiss) {
+                Text(stringResource(if (stop != null) R.string.action_stop else R.string.action_cancel))
             }
         },
     )

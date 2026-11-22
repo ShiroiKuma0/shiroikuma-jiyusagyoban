@@ -300,6 +300,23 @@ class BackupEncryptionTest {
         }
     }
 
+    @Test
+    fun anEncryptedBackupIsToldFromAPlainDatabaseByItsHeader() {
+        val encrypted = ByteArrayOutputStream()
+        BackupEncryption.encrypt(ByteArrayInputStream("rows".toByteArray()), encrypted, TEST_PASSPHRASE.toCharArray())
+
+        assertTrue(BackupEncryption.hasEncryptedHeader(ByteArrayInputStream(encrypted.toByteArray())))
+        val notEncrypted = listOf(
+            "SQLite format 3".toByteArray() + 0,
+            "OTB".toByteArray(),
+            ByteArray(0),
+            "otbk".toByteArray(),
+        )
+        notEncrypted.forEach { bytes ->
+            assertEquals(String(bytes), false, BackupEncryption.hasEncryptedHeader(ByteArrayInputStream(bytes)))
+        }
+    }
+
     private companion object {
         const val TEST_PASSPHRASE = "test-passphrase"
         const val V2_HEADER_BYTES = 4 + 4 + 32 + 8 + 4

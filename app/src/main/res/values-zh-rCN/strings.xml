@@ -1941,4 +1941,8 @@
     <string name="ui_message_project_renamed">项目已重命名</string>
     <string name="ui_message_project_reordered">项目已重新排序</string>
     <string name="ui_message_project_deleted">项目已删除</string>
+    <string name="dialog_backup_passphrase_title">加密快照</string>
+    <string name="dialog_backup_passphrase_body">这是一个加密的 OpenTasker 快照。请输入你在设置中为快照设定的密码。OpenTasker 不会保存它。</string>
+    <string name="dialog_backup_passphrase_label">快照密码</string>
+    <string name="dialog_backup_passphrase_wrong">这个密码打不开此文件。如果密码没错，文件可能已损坏。</string>
 </resources>

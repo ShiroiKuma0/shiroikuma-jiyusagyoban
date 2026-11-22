@@ -89,6 +89,16 @@ object BackupEncryption {
         output.flush()
     }
 
+    /**
+     * True when [input] starts with the `.otbackup` header, read from at most its first four bytes.
+     * A restore pick uses it to tell an encrypted snapshot from a plain database before asking for
+     * a passphrase.
+     */
+    fun hasEncryptedHeader(input: InputStream): Boolean {
+        val header = ByteArray(MAGIC.size)
+        return input.readChunk(header) {} == header.size && header.contentEquals(MAGIC)
+    }
+
     fun decrypt(
         encryptedInput: InputStream,
         output: OutputStream,

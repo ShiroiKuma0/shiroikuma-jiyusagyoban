@@ -9,6 +9,7 @@ import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.configureConfigurationSnapshotDestination
+import java.security.GeneralSecurityException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,19 @@ data class RestoreReviewState(
     val candidate: RestoreCandidate,
     val replacesPending: RestoreCandidate? = null,
 )
+
+/** An encrypted `.otbackup` picked for restore, waiting for the passphrase it was written with. */
+data class EncryptedRestorePrompt(val uri: Uri, val wrongPassphrase: Boolean = false)
+
+/**
+ * AES-GCM can't tell a wrong passphrase from a damaged file: both fail the authentication tag,
+ * which [com.opentasker.core.storage.BackupEncryption] reports with the crypto error as its cause.
+ * Either way, asking again is the useful answer, and the prompt says the file may be damaged.
+ */
+internal fun readsAsWrongPassphrase(error: Throwable): Boolean =
+    generateSequence(error) { it.cause.takeIf { cause -> cause !== it } }
+        .take(8)
+        .any { it is GeneralSecurityException }
 
 /**
  * The Setup card's backup lane of [ActiveAutomationViewModel]: backup, export, restore review and
@@ -83,13 +97,21 @@ internal class BackupController(
     private val _restoreReview = MutableStateFlow<RestoreReviewState?>(null)
     val restoreReview: StateFlow<RestoreReviewState?> = _restoreReview.asStateFlow()
 
+    private val _encryptedRestorePrompt = MutableStateFlow<EncryptedRestorePrompt?>(null)
+    val encryptedRestorePrompt: StateFlow<EncryptedRestorePrompt?> = _encryptedRestorePrompt.asStateFlow()
+
     /**
      * Validates and summarizes the selected database, then waits for an explicit Stage decision.
      * Nothing is staged here: selection used to replace the pending journal outright, so a user
      * could not inspect the candidate, tell it apart from an earlier staged restore, or back out.
+     * An encrypted snapshot asks for its passphrase first (A-439).
      */
     fun importDatabaseBackup(uri: Uri) {
         launchBackupOperation {
+            if (databaseBackupManager.isEncryptedBackup(uri)) {
+                _encryptedRestorePrompt.value = EncryptedRestorePrompt(uri)
+                return@launchBackupOperation
+            }
             databaseBackupManager.inspectRestore(uri)
                 .onSuccess { candidate ->
                     _restoreReview.value = RestoreReviewState(
@@ -99,6 +121,39 @@ internal class BackupController(
                 }
                 .onFailure { events.send(loggedUiErrorMessage(it, R.string.ui_error_backup_import)) }
         }
+    }
+
+    /**
+     * Decrypts the snapshot waiting in [encryptedRestorePrompt] into the same review a plain
+     * database gets. A wrong passphrase leaves the prompt up to try again, and the passphrase goes
+     * no further than the decrypt.
+     */
+    fun openEncryptedBackup(passphrase: String) {
+        val prompt = _encryptedRestorePrompt.value ?: return
+        launchBackupOperation {
+            val chars = passphrase.toCharArray()
+            try {
+                databaseBackupManager.inspectEncryptedRestore(prompt.uri, chars)
+                    .onSuccess { candidate ->
+                        _encryptedRestorePrompt.value = null
+                        _restoreReview.value = RestoreReviewState(candidate, databaseBackupManager.pendingRestoreSummary())
+                    }
+                    .onFailure { error ->
+                        if (readsAsWrongPassphrase(error)) {
+                            _encryptedRestorePrompt.value = prompt.copy(wrongPassphrase = true)
+                        } else {
+                            _encryptedRestorePrompt.value = null
+                            events.send(loggedUiErrorMessage(error, R.string.ui_error_backup_import))
+                        }
+                    }
+            } finally {
+                chars.fill('\u0000')
+            }
+        }
+    }
+
+    fun clearEncryptedRestorePrompt() {
+        _encryptedRestorePrompt.value = null
     }
 
     fun confirmStageRestore() {

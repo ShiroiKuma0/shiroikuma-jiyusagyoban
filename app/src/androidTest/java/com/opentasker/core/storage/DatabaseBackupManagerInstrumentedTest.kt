@@ -188,11 +188,13 @@ class DatabaseBackupManagerInstrumentedTest {
             }
             encrypted.writeBytes(corrupted)
 
-            val failure = manager.stageEncryptedRestore(Uri.fromFile(encrypted), "correct".toCharArray()).exceptionOrNull()
+            val failure = manager.inspectEncryptedRestore(Uri.fromFile(encrypted), "correct".toCharArray()).exceptionOrNull()
 
             assertTrue(failure is java.io.IOException)
             assertArrayEquals(pendingBefore, pending.readBytes())
-            assertFalse(context.filesDir.resolve("backups/${pending.name}.decrypt.tmp").exists())
+            val candidate = DatabaseBackupManager.candidateRestoreFile(context, TEST_DATABASE)
+            assertFalse(context.filesDir.resolve("backups/${candidate.name}.decrypt.tmp").exists())
+            assertFalse("a failed decrypt leaves nothing to stage", candidate.exists())
         } finally {
             db.close()
             encrypted.delete()
@@ -234,9 +236,12 @@ class DatabaseBackupManagerInstrumentedTest {
             context.deleteDatabase(ENCRYPTED_TEST_DATABASE)
             context.getSharedPreferences("database_security", 0).edit().clear().commit()
 
-            DatabaseBackupManager(context, db, ENCRYPTED_TEST_DATABASE)
-                .stageEncryptedRestore(Uri.fromFile(exported), passphrase.toCharArray())
-                .getOrThrow()
+            // The path Setup's restore picker takes for a snapshot: decrypt into the review, then Stage.
+            val restoring = DatabaseBackupManager(context, db, ENCRYPTED_TEST_DATABASE)
+            assertTrue(restoring.isEncryptedBackup(Uri.fromFile(exported)))
+            val reviewed = restoring.inspectEncryptedRestore(Uri.fromFile(exported), passphrase.toCharArray()).getOrThrow()
+            assertEquals("the review counts what the snapshot holds", 1, reviewed.profileCount)
+            restoring.stageInspectedRestore().getOrThrow()
             val applied = DatabaseBackupManager.applyPendingRestoreIfPresent(context, ENCRYPTED_TEST_DATABASE)
             assertTrue("restore must apply on the new install", applied is PendingRestoreApplyResult.Applied)
 

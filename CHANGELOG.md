@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- Encrypted snapshots from Setup can be restored now. Pick one under restore and the app asks for the snapshot passphrase, then shows the same review as any other backup before you stage it. A wrong passphrase lets you try again. Until now the restore picker only took a plain database file, so a snapshot couldn't be restored from the app at all.
 - Array Push and Pop failed on a Position holding a number with a fraction, like 2.5. They count it by its whole part now, as Tasker does.
 - A backup restore that failed after the restored database was already in place, with no way to put the old one back, kept the plugin condition grants made for the old database. They're cleared now, as after a restore that works.
 - If the app stopped in the moment just after a restore put its database in place, before it cleared the plugin condition grants made for the old database, those grants stayed. A restore now keeps its record until the grants are cleared on disk, so the next start finishes the job.
