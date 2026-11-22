@@ -56,6 +56,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.opentasker.ui.charts.ANNOTATION_FILL
 
 /**
  * 「言語島 統計」 — how much, when, how far along, and what is due.
@@ -132,7 +133,7 @@ private fun StatsScreen(onClose: () -> Unit) {
                 DayGridCell(
                     epochDay = day,
                     fill = if (on) ANNOTATION_INK else REST,
-                    ink = if (on) Color.Black else ANNOTATION_INK.copy(alpha = 0.8f),
+                    ink = if (on) ANNOTATION_FILL else ANNOTATION_INK.copy(alpha = 0.8f),
                     bold = on,
                     badge = if (on) "${(ms + 59_999) / 60_000}" else null,
                 )

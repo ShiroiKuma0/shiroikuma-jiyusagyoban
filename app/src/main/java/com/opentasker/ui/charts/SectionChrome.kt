@@ -64,7 +64,7 @@ val sectionInk: Color
 
 /** The explanation ink: a soft cyan, lighter and less saturated than the heart-rate series blue. */
 val sectionNote: Color
-    @Composable get() = Color(0xFF8FCBE8)
+    @Composable get() = com.opentasker.ui.theme.role(com.opentasker.ui.theme.UiRole.CHART_NOTE)
 
 /**
  * A bordered group.

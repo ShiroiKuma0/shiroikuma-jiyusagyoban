@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.ui.components.AlertDialog
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -148,8 +151,8 @@ fun FormDialog(
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
                     .clip(shape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.5.dp, MaterialTheme.colorScheme.primary, shape),
+                    .background(role(UiRole.DIALOG_GROUND))
+                    .dialogFrame(shape),
             ) {
                 Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp)) {
                     Text(
@@ -339,8 +342,8 @@ private fun ChoicePicker(title: String, options: List<String>, selected: Int, on
                 Modifier
                     .fillMaxWidth()
                     .clip(shape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.5.dp, MaterialTheme.colorScheme.primary, shape)
+                    .background(role(UiRole.DIALOG_GROUND))
+                    .dialogFrame(shape)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -409,7 +412,9 @@ private fun ColorField(value: String, onPick: (String) -> Unit) {
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (on) Text("✓", fontWeight = FontWeight.Bold, color = if (c.luminance() > 0.5f) Color.Black else Color.White)
+                        // The tick has to show on whatever swatch it lies on: the mark's own colour on a
+                        // light one, the chosen box's colour on a dark one.
+                        if (on) Text("✓", fontWeight = FontWeight.Bold, color = if (c.luminance() > 0.5f) role(UiRole.CHECK_MARK) else role(UiRole.CHECK_ON))
                     }
                     Text(name, style = MaterialTheme.typography.labelSmall, fontSize = 11.sp)
                 }
@@ -473,7 +478,7 @@ private fun ColorField(value: String, onPick: (String) -> Unit) {
 @Composable
 private fun BadgePreview(f: FormField, values: Map<String, String>) {
     val text = values[f.refs["text"].orEmpty()].orEmpty()
-    val fill = parseFormColor(values[f.refs["fill"].orEmpty()].orEmpty()) ?: Color.Gray
+    val fill = parseFormColor(values[f.refs["fill"].orEmpty()].orEmpty()) ?: role(UiRole.BADGE_GROUND)
     val ink = parseFormColor(values[f.refs["ink"].orEmpty()].orEmpty()) ?: Color.Black
     val border = parseFormColor(values[f.refs["border"].orEmpty()].orEmpty()) ?: fill
     Row(

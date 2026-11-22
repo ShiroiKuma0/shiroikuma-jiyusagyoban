@@ -68,7 +68,6 @@ import com.opentasker.core.ocr.article.ArticleHtml
 import com.opentasker.core.ocr.article.ArticleProgress
 import com.opentasker.core.ocr.article.ArticleReader
 import com.opentasker.core.ocr.article.ArticleWriter
-import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.ui.components.SelectionChip
 import com.opentasker.ui.ocr.flash
 import com.opentasker.ui.theme.ThemeStore
@@ -80,6 +79,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /** One screenshot queued to be read, with enough of itself shown to tell it from the next one. */
 private data class Page(val file: File, val width: Int, val height: Int, val thumbnail: Bitmap?)
@@ -216,7 +217,9 @@ fun ArticleBuildScreen(
                     status = "中止しています…"
                     job?.cancel()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = ChartPalette.BAND_WARN),
+                // Stopping a run is a warning, not a deletion: the pill lends the Warning role to its
+                // frame and label, and stays unfilled.
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = role(UiRole.WARNING)),
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp),
             ) {
                 Icon(Icons.Filled.Close, contentDescription = null)

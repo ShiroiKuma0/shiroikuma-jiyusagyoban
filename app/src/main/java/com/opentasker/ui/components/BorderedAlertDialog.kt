@@ -2,7 +2,8 @@ package com.opentasker.ui.components
 
 import androidx.compose.foundation.border
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.MaterialTheme
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,7 +22,8 @@ import androidx.compose.ui.window.DialogProperties
  * shape the dialog has, and `BorderedDialogTest` fails the build if a screen imports Material's own
  * `AlertDialog` again.
  *
- * Same name and parameters as Material3's, so a call site changes only its import.
+ * Same name and parameters as Material3's, so a call site changes only its import. Ground, frame,
+ * title, text and icon are roles of their own (UiRoles.kt).
  */
 @Composable
 fun AlertDialog(
@@ -33,17 +35,17 @@ fun AlertDialog(
     title: @Composable (() -> Unit)? = null,
     text: @Composable (() -> Unit)? = null,
     shape: Shape = AlertDialogDefaults.shape,
-    containerColor: Color = AlertDialogDefaults.containerColor,
-    iconContentColor: Color = AlertDialogDefaults.iconContentColor,
-    titleContentColor: Color = AlertDialogDefaults.titleContentColor,
-    textContentColor: Color = AlertDialogDefaults.textContentColor,
+    containerColor: Color = role(UiRole.DIALOG_GROUND),
+    iconContentColor: Color = role(UiRole.DIALOG_ICON),
+    titleContentColor: Color = role(UiRole.DIALOG_TITLE),
+    textContentColor: Color = role(UiRole.DIALOG_BODY),
     tonalElevation: Dp = AlertDialogDefaults.TonalElevation,
     properties: DialogProperties = DialogProperties(),
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = confirmButton,
-        modifier = modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, shape),
+        modifier = modifier.border(1.5.dp, role(UiRole.DIALOG_FRAME), shape),
         dismissButton = dismissButton,
         icon = icon,
         title = title,
@@ -57,3 +59,7 @@ fun AlertDialog(
         properties = properties,
     )
 }
+
+/** The frame of a dialog that is not an [AlertDialog] — a bare `Dialog { }` panel wears it too. */
+@Composable
+fun Modifier.dialogFrame(shape: Shape): Modifier = border(1.5.dp, role(UiRole.DIALOG_FRAME), shape)

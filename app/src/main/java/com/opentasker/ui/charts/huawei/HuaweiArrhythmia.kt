@@ -131,7 +131,7 @@ fun HuaweiArrhythmiaCard(
 @Composable
 fun PwaWeekBars(week: List<Triple<LocalDate, Int, Int>>, height: Dp) {
     val max = week.maxOf { it.second }.coerceAtLeast(1)
-    val track = Color(0x14FFFFFF)
+    val track = com.opentasker.ui.theme.role(com.opentasker.ui.theme.UiRole.CHART_TRACK).copy(alpha = 0.08f)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         week.forEach { (day, all, bad) ->
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {

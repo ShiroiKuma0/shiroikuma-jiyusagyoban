@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -57,6 +58,9 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.screens.AppMultiSelectDialog
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import com.opentasker.ui.components.dialogFrame
 
 /**
  * Transparent host for a task-driven dialog (Input / List / Text). It reads the dialog spec from its
@@ -299,9 +303,17 @@ class DialogActivity : ComponentActivity() {
 
 private val dialogBorderShape = RoundedCornerShape(28.dp)
 
+/** The check boxes here choose entries of a list, so they stay selection marks, in the mark roles. */
+@Composable
+private fun markColors() = CheckboxDefaults.colors(
+    checkedColor = role(UiRole.CHECK_ON),
+    uncheckedColor = role(UiRole.CHECK_OFF),
+    checkmarkColor = role(UiRole.CHECK_MARK),
+)
+
 @Composable
 private fun dialogModifier() =
-    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, dialogBorderShape)
+    Modifier.dialogFrame(dialogBorderShape)
 
 @Composable
 private fun InputDialog(
@@ -373,11 +385,9 @@ private fun ListDialog(
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(22.dp))
-                            .border(
-                                1.5.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                                RoundedCornerShape(22.dp),
-                            )
+                            // A row of a picker: its frame and its label are the list's own roles. The
+                            // entries are whatever the task lists — pure choices, so no icon column.
+                            .border(1.25.dp, role(UiRole.LIST_ROW_FRAME), RoundedCornerShape(22.dp))
                             .clickable { onPick(index) }
                             .padding(horizontal = 18.dp, vertical = 13.dp),
                     ) {
@@ -385,7 +395,7 @@ private fun ListDialog(
                             item,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = role(UiRole.LIST_LABEL),
                         )
                     }
                 }
@@ -427,7 +437,7 @@ private fun ListMultiSelectDialog(
                         .clickable { checked = if (allChecked) emptySet() else items.toSet() }
                         .padding(vertical = 4.dp),
                 ) {
-                    Checkbox(checked = allChecked, onCheckedChange = null)
+                    Checkbox(checked = allChecked, onCheckedChange = null, colors = markColors())
                     Text(
                         "全選択",
                         style = MaterialTheme.typography.bodyLarge,
@@ -437,7 +447,7 @@ private fun ListMultiSelectDialog(
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 6.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = role(UiRole.LIST_DIVIDER),
                 )
                 items.forEachIndexed { index, item ->
                     val isChecked = item in checked
@@ -454,7 +464,7 @@ private fun ListMultiSelectDialog(
                             }
                             .padding(vertical = 4.dp, horizontal = if (isChild) 24.dp else 0.dp),
                     ) {
-                        Checkbox(checked = isChecked, onCheckedChange = null)
+                        Checkbox(checked = isChecked, onCheckedChange = null, colors = markColors())
                         Text(
                             labels.getOrNull(index)?.takeIf { it.isNotBlank() } ?: item,
                             style = if (isChild) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
@@ -840,7 +850,7 @@ private fun MarkupBox(box: MarkupBlock.Boxed, depth: Int, scale: Float) {
         Modifier
             .fillMaxWidth()
             .padding(start = step * (depth - 2).coerceAtLeast(0), top = 4.dp, bottom = 6.dp)
-            .border(1.5.dp, MaterialTheme.colorScheme.primary, shape)
+            .border(1.5.dp, role(UiRole.DIALOG_FRAME), shape)
             .padding(horizontal = 12.dp * scale, vertical = 8.dp * scale),
     ) {
         Text(
@@ -901,7 +911,8 @@ private fun MarkupText(text: String, style: TextStyle, scale: Float, modifier: M
         var last = 0
         for (m in BADGE_MARKUP_RE.findAll(text)) {
             if (m.range.first > last) Text(inlineSpans(text.substring(last, m.range.first)), style = style)
-            val fill = parseFormColor(m.groupValues[2]) ?: androidx.compose.ui.graphics.Color.Gray
+            // A badge that names no fill of its own: the opaque mid-tone of a list's second line.
+            val fill = parseFormColor(m.groupValues[2]) ?: role(UiRole.BADGE_GROUND)
             Badge(
                 text = m.groupValues[1].trim(),
                 fill = fill,
@@ -917,19 +928,11 @@ private fun MarkupText(text: String, style: TextStyle, scale: Float, modifier: M
     }
 }
 
-/** A rounded, tap-through pill that opens a System settings page. */
+/** The pill that opens a System settings page: an outlined pill like every other, with the › of a row that opens something. */
 @Composable
 private fun SettingsPill(label: String, onClick: () -> Unit) {
-    Text(
-        "Open $label settings  →",
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    )
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text("Open $label settings", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text("›", fontWeight = FontWeight.Bold)
+    }
 }

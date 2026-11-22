@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +66,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.drawable.toBitmap
 import com.opentasker.core.apps.PackageNamePolicy
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.theme.ThemedSwitch
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -157,7 +162,7 @@ internal fun AppMultiSelectDialog(
     onConfirm: (List<Pair<String, String>>, List<Boolean>) -> Unit,
     onCancel: () -> Unit,
 ) {
-    // Option checkboxes under the grid, every one ticked to start with (tasks.launchers: make the
+    // Option switches under the grid, every one on to start with (tasks.launchers: make the
     // launch task / show the freeze bubble). Their state comes back beside the picks.
     val toggleOn = remember { mutableStateListOf<Boolean>().apply { repeat(toggles.size) { add(true) } } }
     val context = LocalContext.current
@@ -271,17 +276,20 @@ internal fun AppMultiSelectDialog(
     Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            tonalElevation = 6.dp,
+            // No tonal elevation: it would tint the ground away from the dialog role.
+            color = role(UiRole.DIALOG_GROUND),
+            contentColor = role(UiRole.DIALOG_BODY),
             modifier = Modifier
                 .fillMaxWidth(0.97f)
                 .fillMaxHeight(0.94f)
-                .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+                .dialogFrame(RoundedCornerShape(28.dp)),
         ) {
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         title.ifBlank { "Select apps" },
                         style = MaterialTheme.typography.titleMedium,
+                        color = role(UiRole.DIALOG_TITLE),
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = { showSizing = !showSizing }) {
@@ -302,15 +310,16 @@ internal fun AppMultiSelectDialog(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         SizeStepper("Pad↕", padV, 0, 32, 2) { padV = it; persist() }
                         SizeStepper("Pad↔", padH, 0, 32, 2) { padH = it; persist() }
-                        TextButton(onClick = { labelBold = !labelBold; persist() }) {
-                            Text(if (labelBold) "Bold ✓" else "Bold", fontWeight = if (labelBold) FontWeight.Bold else FontWeight.Normal)
-                        }
+                        // An on/off setting is a switch, never a pill that grows a tick.
+                        Text("Bold", fontWeight = if (labelBold) FontWeight.Bold else FontWeight.Normal)
+                        ThemedSwitch(checked = labelBold, onCheckedChange = { labelBold = it; persist() })
                     }
                     if (restrictPackages == null) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { showSystem = !showSystem; persist() }) {
-                                Text(if (showSystem) "System apps ✓" else "System apps")
-                            }
+                            ThemedSwitch(checked = showSystem, onCheckedChange = { showSystem = it; persist() })
+                            Spacer(Modifier.width(8.dp))
+                            Text("System apps")
+                            Spacer(Modifier.width(8.dp))
                             Text(
                                 "List preinstalled apps too — gallery, dialer, …",
                                 style = MaterialTheme.typography.labelSmall,
@@ -428,12 +437,18 @@ internal fun AppMultiSelectDialog(
                 }
                 Spacer(Modifier.height(8.dp))
                 toggles.forEachIndexed { i, label ->
+                    // Each option is on or off by itself — a setting, not a pick from the list
+                    // above — so it carries the switch; the whole row is the target.
                     Row(
-                        Modifier.fillMaxWidth().clickable { toggleOn[i] = !toggleOn[i] }.padding(vertical = 2.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(value = toggleOn[i], role = Role.Switch, onValueChange = { toggleOn[i] = it })
+                            .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Checkbox(checked = toggleOn[i], onCheckedChange = { toggleOn[i] = it })
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        ThemedSwitch(checked = toggleOn[i], onCheckedChange = null)
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -521,7 +536,7 @@ private fun SelectableAppTile(
                     Icon(
                         Icons.Filled.CheckCircle,
                         contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = role(UiRole.CHECK_ON),
                         modifier = Modifier.size(18.dp),
                     )
                 }

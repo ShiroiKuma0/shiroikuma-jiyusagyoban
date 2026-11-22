@@ -57,6 +57,12 @@ import com.opentasker.core.gengoshima.GengoshimaLanguage
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.launch
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.IconRole
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Add
 
 /**
  * 「未分類」 — sentences spoken on a walk, reviewed in 白い熊 kxkb, waiting for an island.
@@ -331,11 +337,16 @@ private fun IslandPicker(
             LazyColumn(Modifier.heightIn(max = 480.dp)) {
                 items(pendingNew, key = { "n${it.first}|${it.second}" }) { (name, register) ->
                     TextButton(onClick = { onPick(InboxFiling.Target(null, name, register)) }, modifier = Modifier.fillMaxWidth()) {
+                        // Every row of a picker carries an icon coloured by what the row is about.
+                        RoleIcon(Icons.Filled.Add, IconRole.WRITE, Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
                         Text("＋ $name（新）", fontSize = 17.sp, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 items(islands, key = { it.id }) { isl ->
                     TextButton(onClick = { onPick(InboxFiling.Target(isl.id, "", "")) }, modifier = Modifier.fillMaxWidth()) {
+                        RoleIcon(Icons.Filled.Landscape, IconRole.PERSON, Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
                         Text(islandLabel(isl), fontSize = 17.sp, modifier = Modifier.fillMaxWidth())
                     }
                 }

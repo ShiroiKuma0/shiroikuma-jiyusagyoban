@@ -87,7 +87,6 @@ import com.opentasker.core.scripting.TermuxScriptState
 import com.opentasker.core.shizuku.ShizukuShell
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap

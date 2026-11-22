@@ -14,7 +14,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import android.net.Uri
 import com.opentasker.core.ocr.ModelSlot
-import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.core.ocr.OcrModels
 import com.opentasker.core.ocr.ocrModelPath
 import com.opentasker.core.ocr.withOcrModelPath
@@ -45,11 +44,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import com.opentasker.ui.components.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
 import com.opentasker.ui.components.ThemedSnackbarHost
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -108,12 +104,92 @@ import com.opentasker.core.ocr.OcrTuning
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.BorderOuter
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FormatBold
+import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.ImportExport
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Reorder
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material.icons.filled.Task
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.ToggleOn
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.IconRole
+import com.opentasker.ui.components.RoleIcon
+import com.opentasker.ui.components.destructiveButtonColors
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.theme.RoleSection
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
+import com.opentasker.ui.theme.role
+import kotlinx.coroutines.flow.first
 
-/** Indent unit; section headers sit flush at 16dp, items step to 32dp — the kxkb cascade. */
-private fun rowStartPadding(level: Int) = (16 + level * 16).dp
-
-/** Kōjiki warn red — the directory-unset / failure colour. */
-private val EximWarnColor = Color(0xFFFF5252)
+/**
+ * Indent unit. Section headings and their rows share one left edge at 16 dp, so that the heading's
+ * icon and the rows' rules line up; a row's own gutter (rule, icon) then sets its text in — which is
+ * the step the kxkb cascade used to make with padding alone.
+ */
+private fun rowStartPadding(level: Int) = (level * 16).dp
 
 /**
  * "白い熊 自由作業盤 UI" — the appearance-customization page, mirroring the sister apps' theme page:
@@ -122,8 +198,9 @@ private val EximWarnColor = Color(0xFFFF5252)
  */
 
 /**
- * The 「文字認識」 settings, as their own block so they can be shown at the TOP when the review window
- * sends 白い熊 here to adjust a knob.
+ * The 「文字認識」 settings, as their own block so that the review window can send 白い熊 straight to
+ * them to adjust a knob: the section is unfolded and scrolled to (it used to be hoisted to the top
+ * of the page, before the page folded).
  *
  * That path matters more than it looks: the point of these knobs is to change one, go back, and
  * re-recognise the same screenshot. Making 白い熊 scroll past nine hundred rows of chart settings to
@@ -145,20 +222,17 @@ private fun ModelDownloadRow() {
             )
         }
     }
-    Row(
-        Modifier.fillMaxWidth().padding(start = rowStartPadding(1), end = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedButton(onClick = { open(ModelSlot.DOWNLOAD_PAGE) }, modifier = Modifier.weight(1f)) {
-            Text("日本語・検出器")
-        }
-        OutlinedButton(
-            onClick = { open(ModelSlot.DOWNLOAD_PAGE_MULTILINGUAL) },
-            modifier = Modifier.weight(1f),
-        ) {
-            Text("Latin・Кириллица")
-        }
-    }
+    // Two pills that hug their labels, each with the › of a row that leads away (to the browser).
+    PillRow(
+        level = 1, label = "日本語・検出器", description = "", opens = true,
+        icon = Icons.Filled.Public, iconRole = IconRole.VIEW,
+        onClick = { open(ModelSlot.DOWNLOAD_PAGE) },
+    )
+    PillRow(
+        level = 1, label = "Latin・Кириллица", description = "", opens = true,
+        icon = Icons.Filled.Public, iconRole = IconRole.VIEW,
+        onClick = { open(ModelSlot.DOWNLOAD_PAGE_MULTILINGUAL) },
+    )
 }
 
 /**
@@ -186,34 +260,26 @@ private fun ModelRow(slot: ModelSlot) {
         OcrModels.close()
     }
 
-    Column(Modifier.fillMaxWidth().padding(start = rowStartPadding(1), end = 16.dp, bottom = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(slot.label, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    if (current.isBlank()) "未設定 — ${slot.fileName}" else "設定済み",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (current.isBlank()) ChartPalette.BAND_WARN
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            OutlinedButton(onClick = { picker.launch(arrayOf("*/*")) }) {
-                Text(if (current.isBlank()) "選ぶ" else "変更")
-            }
+    IconRow(1, Icons.Filled.Memory, IconRole.VIEW, ruled = true) {
+        Column(Modifier.weight(1f)) {
+            RowLabel(slot.label)
+            if (current.isBlank()) RowNote("未設定 — ${slot.fileName}", warn = true) else RowValue("設定済み")
+            // The pill opens the file picker, so it carries the ›; its explanation sits beneath it.
+            HuggingPill(
+                label = if (current.isBlank()) "選ぶ" else "変更",
+                opens = true,
+                modifier = Modifier.padding(vertical = 3.dp),
+                onClick = { picker.launch(arrayOf("*/*")) },
+            )
+            RowNote(slot.about)
         }
-        Text(
-            slot.about,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
 /** Focus key for [UiCustomizationScreen] — the 文字認識 detection rows. */
 const val FOCUS_OCR = "ocr"
 
-private fun LazyListScope.ocrSectionRows(prefs: ThemePrefs) {
-    item { SectionHeader("「文字認識」 OCR") }
+private fun SectionRows.ocrSectionRows(prefs: ThemePrefs) {
     item {
                 SwitchRow(
                     level = 1, label = "High-accuracy model",
@@ -307,10 +373,9 @@ private fun LazyListScope.ocrSectionRows(prefs: ThemePrefs) {
 @Composable
 fun UiCustomizationScreen(
     onBack: () -> Unit,
-    /** When [FOCUS_OCR], the 文字認識 rows are hoisted to the top — see [ocrSectionRows]. */
+    /** When [FOCUS_OCR], the 文字認識 section is unfolded and scrolled to — see [ocrSectionRows]. */
     focusSection: String? = null,
 ) {
-    val focusOcr = focusSection == FOCUS_OCR
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val prefs by ThemeStore.state.collectAsState()
@@ -318,6 +383,18 @@ fun UiCustomizationScreen(
     val scope = rememberCoroutineScope()
     var colorTarget by remember { mutableStateOf<ColorTarget?>(null) }
     var chartColorTarget by remember { mutableStateOf<ChartColorTarget?>(null) }
+    var roleTarget by remember { mutableStateOf<UiRole?>(null) }
+    var confirmResetColours by remember { mutableStateOf(false) }
+
+    // The page is a folding accordion: its sections in 白い熊's order, each folded unless it is in the
+    // open set. Both live in the page's own preferences, so they travel in the export.
+    val listState = rememberLazyListState()
+    val order = remember(prefs.uiSectionOrder) { sectionOrder(prefs.uiSectionOrder) }
+    val open = remember(prefs.uiSectionsOpen) { openSections(prefs.uiSectionsOpen) }
+    fun toggleSection(id: String) = ThemeStore.update { p ->
+        val now = openSections(p.uiSectionsOpen)
+        p.copy(uiSectionsOpen = encodeSections(if (id in now) now - id else now + id))
+    }
     var showFontPicker by remember { mutableStateOf(false) }
     var showBubbleFontPicker by remember { mutableStateOf(false) }
     var showPickerFontPicker by remember { mutableStateOf(false) }
@@ -359,47 +436,37 @@ fun UiCustomizationScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        snackbarHost = { ThemedSnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("白い熊 自由作業盤 UI") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background,
-                ),
+    // The whole page, as rows handed to [SectionRows] — once for the list, and once more without a
+    // list whenever a chip is tapped, to learn at which row the section's heading stands.
+    val page: (SectionRows, Set<String>, (String) -> Unit) -> Unit = { rows, openNow, onJump -> with(rows) {
+        item(key = "chip-index") {
+            ChipIndex(
+                order = order,
+                onJump = onJump,
+                onReorder = { ids -> ThemeStore.update { it.copy(uiSectionOrder = ids.joinToString(",")) } },
             )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 28.dp),
-        ) {
-            // --- Export / Import — first separated section (Kōjiki UI-page flow) ---
-            if (focusOcr) ocrSectionRows(prefs)
-
-            item { SectionHeader("Export / Import", first = !focusOcr) }
+        }
+        order.forEach { section ->
+            val id = section.id
+            header(id) { SectionHeader(section, open = id in openNow, onToggle = { toggleSection(id) }) }
+            // A folded section emits no rows at all: its heading and the line above it are all of it.
+            if (id in openNow) when (id) {
+            "exim" -> {
+            // --- Export / Import (Kōjiki UI-page flow) ---
             item {
-                RowScaffold(1, onClick = { eximDirPicker.launch(SettingsBackup.dirUri(context)) }) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Export directory (tap to choose)", style = MaterialTheme.typography.bodyLarge)
-                        val dirName = eximStatus.first
-                        Text(
-                            dirName ?: "Not set — tap to choose a directory",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (dirName == null) EximWarnColor else MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
+                // Choosing the directory opens the system picker, so it is a pill with a › and the
+                // directory it stands at beneath — it used to be a plain row that read as a note.
+                val dirName = eximStatus.first
+                PillRow(
+                    level = 1,
+                    label = "Export directory",
+                    description = dirName ?: "Not set — choose a directory",
+                    opens = true,
+                    warn = dirName == null,
+                    icon = Icons.Filled.Storage,
+                    iconRole = IconRole.SHARE,
+                    onClick = { eximDirPicker.launch(SettingsBackup.dirUri(context)) },
+                )
             }
             item {
                 val (dirName, latest) = eximStatus
@@ -408,12 +475,7 @@ fun UiCustomizationScreen(
                     latest == null -> "No export in this directory yet." to false
                     else -> "Last export: ${latest.timestampText}" to false
                 }
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (warn) EximWarnColor else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = rowStartPadding(1), end = 16.dp, bottom = 8.dp),
-                )
+                SettingNote(message, warn = warn)
             }
             item {
                 PillRow(
@@ -422,6 +484,8 @@ fun UiCustomizationScreen(
                     description = "Back up or restore everything settable — the whole workspace and all app settings — as one ZIP.",
                     main = true,
                     opens = true,
+                    icon = Icons.Filled.ImportExport,
+                    iconRole = IconRole.SHARE,
                     onClick = { showEximPanel = true },
                 )
             }
@@ -433,6 +497,8 @@ fun UiCustomizationScreen(
                         "and restore it. On by default — 白い熊 応用管理 needs it to reach a freshly " +
                         "installed copy on a clean phone.",
                     checked = automationEnabled,
+                    icon = Icons.Filled.ImportExport,
+                    iconRole = IconRole.SHARE,
                     onCheckedChange = {
                         automationEnabled = it
                         AutomationAuth.setEnabled(context, it)
@@ -447,6 +513,8 @@ fun UiCustomizationScreen(
                         "also present the token below. The data door checks the caller's identity " +
                         "and signature either way, so this is extra, not the gate.",
                     checked = automationRequireToken,
+                    icon = Icons.Filled.Lock,
+                    iconRole = IconRole.BLOCK,
                     onCheckedChange = {
                         automationRequireToken = it
                         AutomationAuth.setRequireToken(context, it)
@@ -457,39 +525,49 @@ fun UiCustomizationScreen(
             // under a switch that is off invites 白い熊 to paste it somewhere it will do nothing.
             if (automationRequireToken) item {
                 val clipboard = LocalClipboardManager.current
-                RowScaffold(1, onClick = {
-                    clipboard.setText(AnnotatedString(automationToken))
-                    scope.launch { snackbarHostState.showSnackbar("Automation token copied") }
-                }) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Automation token (tap to copy)", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            "${automationToken.take(8)}…${automationToken.takeLast(8)}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    // A pill, never a bare clickable word (the black-yellow theme); red, as the
-                    // destructive one, by lending its colour to the frame and the text.
-                    OutlinedButton(
-                        onClick = {
-                            automationToken = AutomationAuth.regenerateToken(context)
-                            scope.launch { snackbarHostState.showSnackbar("Automation token regenerated — update pasted copies") }
-                        },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = EximWarnColor),
-                    ) { Text("Regenerate") }
-                }
+                PillRow(
+                    level = 1,
+                    label = "Copy automation token",
+                    description = "${automationToken.take(8)}…${automationToken.takeLast(8)}",
+                    icon = Icons.Filled.ContentCopy,
+                    iconRole = IconRole.SHARE,
+                    onClick = {
+                        clipboard.setText(AnnotatedString(automationToken))
+                        scope.launch { snackbarHostState.showSnackbar("Automation token copied") }
+                    },
+                )
+            }
+            // Regenerating throws the old token away, so its pill is the destructive one.
+            if (automationRequireToken) item {
+                PillRow(
+                    level = 1,
+                    label = "Regenerate token",
+                    description = "Makes a new token. Every copy pasted elsewhere has to be updated.",
+                    destructive = true,
+                    icon = Icons.Filled.Refresh,
+                    iconRole = IconRole.DELETE,
+                    onClick = {
+                        automationToken = AutomationAuth.regenerateToken(context)
+                        scope.launch { snackbarHostState.showSnackbar("Automation token regenerated — update pasted copies") }
+                    },
+                )
             }
 
-            item { SectionHeader("Colors") }
+            }
+            "colors" -> {
+            item {
+                SettingNote(
+                    "The foundation colours. Every other colour follows these until it is set apart in its own section."
+                )
+            }
             item { ColorRow(1, "Background", prefs.background, ColorTarget.Background) { colorTarget = it } }
             item { ColorRow(1, "Text", prefs.text, ColorTarget.Text) { colorTarget = it } }
             item { ColorRow(1, "Secondary text", prefs.textSecondary, ColorTarget.TextSecondary) { colorTarget = it } }
             item { ColorRow(1, "Accent", prefs.accent, ColorTarget.Accent) { colorTarget = it } }
             item { ColorRow(1, "Surface (cards & bars)", prefs.surface, ColorTarget.Surface) { colorTarget = it } }
 
-            item { SectionHeader("Borders") }
+            }
+            "borders" -> {
             item { ColorRow(1, "Border color", prefs.border, ColorTarget.Border) { colorTarget = it } }
             item {
                 SliderRow(
@@ -502,7 +580,8 @@ fun UiCustomizationScreen(
                 )
             }
 
-            item { SectionHeader("Typography") }
+            }
+            "typography" -> {
             item {
                 FontRow(
                     level = 1,
@@ -529,7 +608,8 @@ fun UiCustomizationScreen(
             }
             item { SampleRow(level = 1) }
 
-            item { SectionHeader("Flash / toast") }
+            }
+            "flash" -> {
             item { FlashPreview(level = 1, prefs = prefs) }
             item { ColorRow(1, "Background", prefs.flashBackground, ColorTarget.FlashBackground) { colorTarget = it } }
             item { ColorRow(1, "Text", prefs.flashText, ColorTarget.FlashText) { colorTarget = it } }
@@ -573,21 +653,25 @@ fun UiCustomizationScreen(
                 )
             }
 
-            item { SectionHeader("Editor") }
+            }
+            "editor" -> {
             item {
                 SwitchRow(
                     level = 1,
                     label = "Advanced action picker",
+                    icon = Icons.Filled.Checklist,
                     description = "When adding an action, browse a full-screen list folded by category, each action expandable to its description and fields.",
                     checked = prefs.advancedActionPicker,
                     onCheckedChange = { ThemeStore.update { p -> p.copy(advancedActionPicker = it) } },
                 )
             }
 
-            item { SectionHeader("Task list") }
+            }
+            "tasklist" -> {
             item { TaskIconSizeRow(level = 1, prefs = prefs) }
 
-            item { SectionHeader("Tasks") }
+            }
+            "tasks" -> {
             item {
                 SliderRow(
                     level = 1, label = "Padding between cards",
@@ -670,7 +754,8 @@ fun UiCustomizationScreen(
 
             // Variables tab — the folded row's name/value styling. Defaults equal the action-view data
             // styling (blue name / white value, 16 sp); name and value colour + size are independent.
-            item { SectionHeader("Variables") }
+            }
+            "variables" -> {
             item {
                 SliderRow(
                     level = 1, label = "Padding inside variable rows",
@@ -698,7 +783,8 @@ fun UiCustomizationScreen(
             item { ColorRow(1, "Variable name colour", prefs.varNameColor, ColorTarget.VarName) { colorTarget = it } }
             item { ColorRow(1, "Variable value colour", prefs.varValueColor, ColorTarget.VarValue) { colorTarget = it } }
 
-            item { SectionHeader("Monitor") }
+            }
+            "monitor" -> {
             item {
                 SliderRow(
                     level = 1, label = "Task row spacing",
@@ -708,7 +794,8 @@ fun UiCustomizationScreen(
                 )
             }
 
-            item { SectionHeader("Panel bars") }
+            }
+            "panelbars" -> {
             item {
                 SliderRow(
                     level = 1, label = "Oval bar border width",
@@ -719,7 +806,8 @@ fun UiCustomizationScreen(
             }
             item { ColorRow(1, "Oval bar border colour", prefs.ovalBarBorderColor, ColorTarget.OvalBarBorder) { colorTarget = it } }
 
-            item { SectionHeader("Freeze bubbles") }
+            }
+            "bubbles" -> {
             item { FreezeBubblePreview(level = 1, prefs = prefs) }
             item {
                 SliderRow(
@@ -762,7 +850,8 @@ fun UiCustomizationScreen(
 
             // Flash bubbles (通知明滅): the left-edge Desktop icons share the freeze bubbles' icon /
             // label styling above; only the gesture behaviors and kill tasks are their own.
-            item { SectionHeader("Flash bubbles (通知明滅)") }
+            }
+            "flashbubbles" -> {
             item {
                 FlashBehaviorRow(
                     level = 1, label = "Tap",
@@ -792,7 +881,8 @@ fun UiCustomizationScreen(
                 )
             }
 
-            item { SectionHeader("Shortcut picker") }
+            }
+            "picker" -> {
             item {
                 SliderRow(
                     level = 1, label = "Font size",
@@ -847,7 +937,8 @@ fun UiCustomizationScreen(
             }
             item { FontRow(level = 1, fileName = prefs.pickerFontFileName, onClick = { showPickerFontPicker = true }) }
 
-            item { SectionHeader("Import review") }
+            }
+            "importreview" -> {
             item { ImportReviewPreview(level = 1, prefs = prefs) }
             item {
                 SliderRow(
@@ -892,9 +983,10 @@ fun UiCustomizationScreen(
             }
 
 
+            }
+            "ocr" -> ocrSectionRows(prefs)
             // --- 「健康」 charts — the numbers the band screens draw with ---------------------
-            if (!focusOcr) ocrSectionRows(prefs)
-            item { SectionHeader("「健康」 charts") }
+            "charts" -> {
             item { ChartLivePreview(level = 1, prefs = prefs) }
 
             item { SubHeader(1, "Sizes") }
@@ -1037,6 +1129,7 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1, label = "Grid",
+                    icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
                     description = "The recessive lines behind the data.",
                     checked = prefs.chartShowGrid,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowGrid = v) } },
@@ -1045,6 +1138,7 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1, label = "Sample dots",
+                    icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
                     description = "The real readings, drawn over the smoothed line. Turning these off hides where the curve is interpolating.",
                     checked = prefs.chartShowDots,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowDots = v) } },
@@ -1053,6 +1147,7 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1, label = "Flagged-sample ✕ marks",
+                    icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
                     description = "Readings the outlier filter dropped, shown at their real value.",
                     checked = prefs.chartShowRejected,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowRejected = v) } },
@@ -1061,6 +1156,7 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1, label = "Tint stretches with no measurement",
+                    icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
                     description = "Off, a gap looks the same as a flat reading — the chart stops showing that the band was not measuring.",
                     checked = prefs.chartShowGaps,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowGaps = v) } },
@@ -1093,20 +1189,107 @@ fun UiCustomizationScreen(
                     level = 1,
                     label = "Restore the validated chart palette",
                     description = "Puts every chart knob above back to what shipped — the colours that pass the checks in the preview.",
+                    icon = Icons.Filled.Restore,
+                    iconRole = IconRole.DELETE,
                     onClick = { ThemeStore.resetChartsToDefault() },
                 )
             }
 
-            // --- Presets — at the very bottom (白い熊 2026-07-25), like Kōjiki's trailing Reset row ---
-            item { SectionHeader("Presets") }
+            }
+            // --- Maintenance: what puts the page, or parts of it, back the way it shipped ---
+            "maintenance" -> {
+            item {
+                PillRow(
+                    level = 1,
+                    label = "Reset section order",
+                    description = "Puts the sections of this page, and the chips at its top, back in their built-in order. What is unfolded stays unfolded.",
+                    icon = Icons.Filled.Restore,
+                    iconRole = IconRole.DELETE,
+                    onClick = { ThemeStore.update { it.copy(uiSectionOrder = "") } },
+                )
+            }
+            item {
+                PillRow(
+                    level = 1,
+                    label = "Reset all colours",
+                    description = "Every colour back to black and yellow: the foundation colours, and every item that was set apart in its own section. Fonts, sizes, widths and the chart palette stay.",
+                    destructive = true,
+                    icon = Icons.Filled.Palette,
+                    iconRole = IconRole.DELETE,
+                    onClick = { confirmResetColours = true },
+                )
+            }
             item {
                 PillRow(
                     level = 1,
                     label = "Reset to black & yellow",
                     description = "Restore the default appearance — black background, yellow text and borders.",
-                    onClick = { ThemeStore.resetToDefault() },
+                    destructive = true,
+                    icon = Icons.Filled.Restore,
+                    iconRole = IconRole.DELETE,
+                    // The arrangement of this page is not appearance: the order and the unfolded
+                    // sections stay, or the section under the finger would fold away with the tap.
+                    onClick = {
+                        ThemeStore.update {
+                            ThemePrefs.DEFAULT.copy(uiSectionOrder = it.uiSectionOrder, uiSectionsOpen = it.uiSectionsOpen)
+                        }
+                    },
                 )
             }
+            }
+            // --- One section per group of the role table: every item's own colour ---
+            else -> section.roles?.let { group ->
+                items(UiRole.entries.filter { it.section == group }, key = { "role-${it.key}" }) { uiRole ->
+                    RoleRow(level = 1, uiRole = uiRole, icon = section.icon, prefs = prefs) { roleTarget = it }
+                }
+            }
+            }
+        }
+    } }
+
+    /** Unfolds [id] and scrolls its heading to the top; the stored order is not touched. */
+    fun jumpTo(id: String) {
+        val openNow = open + id
+        if (id !in open) ThemeStore.update { it.copy(uiSectionsOpen = encodeSections(openNow)) }
+        val index = SectionRows(null).also { page(it, openNow) {} }.headers[id] ?: return
+        scope.launch {
+            // The list still holds the rows of before the unfolding until it is composed again.
+            snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > index }
+            listState.animateScrollToItem(index)
+        }
+    }
+
+    // Sent here to adjust one section (the 文字認識 review window): open it and go to it.
+    LaunchedEffect(focusSection) {
+        if (focusSection == FOCUS_OCR) jumpTo("ocr")
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { ThemedSnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("白い熊 自由作業盤 UI") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(bottom = 28.dp),
+        ) {
+            page(SectionRows(this), open) { jumpTo(it) }
         }
     }
 
@@ -1122,11 +1305,58 @@ fun UiCustomizationScreen(
         )
     }
 
+    if (confirmResetColours) {
+        AlertDialog(
+            onDismissRequest = { confirmResetColours = false },
+            title = { Text("Reset all colours?") },
+            text = {
+                Text(
+                    "The foundation colours and every colour set apart in a section of its own go back to " +
+                        "black and yellow. Fonts, sizes, widths and the chart palette are not touched."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // One update: the page's own colour table back to its defaults, and no role set apart.
+                        ThemeStore.update { p ->
+                            ColorTarget.entries.fold(p) { acc, target -> target.set(acc, target.default) }
+                                .copy(roleOverrides = emptyMap())
+                        }
+                        confirmResetColours = false
+                    },
+                    colors = destructiveButtonColors(),
+                ) { Text("Reset") }
+            },
+            dismissButton = { OutlinedButton(onClick = { confirmResetColours = false }) { Text("Cancel") } },
+        )
+    }
+
+    roleTarget?.let { target ->
+        ColorPickerDialog(
+            title = target.label,
+            initial = UiRoles.argb(target, prefs),
+            onDismiss = { roleTarget = null },
+            onDefault = {
+                UiRoles.reset(target)
+                roleTarget = null
+            },
+            onConfirm = { argb ->
+                UiRoles.set(target, argb)
+                roleTarget = null
+            },
+        )
+    }
+
     chartColorTarget?.let { target ->
         ColorPickerDialog(
             title = target.label,
             initial = target.get(prefs),
             onDismiss = { chartColorTarget = null },
+            onDefault = {
+                ThemeStore.update { target.set(it, target.get(ThemePrefs.DEFAULT)) }
+                chartColorTarget = null
+            },
             onConfirm = { argb ->
                 ThemeStore.update { target.set(it, argb) }
                 chartColorTarget = null
@@ -1139,6 +1369,10 @@ fun UiCustomizationScreen(
             title = target.label,
             initial = target.get(prefs),
             onDismiss = { colorTarget = null },
+            onDefault = {
+                ThemeStore.update { target.set(it, target.default) }
+                colorTarget = null
+            },
             onConfirm = { argb ->
                 ThemeStore.update { target.set(it, argb) }
                 colorTarget = null
@@ -1203,86 +1437,505 @@ fun UiCustomizationScreen(
 
 // ---- section / rows -----------------------------------------------------------------------------
 
+// ---- sections: registry, order, folding ----------------------------------------------------------
+
 /**
- * kxkb-style section heading: 20sp medium accent title underlined only as wide as the text
- * (IntrinsicSize.Min sizes the column to its single line), each section preceded by a thin
- * full-width hairline spacer (Kōjiki's addSectionSpacer).
+ * One top-level section of the page. [id] is what the stored order and the stored open set name, so
+ * it never changes; [chip] is the short name on the section's index chip. [roles] is set for the
+ * sections that are generated from the role table.
  */
+private class PageSection(
+    val id: String,
+    val title: String,
+    val chip: String,
+    val icon: ImageVector,
+    val roles: RoleSection? = null,
+)
+
+/** The section that lists one group of the role table, a swatch row per role. */
+private fun roleSection(group: RoleSection): PageSection {
+    val (chip, icon) = when (group) {
+        RoleSection.TEXT -> "Text" to Icons.Filled.Title
+        RoleSection.BUTTONS -> "Buttons" to Icons.Filled.TouchApp
+        RoleSection.DIALOGS -> "Dialogs" to Icons.Filled.ChatBubble
+        RoleSection.SWITCHES -> "Switches" to Icons.Filled.ToggleOn
+        RoleSection.MARKS -> "Marks" to Icons.Filled.CheckBox
+        RoleSection.MENUS -> "Menus" to Icons.Filled.Menu
+        RoleSection.LISTS -> "Lists" to Icons.Filled.Reorder
+        RoleSection.PAGE -> "This page" to Icons.Filled.Settings
+        RoleSection.BARS -> "Bars" to Icons.Filled.Tab
+        RoleSection.SCENES -> "Scenes" to Icons.Filled.Layers
+        RoleSection.WIDGETS -> "Widgets" to Icons.Filled.Widgets
+        RoleSection.PROGRESS -> "Progress" to Icons.Filled.HourglassEmpty
+        RoleSection.CHARTS -> "健康 chrome" to Icons.Filled.BarChart
+        RoleSection.ISLANDS -> "言語島" to Icons.Filled.Translate
+        RoleSection.SCREENS -> "Screens" to Icons.Filled.Smartphone
+    }
+    return PageSection("role_" + group.name.lowercase(), group.title, chip, icon, group)
+}
+
+/** Every section, in the built-in order: the foundation colours first, then each item's own. */
+private val PAGE_SECTIONS: List<PageSection> = listOf(
+    PageSection("exim", "Export / Import", "Export", Icons.Filled.ImportExport),
+    PageSection("colors", "Colors", "Colors", Icons.Filled.Palette),
+    PageSection("borders", "Borders", "Borders", Icons.Filled.BorderOuter),
+) + RoleSection.entries.map(::roleSection) + listOf(
+    PageSection("typography", "Typography", "Fonts", Icons.Filled.TextFields),
+    PageSection("flash", "Flash / toast", "Flash", Icons.Filled.Notifications),
+    PageSection("editor", "Editor", "Editor", Icons.Filled.Edit),
+    PageSection("tasklist", "Task list", "Task list", Icons.Filled.Checklist),
+    PageSection("tasks", "Tasks", "Tasks", Icons.Filled.Task),
+    PageSection("variables", "Variables", "Variables", Icons.Filled.Code),
+    PageSection("monitor", "Monitor", "Monitor", Icons.Filled.Visibility),
+    PageSection("panelbars", "Panel bars", "Panels", Icons.Filled.Tune),
+    PageSection("bubbles", "Freeze bubbles", "Freeze", Icons.Filled.AcUnit),
+    PageSection("flashbubbles", "Flash bubbles (通知明滅)", "通知明滅", Icons.Filled.FlashOn),
+    PageSection("picker", "Shortcut picker", "Picker", Icons.Filled.Apps),
+    PageSection("importreview", "Import review", "Import", Icons.Filled.Download),
+    PageSection("ocr", "「文字認識」 OCR", "OCR", Icons.Filled.CenterFocusStrong),
+    PageSection("charts", "「健康」 charts", "健康", Icons.Filled.BarChart),
+    PageSection("maintenance", "Maintenance", "Reset", Icons.Filled.Build),
+)
+
+/** The sections as [stored] orders them: unknown ids are ignored, missing ones follow in the built-in order. */
+private fun sectionOrder(stored: String): List<PageSection> {
+    val byId = PAGE_SECTIONS.associateBy { it.id }
+    val named = stored.split(',').mapNotNull { byId[it.trim()] }.distinct()
+    return named + PAGE_SECTIONS.filter { it !in named }
+}
+
+/** The ids of the unfolded sections. Nothing stored means everything folded. */
+private fun openSections(stored: String): Set<String> =
+    stored.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+private fun encodeSections(ids: Set<String>): String =
+    PAGE_SECTIONS.filter { it.id in ids }.joinToString(",") { it.id }
+
+/**
+ * The page's rows, counted as they are handed to the list.
+ *
+ * A chip has to scroll to its section's heading, and a lazy list scrolls to a row NUMBER — which
+ * depends on which sections above are unfolded and how many rows each has. So the page is written
+ * against this instead of the list itself: it passes every row on to [list] and remembers where each
+ * heading landed. With no [list] it only counts, which is how a tap on a chip learns the number for
+ * the open set it is about to store.
+ */
+private class SectionRows(private val list: LazyListScope?) {
+    private var count = 0
+
+    /** Section id → the row number of its heading. */
+    val headers = HashMap<String, Int>()
+
+    fun header(id: String, content: @Composable LazyItemScope.() -> Unit) {
+        headers[id] = count
+        item(key = "section-$id", content = content)
+    }
+
+    fun item(key: Any? = null, content: @Composable LazyItemScope.() -> Unit) {
+        count++
+        list?.item(key = key, content = content)
+    }
+
+    fun <T> items(items: List<T>, key: ((T) -> Any)? = null, itemContent: @Composable LazyItemScope.(T) -> Unit) {
+        count += items.size
+        list?.items(items, key = key, itemContent = itemContent)
+    }
+}
+
+private const val CHIPS_PER_ROW = 4
+private val CHIP_SHAPE = RoundedCornerShape(percent = 50)
+
+/**
+ * The index under the page title: one small outlined chip per section, about four to a row.
+ *
+ * A tap unfolds the section and goes to it. A long-press lifts the chip, and from then on the chips
+ * reorder LIVE under the finger — the dragged one moves to the slot of whichever chip the finger is
+ * over — and the sections follow on drop ([onReorder]). Reordering only on drop was tried in the 地図
+ * chat and turned down.
+ *
+ * The drag is detected on the grid, not on a chip: a chip changes place while it is dragged, and a
+ * gesture that lived on it would see its own coordinates move under it.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SectionHeader(title: String, first: Boolean = false) {
-    Column(Modifier.fillMaxWidth()) {
-        if (!first) {
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 20.dp),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-            )
-        }
-        Column(
-            Modifier
-                .padding(start = 16.dp, top = if (first) 8.dp else 20.dp, end = 16.dp, bottom = 4.dp)
-                // Max, not Min. The rule under a heading should be exactly as wide as the heading, and
-                // for a Latin title Min happens to give that. For a CJK title it does not: every
-                // character is a legal break point, so the MINIMUM intrinsic width is about one glyph —
-                // and with softWrap off the title is then clipped to 「文 rather than wrapped. It hit
-                // 「健康」 charts too, quietly, until a second Japanese section made it obvious.
-                .width(IntrinsicSize.Max),
+private fun ChipIndex(order: List<PageSection>, onJump: (String) -> Unit, onReorder: (List<String>) -> Unit) {
+    val latestOrder by rememberUpdatedState(order)
+    val latestReorder by rememberUpdatedState(onReorder)
+    // The order while a chip is in the air; kept after the drop until the stored order has caught up,
+    // so that the chips do not flick back for a frame.
+    var live by remember { mutableStateOf<List<PageSection>?>(null) }
+    var dragged by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(order) { if (dragged == null) live = null }
+    // Where each chip and the grid stand in the window. Plain holders: only the gesture reads them.
+    val bounds = remember { HashMap<String, Rect>() }
+    val origin = remember { arrayOf(Offset.Zero) }
+    val shown = live ?: order
+    val frame = role(UiRole.PAGE_CHIP_FRAME)
+    val ink = role(UiRole.PAGE_CHIP_LABEL)
+
+    Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 4.dp)) {
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { origin[0] = it.positionInRoot() }
+                .pointerInput(Unit) {
+                    // The chip the finger was over at the last move. A move is made once per chip
+                    // entered, not once per event: a wide chip dragged over a narrow one would
+                    // otherwise land under the finger again and swap back, to and fro.
+                    var lastOver: String? = null
+                    fun chipAt(position: Offset): String? {
+                        val inRoot = position + origin[0]
+                        return bounds.entries.firstOrNull { it.value.contains(inRoot) }?.key
+                    }
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { at ->
+                            val id = chipAt(at)
+                            lastOver = id
+                            live = if (id != null) latestOrder else null
+                            dragged = id
+                        },
+                        onDragEnd = {
+                            val dropped = live
+                            if (dragged != null && dropped != null) latestReorder(dropped.map { it.id })
+                            dragged = null
+                        },
+                        onDragCancel = {
+                            live = null
+                            dragged = null
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val id = dragged
+                            val now = live
+                            if (id != null && now != null) {
+                                val over = chipAt(change.position)
+                                if (over != lastOver) {
+                                    lastOver = over
+                                    val from = now.indexOfFirst { it.id == id }
+                                    val to = now.indexOfFirst { it.id == over }
+                                    if (over != id && from >= 0 && to >= 0) {
+                                        live = now.toMutableList().apply { add(to, removeAt(from)) }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                },
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            maxItemsInEachRow = CHIPS_PER_ROW,
         ) {
-            Text(
-                title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                softWrap = false,
-            )
-            Spacer(Modifier.height(4.dp))
-            HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.primary)
+            shown.forEach { section ->
+                key(section.id) {
+                    val lifted = dragged == section.id
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .onGloballyPositioned { bounds[section.id] = it.boundsInRoot() }
+                            .clip(CHIP_SHAPE)
+                            // Never filled: the chip in the air is told apart by its frame alone.
+                            .border(if (lifted) 3.dp else 1.dp, frame, CHIP_SHAPE)
+                            // A long-press that ends without a move still ends in a release on the
+                            // chip; that release belongs to the drag, not to a tap.
+                            .clickable { if (dragged == null) onJump(section.id) }
+                            .padding(horizontal = 6.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            section.chip,
+                            color = ink,
+                            fontSize = 12.sp,
+                            fontWeight = if (lifted) FontWeight.Bold else null,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            // The last line is filled up with empty slots, or its chips would stretch across it.
+            repeat((CHIPS_PER_ROW - shown.size % CHIPS_PER_ROW) % CHIPS_PER_ROW) { Spacer(Modifier.weight(1f)) }
         }
     }
 }
 
+/**
+ * The heading of a folding section: the thin divider above it (which stays, folded or open), the
+ * section's icon, the bold title underlined only as wide as its text, and › when folded or ⌄ when
+ * open at the row's right. The whole line folds and unfolds.
+ */
+@Composable
+private fun SectionHeader(section: PageSection, open: Boolean, onToggle: () -> Unit) {
+    val ink = role(UiRole.HEADING)
+    val titleStyle = TextStyle(fontSize = 20.sp)
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 6.dp),
+            thickness = 1.dp,
+            color = role(UiRole.PAGE_DIVIDER),
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Sized by the heading, as a row's icon is sized by its label.
+            RoleIcon(section.icon, IconRole.VIEW, Modifier.padding(end = ROW_ICON_GAP).size(rowIconSize(titleStyle)))
+            Box(Modifier.weight(1f)) {
+                Column(
+                    // Max, not Min. The rule under a heading should be exactly as wide as the heading, and
+                    // for a Latin title Min happens to give that. For a CJK title it does not: every
+                    // character is a legal break point, so the MINIMUM intrinsic width is about one glyph —
+                    // and with softWrap off the title is then clipped to 「文 rather than wrapped. It hit
+                    // 「健康」 charts too, quietly, until a second Japanese section made it obvious.
+                    Modifier.width(IntrinsicSize.Max),
+                ) {
+                    Text(
+                        section.title,
+                        fontSize = titleStyle.fontSize,
+                        fontWeight = FontWeight.Bold,
+                        color = ink,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    HorizontalDivider(thickness = 2.dp, color = ink)
+                }
+            }
+            Text(
+                if (open) "⌄" else "›",
+                modifier = Modifier.padding(start = 8.dp),
+                fontSize = titleStyle.fontSize,
+                fontWeight = FontWeight.Bold,
+                color = ink,
+            )
+        }
+    }
+}
+
+// ---- row furniture: rule, icon, label, note ------------------------------------------------------
+
+private val RULE_WIDTH = 2.dp
+
+/** From a row's left edge to its icon: the 2 dp rule of an explained row, and the 10 dp after it. */
+private val RULE_GUTTER = 12.dp
+private val ROW_ICON_GAP = 8.dp
+private val ROW_ICON_FLOOR = 18.dp
+
+/**
+ * A row icon's side: 1.25 × its label's text size, never under 18 dp (settled 2026-11-22). The text
+ * size is settable on this very page, so a fixed size would be right for one setting only.
+ */
+@Composable
+private fun rowIconSize(labelStyle: TextStyle): Dp {
+    val fontSize = if (labelStyle.fontSize.isSp) labelStyle.fontSize else 16.sp
+    return maxOf(ROW_ICON_FLOOR, with(LocalDensity.current) { (fontSize * 1.25f).toDp() })
+}
+
+/** How tall the first line of a label in [labelStyle] is — what its icon is centred on. */
+@Composable
+private fun firstLineHeight(labelStyle: TextStyle): Dp {
+    val fontSize = if (labelStyle.fontSize.isSp) labelStyle.fontSize else 16.sp
+    val line = if (labelStyle.lineHeight.isSp) labelStyle.lineHeight else fontSize * 1.2f
+    return with(LocalDensity.current) { line.toDp() }
+}
+
+/**
+ * The icon at a row's left, coloured by what the row does. It is centred on the label's FIRST line,
+ * not on the row — a row with a description is tall, and an icon centred on all of it drifts away
+ * from the label it belongs to. [slotExtra] is what the first line carries besides its text (the
+ * padding of a pill).
+ */
+@Composable
+private fun RowIcon(icon: ImageVector, iconRole: IconRole, labelStyle: TextStyle, slotExtra: Dp = 0.dp) {
+    val side = rowIconSize(labelStyle)
+    Box(
+        Modifier
+            .padding(end = ROW_ICON_GAP)
+            .size(width = side, height = maxOf(side, firstLineHeight(labelStyle) + slotExtra)),
+        contentAlignment = Alignment.Center,
+    ) {
+        RoleIcon(icon, iconRole, Modifier.size(side))
+    }
+}
+
+/**
+ * What every row of the page is built on: the gutter (the dim-gold rule of an explained row, or the
+ * same width left empty, so that all icons stand in one column), the row's icon, then [content].
+ * No minimum height, and 2 dp above and below — a row is as tall as what is in it.
+ */
+@Composable
+private fun IconRow(
+    level: Int,
+    icon: ImageVector,
+    iconRole: IconRole,
+    ruled: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    verticalPadding: Dp = 2.dp,
+    labelStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    iconSlotExtra: Dp = 0.dp,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val rule = role(UiRole.DIM_GOLD)
+    val base = Modifier.fillMaxWidth()
+    val clickable = if (onClick != null) base.clickable(onClick = onClick) else base
+    Row(
+        modifier = clickable
+            .padding(start = rowStartPadding(level), end = 16.dp, top = verticalPadding, bottom = verticalPadding)
+            // Drawn behind rather than laid out, so that it is as tall as the row without the row
+            // having to be measured twice.
+            .drawBehind { if (ruled) drawRect(rule, size = Size(RULE_WIDTH.toPx(), size.height)) }
+            .padding(start = RULE_GUTTER),
+        verticalAlignment = Alignment.Top,
+    ) {
+        RowIcon(icon, iconRole, labelStyle, iconSlotExtra)
+        content()
+    }
+}
+
+/** A setting's label: bold, in its own role. */
+@Composable
+private fun RowLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Bold,
+        color = role(UiRole.PAGE_LABEL),
+    )
+}
+
+/** The explanation under a label or a pill: dim gold, 13 sp. [warn] is a note that asks for something. */
+@Composable
+private fun RowNote(text: String, modifier: Modifier = Modifier, warn: Boolean = false) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        fontSize = 13.sp,
+        color = role(if (warn) UiRole.WARNING else UiRole.DIM_GOLD),
+    )
+}
+
+/** The value a setting stands at, shown beside or under its label. */
+@Composable
+private fun RowValue(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.labelMedium,
+    fontFamily: FontFamily? = null,
+) {
+    Text(
+        text,
+        modifier = modifier,
+        style = style,
+        fontFamily = fontFamily,
+        color = role(UiRole.PAGE_VALUE),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/** The round colour sample at a swatch row's right. */
+@Composable
+private fun Swatch(argb: Int) {
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(Color(argb))
+            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+    )
+}
+
+/** A small round outlined button that carries one glyph — the ↺ beside a swatch. */
+@Composable
+private fun GlyphButton(glyph: String, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .border(1.25.dp, role(UiRole.BUTTON_FRAME), CircleShape)
+            .clickable(onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(glyph, color = role(UiRole.BUTTON_LABEL), fontSize = 16.sp)
+    }
+}
+
+// ---- rows ---------------------------------------------------------------------------------------
+
+/** A plain control row: label and value side by side, the control (or the value that opens a picker) at the right. */
 @Composable
 private fun RowScaffold(
     level: Int,
     onClick: (() -> Unit)? = null,
-    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+    icon: ImageVector = Icons.Filled.Tune,
+    iconRole: IconRole = IconRole.VIEW,
+    ruled: Boolean = false,
+    content: @Composable RowScope.() -> Unit,
 ) {
-    val base = Modifier.fillMaxWidth()
-    val clickable = if (onClick != null) base.clickable(onClick = onClick) else base
-    // Minimal padding (the black-yellow theme, 白い熊 2026-11-07): a row is as tall as its content.
-    // 12 dp above and below made a list of one-line rows read as double-spaced.
-    Row(
-        modifier = clickable.padding(
-            start = rowStartPadding(level),
-            end = 16.dp,
-            top = 2.dp,
-            bottom = 2.dp,
-        ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        content = content,
-    )
+    IconRow(level, icon, iconRole, ruled = ruled, onClick = onClick) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable
-private fun ColorRow(level: Int, label: String, value: Int, target: ColorTarget, onPick: (ColorTarget) -> Unit) {
-    RowScaffold(level, onClick = { onPick(target) }) {
+private fun ColorRow(
+    level: Int,
+    label: String,
+    value: Int,
+    target: ColorTarget,
+    icon: ImageVector = Icons.Filled.Palette,
+    iconRole: IconRole = IconRole.VIEW,
+    onPick: (ColorTarget) -> Unit,
+) {
+    RowScaffold(level, onClick = { onPick(target) }, icon = icon, iconRole = iconRole) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(
+            RowLabel(label)
+            RowValue(
                 if (value == target.default) "Default - ${hex6(value)}" else hex6(value),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Box(
-            Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(Color(value))
-                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
-        )
+        Swatch(value)
+    }
+}
+
+/** Which icon colour a role's own row wears: the menu icon roles show themselves, the rest are colour rows. */
+private fun roleRowIconRole(uiRole: UiRole): IconRole = when (uiRole) {
+    UiRole.ICON_CONNECT -> IconRole.CONNECT
+    UiRole.ICON_MESSAGE -> IconRole.WRITE
+    UiRole.ICON_CONTACT -> IconRole.PERSON
+    UiRole.ICON_SHARE -> IconRole.SHARE
+    UiRole.ICON_BLOCK -> IconRole.BLOCK
+    UiRole.DELETE -> IconRole.DELETE
+    else -> IconRole.VIEW
+}
+
+/**
+ * The swatch row of one role of the role table — the same row for all of them, generated from the
+ * table, so that a role added there shows up here without a line being written for it. A tap opens
+ * the colour picker; the ↺ appears once the role is set apart and puts it back to following.
+ */
+@Composable
+private fun RoleRow(level: Int, uiRole: UiRole, icon: ImageVector, prefs: ThemePrefs, onPick: (UiRole) -> Unit) {
+    RowScaffold(level, onClick = { onPick(uiRole) }, icon = icon, iconRole = roleRowIconRole(uiRole), ruled = true) {
+        Column(Modifier.weight(1f)) {
+            RowLabel(uiRole.label)
+            RowNote(uiRole.note)
+        }
+        if (uiRole.key in prefs.roleOverrides) {
+            GlyphButton("↺", "Reset ${uiRole.label}") { UiRoles.reset(uiRole) }
+        }
+        Swatch(UiRoles.argb(uiRole, prefs))
     }
 }
 
@@ -1293,36 +1946,37 @@ private fun SliderRow(
     value: Int,
     valueText: String,
     range: ClosedFloatingPointRange<Float>,
+    icon: ImageVector = Icons.Filled.Tune,
+    iconRole: IconRole = IconRole.VIEW,
     onChange: (Int) -> Unit,
 ) {
-    Column(
-        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(valueText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    IconRow(level, icon, iconRole) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RowLabel(label, Modifier.weight(1f))
+                RowValue(valueText)
+            }
+            // No 48 dp touch-target floor around the slider: the row is as tall as the slider itself.
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                Slider(
+                    value = value.toFloat(),
+                    onValueChange = { onChange(it.roundToInt()) },
+                    valueRange = range,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { onChange(it.roundToInt()) },
-            valueRange = range,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
 @Composable
 private fun FontRow(level: Int, fileName: String, onClick: () -> Unit) {
-    RowScaffold(level, onClick = onClick) {
-        Text("Font", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Text(
+    RowScaffold(level, onClick = onClick, icon = Icons.Filled.TextFields, iconRole = IconRole.WRITE) {
+        RowLabel("Font", Modifier.weight(1f))
+        RowValue(
             ThemeStore.displayNameFor(fileName),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontFamily = ThemeStore.fontFamily(fileName) ?: FontFamily.Default,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1331,13 +1985,9 @@ private fun FontRow(level: Int, fileName: String, onClick: () -> Unit) {
 private fun WeightRow(level: Int, weight: Int, onPick: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        RowScaffold(level, onClick = { expanded = true }) {
-            Text("Weight", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                weightLabel(weight),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        RowScaffold(level, onClick = { expanded = true }, icon = Icons.Filled.FormatBold, iconRole = IconRole.WRITE) {
+            RowLabel("Weight", Modifier.weight(1f))
+            RowValue(weightLabel(weight), style = MaterialTheme.typography.bodyLarge)
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             WEIGHT_OPTIONS.forEach { (label, w) ->
@@ -1347,6 +1997,8 @@ private fun WeightRow(level: Int, weight: Int, onPick: (Int) -> Unit) {
                         onPick(w)
                         expanded = false
                     },
+                    trailingIcon = if (w == weight) ({ Text("✓") }) else null,
+                    choice = true,
                 )
             }
         }
@@ -1365,12 +2017,11 @@ private val FLASH_BEHAVIOR_OPTIONS = listOf(
 private fun FlashBehaviorRow(level: Int, label: String, value: String, onPick: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        RowScaffold(level, onClick = { expanded = true }) {
-            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(
+        RowScaffold(level, onClick = { expanded = true }, icon = Icons.Filled.TouchApp, iconRole = IconRole.CONNECT) {
+            RowLabel(label, Modifier.weight(1f))
+            RowValue(
                 FLASH_BEHAVIOR_OPTIONS.firstOrNull { it.first == value }?.second ?: value,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -1381,6 +2032,8 @@ private fun FlashBehaviorRow(level: Int, label: String, value: String, onPick: (
                         onPick(v)
                         expanded = false
                     },
+                    trailingIcon = if (v == value) ({ Text("✓") }) else null,
+                    choice = true,
                 )
             }
         }
@@ -1390,27 +2043,21 @@ private fun FlashBehaviorRow(level: Int, label: String, value: String, onPick: (
 /** A workspace task name the flash-bubble layer runs (kill / kill-all), edited inline. */
 @Composable
 private fun FlashTaskRow(level: Int, label: String, value: String, onChange: (String) -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-    ) {
+    // The field is 56 dp tall and its text is its one line, so the icon is centred on the field.
+    IconRow(level, Icons.Filled.Block, IconRole.BLOCK, iconSlotExtra = 32.dp) {
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
         )
     }
 }
 
 @Composable
 private fun SampleRow(level: Int) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-    ) {
-        Text("Live sample", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PreviewBlock(level, caption = "Live sample", spacing = 0.dp) {
         Text(
             "AaIiMmQq 0123  白い熊 自由作業盤  áÁčČ",
             style = MaterialTheme.typography.bodyLarge,
@@ -1421,12 +2068,7 @@ private fun SampleRow(level: Int) {
 /** Renders a sample flash exactly as the real one, so changes are visible without running a task. */
 @Composable
 private fun FlashPreview(level: Int, prefs: ThemePrefs) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-    ) {
-        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PreviewBlock(level, spacing = 0.dp) {
         Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
             Surface(
                 shape = RoundedCornerShape(prefs.flashCornerRadiusDp.dp),
@@ -1459,27 +2101,13 @@ private fun TaskIconSizeRow(level: Int, prefs: ThemePrefs) {
             }.getOrNull()
         }
     }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Task icon size", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                "${prefs.taskIconSizeDp} dp",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Slider(
-            value = prefs.taskIconSizeDp.toFloat(),
-            onValueChange = { v -> ThemeStore.update { it.copy(taskIconSizeDp = v.roundToInt()) } },
-            valueRange = ThemePrefs.TASK_ICON_MIN.toFloat()..ThemePrefs.TASK_ICON_MAX.toFloat(),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    SliderRow(
+        level = level, label = "Task icon size",
+        value = prefs.taskIconSizeDp, valueText = "${prefs.taskIconSizeDp} dp",
+        range = ThemePrefs.TASK_ICON_MIN.toFloat()..ThemePrefs.TASK_ICON_MAX.toFloat(),
+        onChange = { v -> ThemeStore.update { it.copy(taskIconSizeDp = v) } },
+    )
+    PreviewBlock(level) {
         // Fixed-height box so the row doesn't jump as the icon grows/shrinks.
         Box(Modifier.fillMaxWidth().height((ThemePrefs.TASK_ICON_MAX + 8).dp), contentAlignment = Alignment.CenterStart) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1513,11 +2141,7 @@ private fun FreezeBubblePreview(level: Int, prefs: ThemePrefs) {
     val label = runCatching { context.applicationInfo.loadLabel(context.packageManager).toString() }.getOrDefault("App")
     val badgeDp = (prefs.bubbleIconSizeDp * 0.4f).coerceIn(14f, 26f)
 
-    Column(
-        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PreviewBlock(level) {
         Box(Modifier.fillMaxWidth().height((ThemePrefs.BUBBLE_ICON_MAX + 44).dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Box {
@@ -1560,11 +2184,7 @@ private fun FreezeBubblePreview(level: Int, prefs: ThemePrefs) {
 @Composable
 private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
     val conflictColor = Color(prefs.importConflictColor)
-    Column(
-        Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PreviewBlock(level) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -1638,11 +2258,13 @@ private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
 }
 
 /**
- * A row that DOES something — a full-width outlined pill with its explanation beneath (the
- * black-yellow theme's settings-page rule, 白い熊 2026-11-07). A plain row that runs an action reads as
- * a heading or a note; the pill says “press me”. [opens] adds the › of a row that leads somewhere
- * (a panel, a screen); an in-place action (Reset) has none. [main] is the section's one main action:
- * thick frame, bold label. Only the pill is the touch target, never the explanation.
+ * A row that DOES something — an outlined pill that hugs its label, with its explanation beneath
+ * (the black-yellow theme's settings-page rule, 白い熊 2026-11-07; hugging since 2026-11-09: a short
+ * action blown up to the full width reads as a banner, not a button). A plain row that runs an
+ * action reads as a heading or a note; the pill says “press me”. [opens] adds the › of a row that
+ * leads somewhere (a panel, a picker, the browser); an in-place action (Reset) has none. [main] is
+ * the section's one main action: thick frame, bold label. [destructive] lends it the Delete role.
+ * Only the pill is the touch target, never the explanation.
  */
 @Composable
 private fun PillRow(
@@ -1651,43 +2273,113 @@ private fun PillRow(
     description: String,
     main: Boolean = false,
     opens: Boolean = false,
+    destructive: Boolean = false,
+    /** The explanation is a warning (nothing chosen yet), not a description. */
+    warn: Boolean = false,
+    icon: ImageVector = Icons.Filled.PlayArrow,
+    iconRole: IconRole = IconRole.CONNECT,
     onClick: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 3.dp, bottom = 3.dp)) {
-        val inner = PaddingValues(horizontal = PILL_TEXT_INSET, vertical = 9.dp)
-        val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
-            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            if (opens) Text("›", style = MaterialTheme.typography.bodyLarge)
+    // About 3 dp around the pill; the icon is centred on the pill, whose label line carries 9 dp
+    // of padding above and below.
+    IconRow(
+        level, icon, iconRole,
+        ruled = description.isNotEmpty(),
+        verticalPadding = 3.dp,
+        iconSlotExtra = PILL_TEXT_VPAD * 2,
+    ) {
+        Column(Modifier.weight(1f)) {
+            HuggingPill(label = label, main = main, opens = opens, destructive = destructive, onClick = onClick)
+            if (description.isNotEmpty()) {
+                // Lined up with the label inside the pill, not with the pill's edge.
+                RowNote(description, Modifier.padding(start = PILL_TEXT_INSET, top = 2.dp), warn = warn)
+            }
         }
-        if (main) {
-            Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = inner, content = content)
-        } else {
-            OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = inner, content = content)
-        }
+    }
+}
+
+/** The pill of a [PillRow]: as wide as its label, never stretched across the line. */
+@Composable
+private fun HuggingPill(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    main: Boolean = false,
+    opens: Boolean = false,
+    destructive: Boolean = false,
+) {
+    val inner = PaddingValues(horizontal = PILL_TEXT_INSET, vertical = PILL_TEXT_VPAD)
+    val colors = if (destructive) destructiveButtonColors() else null
+    val content: @Composable RowScope.() -> Unit = {
         Text(
-            description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = PILL_TEXT_INSET, top = 2.dp),
+            label,
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.bodyLarge,
+            // Said again here: the style names a weight of its own, which would undo the pill's bold.
+            fontWeight = if (main) FontWeight.Bold else null,
         )
+        if (opens) {
+            Text(
+                "›",
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+    // No 48 dp touch-target floor: it would add space above and below the pill, and the pill's own
+    // padding already makes it easy to hit.
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        if (main) {
+            Button(onClick = onClick, modifier = modifier, colors = colors, contentPadding = inner, content = content)
+        } else {
+            OutlinedButton(onClick = onClick, modifier = modifier, colors = colors, contentPadding = inner, content = content)
+        }
     }
 }
 
 /** Inside a [PillRow]: where the label starts, so the explanation beneath lines up with it. */
 private val PILL_TEXT_INSET = 16.dp
+private val PILL_TEXT_VPAD = 9.dp
 
 @Composable
-private fun SwitchRow(level: Int, label: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    RowScaffold(level, onClick = { onCheckedChange(!checked) }) {
+private fun SwitchRow(
+    level: Int,
+    label: String,
+    description: String,
+    checked: Boolean,
+    icon: ImageVector = Icons.Filled.ToggleOn,
+    iconRole: IconRole = IconRole.CONNECT,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    RowScaffold(level, onClick = { onCheckedChange(!checked) }, icon = icon, iconRole = iconRole, ruled = true) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            RowLabel(label)
+            RowNote(description)
         }
         // No 48 dp touch-target floor: the whole row toggles, so the switch needs no padding of its own.
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp,
-        ) {
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
             ThemedSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+/**
+ * A preview or a sample, as a row of its own: the caption with the eye beside it, and what is shown
+ * beneath. The icon is sized by the caption, as every row's icon is sized by its label.
+ */
+@Composable
+private fun PreviewBlock(
+    level: Int,
+    caption: String = "Live preview",
+    spacing: Dp = 8.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val captionStyle = MaterialTheme.typography.labelMedium
+    IconRow(level, Icons.Filled.Visibility, IconRole.VIEW, labelStyle = captionStyle) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing)) {
+            Text(caption, style = captionStyle, color = role(UiRole.DIM_GOLD))
+            content()
         }
     }
 }
@@ -1695,7 +2387,14 @@ private fun SwitchRow(level: Int, label: String, description: String, checked: B
 // ---- dialogs ------------------------------------------------------------------------------------
 
 @Composable
-private fun ColorPickerDialog(title: String, initial: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
+private fun ColorPickerDialog(
+    title: String,
+    initial: Int,
+    onDismiss: () -> Unit,
+    /** Puts the edited colour back to its default (a role: back to following) and closes; null where there is none. */
+    onDefault: (() -> Unit)? = null,
+    onConfirm: (Int) -> Unit,
+) {
     var r by remember { mutableIntStateOf((initial ushr 16) and 0xFF) }
     var g by remember { mutableIntStateOf((initial ushr 8) and 0xFF) }
     var b by remember { mutableIntStateOf(initial and 0xFF) }
@@ -1735,6 +2434,9 @@ private fun ColorPickerDialog(title: String, initial: Int, onDismiss: () -> Unit
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (onDefault != null) {
+                    OutlinedButton(onClick = onDefault) { Text("Default") }
+                }
             }
         },
         confirmButton = { Button(onClick = { onConfirm(argb) }) { Text("Apply") } },
@@ -1784,37 +2486,33 @@ private fun FontPickerDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        RoleIcon(Icons.Filled.TextFields, IconRole.WRITE, Modifier.size(20.dp))
                         Text(
                             option.displayName,
                             modifier = Modifier.weight(1f),
                             // Render every option in its OWN glyphs.
                             fontFamily = ThemeStore.fontFamily(option.fileName) ?: FontFamily.Default,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = role(UiRole.LIST_LABEL),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (option.fileName == current) {
-                            Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = role(UiRole.LIST_SELECTED))
                         }
                         if (option.fileName.isNotEmpty() && option.fileName != ThemeStore.MONOSPACE) {
                             IconButton(onClick = { onDelete(option.fileName) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete font", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete font", tint = role(UiRole.DELETE))
                             }
                         }
                     }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onAddFont)
-                        .padding(vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Add font…", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp), color = role(UiRole.LIST_DIVIDER))
+                // An action, not an entry of the list: a pill, with the … and the › of what opens a picker.
+                OutlinedButton(onClick = onAddFont) {
+                    RoleIcon(Icons.Filled.Add, IconRole.WRITE, Modifier.size(18.dp))
+                    Text("Add font…", Modifier.padding(start = 8.dp))
+                    Text("›", Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
                 }
             }
         },
@@ -1832,12 +2530,13 @@ private fun FontPickerDialog(
  * and which way it goes wrong.
  */
 @Composable
-private fun SettingNote(text: String) {
-    Text(
+private fun SettingNote(text: String, warn: Boolean = false) {
+    // A loose note belongs to no single row, so it has no rule; it stands at the rows' text edge.
+    val textEdge = RULE_GUTTER + rowIconSize(MaterialTheme.typography.bodyLarge) + ROW_ICON_GAP
+    RowNote(
         text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = rowStartPadding(1), end = 16.dp, bottom = 6.dp),
+        Modifier.padding(start = rowStartPadding(1) + textEdge, end = 16.dp, top = 2.dp, bottom = 2.dp),
+        warn = warn,
     )
 }
 
@@ -1850,11 +2549,14 @@ private fun SettingNote(text: String) {
  */
 @Composable
 private fun SubHeader(level: Int, title: String) {
+    // Bold and underlined, in the heading's role. The space above stays: it is what marks where
+    // the group before it ends.
     Text(
         title,
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textDecoration = TextDecoration.Underline,
+        color = role(UiRole.HEADING),
         modifier = Modifier.padding(start = rowStartPadding(level), end = 16.dp, top = 14.dp, bottom = 2.dp),
     )
 }
@@ -1869,17 +2571,12 @@ private fun SubHeader(level: Int, title: String) {
  */
 @Composable
 private fun ChartLivePreview(level: Int, prefs: ThemePrefs) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = rowStartPadding(level), end = 16.dp, top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Live preview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    PreviewBlock(level, spacing = 10.dp) {
         Surface(color = Color(ThemePrefs.NEAR_BLACK), shape = RoundedCornerShape(12.dp)) {
             ChartStylePreview(prefs, Modifier.padding(10.dp))
         }
-        Text("Colour check", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    PreviewBlock(level, caption = "Colour check", spacing = 10.dp) {
         ChartPaletteVerdict(prefs)
     }
 }
@@ -1895,17 +2592,21 @@ private val CHART_CURVE_OPTIONS = listOf(
 private fun ChartCurveRow(level: Int, value: String, onPick: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        RowScaffold(level, onClick = { expanded = true }) {
-            Text("Line shape", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(
+        RowScaffold(level, onClick = { expanded = true }, icon = Icons.Filled.Timeline) {
+            RowLabel("Line shape", Modifier.weight(1f))
+            RowValue(
                 CHART_CURVE_OPTIONS.firstOrNull { it.first == value }?.second ?: value,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             CHART_CURVE_OPTIONS.forEach { (v, text) ->
-                DropdownMenuItem(text = { Text(text) }, onClick = { onPick(v); expanded = false })
+                DropdownMenuItem(
+                    text = { Text(text) },
+                    onClick = { onPick(v); expanded = false },
+                    trailingIcon = if (v == value) ({ Text("✓") }) else null,
+                    choice = true,
+                )
             }
         }
     }
@@ -1919,22 +2620,15 @@ private fun ChartColorRow(
     onPick: (ChartColorTarget) -> Unit,
 ) {
     val value = target.get(prefs)
-    RowScaffold(level, onClick = { onPick(target) }) {
+    RowScaffold(level, onClick = { onPick(target) }, icon = Icons.Filled.Palette) {
         Column(Modifier.weight(1f)) {
-            Text(target.label, style = MaterialTheme.typography.bodyLarge)
-            Text(
+            RowLabel(target.label)
+            RowValue(
                 if (value == target.get(ThemePrefs.DEFAULT)) "Default - ${hex6(value)}" else hex6(value),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Box(
-            Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(Color(value))
-                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
-        )
+        Swatch(value)
     }
 }
 
@@ -2169,9 +2863,9 @@ private fun ExportImportPanel(
 
     Dialog(onDismissRequest = { if (!busy) onDismiss() }) {
         Surface(
+            modifier = Modifier.dialogFrame(RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.background,
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+            color = role(UiRole.DIALOG_GROUND),
         ) {
             Column(
                 Modifier
@@ -2183,32 +2877,32 @@ private fun ExportImportPanel(
                     "Export / Import — 白い熊 自由作業盤",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = role(UiRole.DIALOG_TITLE),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
                     "Everything settable in the app, category by category, as one ZIP of plain JSON files.",
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                    color = role(UiRole.DIM_GOLD),
                     modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
                 )
                 val (dirName, latest) = status
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                        .clickable(enabled = !busy) { dirPicker.launch(SettingsBackup.dirUri(context)) }
-                        .padding(12.dp),
+                // Choosing the directory opens the system picker: a pill with a ›, the directory it
+                // stands at as its label — it used to be a framed box, which read as a field.
+                Text("Export directory", fontSize = 12.sp, color = role(UiRole.DIM_GOLD))
+                OutlinedButton(
+                    onClick = { dirPicker.launch(SettingsBackup.dirUri(context)) },
+                    enabled = !busy,
+                    modifier = Modifier.padding(top = 2.dp),
                 ) {
-                    Text("Export directory (tap to choose)", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    RoleIcon(Icons.Filled.Storage, IconRole.SHARE, Modifier.size(18.dp))
                     Text(
-                        dirName ?: "Not set — tap to choose a directory",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (dirName == null) EximWarnColor else MaterialTheme.colorScheme.onSurface,
+                        dirName ?: "Not set — choose a directory",
+                        modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
+                        color = if (dirName == null) role(UiRole.WARNING) else Color.Unspecified,
                     )
+                    Text("›", Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
                 }
                 val (statusMessage, statusWarn) = when {
                     dirName == null -> "No directory set yet — pick one to enable one-tap export." to true
@@ -2218,13 +2912,13 @@ private fun ExportImportPanel(
                 Text(
                     statusMessage,
                     fontSize = 13.sp,
-                    color = if (statusWarn) EximWarnColor else MaterialTheme.colorScheme.primary,
+                    color = role(if (statusWarn) UiRole.WARNING else UiRole.DIM_GOLD),
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 10.dp),
                     thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    color = role(UiRole.LIST_DIVIDER),
                 )
                 val allSelected = SettingsBackup.Cat.entries.all { selected[it] == true }
                 EximCheckRow("Select all", allSelected, bold = true) { checked ->
@@ -2236,7 +2930,7 @@ private fun ExportImportPanel(
                 HorizontalDivider(
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    color = role(UiRole.LIST_DIVIDER),
                 )
                 Row(
                     Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -2248,7 +2942,7 @@ private fun ExportImportPanel(
                         importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                     }
                     Spacer(Modifier.width(8.dp))
-                    EximPill("Export", enabled = !busy, onClick = ::onExport)
+                    EximPill("Export", enabled = !busy, main = true, onClick = ::onExport)
                 }
             }
         }
@@ -2259,7 +2953,7 @@ private fun ExportImportPanel(
             title = "✓ Export finished",
             body = current.message,
             buttons = {
-                EximPill("OK") {
+                EximPill("OK", main = true) {
                     info = null
                     onCloseChain()
                 }
@@ -2274,7 +2968,7 @@ private fun ExportImportPanel(
                     onCloseChain()
                 }
                 Spacer(Modifier.width(8.dp))
-                EximPill("Restart now") { restartApp(context) }
+                EximPill("Restart now", main = true) { restartApp(context) }
             },
         )
         is EximInfo.Failure -> EximInfoDialog(
@@ -2282,7 +2976,7 @@ private fun ExportImportPanel(
             body = current.message,
             warn = true,
             // Failure leaves the panel open underneath — only the info dialog closes.
-            buttons = { EximPill("OK") { info = null } },
+            buttons = { EximPill("OK", main = true) { info = null } },
         )
         null -> Unit
     }
@@ -2298,21 +2992,21 @@ private fun EximInfoDialog(
 ) {
     Dialog(onDismissRequest = {}) {
         Surface(
+            modifier = Modifier.dialogFrame(RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.background,
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+            color = role(UiRole.DIALOG_GROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text(
                     title,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (warn) EximWarnColor else MaterialTheme.colorScheme.primary,
+                    color = role(if (warn) UiRole.WARNING else UiRole.DIALOG_TITLE),
                 )
                 Text(
                     body,
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = role(UiRole.DIALOG_BODY),
                     modifier = Modifier.padding(top = 10.dp, bottom = 16.dp),
                 )
                 Row(
@@ -2326,21 +3020,17 @@ private fun EximInfoDialog(
     }
 }
 
-/** ArcaneChat-style pill: black fill, 1.5dp accent stroke, accent text, fully rounded. */
+/**
+ * A button of the Export / Import panel and its outcome dialogs: the app's pill, with the panel's
+ * tighter padding. [main] is the one a dialog exists for (Export, OK, Restart now).
+ */
 @Composable
-private fun EximPill(label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(50),
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.4f)),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-    ) {
-        Text(label)
+private fun EximPill(label: String, enabled: Boolean = true, main: Boolean = false, onClick: () -> Unit) {
+    val inner = PaddingValues(horizontal = 20.dp, vertical = 6.dp)
+    if (main) {
+        Button(onClick = onClick, enabled = enabled, contentPadding = inner) { Text(label) }
+    } else {
+        OutlinedButton(onClick = onClick, enabled = enabled, contentPadding = inner) { Text(label) }
     }
 }
 
@@ -2357,16 +3047,16 @@ private fun EximCheckRow(label: String, checked: Boolean, bold: Boolean = false,
             checked = checked,
             onCheckedChange = onChecked,
             colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary,
-                uncheckedColor = MaterialTheme.colorScheme.primary,
-                checkmarkColor = MaterialTheme.colorScheme.background,
+                checkedColor = role(UiRole.CHECK_ON),
+                uncheckedColor = role(UiRole.CHECK_OFF),
+                checkmarkColor = role(UiRole.CHECK_MARK),
             ),
         )
         Text(
             label,
             fontSize = 15.sp,
             fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = role(UiRole.DIALOG_BODY),
         )
     }
 }

@@ -98,6 +98,9 @@ import com.opentasker.ui.theme.ThemeStore
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.CheckboxDefaults
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * 「言語島 聴く」 — choosing what to hear, then hearing it on one giant screen.
@@ -527,7 +530,14 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>, Bool
                     Modifier.fillMaxWidth().clickable(enabled = n > 0) { chosen[i.id] = !on },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Checkbox(checked = on && n > 0, onCheckedChange = { chosen[i.id] = it }, enabled = n > 0)
+                    Checkbox(
+                        checked = on && n > 0, onCheckedChange = { chosen[i.id] = it }, enabled = n > 0,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = role(UiRole.CHECK_ON),
+                            uncheckedColor = role(UiRole.CHECK_OFF),
+                            checkmarkColor = role(UiRole.CHECK_MARK),
+                        ),
+                    )
                     Column {
                         Text("${i.position}. ${i.nameJa.ifBlank { i.nameEn }}", fontSize = 18.sp)
                         Text(
@@ -847,6 +857,7 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
             if (isPlaying) "一時停止 / pause" else "再生 / play",
             150.dp,
             Modifier.align(Alignment.CenterHorizontally),
+            main = true,
         ) {
             if (isPlaying || inGap) c.pause() else {
                 if (ended) c.seekTo(0, 0L)
@@ -894,14 +905,22 @@ private fun SentenceBar(fraction: Float) {
 }
 
 @Composable
-private fun BigButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun BigButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    size: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    /** Play / pause is the window's main action: the thick ring. The others wear the thin one. */
+    main: Boolean = false,
+    onClick: () -> Unit,
+) {
     IconButton(
         onClick = onClick,
         modifier = modifier
             .size(size)
-            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape),
+            .border(if (main) 3.dp else 1.25.dp, role(if (main) UiRole.BUTTON_MAIN_FRAME else UiRole.BUTTON_FRAME), CircleShape),
     ) {
-        Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(size * 0.6f))
+        Icon(icon, contentDescription = label, tint = role(if (main) UiRole.BUTTON_MAIN_LABEL else UiRole.BUTTON_LABEL), modifier = Modifier.size(size * 0.6f))
     }
 }
 

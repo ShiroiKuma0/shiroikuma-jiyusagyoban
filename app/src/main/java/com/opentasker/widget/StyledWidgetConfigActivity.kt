@@ -15,8 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
@@ -102,9 +101,9 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                                 Text(if (tapTask.isBlank()) "Tap task: none" else "Tap task: $tapTask")
                             }
                             ThemedDropdownMenu(expanded = tapMenu, onDismissRequest = { tapMenu = false }) {
-                                DropdownMenuItem(text = { Text("None") }, onClick = { tapTask = ""; tapMenu = false })
+                                DropdownMenuItem(text = { Text("None") }, onClick = { tapTask = ""; tapMenu = false }, choice = true)
                                 taskNames.forEach { n ->
-                                    DropdownMenuItem(text = { Text(n) }, onClick = { tapTask = n; tapMenu = false })
+                                    DropdownMenuItem(text = { Text(n) }, onClick = { tapTask = n; tapMenu = false }, choice = true)
                                 }
                             }
                         }
@@ -113,9 +112,9 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                                 Text(if (template.isBlank()) "Content: Custom layout" else "Content: template \"$template\"")
                             }
                             ThemedDropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
-                                DropdownMenuItem(text = { Text("Custom layout (edit below)") }, onClick = { template = ""; templateMenu = false })
+                                DropdownMenuItem(text = { Text("Custom layout (edit below)") }, onClick = { template = ""; templateMenu = false }, choice = true)
                                 templateNames.forEach { n ->
-                                    DropdownMenuItem(text = { Text(n) }, onClick = { template = n; templateMenu = false })
+                                    DropdownMenuItem(text = { Text(n) }, onClick = { template = n; templateMenu = false }, choice = true)
                                 }
                             }
                         }

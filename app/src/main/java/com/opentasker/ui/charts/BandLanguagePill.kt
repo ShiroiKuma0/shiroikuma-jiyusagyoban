@@ -20,6 +20,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * The 日本語／英語 pill — one definition, worn by every page of the report.
@@ -61,9 +63,9 @@ fun rememberLanguageSwitch(): LanguageSwitchState = remember { LanguageSwitchSta
  *
  * **Yellow border, no fill**, which is this app's settled grammar for a live control — see
  * `SelectionChip`: an outline is the thing you can press, a filled yellow slab is the thing you are
- * about to do. It follows `colorScheme.primary` rather than a literal `#FFFF00` because the whole
- * window is re-themeable from the customization page, and a hard-coded yellow would survive a theme
- * change that everything around it did not.
+ * about to do. It is the theme's regular pill — 1.25 dp, fully round — and takes the button roles
+ * rather than a literal `#FFFF00`, because the whole window is re-themeable from the customization
+ * page, and a hard-coded yellow would survive a theme change that everything around it did not.
  *
  * Tapping it rewrites `健康の設定 -- [727][01]`, saves it and runs it — see [BandLanguageSwitch] for
  * why it goes the long way round rather than writing the preference. That is a database write and a
@@ -77,13 +79,15 @@ fun LanguagePill(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    val accent = MaterialTheme.colorScheme.primary
-    val ink = accent.copy(alpha = if (state.switching) 0.4f else 1f)
+    val quiet = if (state.switching) 0.38f else 1f
+    val frame = role(UiRole.BUTTON_FRAME).copy(alpha = quiet)
+    val ink = role(UiRole.BUTTON_LABEL).copy(alpha = quiet)
+    val pill = RoundedCornerShape(percent = 50)
     Box(
         modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(pill)
             .background(Color.Transparent)
-            .border(1.5.dp, ink, RoundedCornerShape(14.dp))
+            .border(1.25.dp, frame, pill)
             .clickable(enabled = !state.switching) {
                 state.switching = true
                 state.failure = null

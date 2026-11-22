@@ -22,18 +22,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Warning
 import com.opentasker.ui.components.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.components.dialogFrame
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -271,10 +276,9 @@ internal fun ImportReviewScreen(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.98f).fillMaxHeight(0.94f),
+            modifier = Modifier.fillMaxWidth(0.98f).fillMaxHeight(0.94f).dialogFrame(RoundedCornerShape(24.dp)),
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+            color = role(UiRole.DIALOG_GROUND),
         ) {
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Text(
@@ -444,7 +448,11 @@ private fun <T> StrategyChoice(
                         .clickable { onSelect(value) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RadioButton(selected = selected == value, onClick = { onSelect(value) })
+                    RadioButton(
+                        selected = selected == value,
+                        onClick = { onSelect(value) },
+                        colors = RadioButtonDefaults.colors(selectedColor = role(UiRole.RADIO_ON), unselectedColor = role(UiRole.RADIO_OFF)),
+                    )
                     Text(
                         label,
                         style = MaterialTheme.typography.bodyMedium,
@@ -535,7 +543,9 @@ private fun ProjectChoicePill(
     Box {
         Row(
             modifier = Modifier
-                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
+                // A compact pill: the rows here are forced tight, so it keeps its own measures and
+                // takes the frame every other button has.
+                .border(1.25.dp, role(UiRole.BUTTON_FRAME), RoundedCornerShape(50))
                 .clickable { open = true }
                 .padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -545,20 +555,22 @@ private fun ProjectChoicePill(
                 options.firstOrNull { it.first == selected }?.second ?: "",
                 style = MaterialTheme.typography.labelMedium,
                 fontSize = titleSp.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = role(UiRole.BUTTON_LABEL),
                 maxLines = 1,
             )
             Icon(
                 Icons.Filled.ArrowDropDown,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = role(UiRole.BUTTON_LABEL),
                 modifier = Modifier.size((titleSp + 4).dp),
             )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        ThemedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             options.forEach { (value, label) ->
                 DropdownMenuItem(
                     text = { Text(label) },
+                    leadingIcon = { if (value == selected) Icon(Icons.Filled.Check, contentDescription = null, tint = role(UiRole.LIST_SELECTED)) },
+                    choice = true,
                     onClick = { onSelect(value); open = false },
                 )
             }
@@ -671,7 +683,7 @@ private fun ReviewItemRow(
             Icon(
                 Icons.Filled.Warning,
                 contentDescription = "Already exists",
-                tint = Color(0xFFFF0000),
+                tint = role(UiRole.WARNING),
                 modifier = Modifier.size(itemSp.dp),
             )
             Spacer(Modifier.width(4.dp))
@@ -707,7 +719,9 @@ private fun ItemStrategyPill(
     Box {
         Row(
             modifier = Modifier
-                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
+                // A compact pill: the rows here are forced tight, so it keeps its own measures and
+                // takes the frame every other button has.
+                .border(1.25.dp, role(UiRole.BUTTON_FRAME), RoundedCornerShape(50))
                 .clickable { open = true }
                 .padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -728,10 +742,12 @@ private fun ItemStrategyPill(
                 modifier = Modifier.size((itemSp + 4).dp),
             )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        ThemedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             ItemConflictStrategy.entries.forEach { strat ->
                 DropdownMenuItem(
                     text = { Text(itemStrategyLongLabel(strat)) },
+                    leadingIcon = { if (strat == selected) Icon(Icons.Filled.Check, contentDescription = null, tint = role(UiRole.LIST_SELECTED)) },
+                    choice = true,
                     onClick = { onSelect(strat); open = false },
                 )
             }
@@ -793,7 +809,7 @@ private fun StatLine(label: String, count: Int, exists: Int, conflictColor: Colo
             Icon(
                 Icons.Filled.Warning,
                 contentDescription = null,
-                tint = Color(0xFFFF0000),
+                tint = role(UiRole.WARNING),
                 modifier = Modifier.size(headerSp.dp),
             )
             Spacer(Modifier.width(4.dp))

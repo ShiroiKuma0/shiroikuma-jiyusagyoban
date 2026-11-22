@@ -63,7 +63,7 @@ object OnseWarning {
         }
         val builder = NotificationCompat.Builder(app, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ContextCompat.getColor(app, R.color.notification_accent))
+            .setColor(com.opentasker.ui.theme.UiRoles.argb(com.opentasker.ui.theme.UiRole.NOTIFICATION_ACCENT))
             .setContentTitle("音声：電池の最適化から外してください / exempt 白い熊 音声")
             .setContentText(text.lineSequence().first())
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

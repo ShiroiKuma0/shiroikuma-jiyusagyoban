@@ -49,56 +49,54 @@ private val OpenTaskerShapes = Shapes(
  * tonal-elevation overlay never tints surfaces. The result is true black with pure-yellow content.
  */
 fun colorSchemeFrom(prefs: ThemePrefs): ColorScheme {
+    // Every entry is a role of its own (UiRoles.kt, RoleSection.SCREENS): by default they are what
+    // they were when one accent fed them all, and each can now be set apart on the UI page.
+    fun c(role: UiRole) = Color(UiRoles.argb(role, prefs))
     val background = Color(prefs.background)
     val surface = Color(prefs.surface)
-    val text = Color(prefs.text)
-    val textSecondary = Color(prefs.textSecondary)
-    val accent = Color(prefs.accent)
-    val onAccent = accent.contrastingOnColor()
-    val border = Color(prefs.border)
-    val error = Color(0xFFFF6B6B)
+    val container = c(UiRole.SCHEME_CONTAINER)
 
     return darkColorScheme(
-        primary = accent,
-        onPrimary = onAccent,
-        primaryContainer = surface,
-        onPrimaryContainer = accent,
-        secondary = accent,
-        onSecondary = onAccent,
-        secondaryContainer = surface,
-        onSecondaryContainer = accent,
-        tertiary = accent,
-        onTertiary = onAccent,
-        tertiaryContainer = surface,
-        onTertiaryContainer = accent,
-        error = error,
-        onError = Color.Black,
-        errorContainer = surface,
-        onErrorContainer = error,
+        primary = c(UiRole.SCHEME_PRIMARY),
+        onPrimary = c(UiRole.SCHEME_ON_PRIMARY),
+        primaryContainer = c(UiRole.SCHEME_PRIMARY_CONTAINER),
+        onPrimaryContainer = c(UiRole.SCHEME_ON_PRIMARY_CONTAINER),
+        secondary = c(UiRole.SCHEME_SECONDARY),
+        onSecondary = c(UiRole.SCHEME_ON_SECONDARY),
+        secondaryContainer = c(UiRole.SCHEME_SECONDARY_CONTAINER),
+        onSecondaryContainer = c(UiRole.SCHEME_ON_SECONDARY_CONTAINER),
+        tertiary = c(UiRole.SCHEME_TERTIARY),
+        onTertiary = c(UiRole.SCHEME_ON_TERTIARY),
+        tertiaryContainer = c(UiRole.SCHEME_TERTIARY_CONTAINER),
+        onTertiaryContainer = c(UiRole.SCHEME_ON_TERTIARY_CONTAINER),
+        error = c(UiRole.SCHEME_ERROR),
+        onError = c(UiRole.SCHEME_ON_ERROR),
+        errorContainer = c(UiRole.SCHEME_ERROR_CONTAINER),
+        onErrorContainer = c(UiRole.SCHEME_ON_ERROR_CONTAINER),
         background = background,
-        onBackground = text,
+        onBackground = c(UiRole.SCHEME_ON_BACKGROUND),
         surface = surface,
-        onSurface = text,
-        surfaceVariant = surface,
+        onSurface = c(UiRole.SCHEME_ON_SURFACE),
+        surfaceVariant = c(UiRole.SCHEME_SURFACE_VARIANT),
         // Material3 1.4 ("expressive") routes Outlined/Text button LABEL + ICON colour to
-        // onSurfaceVariant (not primary as older versions did). Mapping it to the dim textSecondary
-        // made every button's text render as a muted/olive yellow while its border stayed bright.
-        // Point it at the full-strength text colour so button labels are pure #FFFF00 like the headings.
-        onSurfaceVariant = text,
-        // All surfaceContainer roles are pure black so elevated popups — DropdownMenus
-        // (surfaceContainer) and AlertDialogs (surfaceContainerHigh) — render true black, not the
-        // lifted/brownish `surface`. Cards keep `surface` (set directly), so they're unaffected.
-        surfaceContainerLowest = background,
-        surfaceContainerLow = background,
-        surfaceContainer = background,
-        surfaceContainerHigh = background,
-        surfaceContainerHighest = background,
+        // onSurfaceVariant (not primary as older versions did). Its default is therefore the
+        // full-strength text colour, not the dim textSecondary, which made every button's text
+        // render as a muted/olive yellow while its border stayed bright.
+        onSurfaceVariant = c(UiRole.SCHEME_ON_SURFACE_VARIANT),
+        // All surfaceContainer roles share one role, by default the background, so elevated popups —
+        // DropdownMenus (surfaceContainer) and AlertDialogs (surfaceContainerHigh) — render true
+        // black, not the lifted/brownish `surface`. Cards keep `surface` (set directly).
+        surfaceContainerLowest = container,
+        surfaceContainerLow = container,
+        surfaceContainer = container,
+        surfaceContainerHigh = container,
+        surfaceContainerHighest = container,
         surfaceTint = Color.Transparent,
-        inverseSurface = text,
-        inverseOnSurface = background,
-        outline = border,
-        outlineVariant = border,
-        scrim = Color.Black,
+        inverseSurface = c(UiRole.SCHEME_INVERSE_SURFACE),
+        inverseOnSurface = c(UiRole.SCHEME_INVERSE_ON_SURFACE),
+        outline = c(UiRole.SCHEME_OUTLINE),
+        outlineVariant = c(UiRole.SCHEME_OUTLINE_VARIANT),
+        scrim = c(UiRole.SCHEME_SCRIM),
     )
 }
 
@@ -151,6 +149,14 @@ fun OpenTaskerTheme(
             // Under edge-to-edge (target SDK 35+) window.statusBarColor/navigationBarColor are
             // deprecated no-ops; only the appearance flags still control bar icon contrast.
             val window = (view.context as? Activity)?.window ?: return@SideEffect
+            // The theme's black window background is only what the platform draws before any code
+            // runs; from here on the window wears the background 白い熊 set.
+            // Only an opaque window is repainted: the dialog and over-lock-screen activities have a
+            // see-through window on purpose, and painting it would black out what is behind them.
+            val ground = window.decorView.background as? android.graphics.drawable.ColorDrawable
+            if (ground != null && android.graphics.Color.alpha(ground.color) == 255 && ground.color != prefs.background) {
+                window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(prefs.background))
+            }
             // Background is user-chosen and usually dark; keep light status-bar/nav-bar icons unless
             // the chosen background is itself light.
             val lightBg = colors.background.luminance() > 0.5f
@@ -160,12 +166,15 @@ fun OpenTaskerTheme(
             }
         }
     }
-    MaterialTheme(
-        colorScheme = colors,
-        typography = typography,
-        shapes = OpenTaskerShapes,
-        content = content,
-    )
+    val roles = remember(prefs) { RolePalette(prefs) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalRolePalette provides roles) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = typography,
+            shapes = OpenTaskerShapes,
+            content = content,
+        )
+    }
 }
 
 /**
@@ -183,4 +192,3 @@ fun selectedContainerColor(): Color =
 
 private fun Color.luminance(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
 
-private fun Color.contrastingOnColor(): Color = if (luminance() > 0.5f) Color.Black else Color.White

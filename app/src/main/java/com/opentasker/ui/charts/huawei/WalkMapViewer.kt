@@ -31,6 +31,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.opentasker.core.huawei.maps.WalkPlot
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.core.huawei.maps.WalkTrack
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
+import com.opentasker.ui.components.dialogFrame
+import androidx.compose.ui.graphics.RectangleShape
 
 /**
  * One walk's map, full screen and pinchable.
@@ -85,10 +89,11 @@ object WalkMapViewer {
             Box(
                 Modifier
                     .fillMaxSize()
-                    // Opaque, and black rather than the surface colour: a map is the only thing
-                    // worth looking at here, and every pixel of chrome around it is one the map
-                    // does not get.
-                    .background(Color.Black),
+                    // Opaque, and the dialog ground rather than the surface colour: a map is the
+                    // only thing worth looking at here, and every pixel of chrome around it is one
+                    // the map does not get. The frame is the one every dialog wears.
+                    .background(role(UiRole.DIALOG_GROUND))
+                    .dialogFrame(RectangleShape),
             ) {
                 Box(
                     Modifier
@@ -166,7 +171,7 @@ object WalkMapViewer {
                         "${HuaweiText.walksZoomHint[lang]}  ·  ${"%.1f".format(zoom)}×"
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = role(UiRole.DIALOG_BODY),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()

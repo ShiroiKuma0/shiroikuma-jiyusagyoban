@@ -199,7 +199,7 @@ private fun ZoneRow(name: String, seconds: Int, most: Int) {
         }
         Box(
             Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
-                .background(Color(0x22FFFFFF)),
+                .background(com.opentasker.ui.theme.role(com.opentasker.ui.theme.UiRole.CHART_TRACK).copy(alpha = 0.13f)),
         ) {
             if (seconds > 0) {
                 Box(

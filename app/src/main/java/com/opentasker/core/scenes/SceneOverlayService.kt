@@ -6,9 +6,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
@@ -33,6 +36,8 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.UiRoles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -119,12 +124,14 @@ class SceneOverlayService : Service() {
         // Root container: header + scene content
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(OVERLAY_BACKGROUND)
+            // This overlay reads no colour from the scene, so every colour here is the theme's
+            // fallback, read as the view is built: a changed role shows the next time it opens.
+            setBackgroundColor(UiRoles.argb(UiRole.SCENE_GROUND))
         }
 
         // Header bar (draggable area + close button)
         val header = FrameLayout(this).apply {
-            setBackgroundColor(HEADER_BACKGROUND)
+            setBackgroundColor(UiRoles.argb(UiRole.SCENE_PANEL))
             contentDescription = getString(R.string.scene_overlay_drag_handle_content_description)
             isFocusable = true
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -136,7 +143,7 @@ class SceneOverlayService : Service() {
 
         val closeButton = TextView(this).apply {
             text = CLOSE_LABEL
-            setTextColor(Color.WHITE)
+            setTextColor(UiRoles.argb(UiRole.SCENE_TEXT))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.CENTER
@@ -200,6 +207,9 @@ class SceneOverlayService : Service() {
         return when (element.type) {
             SceneElementType.BUTTON -> Button(this).apply {
                 text = element.config["label"] ?: getString(R.string.scene_overlay_default_button)
+                // The element carries no colour of its own here, so it wears the theme's outlined
+                // pill instead of the platform's grey slab.
+                stylePillButton(this)
                 // Tapjacking guard: drop taps delivered while a malicious window obscures this
                 // task-firing control (the overlay floats over other apps).
                 filterTouchesWhenObscured = true
@@ -218,7 +228,7 @@ class SceneOverlayService : Service() {
                 // `label` is read as a fallback so an element migrated from a removed type keeps
                 // the caption it was authored with instead of rendering as an invisible box.
                 text = element.config["text"] ?: element.config["label"].orEmpty()
-                setTextColor(Color.WHITE)
+                setTextColor(UiRoles.argb(UiRole.SCENE_TEXT))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             }
 
@@ -251,7 +261,7 @@ class SceneOverlayService : Service() {
                         addView(
                             TextView(this@SceneOverlayService).apply {
                                 text = config.label
-                                setTextColor(Color.WHITE)
+                                setTextColor(UiRoles.argb(UiRole.SCENE_TEXT))
                                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                             },
                             LinearLayout.LayoutParams(
@@ -311,6 +321,33 @@ class SceneOverlayService : Service() {
         }
     }
 
+    /** An outlined pill: transparent inside, a thin fully round frame, the label as written. */
+    private fun stylePillButton(button: Button) {
+        val density = resources.displayMetrics.density
+        val frame = UiRoles.argb(UiRole.SCENE_BUTTON_FRAME)
+        // A radius larger than any button is clamped to half its height, which is "fully round".
+        val round = 1000f * density
+        val outline = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = round
+            setColor(Color.TRANSPARENT)
+            setStroke((1.25f * density).toInt().coerceAtLeast(1), frame)
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = round
+            setColor(Color.WHITE)
+        }
+        // The press ripple is the frame's colour at 30 %, kept inside the pill by the mask.
+        val ripple = ColorStateList.valueOf((frame and 0x00FFFFFF) or (0x4D shl 24))
+        button.background = RippleDrawable(ripple, outline, mask)
+        button.setTextColor(UiRoles.argb(UiRole.SCENE_BUTTON_LABEL))
+        button.setAllCaps(false)
+        // The stock button lifts on press through this animator; a pill stays flat.
+        button.stateListAnimator = null
+        button.elevation = 0f
+    }
+
     private fun unsupportedElementView(element: SceneElement): TextView =
         TextView(this).apply {
             val typeRes = when (element.type) {
@@ -322,7 +359,7 @@ class SceneOverlayService : Service() {
             }
             val typeLabel = typeRes?.let { getString(it) } ?: element.type.name.lowercase()
             text = getString(R.string.scene_overlay_unsupported_element, typeLabel)
-            setTextColor(Color.GRAY)
+            setTextColor(UiRoles.argb(UiRole.SCENE_NOTE))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             val padPx = (2 * resources.displayMetrics.density).toInt()
             setPadding(padPx, padPx, padPx, padPx)
@@ -470,8 +507,6 @@ class SceneOverlayService : Service() {
         private const val CLOSE_BUTTON_SIZE_DP = 48
         private const val ACCESSIBILITY_MOVE_STEP_DP = 24
         private const val CLOSE_LABEL = "✕"
-        private const val OVERLAY_BACKGROUND = 0xE0_1E_1E_2E.toInt()  // Catppuccin Mocha base ~88% alpha
-        private const val HEADER_BACKGROUND = 0xFF_31_32_44.toInt()   // Catppuccin Mocha surface0
 
         /** Start the overlay service, displaying the given [scene]. */
         fun show(context: Context, scene: Scene) {

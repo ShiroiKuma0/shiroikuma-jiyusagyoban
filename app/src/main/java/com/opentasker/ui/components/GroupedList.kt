@@ -17,15 +17,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +57,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /** A rendered row in a grouped list: a group header, the "Ungrouped" drop zone, or a member item. */
 sealed interface GroupRow<out T> {
@@ -342,9 +346,9 @@ fun <T> LazyListScope.groupedItems(
                                     },
                             )
                             ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                DropdownMenuItem(text = { Text("Move into group…") }, onClick = { menu = false; onMoveItem(key) })
+                                DropdownMenuItem(text = { Text("Move into group…") }, icon = Icons.AutoMirrored.Filled.DriveFileMove, role = IconRole.SHARE, opens = true, onClick = { menu = false; onMoveItem(key) })
                                 if (ops.groupIdOf(key) != null) {
-                                    DropdownMenuItem(text = { Text("Move out of group") }, onClick = { menu = false; ops.setItemGroup(key, null) })
+                                    DropdownMenuItem(text = { Text("Move out of group") }, icon = Icons.AutoMirrored.Filled.Logout, role = IconRole.SHARE, onClick = { menu = false; ops.setItemGroup(key, null) })
                                 }
                             }
                         }
@@ -484,27 +488,37 @@ fun GroupHeaderRow(
             ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = { Text("New subgroup") },
-                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    icon = Icons.Filled.Add,
+                    role = IconRole.WRITE,
+                    opens = true,
                     onClick = { menuOpen = false; addingSub = true },
                 )
                 DropdownMenuItem(
                     text = { Text("Rename group") },
-                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                    icon = Icons.Filled.Edit,
+                    role = IconRole.WRITE,
+                    opens = true,
                     onClick = { menuOpen = false; renaming = true },
                 )
                 DropdownMenuItem(
                     text = { Text("Move into group…") },
+                    icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                    role = IconRole.SHARE,
+                    opens = true,
                     onClick = { menuOpen = false; onMoveInto() },
                 )
                 if (group.parentGroupId != null) {
                     DropdownMenuItem(
                         text = { Text("Move out of group") },
+                        icon = Icons.AutoMirrored.Filled.Logout,
+                        role = IconRole.SHARE,
                         onClick = { menuOpen = false; onMoveOut() },
                     )
                 }
                 DropdownMenuItem(
                     text = { Text("Delete group") },
-                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                    icon = Icons.Filled.Delete,
+                    destructive = true,
                     onClick = { menuOpen = false; onDelete() },
                 )
             }
@@ -772,16 +786,22 @@ fun GroupPickerDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 groups.forEach { g ->
-                    Text(
-                        g.name,
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onPick(g.id) }
                             .padding(vertical = 10.dp, horizontal = 8.dp),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        RoleIcon(Icons.Filled.Layers, IconRole.PERSON, Modifier.size(18.dp))
+                        Text(g.name, color = role(UiRole.LIST_LABEL))
+                    }
                 }
                 if (onCreate != null) {
+                    // The picker's two groups of rows: the groups there are, and making a new one.
+                    if (groups.isNotEmpty()) HorizontalDivider(color = role(UiRole.LIST_DIVIDER))
                     if (creating) {
                         OutlinedTextField(
                             value = newName,
@@ -799,8 +819,8 @@ fun GroupPickerDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text("New group")
+                            RoleIcon(Icons.Filled.Add, IconRole.WRITE, Modifier.size(18.dp))
+                            Text("New group", color = role(UiRole.LIST_LABEL))
                         }
                     }
                 }

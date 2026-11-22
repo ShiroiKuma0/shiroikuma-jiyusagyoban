@@ -388,8 +388,8 @@ fun HuaweiEcgDetailScreen(
 @Composable
 fun EcgStrip(rec: HuaweiEcgRecording, fromSec: Int, seconds: Int, modifier: Modifier = Modifier) {
     val scale = remember(rec.startMs) { ecgScale(rec.samples, rec.sampleRate) }
-    val grid = Color(0x1AFFFFFF)
-    val gridHeavy = Color(0x33FFFFFF)
+    val grid = com.opentasker.ui.theme.role(com.opentasker.ui.theme.UiRole.CHART_TRACK).copy(alpha = 0.1f)
+    val gridHeavy = com.opentasker.ui.theme.role(com.opentasker.ui.theme.UiRole.CHART_TRACK).copy(alpha = 0.2f)
     Canvas(modifier) {
         val rate = rec.sampleRate.coerceAtLeast(1)
         val from = (fromSec * rate).coerceIn(0, rec.samples.size)

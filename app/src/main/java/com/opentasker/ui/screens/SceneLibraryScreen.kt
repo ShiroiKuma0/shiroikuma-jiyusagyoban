@@ -30,6 +30,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -42,11 +43,13 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
+import com.opentasker.ui.components.destructiveButtonColors
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -1062,10 +1065,7 @@ private fun SceneElementDeleteDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
+                colors = destructiveButtonColors(),
             ) {
                 Text(stringResource(R.string.action_remove_element))
             }
@@ -1278,10 +1278,12 @@ private fun SceneElementTypeSelector(
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text(sceneElementTypeLabel(selected), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             SceneElementDrafts.editableTypes.forEach { type ->
                 DropdownMenuItem(
                     text = { Text(sceneElementTypeLabel(type)) },
+                    leadingIcon = { if (type == selected) Icon(Icons.Filled.Check, contentDescription = null, tint = role(UiRole.LIST_SELECTED)) },
+                    choice = true,
                     onClick = {
                         onSelect(type)
                         expanded = false
@@ -1312,9 +1314,11 @@ private fun SceneTaskBindingSelector(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.label_none)) },
+                leadingIcon = { if (selectedTaskId == null) Icon(Icons.Filled.Check, contentDescription = null, tint = role(UiRole.LIST_SELECTED)) },
+                choice = true,
                 onClick = {
                     onSelect(null)
                     expanded = false
@@ -1323,6 +1327,8 @@ private fun SceneTaskBindingSelector(
             tasks.sortedBy { it.name.lowercase() }.forEach { task ->
                 DropdownMenuItem(
                     text = { Text(task.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = { if (task.id == selectedTaskId) Icon(Icons.Filled.Check, contentDescription = null, tint = role(UiRole.LIST_SELECTED)) },
+                    choice = true,
                     onClick = {
                         onSelect(task.id)
                         expanded = false

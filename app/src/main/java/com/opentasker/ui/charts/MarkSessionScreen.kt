@@ -37,6 +37,8 @@ import com.opentasker.core.band.TrainingSessions
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.opentasker.ui.components.Button
+import com.opentasker.ui.components.OutlinedButton
 
 /**
  * Mark a training session after the fact, by drawing it on the heart-rate chart.
@@ -183,28 +185,26 @@ fun MarkSessionScreen(
                             minutes >= TrainingSessions.MIN_SESSION_MINUTES &&
                             minutes <= TrainingSessions.MAX_OPEN_MINUTES
                         Button(
-                            text = BandText.markSessionSubmit[lang],
+                            onClick = {
+                                // Guarded twice on purpose: the button is disabled when the span is out
+                                // of range, and the model refuses it anyway. The store is the thing that
+                                // must never take a one-minute "workout", so it owns the rule.
+                                if (start != null && end != null && onSubmit(start, end)) {
+                                    span.clear()
+                                    message = BandText.markSessionDone
+                                } else {
+                                    message = BandText.markSessionRejected
+                                }
+                            },
                             enabled = valid,
-                            primary = true,
-                        ) {
-                            // Guarded twice on purpose: the button is disabled when the span is out
-                            // of range, and the model refuses it anyway. The store is the thing that
-                            // must never take a one-minute "workout", so it owns the rule.
-                            if (start != null && end != null && onSubmit(start, end)) {
+                        ) { Text(BandText.markSessionSubmit[lang]) }
+                        OutlinedButton(
+                            onClick = {
                                 span.clear()
-                                message = BandText.markSessionDone
-                            } else {
-                                message = BandText.markSessionRejected
-                            }
-                        }
-                        Button(
-                            text = BandText.markSessionClear[lang],
+                                message = null
+                            },
                             enabled = span.active,
-                            primary = false,
-                        ) {
-                            span.clear()
-                            message = null
-                        }
+                        ) { Text(BandText.markSessionClear[lang]) }
                     }
                 }
             }
@@ -219,32 +219,10 @@ private fun NudgeRow(label: String, onNudge: (Long) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = style.axisText)
         Spacer(Modifier.width(4.dp))
-        Button(text = "−5", enabled = true, primary = false) { onNudge(-5 * 60_000L) }
-        Button(text = "+5", enabled = true, primary = false) { onNudge(5 * 60_000L) }
+        // The app's own pills (ui/components/Pills.kt), like every other button: never filled.
+        OutlinedButton(onClick = { onNudge(-5 * 60_000L) }, contentPadding = NUDGE_PADDING) { Text("−5") }
+        OutlinedButton(onClick = { onNudge(5 * 60_000L) }, contentPadding = NUDGE_PADDING) { Text("+5") }
     }
 }
 
-/** A plain tappable pill — the window has no button style of its own and needs two here. */
-@Composable
-private fun Button(text: String, enabled: Boolean, primary: Boolean, onClick: () -> Unit) {
-    val style = LocalChartStyle.current
-    val tint = if (primary) ChartPalette.HEART_RATE else style.axisText
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (primary) tint.copy(alpha = if (enabled) 0.22f else 0.06f) else Color.Transparent)
-            .then(
-                if (primary) Modifier else Modifier.clip(RoundedCornerShape(12.dp)),
-            )
-            // padding before clickable, so the whole pill is the target rather than the text.
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(enabled = enabled, onClick = onClick),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (primary) FontWeight.Bold else FontWeight.Normal,
-            color = if (enabled) tint else tint.copy(alpha = 0.4f),
-        )
-    }
-}
+private val NUDGE_PADDING = PaddingValues(horizontal = 16.dp, vertical = 8.dp)

@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import com.opentasker.ui.theme.isNarrowScreen
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 
 /**
  * 回復 — last night's markers against 白い熊's own normal.
@@ -610,15 +612,18 @@ fun loadBandLabel(b: LoadBand): Loc = when (b) {
 @Composable
 private fun RegisterButton(nights: Int, rated: Int, onClick: () -> Unit) {
     val lang = LocalBandLanguage.current
-    val accent = ChartPalette.HEART_RATE
+    // The card's main action, so the theme's main pill: a 3 dp frame, bold, and nothing filled. It
+    // is drawn here rather than through ui/components because it carries two lines and a ▸.
+    val accent = role(UiRole.BUTTON_MAIN_LABEL)
+    val pill = RoundedCornerShape(percent = 50)
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(accent.copy(alpha = 0.16f))
-            .border(1.5.dp, accent, RoundedCornerShape(14.dp))
+            .clip(pill)
+            .border(3.dp, role(UiRole.BUTTON_MAIN_FRAME), pill)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            // Wide enough at the sides that the round ends do not cut into the two lines.
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -33,7 +33,6 @@ import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -396,13 +395,15 @@ private fun DeadCatRow(label: String, count: Int, action: String, highlight: Boo
 /** One dead variable's detail line: `%name` · where (twin project, for a shadow) · value. */
 @Composable
 private fun DeadItemRow(name: String, where: String, value: String) {
+    // A variable's name wears the colour it has in the list below — the settable "variable name" colour.
+    val themePrefs by ThemeStore.state.collectAsState()
     Row(
         Modifier.fillMaxWidth().padding(start = 26.dp, top = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(name, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold, color = Color(0xFF7FB4FF), maxLines = 1)
+            fontWeight = FontWeight.Bold, color = Color(themePrefs.varNameColor), maxLines = 1)
         if (where.isNotEmpty()) {
             Text(where, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
