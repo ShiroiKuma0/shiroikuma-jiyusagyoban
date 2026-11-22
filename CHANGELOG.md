@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- `%arr(+sep+range)` reads a range only when Tasker would. `%arr(+;+2)` is still element 2, but `%arr(+;+12)` and `%arr(+x+:)` now join with `;+12` and `x+:`, as they do in Tasker, instead of reading element 12 or every element.
 - `%found(#)` reads 0 when `%found` is set but has no elements, as it does in Tasker, and so do `(#<)` and `(#>)`. After Split Text into `%found` and then an Array Clear, or a Replace Text that found nothing, it used to read the first part.
 - Array Push, Array Pop and Array Process now work on a list Split Text or Match Text kept. They read it as elements 1, 2, 3 and so on, and what they leave is what Join Text, For Each and `%parts(#)` read next. Before, they changed only numbered elements, so Join Text and For Each kept reading the old list.
 - A huge range on a Split Text or Match Text array, like `%parts(0:2000000000)`, now reads the parts that exist straight away. It used to count through every number in the range first, which held the step up for seconds.

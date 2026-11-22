@@ -393,8 +393,9 @@ class VariableExpander {
     /**
      * Tasker's `+sep` (every element, joined by sep), `+sep+range` (the elements in range, as in
      * `%arr(+>+2:4)`) and `*` (one element at random), read from the form with its variables filled
-     * in. Null for any other form. The separator is everything after the first `+`, unless a second
-     * `+` is followed by a range, so `%arr(+, )` joins with a comma and a space.
+     * in. Null for any other form. The separator is everything after the first `+`, so `%arr(+, )`
+     * joins with a comma and a space, unless Tasker's test ([isTaskerJoinRange]) says a range follows
+     * the last `+`.
      */
     private sealed interface TaskerJoinOrPick {
         data class Join(val separator: String, val range: String) : TaskerJoinOrPick
@@ -405,13 +406,32 @@ class VariableExpander {
         if (expanded.trim() == "*") return TaskerJoinOrPick.AtRandom
         if (!expanded.startsWith('+')) return null
         val rest = expanded.substring(1)
-        val split = rest.lastIndexOf('+')
-        if (split >= 0) {
-            val range = rest.substring(split + 1)
-            if (range.isNotEmpty() && TASKER_RANGE_FORM.matches(range)) return TaskerJoinOrPick.Join(rest.substring(0, split), range)
-        }
-        return TaskerJoinOrPick.Join(rest, "")
+        if (!isTaskerJoinRange(rest)) return TaskerJoinOrPick.Join(rest, "")
+        val split = if ("+\$?" in rest) rest.indexOf("+\$?") else rest.lastIndexOf('+')
+        val range = rest.substring(split + 1)
+        // A range Tasker reads that isn't read here yet, like `$?pattern`, still joins with all of it.
+        return if (TASKER_RANGE_FORM.matches(range)) TaskerJoinOrPick.Join(rest.substring(0, split), range) else TaskerJoinOrPick.Join(rest, "")
     }
+
+    /**
+     * Tasker's test for a range after a second `+` (decompiled 6.7.8, `dq.X`): there must be one, and
+     * the text must also hold a `:` or `,` and a digit, hold `+$?`, or end in `+` and one digit. So
+     * `%arr(+;+2)` reads element 2 while `%arr(+;+12)` and `%arr(+x+:)` join with `;+12` and `x+:`.
+     */
+    private fun isTaskerJoinRange(rest: String): Boolean =
+        '+' in rest &&
+            (
+                ((':' in rest || ',' in rest) && hasTaskerDigit(rest)) ||
+                    "+\$?" in rest ||
+                    TASKER_SINGLE_DIGIT_RANGE.matches(rest)
+                )
+
+    /**
+     * Tasker's `(.|\n)*\d(.|\n)*`, without the regex, which overflows Java's stack on long text: a
+     * digit, and no line break but `\n`, since `.` doesn't cross `\r`, U+0085, U+2028 or U+2029.
+     */
+    private fun hasTaskerDigit(text: String): Boolean =
+        text.any { it in '0'..'9' } && text.none { it == '\r' || it.code == 0x85 || it.code == 0x2028 || it.code == 0x2029 }
 
     /**
      * Tasker's array forms over numbered variables (`%arr1`, `%arr2`, ...): `#` counts the elements,
@@ -1055,6 +1075,9 @@ class VariableExpander {
         private val TASKER_COUNT_FORMS = setOf("#", "#<", "#>")
         private val STORED_ARRAY_FORM = Regex("""#|\d*(?::\d*)?""")
         private val TASKER_RANGE_FORM = Regex("""\d*(?::\d*)?""")
+
+        /** Java's `.+\+\d$` as Tasker writes it: `.` stops at a line break and `\d` is 0 to 9. */
+        private val TASKER_SINGLE_DIGIT_RANGE = Regex(""".+\+\d""")
 
         private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 
