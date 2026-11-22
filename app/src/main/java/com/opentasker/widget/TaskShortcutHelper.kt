@@ -51,10 +51,15 @@ object TaskShortcutHelper {
         val disable: List<String>,
         val enable: List<String>,
         val update: List<ShortcutState>,
+        val stillHeld: Map<String, String> = emptyMap(),
     ) {
-        /** The task name each shortcut in [update] is being written for. */
-        val updatedNames: Map<Long, String>
-            get() = update.mapNotNull { shortcut -> shortcut.madeFor?.let { shortcut.taskId to it } }.toMap()
+        /**
+         * What [WatchState.heldBack] becomes after this plan: [stillHeld], the entries for shortcuts
+         * whose task is gone, and unless Android [applied] the renames, the task name each shortcut
+         * in [update] is being written for.
+         */
+        fun heldBack(applied: Boolean): Map<String, String> =
+            if (applied) stillHeld else stillHeld + update.mapNotNull { shortcut -> shortcut.madeFor?.let { shortcut.id to it } }
     }
 
     fun canPinShortcut(context: Context): Boolean =
@@ -108,7 +113,7 @@ object TaskShortcutHelper {
         state: WatchState = WatchState(previous = null, afterRestore = false),
     ): Reconciled {
         var outcome = ReconcileOutcome.FAILED
-        var heldBack = emptyMap<Long, String>()
+        var heldBack = emptyMap<String, String>()
         runCatching {
             val shortcuts = ShortcutManagerCompat.getShortcuts(
                 context,
@@ -136,14 +141,15 @@ object TaskShortcutHelper {
                 ShortcutManagerCompat.enableShortcuts(context, shortcuts.filter { it.id in plan.enable })
             }
             outcome = ReconcileOutcome.CHECKED
+            heldBack = plan.heldBack(applied = false)
             val updated = plan.update.isEmpty() || ShortcutManagerCompat.updateShortcuts(
                 context,
                 plan.update.map { taskShortcut(context, it.id, it.taskId, it.label, it.kind, it.madeFor) },
             )
             if (updated) {
                 outcome = ReconcileOutcome.APPLIED
+                heldBack = plan.heldBack(applied = true)
             } else {
-                heldBack = plan.updatedNames
                 AppLogger.warn(TAG, "Android held back renaming task shortcuts; the next change tries again")
             }
         }.onFailure { AppLogger.error(TAG, "Could not update task shortcuts", it) }
@@ -160,48 +166,52 @@ object TaskShortcutHelper {
         APPLIED,
     }
 
-    /** How far a [reconcile] got, and the name of each task whose shortcuts Android didn't let it rename. */
-    data class Reconciled(val outcome: ReconcileOutcome, val heldBack: Map<Long, String> = emptyMap())
+    /** How far a [reconcile] got, and what [WatchState.heldBack] becomes unless it [ReconcileOutcome.FAILED]. */
+    data class Reconciled(val outcome: ReconcileOutcome, val heldBack: Map<String, String> = emptyMap())
 
     /**
      * What the app carries from one [reconcile] to the next. A restore's caution lasts until a
      * pass has turned off what it had to. [previous] is the task names the shortcuts last matched,
      * or the first ones seen until then, kept while renames are held back so an older shortcut can
-     * still follow from its label. [heldBack] is the name each task had when Android held back
-     * renaming its shortcuts, so one turned off before the rename got through still comes back
-     * with its task.
+     * still follow from its label. [heldBack] is, by shortcut id, the task name a shortcut was being
+     * renamed for when Android held that back, kept while its task is gone, so one turned off
+     * before the rename got through still comes back with its task.
      */
     data class WatchState(
         val previous: Map<Long, String>?,
         val afterRestore: Boolean,
-        val heldBack: Map<Long, String> = emptyMap(),
+        val heldBack: Map<String, String> = emptyMap(),
     ) {
-        fun after(outcome: ReconcileOutcome, names: Map<Long, String>, heldBack: Map<Long, String> = emptyMap()) = WatchState(
+        fun after(outcome: ReconcileOutcome, names: Map<Long, String>, heldBack: Map<String, String> = emptyMap()) = WatchState(
             previous = if (outcome == ReconcileOutcome.APPLIED) names else previous ?: names,
             afterRestore = afterRestore && outcome == ReconcileOutcome.FAILED,
-            heldBack = if (outcome == ReconcileOutcome.FAILED) this.heldBack else this.heldBack - names.keys + heldBack,
+            heldBack = if (outcome == ReconcileOutcome.FAILED) this.heldBack else heldBack,
         )
     }
 
     /**
      * Runs [pass] on every new task list, carrying [state] from one to the next for the life of
-     * the process. A pass that failed outright is tried again every [retryDelayMs] until it gets
-     * through or the list changes, so a restore's check doesn't wait for the next edit.
+     * the process. A pass that failed outright is tried again after [retryDelayMs], then twice as
+     * long each time up to [maxRetryDelayMs], until it gets through or the list changes, so a
+     * restore's check doesn't wait for the next edit.
      */
     class Watcher(
         afterRestore: Boolean,
         private val retryDelayMs: Long = 60_000L,
+        private val maxRetryDelayMs: Long = 3_600_000L,
         private val pass: (Map<Long, String>, WatchState) -> Reconciled,
     ) {
         var state = WatchState(previous = null, afterRestore = afterRestore)
             private set
 
         suspend fun watch(names: Flow<Map<Long, String>>) = names.collectLatest { current ->
+            var wait = retryDelayMs
             while (true) {
                 val result = pass(current, state)
                 state = state.after(result.outcome, current, result.heldBack)
                 if (result.outcome != ReconcileOutcome.FAILED) break
-                delay(retryDelayMs)
+                delay(wait)
+                wait = (wait * 2).coerceAtMost(maxRetryDelayMs)
             }
         }
     }
@@ -229,21 +239,23 @@ object TaskShortcutHelper {
         taskNames: Map<Long, String>,
         previousNames: Map<Long, String>? = null,
         afterRestore: Boolean = false,
-        heldBack: Map<Long, String> = emptyMap(),
+        heldBack: Map<String, String> = emptyMap(),
     ): ShortcutPlan {
         val disable = mutableListOf<String>()
         val enable = mutableListOf<String>()
         val update = mutableListOf<ShortcutState>()
+        val stillHeld = mutableMapOf<String, String>()
         for (shortcut in shortcuts) {
             val name = taskNames[shortcut.taskId]
             if (name == null) {
                 if (shortcut.enabled) disable += shortcut.id
+                heldBack[shortcut.id]?.let { stillHeld[shortcut.id] = it }
                 continue
             }
             val madeFor = if (shortcut.kind == ShortcutKind.LEGACY) shortcut.label else shortcut.madeFor
             val sameTask = madeFor == (if (afterRestore) previousNames?.get(shortcut.taskId) ?: name else name)
             if (!shortcut.enabled) {
-                if (!sameTask && heldBack[shortcut.taskId] != name) continue
+                if (!sameTask && heldBack[shortcut.id] != name) continue
                 enable += shortcut.id
             } else if (afterRestore && !sameTask) {
                 disable += shortcut.id
@@ -262,7 +274,7 @@ object TaskShortcutHelper {
                 }
             }
         }
-        return ShortcutPlan(disable, enable, update)
+        return ShortcutPlan(disable, enable, update, stillHeld)
     }
 
     private fun defaultId(taskId: Long) = "task_$taskId"

@@ -143,15 +143,33 @@ class TaskShortcutPlanTest {
         val renamed = mapOf(4L to "B")
         val rename = TaskShortcutHelper.plan(listOf(shortcut), renamed, seen.previous, heldBack = seen.heldBack)
         assertEquals(listOf(pinned(4, "B")), rename.update)
-        val held = seen.after(ReconcileOutcome.CHECKED, renamed, rename.updatedNames)
+        val held = seen.after(ReconcileOutcome.CHECKED, renamed, rename.heldBack(applied = false))
 
-        assertEquals(listOf("task_4"), TaskShortcutHelper.plan(listOf(shortcut), emptyMap(), held.previous, heldBack = held.heldBack).disable)
-        val deleted = held.after(ReconcileOutcome.APPLIED, emptyMap())
+        val delete = TaskShortcutHelper.plan(listOf(shortcut), emptyMap(), held.previous, heldBack = held.heldBack)
+        assertEquals(listOf("task_4"), delete.disable)
+        val deleted = held.after(ReconcileOutcome.APPLIED, emptyMap(), delete.heldBack(applied = true))
 
         val undo = TaskShortcutHelper.plan(listOf(shortcut.copy(enabled = false)), renamed, deleted.previous, heldBack = deleted.heldBack)
         assertEquals(listOf("task_4"), undo.enable)
         assertEquals(listOf(pinned(4, "B", enabled = false)), undo.update)
-        assertEquals(emptyMap<Long, String>(), deleted.after(ReconcileOutcome.APPLIED, renamed).heldBack)
+        assertEquals(emptyMap<String, String>(), undo.heldBack(applied = true))
+    }
+
+    /**
+     * Held-back names used to be kept per task, so a held-back rename of one shortcut turned on
+     * another of the same task that a restore had turned off for being made for a different task.
+     */
+    @Test
+    fun aHeldBackRenameDoesNotTurnOnAnotherShortcutOfTheTask() {
+        val offAfterRestore = picked(4, "Wake up", madeFor = "Q", enabled = false).copy(id = "x")
+        val shortcuts = listOf(offAfterRestore, pinned(4, "A"))
+        val renamed = mapOf(4L to "B")
+        val rename = TaskShortcutHelper.plan(shortcuts, renamed, mapOf(4L to "A"))
+        val held = WatchState(mapOf(4L to "A"), afterRestore = false).after(ReconcileOutcome.CHECKED, renamed, rename.heldBack(applied = false))
+
+        val next = TaskShortcutHelper.plan(shortcuts, renamed + (9L to "New"), held.previous, heldBack = held.heldBack)
+        assertEquals(emptyList<String>(), next.enable)
+        assertEquals(listOf(pinned(4, "B")), next.update)
     }
 
     /**
