@@ -14,8 +14,6 @@
     <string name="qs_tile_subtitle_hint">简短的说明文字</string>
     <string name="qs_tile_icon">图标</string>
     <string name="qs_tile_save">保存磁贴</string>
-    <string name="qs_tile_saved">快捷设置磁贴已保存。</string>
-    <string name="qs_tile_default_label">任务磁贴 %1$d</string>
     <string name="permission_automation_label">控制OpenTasker自动化</string>
     <string name="permission_automation_description">允许同签名集成方通过文档化的Intent运行OpenTasker任务、切换配置文件并查询自动化状态。</string>
     <string name="widget_task_description">一键运行一个OpenTasker任务</string>
@@ -113,7 +111,6 @@
     <string name="action_save">保存</string>
     <string name="action_run_alone">单独运行此操作</string>
     <string name="action_delete">删除</string>
-    <string name="action_dismiss">关闭</string>
     <string name="action_import">导入</string>
     <string name="action_export">导出</string>
     <string name="action_close">关闭</string>
@@ -129,14 +126,11 @@
     <string name="action_pin">固定</string>
     <string name="action_clear">清除</string>
     <string name="action_browse">浏览</string>
-    <string name="action_working">处理中…</string>
 
     <!-- Common labels -->
     <string name="label_all">全部</string>
     <string name="label_selected">已选择</string>
-    <string name="label_masked">已掩码</string>
     <string name="label_hidden">已隐藏</string>
-    <string name="label_entries">条目</string>
     <string name="label_source">来源：%1$s</string>
 
     <!-- Status labels -->
@@ -174,12 +168,6 @@
     <string name="theme_dynamic">Material You</string>
 
     <!-- Screen titles -->
-    <string name="title_automation_workspace">自动化工作区</string>
-    <string name="title_task_library">任务库</string>
-    <string name="title_variable_vault">变量库</string>
-    <string name="title_scene_library">场景库</string>
-    <string name="title_context_inspector">上下文检查器</string>
-    <string name="title_setup_checklist">设置清单</string>
     <string name="settings_section_general">通用</string>
     <string name="setup_focus_title">完成自动化的设置</string>
     <string name="setup_focus_body">它在运行前需要下方列出的访问权限。</string>
@@ -208,7 +196,6 @@
     <string name="setup_progress_percent">%1$d%%</string>
     <string name="setup_progress_ready_count">%1$d 项中的 %2$d 项就绪</string>
     <string name="setup_progress_loading">正在检查设置状态…</string>
-    <string name="title_execution_history">执行历史</string>
     <string name="title_starter_templates">入门模板</string>
 
     <!-- Dialog titles -->
@@ -346,29 +333,23 @@
     <string name="context_days_hint">工作日、周末、周一至周五</string>
 
     <!-- Setup permissions -->
-    <string name="setup_title">设置</string>
     <string name="setup_battery_title">电池优化</string>
     <string name="setup_local_network_title">局域网访问</string>
     <string name="setup_local_network_body">Android 17及以上版本要求任何局域网设备通信（HTTP、Ping、局域网唤醒、MQTT、mDNS）均需此权限。否则，针对本地地址的网络操作将失败。</string>
-    <string name="setup_pending_required">待处理的必需项必须先完成，自动化才能可靠触发。</string>
     <string name="setup_status_order">待处理的必需项列在最前面。可选集成列在必需设置之后。</string>
     <string name="setup_review_settings">查看应用设置</string>
-    <string name="setup_optional_requirement">可选：%1$s</string>
 
     <!-- Setup - Theme -->
     <string name="setup_theme_label">主题</string>
-    <string name="setup_theme_helper">选择OpenTasker的显示模式。</string>
 
     <!-- Setup - Backup -->
     <string name="setup_backup_label">备份与恢复</string>
-    <string name="setup_backup_helper">创建本地备份或导入/导出备份用于设备迁移。</string>
     <string name="setup_backup_create">创建本地备份</string>
     <string name="setup_backup_restore_staged">恢复暂存备份</string>
     <string name="setup_backup_available">有可用备份</string>
     <string name="setup_backup_none">尚无备份</string>
     <string name="setup_checklist_body">OpenTasker可以在缺少访问权限的情况下运行，但受影响的自动化在设置完成前会一直保持受限。</string>
     <string name="setup_item_already_ready">%1$s 已就绪。</string>
-    <string name="setup_theme_helper_full">选择用于导航、设置和运行时审阅界面的显示模式。</string>
     <string name="setup_direct_boot_title">解锁前的时间触发</string>
     <string name="setup_direct_boot_body">可选，默认关闭。开启时，OpenTasker在你首次解锁手机前唯一会启动的是它自己的每分钟时钟，并在锁屏可访问的存储中记住一次滴答。你的配置文件、任务、已保存数据、机密以及所有其他类型的触发都会等到你解锁。</string>
     <string name="setup_direct_boot_enabled">开启：解锁前可能记住一次时钟滴答。</string>
@@ -403,7 +384,6 @@
     <string name="setup_global_fallback_title">全局失败回退</string>
     <string name="setup_global_fallback_body">当任务在没有 flow.catch 或配置文件回退的情况下失败时，使用结构化的 FLOW_ERROR_JSON 负载运行此任务一次。</string>
     <string name="setup_global_fallback_label">全局回退任务</string>
-    <string name="setup_global_fallback_hint">可选的最终恢复任务</string>
     <string name="restore_review_title">审阅恢复</string>
     <string name="restore_review_summary">%1$s · %2$s · 架构 v%3$d</string>
     <string name="restore_review_counts">%1$d 个配置文件 · %2$d 个任务 · %3$d 个场景 · %4$d 个变量 · %5$d 条运行日志记录</string>
@@ -592,16 +572,12 @@
     <string name="setup_oem_guide_unavailable">没有应用可以打开指南页面：%1$s</string>
 
     <!-- Empty states -->
-    <string name="empty_profiles_title">尚无配置文件</string>
-    <string name="empty_profiles_body">配置文件将触发器与任务结合，以自动化你的设备。</string>
     <string name="empty_tasks_title">尚无任务</string>
-    <string name="empty_tasks_body">任务包含你的自动化将执行的操作。</string>
     <string name="empty_run_log_title">没有运行日志条目</string>
     <string name="empty_run_log_body">配置文件触发任务执行后，条目会出现在这里。</string>
     <string name="empty_variables_title">尚无全局变量</string>
     <string name="empty_variables_body">存储任务可复用的值。任务也可以设置它们，它们保存的任何内容都会显示在这里。</string>
     <string name="empty_variables_create">新变量</string>
-    <string name="variables_summary_body">此项目的已保存全局变量。机密值在你揭示之前一直保持掩码。</string>
     <plurals name="import_review_more">
         <item quantity="one">另外 %d 个</item>
         <item quantity="other">另外 %d 个</item>
@@ -617,9 +593,7 @@
     <!-- Run log -->
     <string name="run_log_retention_title">保留</string>
     <string name="run_log_retention_body">存储的运行历史会根据你在下面选择的保留策略自动裁剪。</string>
-    <string name="run_log_find_runs">查找运行</string>
     <string name="run_log_shown_count">显示了 %1$d 项中的 %2$d 项</string>
-    <string name="run_log_history_body">最近的运行，包含时长、状态和操作级跟踪。</string>
     <string name="run_log_any_task">任意任务</string>
     <string name="run_log_search_label">搜索任务或消息</string>
     <string name="run_log_search_hint">权限、Wi-Fi、任务名称</string>
@@ -629,8 +603,6 @@
     <string name="run_log_share_short">分享</string>
     <string name="share_uri_unreadable">OpenTasker无法读取共享的文件。请以读取权限重新分享它。</string>
     <string name="share_invalid">OpenTasker无法读取该分享。</string>
-    <string name="run_log_more_actions">还有 %1$d 个操作</string>
-    <string name="run_log_loaded">已加载</string>
     <string name="run_log_loading">正在加载运行日志…</string>
     <string name="run_log_load_more">加载更多</string>
     <string name="run_log_refresh">刷新</string>
@@ -639,10 +611,8 @@
     <string name="run_log_unstar">取消保留</string>
     <string name="run_log_kept">已保留</string>
     <string name="run_log_held_policy">保留原因：%1$s</string>
-    <string name="run_log_export_json">导出JSON</string>
     <string name="run_log_export_json_short">JSON</string>
     <string name="run_log_export_csv_short">CSV</string>
-    <string name="run_log_export_csv">导出CSV</string>
     <string name="run_log_show_all_actions">显示全部 %1$d 个操作</string>
     <string name="run_log_show_fewer_actions">显示更少（共 %1$d 个）</string>
     <string name="run_log_retention_preview_title">审阅保留缩减</string>
@@ -671,8 +641,6 @@
     <string name="variables_secret_reentry_helper">此机密无法解密，通常是在另一台设备上恢复或丢失密钥库密钥后发生。输入一个替换值以恢复它。</string>
     <string name="variables_reveal_secret">揭示机密值</string>
     <string name="variables_hide_secret">隐藏机密值</string>
-    <string name="variables_shown_count">显示了 %1$d 项</string>
-    <string name="variables_saved_count_label">已保存</string>
     <string name="content_description_info">信息</string>
     <string name="import_power_review">请求的自动化能力</string>
     <string name="import_power_task">任务 %1$s：%2$s</string>
@@ -775,7 +743,6 @@
     <!-- Inspector -->
     <string name="inspector_sources_title">上下文来源</string>
     <string name="inspector_match_title">配置文件匹配状态</string>
-    <string name="inspector_body">用于调试自动化状态的实时来源值和配置文件匹配说明。</string>
     <string name="inspector_refresh">刷新状态</string>
     <string name="inspector_last_update">上次更新</string>
     <string name="inspector_no_value">尚未观察到值</string>
@@ -796,7 +763,6 @@
 
     <!-- Import -->
     <string name="import_disabled_notice">导入的配置文件将以禁用状态创建以供审阅。</string>
-    <string name="import_schema_info">架构 %1$d</string>
     <string name="import_schema_app">架构 %1$d · 由应用 %2$s 导出</string>
     <string name="import_incompatible">无法导入</string>
     <string name="import_incompatible_body">包架构与此版本的OpenTasker不兼容。</string>
@@ -810,7 +776,6 @@
     <string name="import_disabled">已禁用导入</string>
     <string name="import_tasker">导入Tasker或MacroDroid</string>
     <string name="import_reading_xml">正在读取导入</string>
-    <string name="import_reading_json">正在读取JSON</string>
     <string name="import_export_json">导出JSON</string>
     <string name="import_export_tasker_xml">导出Tasker XML</string>
     <string name="import_import_json">导入JSON</string>
@@ -864,7 +829,6 @@
     <string name="profile_share_import_plan">包导入计划</string>
     <string name="profile_share_review_import">审阅导入计划</string>
     <string name="profile_share_preview_action">预览社区分享</string>
-    <string name="profile_share_preparing">正在准备分享…</string>
     <string name="action_remove_share_screenshot">移除屏幕截图</string>
 
     <!-- Installed app picker -->
@@ -879,25 +843,18 @@
     <string name="app_picker_icon_description">%1$s 应用图标</string>
 
     <!-- Workspace -->
-    <string name="workspace_review_readiness">启用配置文件前请先审阅就绪状态。点击“设置”查看权限详情。</string>
-    <string name="workspace_task_library_body">为你的自动化构建可复用的操作序列。</string>
     <string name="workspace_templates">模板</string>
 
     <!-- Flow -->
-    <string name="flow_empty_title">没有自动化流程</string>
-    <string name="flow_empty_body">创建配置文件和任务，以在这里查看它们的连接。</string>
 
     <!-- Localization extraction batch -->
     <string name="action_retry">重试</string>
     <string name="action_show">显示</string>
     <string name="action_arm">启用</string>
-    <string name="action_task">任务</string>
     <string name="action_add_element">添加元素</string>
     <string name="action_create_blank_task">创建空白任务</string>
     <string name="action_create_blank_profile">创建空白配置文件</string>
     <string name="action_browse_templates">浏览模板</string>
-    <string name="action_add_context_short">添加上下文</string>
-    <string name="action_add_action_short">添加操作</string>
     <string name="action_create_for_review">创建以供审阅</string>
     <string name="action_import_tasker_xml">导入Tasker / MacroDroid</string>
     <string name="action_create_task">创建任务</string>
@@ -916,12 +873,7 @@
     <string name="permission_denied_settings">权限被反复拒绝。请使用应用设置授予。</string>
     <string name="permission_denied_settings_body">Android将不再显示请求对话框；请使用应用设置恢复访问。</string>
 
-    <string name="label_profiles">配置文件</string>
-    <string name="label_contexts">上下文</string>
     <string name="label_actions">操作</string>
-    <string name="label_tasks">任务</string>
-    <string name="label_need_actions">需要操作</string>
-    <string name="label_latest_value">最新值</string>
     <string name="label_width_dp">宽度 dp</string>
     <string name="label_height_dp">高度 dp</string>
     <string name="label_none">无</string>
@@ -933,7 +885,6 @@
     <string name="label_image_decorative">装饰性图片（对辅助功能隐藏）</string>
     <string name="label_tap_task">点击任务</string>
     <string name="label_long_press_task">长按任务</string>
-    <string name="label_more">更多</string>
     <string name="label_required">必需</string>
     <string name="label_on">开</string>
     <string name="label_off">关</string>
@@ -949,14 +900,8 @@
     <string name="a11y_collapsed">已折叠</string>
     <string name="a11y_profile_status">%1$s 配置文件状态</string>
     <string name="a11y_edit_profile">编辑配置文件 %1$s</string>
-    <string name="a11y_add_context_to_profile">向配置文件 %1$s 添加上下文</string>
-    <string name="a11y_delete_profile">删除配置文件 %1$s</string>
     <string name="a11y_duplicate_profile">配置文件 %1$s 的更多操作</string>
-    <string name="a11y_edit_task">编辑任务 %1$s</string>
-    <string name="a11y_add_action_to_task">向任务 %1$s 添加操作</string>
     <string name="a11y_run_task">运行任务 %1$s</string>
-    <string name="a11y_pin_task">固定任务 %1$s</string>
-    <string name="a11y_delete_task">删除任务 %1$s</string>
     <string name="a11y_duplicate_task">任务 %1$s 的更多操作</string>
     <string name="a11y_duplicate_scene">场景 %1$s 的更多操作</string>
     <string name="a11y_edit_action">编辑操作 %1$d、%2$s</string>
@@ -978,18 +923,11 @@
     <string name="scene_overlay_move_up_action">向上移动叠加层</string>
     <string name="scene_overlay_move_down_action">向下移动叠加层</string>
     <string name="scene_overlay_move_right_action">向右移动叠加层</string>
-    <string name="label_live_count">%1$d 个活动</string>
     <string name="label_issue_count">%1$d 个问题</string>
     <string name="label_context_count">%1$d 个上下文</string>
     <string name="label_action_count">%1$d 个操作</string>
     <string name="label_cooldown_seconds">%1$d 秒冷却</string>
     <string name="label_priority_short">优先级 %1$d</string>
-    <string name="label_profile_priority">配置文件优先级 %1$d</string>
-    <string name="label_profile_grace_seconds">%1$d 秒宽限</string>
-    <string name="label_profile_active_limit">活动 ≤ %1$d</string>
-    <string name="label_profile_burst_limit">最多 %1$d 次快速启动</string>
-    <string name="label_profile_overflow_silent">超出上限：静默跳过</string>
-    <string name="label_profile_expiry_date">直到 %1$s</string>
     <string name="label_more_count">另外 %1$d 个</string>
 
 
@@ -1041,17 +979,12 @@
     <string name="scenes_resize_taller_content_description">将元素变高 1 dp</string>
 
     <string name="inspector_not_matching">不匹配</string>
-    <string name="inspector_warning_content_description">警告</string>
     <string name="inspector_unavailable_content_description">上下文检查器不可用</string>
     <string name="inspector_unavailable_title">上下文检查器不可用</string>
     <string name="inspector_waiting_for_sources">正在等待来源</string>
 
     <string name="import_reading_bundle">正在读取包…</string>
 
-    <string name="workspace_review_readiness_templates">启用配置文件前请先审阅就绪状态。模板在你批准之前保持禁用。</string>
-    <string name="workspace_task_library_ready_body">构建可复用的操作序列，然后在顺序和权限就绪时将它们附加到配置文件。</string>
-    <string name="workspace_recent_failure">最近失败</string>
-    <string name="workspace_review_run_log_details">查看运行日志以了解详情。</string>
     <string name="workspace_stored_data_review">存储的数据需要审阅</string>
     <string name="workspace_stored_data_review_body">OpenTasker阻止了受影响的记录被执行和编辑。%1$s%2$s。请先恢复数据库备份再继续；原始存储的数据保持不变。</string>
     <string name="workspace_runs_task">运行：%1$s</string>
@@ -1059,7 +992,6 @@
     <string name="workspace_exit_task_only">%1$s（停止匹配时）</string>
     <string name="workspace_profile_cannot_match">配置文件尚无法匹配</string>
     <string name="workspace_profile_cannot_match_body">在依赖此配置文件前至少添加一个上下文。</string>
-    <string name="workspace_task_priority">优先级 %1$d · %2$s</string>
     <string name="workspace_task_has_no_actions">任务没有操作</string>
     <string name="workspace_task_has_no_actions_body">将此任务附加到已启用的配置文件前至少添加一个操作。</string>
     <string name="workspace_no_arguments">无参数</string>
@@ -1077,8 +1009,6 @@
     <string name="flow_empty_profile_graph_title">尚无配置文件图</string>
     <string name="flow_empty_profile_graph_body">创建或导入一个配置文件，以生成包含上下文、任务、操作和缺失引用的可读自动化图。</string>
     <string name="flow_waiting_for_profile">正在等待配置文件</string>
-    <string name="flow_overview_title">流程概览</string>
-    <string name="flow_overview_body">由你保存的配置文件和任务生成的配置文件图。</string>
     <string name="flow_context_action_summary">%1$d 个上下文 · %2$d 个操作</string>
     <string name="flow_all_context_rules">所有上下文规则</string>
     <string name="flow_add_content_description">添加</string>
@@ -1221,11 +1151,6 @@
     <string name="ui_loading_content">加载中</string>
     <string name="history_nothing_to_undo">没有可撤销的内容</string>
     <string name="history_nothing_to_redo">没有可重做的内容</string>
-    <string name="setup_no_action_available">此设备上没有可用的操作</string>
-    <string name="ui_retry_content_description">重试此操作</string>
-    <string name="ui_retry_loading_content_description">重试加载此内容</string>
-    <string name="ui_loading_in_progress">%1$s 进行中</string>
-    <string name="ui_disabled_label">%1$s 已禁用</string>
 
     <string name="status_planned">已计划</string>
     <string name="template_disabled_review">从模板创建的配置文件以禁用状态启动，以便你在启用前审阅权限、操作和上下文。</string>
@@ -1255,10 +1180,6 @@
     <string name="automation_mode_restart_body">停止正在运行的任务，然后重新开始。</string>
     <string name="automation_mode_queued_body">等正在运行的任务完成后再运行。最多可有 50 次运行排队等待。</string>
     <string name="automation_mode_parallel_body">在已在运行的任务之外，再同时启动一次运行。</string>
-    <string name="action_remove_action">移除操作</string>
-    <string name="action_remove_context">移除上下文</string>
-    <string name="delete_action_body">这会从&quot;%2$s&quot;中移除步骤 %1$d。剩余操作保持其顺序。</string>
-    <string name="delete_context_body">这会从&quot;%2$s&quot;中移除 %1$s 上下文。</string>
 
     <string name="delete_task_references_title">任务仍在使用中</string>
     <string name="delete_task_references_body">&quot;%1$s&quot; 被另外 %2$d 个自动化引用。请在删除前决定这些引用如何处理。</string>
@@ -1278,9 +1199,6 @@
     <string name="context_nfc_trigger_label_with_tag">OpenTasker NFC触发器 %1$s</string>
     <string name="context_nfc_write_helper_body">为下一个被扫描的标签启动一次性的NDEF文本写入。</string>
 
-    <string name="label_scenes">场景</string>
-    <string name="label_elements">元素</string>
-    <string name="label_errors">错误</string>
     <string name="label_min">最小</string>
     <string name="label_max">最大</string>
     <string name="label_value">值</string>
@@ -1299,8 +1217,6 @@
     <string name="scene_element_type_slider">滑块</string>
     <string name="scene_element_type_image">图片</string>
 
-    <string name="diagnostics_title">诊断与引擎健康</string>
-    <string name="diagnostics_summary_body">在不连接服务器的情况下检查后台投递、捕获的崩溃和受限的应用内日志。</string>
     <string name="diagnostics_status_healthy">引擎健康</string>
     <string name="diagnostics_status_attention">需要关注</string>
     <string name="diagnostics_status_checking">正在检查引擎健康…</string>
@@ -1350,7 +1266,6 @@
     <string name="diagnostics_process_exit_no_match">检测到心跳间隔（%1$s），但没有报告匹配的历史进程退出记录。</string>
     <string name="diagnostics_process_exit_matched">原因：%1$s；描述：%2$s；退出时间：%3$s；心跳间隔：%4$s</string>
     <string name="diagnostics_fgs_types">前台服务类型</string>
-    <string name="diagnostics_standby_bucket">应用待机存储桶</string>
     <string name="diagnostics_standby_consequence">待机投递后果</string>
     <string name="diagnostics_standby_throttled">此存储桶会限制每分钟的触发闹钟和后台工作，因此时间和轮询触发可能延迟。请将OpenTasker添加到设置中的电池优化豁免名单，以保持其响应。</string>
     <string name="diagnostics_advanced_protection">高级保护</string>
@@ -1547,7 +1462,6 @@
     <string name="setup_update_status_available">有较新版本可用：%1$s</string>
     <string name="setup_update_open_release">打开发布页面</string>
     <string name="ui_flow_target_missing">流程目标不再存在</string>
-    <string name="ui_error_message">错误：%1$s</string>
     <string name="ui_error_generic">操作失败</string>
     <!-- A rejection that already explains itself; the reason comes from the validation that
          refused the change, so this carries it through without prefixing it with noise. -->
@@ -1560,15 +1474,11 @@
     <string name="ui_error_project_name_required">请输入项目名称。</string>
     <string name="ui_error_project_name_too_long">项目名称不得超过64个字符。</string>
     <string name="ui_error_project_name_duplicate">已存在同名项目。</string>
-    <string name="ui_error_project_delete_default">默认项目不能被删除。</string>
-    <string name="ui_error_project_delete_same_target">请选择另一个项目来移入此工作。</string>
-    <string name="ui_error_project_delete_variable_collision">移动这些变量会覆盖目标项目中的 %1$s。请先重命名或移除它们。</string>
     <string name="ui_error_variable_referenced">%1$s 仍被 %2$s 使用。请先移除这些引用。</string>
     <string name="ui_error_corrupt_record">无法读取已保存的数据。请恢复备份或删除受影响的项目。</string>
     <string name="ui_error_diagnostics_refresh">无法刷新诊断</string>
     <string name="ui_error_task_delete">任务删除失败</string>
     <string name="ui_error_tasker_xml_preview">Tasker XML导入预览失败。详情见“诊断”。</string>
-    <string name="ui_error_tasker_xml_import">Tasker XML导入失败</string>
     <string name="ui_error_automation_import_preview">Tasker或MacroDroid导入预览失败。详情见“诊断”。</string>
     <string name="ui_error_automation_import">Tasker或MacroDroid导入失败</string>
     <string name="ui_error_bundle_export">OpenTasker包导出失败</string>
@@ -1597,7 +1507,6 @@
     <string name="ui_error_copy_diagnostics">复制诊断报告失败</string>
     <string name="diagnostics_share_subject">OpenTasker诊断报告</string>
     <string name="diagnostics_share_chooser">分享诊断报告</string>
-    <string name="import_document_tasker_xml">Tasker XML文件</string>
     <string name="import_document_tasker_macrodroid">Tasker XML或MacroDroid文件</string>
     <string name="import_document_opentasker_bundle">OpenTasker包</string>
     <string name="ui_error_document_unreadable">无法打开所选 %1$s。</string>
@@ -1693,9 +1602,7 @@
     <string name="ui_run_status_skipped">已跳过</string>
     <string name="ui_run_status_succeeded">成功</string>
     <string name="ui_run_status_failed">失败</string>
-    <string name="ui_message_import_summary">导入了 %1$d 个任务、%2$d 个配置文件、%3$d 条警告</string>
     <string name="ui_message_tasker_imported">导入了 %1$d 个任务、%2$d 个禁用配置文件</string>
-    <string name="ui_message_export_summary">导出了 %1$d 个任务、%2$d 个配置文件、%3$d 个变量、%4$d 个场景</string>
     <string name="ui_message_bundle_exported">导出了 %1$d 个任务、%2$d 个配置文件、%3$d 个场景</string>
     <string name="ui_message_bundle_imported">导入了 %1$d 个任务、%2$d 个禁用配置文件、%3$d 个场景</string>
     <!--
@@ -1712,8 +1619,6 @@
         <item quantity="one">运行日志保留已更新；裁剪了 %1$d 个条目</item>
         <item quantity="other">运行日志保留已更新；裁剪了 %1$d 个条目</item>
     </plurals>
-    <string name="ui_message_variable_created">变量已创建</string>
-    <string name="workspace_recent_failure_detail">%1$s：%2$s</string>
 
     <string name="run_log_filter_all">全部</string>
     <string name="run_log_filter_succeeded">成功</string>
@@ -1729,7 +1634,6 @@
     <string name="run_log_summary_healthy">健康</string>
     <string name="run_log_summary_failed">%1$d 个失败</string>
     <string name="run_log_summary_skipped">%1$d 个跳过</string>
-    <string name="run_log_latest">最新：%1$s</string>
     <string name="run_log_trace_detail">%1$s · %2$d 毫秒 · %3$s</string>
     <string name="run_log_trace_expanded">已展开：%1$s</string>
     <string name="run_log_template_warnings">%1$d 条模板警告</string>
@@ -1739,9 +1643,6 @@
     <string name="run_log_duration">%1$d 毫秒</string>
     <string name="run_log_trace_indexed">%1$d. %2$s</string>
 
-    <string name="inspector_active_sources">活动来源</string>
-    <string name="inspector_matching">匹配中</string>
-    <string name="inspector_enabled">已启用</string>
     <string name="inspector_source_error">来源错误</string>
     <string name="inspector_match">匹配</string>
     <string name="inspector_no_match">不匹配</string>
@@ -1778,8 +1679,6 @@
     <string name="inspector_duration_minutes_seconds">%1$d 分 %2$d 秒</string>
     <string name="inspector_duration_hours_minutes">%1$d 时 %2$d 分</string>
     <string name="inspector_unavailable_body">运行时上下文来源尚未注册。请打开设置确认权限，然后在来源开始报告后刷新。</string>
-    <string name="inspector_observation_status">观察：%1$s</string>
-    <string name="inspector_observation_age">观察于 %1$s</string>
     <string name="inspector_status_active">活动</string>
     <string name="inspector_status_waiting">等待中</string>
     <string name="inspector_status_needs_setup">需要设置</string>
@@ -1891,7 +1790,6 @@
     <string name="preflight_status_skipped">已跳过</string>
     <string name="preflight_status_blocked">已阻止</string>
     <string name="preflight_effect">预期效果：%1$s</string>
-    <string name="preflight_arguments">展开后的输入：%1$s</string>
     <string name="preflight_branch">分支：%1$s</string>
     <string name="preflight_warning_item">警告：%1$s</string>
     <string name="preflight_no_values">无</string>
@@ -1905,7 +1803,6 @@
     <string name="synthetic_trigger_admission">运行上限</string>
     <string name="synthetic_trigger_available">可用</string>
     <string name="synthetic_trigger_contexts">上下文（%1$d）</string>
-    <string name="synthetic_trigger_pinned_event">固定的合成事件</string>
     <string name="synthetic_trigger_context_number">上下文 %1$d：%2$s</string>
     <string name="synthetic_trigger_source_event">来源事件：%1$s</string>
     <string name="synthetic_trigger_template">模板：%1$s</string>

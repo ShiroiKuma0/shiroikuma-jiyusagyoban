@@ -583,6 +583,30 @@ class LocalizationSourceTest {
     }
 
     /**
+     * Every default string is used by the app's own code or resources (A-342), so copy nothing shows
+     * can't pile up again. A lookup by name would hide a use from this check, so there is none.
+     */
+    @Test
+    fun everyDefaultStringIsReferencedFromMainSource() {
+        val referenced = mutableSetOf<String>()
+        var namedLookup = false
+        Files.walk(moduleRoot.resolve("src/main")).use { paths ->
+            paths.filter { Files.isRegularFile(it) }.forEach { path ->
+                val name = path.fileName.toString()
+                val definitions = name == "strings.xml" && path.parent.fileName.toString().startsWith("values")
+                if (definitions || !(name.endsWith(".kt") || name.endsWith(".java") || name.endsWith(".xml"))) return@forEach
+                val text = path.readText()
+                if ("getIdentifier(" in text) namedLookup = true
+                STRING_REFERENCE.findAll(text).forEach { referenced += it.groupValues[1].ifEmpty { it.groupValues[2] } }
+            }
+        }
+
+        assertFalse("A lookup by name hides a string's use from this check", namedLookup)
+        val unused = (defaultStringResourceNames() - referenced).sorted()
+        assertTrue("Default strings nothing in src/main uses: $unused", unused.isEmpty())
+    }
+
+    /**
      * True only for a `values-<locale>` directory: a two- or three-letter language, optionally with
      * an `-rXX` region, or a BCP-47 `b+` qualifier.
      */
@@ -626,5 +650,6 @@ class LocalizationSourceTest {
 
     private companion object {
         val LOCALE_QUALIFIER = Regex("""^(b\+[A-Za-z0-9+]+|[a-z]{2,3}(-r[A-Z]{2})?)$""")
+        val STRING_REFERENCE = Regex("""R\.string\.([A-Za-z0-9_]+)|@string/([A-Za-z0-9_]+)""")
     }
 }

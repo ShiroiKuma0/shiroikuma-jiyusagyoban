@@ -973,6 +973,11 @@ private fun UpdateCheckSetupCard(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(stringResource(R.string.setup_update_title), style = MaterialTheme.typography.titleSmall)
                 Text(
+                    stringResource(R.string.setup_update_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
                     stateText,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (state.newerVersion != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
@@ -1005,6 +1010,11 @@ private fun GlobalFallbackTaskCard(
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(stringResource(R.string.setup_global_fallback_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.setup_global_fallback_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(selectedName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             Box {
@@ -1459,6 +1469,11 @@ private fun DirectBootSetupCard(
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(stringResource(R.string.setup_direct_boot_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.setup_direct_boot_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(stateDescription, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
             }
             Switch(checked = enabled, onCheckedChange = null)

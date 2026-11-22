@@ -29,6 +29,7 @@
 
 ### Fixed
 
+- Three Settings rows now say what they do. Release update checks explains that it sends nothing about you or your phone and never downloads anything, Pre-unlock time triggers says what runs before your first unlock, and Global failure fallback says when its task runs. The text was in the app all along but never shown.
 - Encrypted snapshots from Settings can be restored now. Pick one under Import and the app asks for the snapshot passphrase, then shows the same review as any other backup before you stage it. A wrong passphrase lets you try again. Until now the restore picker only took a plain database file, so a snapshot couldn't be restored from the app at all.
 - Array Push and Pop failed on a Position holding a number with a fraction, like 2.5. They count it by its whole part now, as Tasker does.
 - A backup restore that failed after the restored database was already in place, with no way to put the old one back, kept the plugin condition grants made for the old database. They're cleared now, as after a restore that works, and if that write fails the next start clears them.
