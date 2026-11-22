@@ -154,7 +154,7 @@ class ConfigurationSnapshotArchiveStore(context: Context) {
 
     companion object {
         const val DESTINATION_UNAVAILABLE_MESSAGE =
-            "Snapshot folder access was lost or the folder was removed. Choose it again in Setup."
+            "Snapshot folder access was lost or the folder was removed. Choose it again in Settings."
     }
 }
 

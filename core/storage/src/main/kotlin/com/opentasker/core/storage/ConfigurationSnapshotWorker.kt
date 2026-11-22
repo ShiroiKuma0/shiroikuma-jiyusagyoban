@@ -36,7 +36,7 @@ class ConfigurationSnapshotWorker(
         return try {
             val treeUri = policy.destinationTreeUri?.let(Uri::parse)
                 ?: throw SnapshotDestinationUnavailableException(
-                    "Choose a snapshot destination folder in Setup.",
+                    "Choose a snapshot destination folder in Settings.",
                 )
             val archiveStore = ConfigurationSnapshotArchiveStore(applicationContext)
             archiveStore.requirePersistedAccess(treeUri)

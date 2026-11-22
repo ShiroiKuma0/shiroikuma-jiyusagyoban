@@ -177,7 +177,7 @@ class ConfigurationSnapshotSettings(context: Context) {
 }
 
 /** Durably claims a user-selected SAF tree and caches the archive passphrase for scheduled work. */
-// Public because the Setup screen configures the destination; core:storage is a module now.
+// Public because the Settings screen configures the destination; core:storage is a module now.
 fun configureConfigurationSnapshotDestination(
     context: Context,
     uri: Uri,
