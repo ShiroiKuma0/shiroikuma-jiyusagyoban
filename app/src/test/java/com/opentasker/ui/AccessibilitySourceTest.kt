@@ -20,7 +20,7 @@ class AccessibilitySourceTest {
     @Test
     fun iconOnlyButtonsKeepAnAccessibleName() {
         val offenders = kotlinFiles().flatMap { file ->
-            unnamedIconOnlyButtons(file.readText()).map { "${uiSourceRoot.relativize(file)}: $it" }
+            unnamedIconOnlyButtons(file.readText()).map { "${mainSourceRoot.relativize(file)}: $it" }
         }
 
         assertTrue("Icon-only buttons with no accessible name: $offenders", offenders.isEmpty())
@@ -49,7 +49,7 @@ class AccessibilitySourceTest {
     @Test
     fun extendedFabsKeepTheirIconDescription() {
         val offenders = kotlinFiles().flatMap { file ->
-            unnamedExtendedFabs(file.readText()).map { "${uiSourceRoot.relativize(file)}: $it" }
+            unnamedExtendedFabs(file.readText()).map { "${mainSourceRoot.relativize(file)}: $it" }
         }
 
         assertTrue("Extended FABs with no accessible name: $offenders", offenders.isEmpty())
@@ -137,10 +137,10 @@ class AccessibilitySourceTest {
 
         val sceneSource = uiSourceRoot.resolve("screens/SceneLibraryCards.kt").readText()
         val requiredNudgeLabels = listOf(
-            "R.string.scenes_move_left_content_description",
-            "R.string.scenes_move_up_content_description",
-            "R.string.scenes_move_down_content_description",
-            "R.string.scenes_move_right_content_description",
+            "R.string.a11y_move_scene_element_left",
+            "R.string.a11y_move_scene_element_up",
+            "R.string.a11y_move_scene_element_down",
+            "R.string.a11y_move_scene_element_right",
         )
         val missingLabels = requiredNudgeLabels.filterNot(sceneSource::contains)
 
@@ -200,6 +200,7 @@ class AccessibilitySourceTest {
             "R.string.a11y_edit_profile",
             "R.string.a11y_run_task",
             "R.string.a11y_edit_action",
+            "R.string.a11y_action_menu",
             "R.string.a11y_delete_context",
             "clearAndSetSemantics",
         )
@@ -231,7 +232,6 @@ class AccessibilitySourceTest {
                 "role = Role.Switch",
                 "stateDescription = if (enabled) onLabel else offLabel",
                 "enabled = canSave",
-                "R.string.ui_info_content_description",
                 "blueprint-input-",
             ),
             "screens/ImportedProfileRiskDialog.kt" to listOf(
@@ -254,7 +254,8 @@ class AccessibilitySourceTest {
             ),
             "screens/SceneLibraryCards.kt" to listOf(
                 "R.string.scenes_empty_content_description",
-                "R.string.scenes_move_left_content_description",
+                "R.string.a11y_move_scene_element_left",
+                "R.string.a11y_delete_scene_element",
             ),
             "screens/SceneEditorDialogs.kt" to listOf(
                 "enabled = canSave",
@@ -306,11 +307,14 @@ class AccessibilitySourceTest {
         assertTrue("Hardcoded accessibility semantic labels found: $offenders", offenders.isEmpty())
     }
 
+    /** The UI package, plus the Compose activities that live beside their context sources. */
     private fun kotlinFiles(): List<Path> =
         Files.walk(uiSourceRoot).use { stream ->
             stream
                 .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".kt") }
                 .toList()
+        } + Files.list(mainSourceRoot.resolve("com/opentasker/core/contexts")).use { stream ->
+            stream.filter { it.fileName.toString().endsWith("Activity.kt") }.toList()
         }
 
     private companion object {

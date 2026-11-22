@@ -238,7 +238,7 @@ private fun VariableEmptyState(title: String, body: String, onCreate: (() -> Uni
         ) {
             Icon(
                 Icons.Filled.Info,
-                contentDescription = stringResource(R.string.content_description_info),
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp),
             )
@@ -320,7 +320,7 @@ private fun VariableRow(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.action_delete),
+                    contentDescription = stringResource(R.string.a11y_delete_variable, variable.name),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }

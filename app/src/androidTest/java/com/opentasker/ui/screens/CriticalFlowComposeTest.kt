@@ -450,9 +450,9 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         }
         composeTestRule.performAccessibilityChecks()
 
-        // Reorder now lives behind each action row's overflow menu (one "More" button per action),
-        // so open the second action's menu before asserting the labelled control.
-        composeTestRule.onAllNodesWithContentDescription("More").onLast().performScrollTo().performClick()
+        // Reorder now lives behind each action row's overflow menu, named for its action, so open
+        // the second action's menu before asserting the labelled control.
+        composeTestRule.onNodeWithContentDescription("More actions for action 2, Second").performScrollTo().performClick()
         composeTestRule.onNodeWithContentDescription("Move action 2, Second, up").performClick()
 
         assertEquals(1 to 0, moved)
@@ -1073,7 +1073,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
             "The list's last line ($contentBottom px) must end above the create button ($createTop px)",
             contentBottom <= createTop,
         )
-        composeTestRule.onAllNodesWithContentDescription("Move element right 1 dp").onLast()
+        composeTestRule.onNodeWithContentDescription("Move element 4, Image, right 1 dp")
             .performScrollTo()
             .assertIsDisplayed()
     }
@@ -1107,7 +1107,7 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
         composeTestRule.performAccessibilityChecks()
         scrollToText("Add Element")
         composeTestRule.performAccessibilityChecks()
-        composeTestRule.onAllNodesWithContentDescription("Move element right 1 dp").onLast().performScrollTo()
+        composeTestRule.onNodeWithContentDescription("Move element 4, Image, right 1 dp").performScrollTo()
         composeTestRule.performAccessibilityChecks()
     }
 

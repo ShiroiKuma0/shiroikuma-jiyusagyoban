@@ -44,7 +44,7 @@ internal fun InlineNotice(
         ) {
             Icon(
                 if (isError) Icons.Filled.Error else Icons.Filled.Info,
-                contentDescription = stringResource(if (isError) R.string.ui_error_content_description else R.string.ui_info_content_description),
+                contentDescription = if (isError) stringResource(R.string.ui_error_content_description) else null,
                 tint = color,
                 modifier = Modifier.size(20.dp),
             )

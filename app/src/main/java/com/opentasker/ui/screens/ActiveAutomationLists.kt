@@ -1050,7 +1050,7 @@ internal fun ActionRow(
             }
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nav_more))
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.a11y_action_menu, index + 1, actionLabel))
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                     // The menu item text is only "Move up"/"Move down", so without an explicit

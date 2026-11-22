@@ -519,9 +519,10 @@ private fun ContextInspectorSummaryCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // The status text beside it says the same, so the icon stays out of the reading.
             Icon(
-                Icons.Filled.CheckCircle,
-                contentDescription = stringResource(R.string.nav_inspector),
+                if (attentionSources == 0) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                contentDescription = null,
                 tint = healthColor,
                 modifier = Modifier.size(20.dp),
             )

@@ -209,10 +209,10 @@ private fun AutomationInvariantRow(
                     thumbContent = null,
                 )
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.automation_invariant_edit))
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.automation_invariant_edit, invariant.name))
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.automation_invariant_delete))
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.automation_invariant_delete, invariant.name))
                 }
             }
             report.findings

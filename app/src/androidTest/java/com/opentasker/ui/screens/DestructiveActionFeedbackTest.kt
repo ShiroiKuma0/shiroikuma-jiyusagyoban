@@ -54,7 +54,7 @@ class DestructiveActionFeedbackTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Stop watching this setting").performClick()
+        composeTestRule.onNodeWithContentDescription("Stop watching Quiet nights").performClick()
         composeTestRule.onNodeWithText("Stopped watching Quiet nights").assertIsDisplayed()
         assertTrue(invariants.isEmpty())
 

@@ -203,10 +203,10 @@ private fun ProjectManagerDialog(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             IconButton(onClick = { onReorderProject(project, -1) }, enabled = index > 0) {
-                                Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.projects_move_up))
+                                Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.a11y_move_project_up, project.name))
                             }
                             IconButton(onClick = { onReorderProject(project, 1) }, enabled = index < projects.lastIndex) {
-                                Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.projects_move_down))
+                                Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.a11y_move_project_down, project.name))
                             }
                             IconButton(
                                 onClick = {
@@ -217,7 +217,7 @@ private fun ProjectManagerDialog(
                             ) {
                                 Icon(
                                     Icons.Filled.Edit,
-                                    contentDescription = stringResource(R.string.action_rename),
+                                    contentDescription = stringResource(R.string.a11y_rename_project, project.name),
                                 )
                             }
                             IconButton(
@@ -229,7 +229,7 @@ private fun ProjectManagerDialog(
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
-                                    contentDescription = stringResource(R.string.action_delete),
+                                    contentDescription = stringResource(R.string.a11y_delete_project, project.name),
                                     tint = if (isDefault) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.error,
                                 )
                             }

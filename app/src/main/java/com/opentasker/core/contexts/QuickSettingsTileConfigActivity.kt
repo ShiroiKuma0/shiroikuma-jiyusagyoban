@@ -7,7 +7,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -46,6 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.OpenTaskerApp_NoHilt
@@ -134,7 +137,7 @@ private val tileIconChoices = listOf(
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun TileConfigScreen(
+internal fun TileConfigScreen(
     slot: Int,
     initial: QuickSettingsTileConfig,
     tasks: List<Task>,
@@ -180,7 +183,7 @@ private fun TileConfigScreen(
                 items(tasks, key = Task::id) { task ->
                     val selected = task.id == taskId
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable {
+                        modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton) {
                             taskId = task.id
                             taskName = task.name
                             if (label.isBlank() || label == initial.taskName) label = task.name
@@ -234,11 +237,16 @@ private fun TileConfigScreen(
             item {
                 Column {
                     Text(stringResource(R.string.qs_tile_icon), style = MaterialTheme.typography.titleSmall)
+                    val selectedDescription = stringResource(R.string.a11y_selected)
+                    val notSelectedDescription = stringResource(R.string.a11y_not_selected)
                     Row(Modifier.horizontalScroll(rememberScrollState())) {
                         tileIconChoices.forEach { choice ->
+                            val choiceDescription = if (choice.key == iconKey) selectedDescription else notSelectedDescription
                             OutlinedButton(
                                 onClick = { iconKey = choice.key },
-                                modifier = Modifier.padding(end = 8.dp),
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .semantics { stateDescription = choiceDescription },
                             ) {
                                 Text(
                                     text = stringResource(choice.labelRes),

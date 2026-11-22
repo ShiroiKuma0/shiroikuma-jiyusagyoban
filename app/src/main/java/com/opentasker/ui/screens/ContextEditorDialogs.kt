@@ -705,9 +705,12 @@ internal fun DayPresetButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectionDescription = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .semantics { stateDescription = selectionDescription },
         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) selectedContainerColor() else Color.Transparent,
             contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,

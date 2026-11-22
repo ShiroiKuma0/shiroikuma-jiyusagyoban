@@ -203,7 +203,7 @@ internal fun SceneCard(
                     onShowOverlay = onShowOverlay,
                 )
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete, scene.name), tint = MaterialTheme.colorScheme.error)
                 }
                 DuplicateMenu(
                     contentDescription = stringResource(R.string.a11y_duplicate_scene, scene.name),
@@ -287,6 +287,7 @@ internal fun SceneCard(
                     scene.elements.forEachIndexed { index, element ->
                         SceneElementRow(
                             scene = scene,
+                            index = index,
                             element = element,
                             taskNames = taskNames,
                             onNudge = { deltaX, deltaY ->
@@ -330,6 +331,7 @@ private fun SceneElement.nudgedWithin(scene: Scene, deltaX: Int, deltaY: Int): S
 @Composable
 private fun SceneElementRow(
     scene: Scene,
+    index: Int,
     element: SceneElement,
     taskNames: Map<Long, String>,
     onNudge: (Int, Int) -> Unit,
@@ -345,12 +347,14 @@ private fun SceneElementRow(
             Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
+            val elementNumber = index + 1
+            val elementLabel = sceneElementTypeLabel(element.type)
             Row(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(sceneElementTypeLabel(element.type), style = MaterialTheme.typography.labelLarge)
+                    Text(elementLabel, style = MaterialTheme.typography.labelLarge)
                     sceneElementSummary(element)?.let { summary ->
                         Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                     }
@@ -384,12 +388,12 @@ private fun SceneElementRow(
                 }
                 Row {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.scenes_edit_element_content_description))
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.a11y_edit_scene_element, elementNumber, elementLabel))
                     }
                     IconButton(onClick = onDelete) {
                         Icon(
                             Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.scenes_delete_element_content_description),
+                            contentDescription = stringResource(R.string.a11y_delete_scene_element, elementNumber, elementLabel),
                             tint = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -398,6 +402,8 @@ private fun SceneElementRow(
             SceneElementNudgeControls(
                 scene = scene,
                 element = element,
+                number = elementNumber,
+                label = elementLabel,
                 onNudge = onNudge,
             )
         }
@@ -408,6 +414,8 @@ private fun SceneElementRow(
 private fun SceneElementNudgeControls(
     scene: Scene,
     element: SceneElement,
+    number: Int,
+    label: String,
     onNudge: (Int, Int) -> Unit,
 ) {
     Row(
@@ -418,25 +426,25 @@ private fun SceneElementNudgeControls(
             enabled = element.xDp > 0,
             onClick = { onNudge(-1, 0) },
         ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.scenes_move_left_content_description))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.a11y_move_scene_element_left, number, label))
         }
         IconButton(
             enabled = element.yDp > 0,
             onClick = { onNudge(0, -1) },
         ) {
-            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.scenes_move_up_content_description))
+            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.a11y_move_scene_element_up, number, label))
         }
         IconButton(
             enabled = element.yDp < (scene.heightDp - element.heightDp).coerceAtLeast(0),
             onClick = { onNudge(0, 1) },
         ) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.scenes_move_down_content_description))
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.a11y_move_scene_element_down, number, label))
         }
         IconButton(
             enabled = element.xDp < (scene.widthDp - element.widthDp).coerceAtLeast(0),
             onClick = { onNudge(1, 0) },
         ) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.scenes_move_right_content_description))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.a11y_move_scene_element_right, number, label))
         }
     }
 }

@@ -993,7 +993,7 @@ internal fun EmptyState(
             Box(modifier = Modifier.padding(14.dp), contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = stringResource(R.string.ui_info_content_description),
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(30.dp),
                 )

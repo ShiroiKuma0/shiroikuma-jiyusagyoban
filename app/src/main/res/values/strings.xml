@@ -675,7 +675,6 @@
     <string name="variables_secret_reentry_helper">This secret cannot be decrypted, usually after restoring on another device or losing the Keystore key. Enter a replacement value to recover it.</string>
     <string name="variables_reveal_secret">Reveal secret value</string>
     <string name="variables_hide_secret">Hide secret value</string>
-    <string name="content_description_info">Information</string>
     <string name="import_power_review">Requested automation powers</string>
     <string name="import_power_task">Task %1$s: %2$s</string>
     <string name="import_power_profiles">Profiles: %1$s</string>
@@ -743,8 +742,8 @@
     <string name="automation_invariant_empty">No settings are being watched yet.</string>
     <string name="automation_invariant_limit">%1$d is the limit. Stop watching a setting to add another.</string>
     <string name="automation_invariant_add">Watch a setting</string>
-    <string name="automation_invariant_edit">Edit watched setting</string>
-    <string name="automation_invariant_delete">Stop watching this setting</string>
+    <string name="automation_invariant_edit">Edit watched setting %1$s</string>
+    <string name="automation_invariant_delete">Stop watching %1$s</string>
     <string name="automation_invariant_enabled_label">Warn about %1$s</string>
     <string name="automation_invariant_deleted">Stopped watching %1$s</string>
     <string name="automation_invariant_guard">Only when: %1$s %2$s %3$s</string>
@@ -774,7 +773,7 @@
 
     <!-- Scenes screen -->
     <string name="scenes_create">Create Scene</string>
-    <string name="scenes_delete">Delete scene</string>
+    <string name="scenes_delete">Delete scene %1$s</string>
 
     <!-- Inspector -->
     <string name="inspector_sources_title">Context sources</string>
@@ -950,6 +949,18 @@
     <string name="a11y_run_action">Run action %1$d, %2$s, on its own</string>
     <string name="a11y_edit_context">Edit context %1$d, %2$s</string>
     <string name="a11y_delete_context">Delete context %1$d, %2$s</string>
+    <string name="a11y_action_menu">More actions for action %1$d, %2$s</string>
+    <string name="a11y_delete_variable">Delete variable %1$s</string>
+    <string name="a11y_move_project_up">Move project %1$s up</string>
+    <string name="a11y_move_project_down">Move project %1$s down</string>
+    <string name="a11y_rename_project">Rename project %1$s</string>
+    <string name="a11y_delete_project">Delete project %1$s</string>
+    <string name="a11y_edit_scene_element">Edit element %1$d, %2$s</string>
+    <string name="a11y_delete_scene_element">Delete element %1$d, %2$s</string>
+    <string name="a11y_move_scene_element_left">Move element %1$d, %2$s, left 1 dp</string>
+    <string name="a11y_move_scene_element_up">Move element %1$d, %2$s, up 1 dp</string>
+    <string name="a11y_move_scene_element_down">Move element %1$d, %2$s, down 1 dp</string>
+    <string name="a11y_move_scene_element_right">Move element %1$d, %2$s, right 1 dp</string>
     <string name="a11y_expression_details">Expression details for %1$s</string>
     <string name="a11y_variable_changes">Variables set by %1$s</string>
     <string name="run_log_variable_added">added</string>
@@ -1034,7 +1045,6 @@
     <string name="scenes_canvas_size">Canvas %1$d x %2$d dp</string>
     <string name="scenes_empty_content_description">Scene library empty</string>
     <string name="scenes_edit_element_content_description">Edit element</string>
-    <string name="scenes_delete_element_content_description">Delete element</string>
     <string name="scenes_move_left_content_description">Move element left 1 dp</string>
     <string name="scenes_move_up_content_description">Move element up 1 dp</string>
     <string name="scenes_move_down_content_description">Move element down 1 dp</string>
@@ -1218,7 +1228,6 @@
     <string name="flow_output_variables">Outputs: %1$s</string>
 
     <string name="ui_error_content_description">Error</string>
-    <string name="ui_info_content_description">Info</string>
     <string name="ui_loading_content">Loading</string>
     <string name="history_nothing_to_undo">Nothing to undo</string>
     <string name="history_nothing_to_redo">Nothing to redo</string>
@@ -1916,7 +1925,6 @@
     <string name="projects_delete_title">Delete project %1$s?</string>
     <string name="projects_delete_body">All tasks, profiles, scenes, and variables will be reassigned to the selected project. Variable name conflicts must be resolved first.</string>
     <string name="projects_choose_destination">Choose destination project</string>
-    <string name="action_rename">Rename</string>
     <string name="action_done">Done</string>
     <string name="ui_message_project_created">Project created</string>
     <string name="ui_message_project_renamed">Project renamed</string>
