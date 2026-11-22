@@ -745,6 +745,42 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun contextsThatMightStillComeRightAreNamedInTheOrderTheRuleWalkUses() {
+        // Context 1 alone and the OR group of contexts 2 and 3 are both unsure, since contexts 1
+        // and 2 aren't known yet. The rule walk keeps their order, so context 1 comes first.
+        val loneFirst = listOf(
+            check(0, false).copy(valueUnknown = true),
+            check(1, false, orGroup = "g").copy(valueUnknown = true),
+            check(2, false, orGroup = "g"),
+        )
+        val loneFirstRule = ContextExpressionNode.group(
+            ContextBooleanOperator.AND,
+            listOf(
+                ContextExpressionNode.leaf(0),
+                ContextExpressionNode.group(ContextBooleanOperator.OR, listOf(ContextExpressionNode.leaf(1), ContextExpressionNode.leaf(2))),
+            ),
+        )
+        assertEquals("reason 1", blockingReason(loneFirst, loneFirstRule))
+        assertEquals("reason 1", blockingReason(loneFirst, null))
+
+        // With the group first it goes first, and inside it the member known to be off is named.
+        val groupFirst = listOf(
+            check(0, false, orGroup = "g").copy(valueUnknown = true),
+            check(1, false, orGroup = "g"),
+            check(2, false).copy(valueUnknown = true),
+        )
+        val groupFirstRule = ContextExpressionNode.group(
+            ContextBooleanOperator.AND,
+            listOf(
+                ContextExpressionNode.group(ContextBooleanOperator.OR, listOf(ContextExpressionNode.leaf(0), ContextExpressionNode.leaf(1))),
+                ContextExpressionNode.leaf(2),
+            ),
+        )
+        assertEquals("reason 2", blockingReason(groupFirst, groupFirstRule))
+        assertEquals("reason 2", blockingReason(groupFirst, null))
+    }
+
+    @Test
     fun aRuleThatCantBeEvaluatedNamesNoContext() {
         // The rule points at a third context the profile doesn't have, so no context can fix it.
         val profile = stateProfile(

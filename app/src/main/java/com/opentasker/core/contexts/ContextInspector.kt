@@ -199,7 +199,9 @@ internal fun evaluateChecks(
  * Why a profile's contexts don't hold, from the context that fails its rule. Without a rule that's
  * the first context that doesn't match, leaving out one whose OR group another member already
  * satisfies and naming last one whose value isn't known yet or whose OR group has such a member,
- * since either might still come right. With one, the rule is walked down to a context whose state keeps it from holding, so
+ * since either might still come right. Those keep their order, an OR group standing where its first
+ * member does with its known members ahead, the way the walk below ranks the same contexts written
+ * as a rule. With one, the rule is walked down to a context whose state keeps it from holding, so
  * a context a NOT is happy to see off isn't blamed. Null when nothing can be named, such as a rule
  * that can't be evaluated.
  */
@@ -207,8 +209,16 @@ internal fun blockingReason(checks: List<ContextCheck>, expression: ContextExpre
     if (expression == null) {
         val satisfiedGroups = checks.filter { it.effectiveMatched }.mapNotNullTo(HashSet()) { it.spec.orGroup }
         val unsureGroups = checks.filter { it.valueUnknown }.mapNotNullTo(HashSet()) { it.spec.orGroup }
-        return checks.filter { !it.effectiveMatched && it.spec.orGroup !in satisfiedGroups }
-            .minWithOrNull(compareBy<ContextCheck>({ it.valueUnknown || it.spec.orGroup in unsureGroups }, { it.valueUnknown }))?.reason
+        val failing = checks.filter { !it.effectiveMatched && it.spec.orGroup !in satisfiedGroups }
+        val groupStart = HashMap<String, Int>()
+        failing.forEachIndexed { index, check -> check.spec.orGroup?.let { groupStart.putIfAbsent(it, index) } }
+        return failing.withIndex().minWithOrNull(
+            compareBy<IndexedValue<ContextCheck>>(
+                { it.value.valueUnknown || it.value.spec.orGroup in unsureGroups },
+                { it.value.spec.orGroup?.let(groupStart::getValue) ?: it.index },
+                { it.value.valueUnknown },
+            ),
+        )?.value?.reason
     }
     if (!expression.isValidForContextCount(checks.size)) return null
     val values = checks.map { if (it.valueUnknown) null else it.effectiveMatched }
