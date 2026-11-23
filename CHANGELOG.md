@@ -8,6 +8,42 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.97+2026-11-23.00-46.g014a87d5+001 — 2026-11-23
+
+Built on upstream `014a87d5` — OpenTasker **0.2.97**, 20 commits past the base of `+036`. Upstream
+moved its own version (code 98 → 99), so the build counter starts again at `+001`; the app still
+updates in place over `+036`. The database stays at version 41.
+
+### Home screen shortcuts
+
+- **Upstream's shortcut upkeep is in, and this app's shortcuts are kept whole by it.** Upstream now
+  follows the task list for the life of the process, tries again after a failed pass, and after a
+  restore turns off a shortcut whose number now belongs to another task. As written it would have
+  rebuilt every shortcut this app had made from a bare intent with the app icon — losing the
+  task's own icon, its name and the app it opens. Here an update starts from the shortcut's own
+  intent and leaves the icon alone.
+- **A shortcut survives a re-import.** Importing a bundle over a task gives the task a new number,
+  and since `+036` that turned its shortcut gray. A shortcut whose number is gone now moves to the
+  one task that carries its name; it is turned off only when no such task exists.
+- **A shortcut follows a rename** and comes back when a delete is undone, also when Android held
+  the rename back at first.
+- **Publish Shortcut** records the task's name with the shortcut, so a published shortcut comes
+  back with its task as a pinned one does.
+
+### Engine
+
+- **Preflight previews the task a run would call**: a step that names a task is read as a number
+  first, then the exact name, then the name ignoring case — so with `Foo` and `foo` side by side
+  the preview shows the right one.
+
+### Not taken from upstream
+
+- Its fixes to renaming, copying and deleting one of two tasks whose names differ only in case, and
+  to notification buttons on delete: they live in its reference rewriter, which this app's own
+  task editor does not use — tasks here are referenced by name.
+- Its snapshot-directory fixes are in the code but not in use: scheduled snapshots and their Setup
+  rows are not part of this app.
+
 ## 0.2.96+2026-11-22.18-16.gcb3b4c60+036 — 2026-11-22
 
 Built on upstream `cb3b4c60` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-22,
