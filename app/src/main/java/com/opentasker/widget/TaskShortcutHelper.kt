@@ -78,6 +78,10 @@ object TaskShortcutHelper {
             // shortcut actions at that app instead of at us. Best-effort snapshot at creation time;
             // GetTaskTargetPackageReceiver answers the live query for shortcuts that predate this extra.
             targetPackage(task)?.let { putExtra(TaskRunActivity.EXTRA_TARGET_PACKAGE, it) }
+            // Say what upstream's reconcile wants to know, so it never has to guess: a shortcut
+            // without these counts as LEGACY and is written again on the first pass that sees it.
+            putExtra(EXTRA_KIND, ShortcutKind.FOLLOWS.name)
+            putExtra(EXTRA_MADE_FOR, task.name)
         }
 
     /**
@@ -167,6 +171,7 @@ object TaskShortcutHelper {
                 )
             }
             val plan = plan(states, taskNames, state.previous, state.afterRestore, state.heldBack)
+            val existing = shortcuts.associateBy { it.id }
             if (plan.disable.isNotEmpty()) {
                 ShortcutManagerCompat.disableShortcuts(context, plan.disable, context.getString(R.string.shortcut_task_deleted))
             }
@@ -177,7 +182,7 @@ object TaskShortcutHelper {
             heldBack = plan.heldBack(applied = false)
             val updated = plan.update.isEmpty() || ShortcutManagerCompat.updateShortcuts(
                 context,
-                plan.update.map { taskShortcut(context, it.id, it.taskId, it.label, it.kind, it.madeFor) },
+                plan.update.map { taskShortcut(context, it.id, it.taskId, it.label, it.kind, it.madeFor, existing[it.id]) },
             )
             if (updated) {
                 outcome = ReconcileOutcome.APPLIED
@@ -281,6 +286,22 @@ object TaskShortcutHelper {
         for (shortcut in shortcuts) {
             val name = taskNames[shortcut.taskId]
             if (name == null) {
+                // Fork: a task is known by its NAME. Re-importing a bundle gives the task a new id,
+                // and the shortcut's intent carries the name for exactly that case, so a shortcut
+                // whose id is gone moves to the one task that has the name it was made for instead
+                // of being turned off.
+                val wanted = heldBack[shortcut.id]
+                    ?: if (shortcut.kind == ShortcutKind.LEGACY) shortcut.label else shortcut.madeFor
+                val movedTo = taskNames.entries.singleOrNull { it.value == wanted }?.key
+                if (movedTo != null) {
+                    if (!shortcut.enabled) enable += shortcut.id
+                    update += shortcut.copy(
+                        taskId = movedTo,
+                        kind = if (shortcut.kind == ShortcutKind.LEGACY) ShortcutKind.FOLLOWS else shortcut.kind,
+                        madeFor = wanted,
+                    )
+                    continue
+                }
                 if (shortcut.enabled) disable += shortcut.id
                 heldBack[shortcut.id]?.let { stillHeld[shortcut.id] = it }
                 continue
@@ -319,18 +340,27 @@ object TaskShortcutHelper {
         label: String,
         kind: ShortcutKind,
         madeFor: String?,
+        existing: ShortcutInfoCompat? = null,
     ): ShortcutInfoCompat {
-        val runIntent = Intent(context, TaskRunActivity::class.java).apply {
+        // Fork: an update starts from the shortcut's OWN intent and sets no icon. Upstream builds a
+        // bare intent with the app icon, which on an update would strip the task icon, the task
+        // name and the target package from every shortcut the fork made. Android keeps whatever an
+        // update leaves unset, the icon included.
+        val runIntent = (existing?.intent?.let { Intent(it) } ?: Intent(context, TaskRunActivity::class.java)).apply {
             action = Intent.ACTION_VIEW
             putExtra(TaskRunActivity.EXTRA_TASK_ID, taskId)
             putExtra(TaskRunActivity.EXTRA_SOURCE, TaskRunActivity.SOURCE_SHORTCUT)
             if (kind != ShortcutKind.LEGACY) putExtra(EXTRA_KIND, kind.name)
-            if (madeFor != null) putExtra(EXTRA_MADE_FOR, madeFor)
+            if (madeFor != null) {
+                putExtra(EXTRA_MADE_FOR, madeFor)
+                // The name TaskRunActivity falls back to once a re-import has re-id'd the task.
+                putExtra(TaskRunActivity.EXTRA_TASK_NAME, madeFor)
+            }
         }
         return ShortcutInfoCompat.Builder(context, shortcutId)
             .setShortLabel(label)
             .setLongLabel("Run: $label")
-            .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+            .apply { if (existing == null) setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher)) }
             .setIntent(runIntent)
             .build()
     }
