@@ -131,9 +131,13 @@ function Resolve-PreviousApk {
     Write-Step 'Downloading the latest release APK with gh'
     & gh release download --repo SysAdminDoc/OpenTasker --pattern 'OpenTasker-v*.apk' --dir $directory | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'gh release download failed; pass -Previous with a local APK' }
-    $apk = Get-ChildItem -LiteralPath $directory -Filter 'OpenTasker-v*.apk' | Select-Object -First 1
-    if (-not $apk) { throw 'The latest release has no OpenTasker-v*.apk asset' }
-    return $apk.FullName
+    # Since v0.2.96 a release also carries OpenTasker-v<ver>-fdroid.apk, and "-fdroid.apk" sorts
+    # before ".apk", so the first match by name was the F-Droid flavor. Upgrade from the standard
+    # APK most users have, and stop if the release doesn't hold exactly one.
+    $apks = @(Get-ChildItem -LiteralPath $directory -Filter 'OpenTasker-v*.apk' |
+        Where-Object { $_.Name -match '^OpenTasker-v\d+(\.\d+)+\.apk$' })
+    if ($apks.Count -ne 1) { throw "The latest release has $($apks.Count) standard OpenTasker-v<ver>.apk assets, expected 1; pass -Previous" }
+    return $apks[0].FullName
 }
 
 function Ensure-Avd([int]$Api) {
