@@ -389,10 +389,10 @@ object BandText {
     val bandsLowCaveat = Loc(
         "It rides the SAME published decades as Night HR, deliberately unshifted — inventing a "
             + "\"sleeping floor\" ladder by subtracting a few beats would be a scale nobody measured. "
-            + "So a green low is a WEAKER claim than a green Night HR: a floor necessarily sits below "
+            + "So a blue low is a WEAKER claim than a blue Night HR: a floor necessarily sits below "
             + "a level, and the two columns are not to be read as agreeing or disagreeing.",
         "夜間心拍と同じ公表された十年区分に乗せてある。数拍引いた「睡眠時の底」の尺度を作れば、誰も測っていない"
-            + "物差しになるからである。よって緑の最低心拍は緑の夜間心拍より弱い主張である。底は必ず水準の下にあり、"
+            + "物差しになるからである。よって青の最低心拍は青の夜間心拍より弱い主張である。底は必ず水準の下にあり、"
             + "二つの欄は一致・不一致として読むものではない。",
     )
     val bandsSpo2Title = Loc("SpO₂", "血中酸素")

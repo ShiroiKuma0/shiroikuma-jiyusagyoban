@@ -189,10 +189,10 @@ object NightScore {
             BandText.regColFelt, 25,
             Loc(
                 "How you woke, your own 1–5. The heaviest weight: the cells measure the body, the " +
-                    "rating is how the morning actually is, and a green score on a morning rated 4 " +
+                    "rating is how the morning actually is, and a blue score on a morning rated 4 " +
                     "was the score being wrong (白い熊, 2026-11-08). The fit at the top of this page " +
                     "is computed WITHOUT it, so it still says how well the measurements alone track you.",
-                "目覚め、自分でつける 1〜5。最も重い。セルは体を測り、評価は朝の実際。4 と付けた朝の緑の点数は点数の誤り（白い熊、2026-11-08）。上の相関はこれを除いて計算するので、測定だけがどれだけ合うかを示し続ける。",
+                "目覚め、自分でつける 1〜5。最も重い。セルは体を測り、評価は朝の実際。4 と付けた朝の青の点数は点数の誤り（白い熊、2026-11-08）。上の相関はこれを除いて計算するので、測定だけがどれだけ合うかを示し続ける。",
             ),
             RecoveryMarker.FELT,
         ),

@@ -212,13 +212,18 @@ object ChartPalette {
      * 44.4/32.9, 27.0/21.3. The worst of ALL ten pairs is 11.7 — the green at 2 against the 4, which
      * is the ceiling of any palette holding both a green and a red.
      *
+     * **2 and 3 changed places on 2026-11-24** (白い熊: “blue is 2, and green 3”); the measurements
+     * above were taken in the earlier order. The colours are the same five, so every pair still
+     * measures what it did — but the emerald now stands NEXT to the orange-red, and that pair (11.7)
+     * is the weakest of the ten.
+     *
      * 4 and 5 are deliberately one family getting worse rather than two hues, so the bad end is read
      * by lightness, which no colour deficiency touches.
      */
     val SCALE = listOf(
         Color(0xFFFFFF00), // 1 — yellow, best
-        Color(0xFF00D084), // 2 — emerald
-        Color(0xFF1E5AFF), // 3 — blue, the neutral middle
+        Color(0xFF1E5AFF), // 2 — blue (白い熊, 2026-11-24: blue and green changed places)
+        Color(0xFF00D084), // 3 — emerald, the neutral middle
         Color(0xFFF4511E), // 4 — orange-red
         Color(0xFFA00000), // 5 — dark red, worst
     )
@@ -233,8 +238,8 @@ object ChartPalette {
      */
     val SCALE_INK = listOf(
         Color(0xFF1E5AFF), // on yellow
-        Color(0xFF000000), // on emerald
         Color(0xFFFFFF00), // on blue
+        Color(0xFF000000), // on emerald
         Color(0xFF000000), // on orange-red
         Color(0xFFFFFFFF), // on dark red
     )
