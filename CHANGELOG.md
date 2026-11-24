@@ -8,6 +8,57 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.97+2026-11-23.00-46.g014a87d5+004 — 2026-11-24
+
+Built on upstream `014a87d5` — OpenTasker **0.2.97**, the same base as `+001`. The database stays
+at version 41. Builds `+002` and `+003` were steps on the way and were not released.
+
+### Japanese
+
+- **The whole app is translated into Japanese.** On a phone set to Japanese every screen, dialog,
+  menu, toast, notification and widget text is Japanese; on any other language nothing changes.
+- **Upstream's string resources** have a Japanese file each: `strings`, `action_catalog_strings`
+  and `dynamic_surface_strings` — 3,082 strings, every key and every placeholder matched.
+- **The fork's own text is translated by its English.** The fork's screens and its action
+  catalogue hold their English as literals in the code, so they cannot be given resource ids
+  without every upstream sync undoing it. A new `tr()` looks the literal up in a table — 4,069
+  entries, at 1,719 places in the code — and shows the English where no entry exists.
+- **The action catalogue is Japanese**: the name, description and category of every action, and
+  the label and hint of every field. Values that are typed (`true`, `quiet / default / urgent`,
+  a package name, a `%variable`) stay exactly as they are.
+- **The action picker's search matches both languages** — the Japanese name and description as
+  well as the English ones and the action's id.
+- **Nothing stored is translated.** Text is translated where it is shown, never where it is saved
+  or compared: task and variable names, option values, group keys and exported files are untouched.
+- **A build with a gap fails.** A test compares the key sets — every resource key, every
+  translated literal, the whole action catalogue and every colour role must have its Japanese.
+- **Still English, on purpose**: action results and run-log lines, the conversion warnings of the
+  Tasker / MacroDroid / bundle importers (they are stored and read back), and the phase texts of
+  the satellite panel (they live in workspace variables). The 「健康」 screens keep their own
+  English / Japanese switch, `%Band_Language`, independent of the phone's language.
+
+### The UI page
+
+- **Every section heading and every chip of the index carries the section's icon, in colour.**
+  Seven colours, each with one meaning: yellow for what the app is, green for controls, light blue
+  for words, heavy blue for the frame and its boxes, orange where the app reaches out, red for
+  what resets, and rose for the one section about what flashes up and goes.
+- **The seven colours are settable**, as seven rows under “This page”.
+- **Chips are as wide as their content** — the fixed four-to-a-row grid is gone.
+- **No two neighbouring sections share a colour** in the built-in order: Menus stands between
+  Switches and Marks, Flash bubbles before Freeze bubbles, OCR before Import review. An order you
+  dragged yourself is kept.
+- **Menu icon colours moved off the ones that read alike**: run / connect is heavy green `#00A550`
+  (was pure green), write is heavy blue `#0066FF`, person is light blue `#00B0FF` (was cyan), stop
+  / block is rose `#FF3D7F` (was magenta). A colour you set yourself is kept.
+
+### 「健康」
+
+- **Blue is 2 and green is 3** on the 1–5 scale, in every graph and every rating — the two
+  changed places. Each step keeps the ink that belongs to its fill: yellow on the blue, black on
+  the green.
+- Two explanations that named the good step by its colour say blue now.
+
 ## 0.2.97+2026-11-23.00-46.g014a87d5+001 — 2026-11-23
 
 Built on upstream `014a87d5` — OpenTasker **0.2.97**, 20 commits past the base of `+036`. Upstream
