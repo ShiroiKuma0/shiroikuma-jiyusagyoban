@@ -14,6 +14,7 @@ import androidx.core.content.IntentCompat
 import com.opentasker.core.bubbles.FreezeBubbleStore
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.policy.AppFreeze
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,14 +68,14 @@ class ShareForwardActivity : Activity() {
             val state = withContext(Dispatchers.IO) { AppFreeze.read(this@ShareForwardActivity, pkg) }
             if (!state.installed) {
                 if (entry != null) ShareRelayStore.remove(pkg)
-                toastAndFinish("$label is no longer installed"); return@launch
+                toastAndFinish(tr("%1\$s is no longer installed", label)); return@launch
             }
             if (state.frozen) {
                 val thawed = withTimeoutOrNull(UNFREEZE_TIMEOUT_MS) {
                     withContext(Dispatchers.IO) { AppFreeze.thaw(this@ShareForwardActivity, pkg) }
                 }
                 if (thawed != true) {
-                    toastAndFinish("Could not unfreeze $label"); return@launch
+                    toastAndFinish(tr("Could not unfreeze %1\$s", label)); return@launch
                 }
                 // Re-freeze reminder — only when WE unfroze it; an already-running app stays as-is.
                 // No companion list: this path thaws exactly the one app it is forwarding to, so the
@@ -99,7 +100,7 @@ class ShareForwardActivity : Activity() {
         if (uris.isNotEmpty() && ShareRelayStore.copyStreams) {
             uris = uris.mapNotNull { copyToProvider(it) }
             if (uris.isEmpty()) {
-                toastAndFinish("Could not copy the shared content"); return
+                toastAndFinish(tr("Could not copy the shared content")); return
             }
         }
         val out = Intent(incoming.action).apply {
@@ -126,10 +127,10 @@ class ShareForwardActivity : Activity() {
             startActivity(out)
             runOnUiThread { finish() }
         } catch (e: ActivityNotFoundException) {
-            toastAndFinish("$label cannot receive this content")
+            toastAndFinish(tr("%1\$s cannot receive this content", label))
         } catch (e: SecurityException) {
             // Re-delegated grant refused → suggest the copy fallback.
-            toastAndFinish("$label rejected the shared content — turn on \"copy files when forwarding\"")
+            toastAndFinish(tr("%1\$s rejected the shared content — turn on \"copy files when forwarding\"", label))
         }
     }
 

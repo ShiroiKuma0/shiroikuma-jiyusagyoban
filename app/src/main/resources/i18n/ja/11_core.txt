@@ -1,0 +1,328 @@
+# 11_core — engine code (core/actions … core/capabilities)
+
+# BuiltInActions.kt
+= Notification
+: 通知
+= Progress
+: 進捗
+# notification channel names (NotificationChannels table, shown through tr(channelDef.name))
+= 白い熊 自由作業盤 quiet
+: 白い熊 自由作業盤 控えめ
+= 白い熊 自由作業盤 actions
+: 白い熊 自由作業盤 アクション
+= 白い熊 自由作業盤 urgent
+: 白い熊 自由作業盤 緊急
+
+# CopyLauncherShortcutAction.kt
+= Copy for 貼り付け
+: 「貼り付け」用にコピー
+
+# PickFreezeBubblesAction.kt
+= Freeze bubbles
+: 凍結バブル
+
+# MakeLauncherTasksAction.kt
+= Select apps
+: アプリを選択
+
+# SettingsActions.kt — the flash of bluetooth.audio
+= NOT CONNECTED — Bluetooth is off
+: 未接続 — Bluetoothがオフです
+= %1$s FAILED — Bluetooth is off
+: %1$s 失敗 — Bluetoothがオフです
+= CONNECTED
+: 接続済み
+= NOT CONNECTED
+: 未接続
+= DISCONNECTED
+: 切断しました
+= already CONNECTED
+: すでに接続済み
+= not connected — nothing to do
+: 未接続 — 何もしません
+= connect FAILED — not paired with this phone
+: connect 失敗 — この端末とペアリングされていません
+= %1$s FAILED — %2$s
+: %1$s 失敗 — %2$s
+= %1$s asked — no change after %2$s s
+: %1$s を要求 — %2$s秒たっても変化なし
+
+# ActionCapabilities.kt — the reasons the action editor shows (capability.reason); the table is
+# built once, so the texts stay English there and are looked up where they are shown.
+= Ready
+: 準備完了
+= Unknown actions are not classified and cannot be added, imported, or enabled.
+: 不明なアクションは分類されておらず、追加、インポート、有効化はできません。
+= This build does not know this action — it may come from a newer version. Re-export the bundle from a build that has it, or remove the action.
+: このビルドはこのアクションを知りません。より新しいバージョンのものかもしれません。このアクションがあるビルドでバンドルをエクスポートし直すか、アクションを削除してください。
+= Requires notification permission on Android 13+.
+: Android 13以降では通知の権限が必要です。
+= Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.
+: 表示中の通知を、タグとIDの両方またはどちらかで指定して取り消します。Android 13以降では通知の権限が必要です。
+= Cancels another app's notifications by package. Requires notification-access (listener) permission.
+: 他のアプリの通知をパッケージ単位で取り消します。通知へのアクセス（リスナー）の権限が必要です。
+= Opens another app's notification as a tap would. Requires notification-access (listener) permission.
+: 他のアプリの通知を、タップしたときと同じように開きます。通知へのアクセス（リスナー）の権限が必要です。
+= Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package.
+: Locale互換のプラグインがインストールされている必要があります。要求は明示的に指定したパッケージにだけ送られます。
+= Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling.
+: Locale互換の条件プラグインがインストールされている必要があります。問い合わせは宛先を明示した順序付きブロードキャストで、タイムアウトも処理します。
+= Checks or connects paired earphones / a headset — needs the Nearby devices (Bluetooth) permission.
+: ペアリング済みのイヤホンやヘッドセットの接続を確認、または接続します。「付近のデバイス」（Bluetooth）の権限が必要です。
+= Requires Write Settings special access.
+: 「システム設定の変更」の特別なアクセスが必要です。
+= Global and Secure need WRITE_SECURE_SETTINGS, granted once over ADB; System uses Write Settings.
+: GlobalとSecureにはWRITE_SECURE_SETTINGSが必要で、ADBから一度だけ許可します。Systemは「システム設定の変更」を使います。
+= May be blocked by Do Not Disturb policy access.
+: おやすみモードのポリシーへのアクセスによって妨げられることがあります。
+= Requires Do Not Disturb access.
+: おやすみモードへのアクセスが必要です。
+= May require Do Not Disturb access on some devices when switching to silent mode.
+: 機種によっては、サイレントに切り替えるときにおやすみモードへのアクセスが必要になります。
+= Uses camera flashlight.
+: カメラのライトを使います。
+= Always-on display is a protected secure setting, and not every build honours it.
+: 常時表示ディスプレイは保護されたSecure設定で、機種によっては効きません。
+= Always-on display is a protected secure setting — requires Shizuku, and not every build honours it.
+: 常時表示ディスプレイは保護されたSecure設定です。Shizukuが必要で、機種によっては効きません。
+= Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on.
+: WireGuardまたはTailscaleが必要です。WireGuardでは、その制御の権限と、「リモートコントロールアプリを許可」をオンにすることも必要です。
+= Requires location access, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so results may be a cached scan.
+: 位置情報へのアクセスが必要で、Android 13以降では「付近のWi-Fiデバイス」も必要です。Androidはスキャンの頻度を制限するため、結果は保持されていたスキャンのものになることがあります。
+= Lists nearby access points into variables — needs Location, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so the result may be a cached one.
+: 付近のアクセスポイントを変数に一覧します。位置情報が必要で、Android 13以降では「付近のWi-Fiデバイス」も必要です。Androidはスキャンの頻度を制限するため、結果は保持されていたものになることがあります。
+= Needs location access only when latitude or longitude is left blank.
+: 緯度または経度を空欄にした場合にだけ、位置情報へのアクセスが必要です。
+= Needs the Calendar editing row in Setup, and a calendar that takes new events.
+: 「セットアップ」の「カレンダーの編集」の行と、新しい予定を受け付けるカレンダーが必要です。
+= Needs the Calendar access row in Setup.
+: 「セットアップ」の「カレンダーへのアクセス」の行が必要です。
+= Plays audio from a file path or content URI; a file outside the app's own directories needs All files access.
+: ファイルのパスまたはコンテンツURIの音声を再生します。アプリ自身のディレクトリの外にあるファイルには「すべてのファイルへのアクセス」が必要です。
+= Plays a generated tone.
+: 生成した音を鳴らします。
+= Stop playback via media key dispatch.
+: メディアキーを送って再生を停止します。
+= Pause playback via media key dispatch.
+: メディアキーを送って再生を一時停止します。
+= Toggle play/pause via media key dispatch.
+: メディアキーを送って再生と一時停止を切り替えます。
+= Toggle play and pause via media key dispatch.
+: メディアキーを送って再生と一時停止を切り替えます。
+= Next track via media key dispatch.
+: メディアキーを送って次の曲に進みます。
+= Previous track via media key dispatch.
+: メディアキーを送って前の曲に戻ります。
+= Resume playback via media key dispatch.
+: メディアキーを送って再生を再開します。
+= Rewind via media key dispatch.
+: メディアキーを送って巻き戻します。
+= Fast forward via media key dispatch.
+: メディアキーを送って早送りします。
+= Mutes a stream. May be blocked by Do Not Disturb policy.
+: 音声ストリームを消音します。おやすみモードのポリシーによって妨げられることがあります。
+= Uses Android TTS engine to speak text aloud.
+: AndroidのTTSエンジンで文字を読み上げます。
+= Reboot requires privileged device-owner or system app access. Shizuku elevated mode is active.
+: 再起動には、デバイス所有者またはシステムアプリの特権が必要です。Shizukuの昇格モードが有効です。
+= Reboot requires privileged device-owner or system app access. Optional elevated backend is not active.
+: 再起動には、デバイス所有者またはシステムアプリの特権が必要です。任意の昇格バックエンドは有効になっていません。
+= Reboot requires privileged device-owner or system app access. This action requires Shizuku permission and its privileged user-service transport. The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.
+: 再起動には、デバイス所有者またはシステムアプリの特権が必要です。このアクションには、Shizukuの権限とその特権ユーザーサービスの経路が必要です。端末は警告なしにすぐ再起動し、保存していない作業は失われます。起動時のトリガーに再起動のタスクを付けると、ループすることがあります。
+= Powers off the device through Shizuku — install and start Shizuku, then grant this app access.
+: Shizukuを通して端末の電源を切ります。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Requires the Lock screen device admin, activated from Setup.
+: 「画面ロック」のデバイス管理者が必要です。「セットアップ」で有効にします。
+= Quick Settings tile updates are not functional yet; per-task tiles are a planned feature.
+: クイック設定タイルの更新はまだ動作しません。タスクごとのタイルは今後の予定です。
+= Applies 応用管理's four freeze gates: force-stop and pm disable-user over Shizuku, suspend and hide through 白い熊 雫's device-policy delegation.
+: 応用管理の4つの凍結の関門を適用します。強制停止とpm disable-userはShizukuで、一時停止と非表示は白い熊 雫のデバイスポリシーの委任で行います。
+= Clears every freeze gate: the device-policy hide first, then the shell suspension, the device-policy suspension, and pm disable-user.
+: 凍結の関門をすべて解除します。まずデバイスポリシーによる非表示、続いてシェルによる一時停止、デバイスポリシーによる一時停止、pm disable-userの順です。
+= Shizuku access and an approved script hash are required.
+: Shizukuへのアクセスと、承認済みのスクリプトのハッシュが必要です。
+= Termux script dispatch ready when Termux and Termux:Tasker are installed.
+: TermuxとTermux:Taskerがインストールされていれば、Termuxのスクリプトを実行できます。
+= Requires Termux 0.109 or newer with RUN_COMMAND permission.
+: Termux 0.109以降と、RUN_COMMANDの権限が必要です。
+= Custom colours, border and position need "display over other apps"; without it the flash falls back to a plain toast.
+: 独自の色、枠線、位置には「他のアプリの上に重ねて表示」が必要です。ない場合、フラッシュは普通のトーストになります。
+= The flash bubbles render only with "display over other apps" and only while the Desktop launcher is foreground.
+: 明滅バブルは、「他のアプリの上に重ねて表示」があり、かつランチャーのDesktopが前面にある間だけ表示されます。
+= The kill-all icon renders only with "display over other apps" and only while the Desktop launcher is foreground.
+: 「全消灯」のアイコンは、「他のアプリの上に重ねて表示」があり、かつランチャーのDesktopが前面にある間だけ表示されます。
+= The freeze bubbles render only with "display over other apps" and only while the Desktop launcher is foreground. The bubble is queued either way — it is the drawing that waits.
+: 凍結バブルは、「他のアプリの上に重ねて表示」があり、かつランチャーのDesktopが前面にある間だけ表示されます。泡はどちらの場合も登録され、待たされるのは描画だけです。
+= Silent only with Shizuku — shell holds the privileged permission the framework reserves for setting a live wallpaper. Without it the system preview opens for a confirming tap.
+: 確認なしで行えるのはShizukuがある場合だけです。ライブ壁紙の設定用にシステムが確保している特権は、シェルが持っています。ない場合は、確認のタップを求めるシステムのプレビューが開きます。
+= Records where the OCR weight files are. Needs no permission beyond being able to read the directory.
+: OCRの重みファイルの場所を記録します。そのディレクトリを読めること以外に権限は要りません。
+= Reads the text in an image entirely on-device (PP-OCRv5); no permissions and no network. The image must be somewhere this app can read.
+: 画像の中の文字を、すべて端末内で読み取ります（PP-OCRv5）。権限もネットワークも要りません。画像は、このアプリが読める場所にある必要があります。
+= Reads a scrolling screenshot into an HTML article, entirely on-device. No network. Needs to read the screenshots and write into the output directory.
+: スクロールして撮ったスクリーンショットを、すべて端末内でHTMLの記事に読み取ります。ネットワークは使いません。スクリーンショットを読み、出力先のディレクトリに書き込める必要があります。
+= Reads battery / charging / WiFi / airplane into variables; no permissions needed.
+: 電池、充電、Wi-Fi、機内モードの状態を変数に読み取ります。権限は要りません。
+= Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background.
+: Android 10以降では、アプリが前面にないとクリップボードを読めません。バックグラウンドからは空が返ることがあります。
+= Android 11+ package visibility limits the result to apps this app can see.
+: Android 11以降では、パッケージの公開範囲の制限により、結果はこのアプリから見えるアプリに限られます。
+= Enable 白い熊 自由作業盤 as a Device Admin (Permissions screen) so it can lock and require the PIN/password.
+: 白い熊 自由作業盤をデバイス管理者として有効にしてください（権限の画面）。ロックして、PINまたはパスワードを求められるようになります。
+= Reads the scenes already stored on this device to list their gesture bindings; shows nothing and needs no permission.
+: この端末に保存されているシーンを読み、ジェスチャーの割り当てを一覧にします。何も表示せず、権限も要りません。
+= Reads the profiles already stored on this device to list what the physical keys are mapped to; shows nothing and needs no permission.
+: この端末に保存されているプロファイルを読み、物理キーの割り当てを一覧にします。何も表示せず、権限も要りません。
+= Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer.
+: 直接発信するには電話（CALL_PHONE）の権限が必要です。ない場合は電話アプリを開きます。
+= Requires Write Settings special access; only the System namespace is writable without Shizuku.
+: 「システム設定の変更」の特別なアクセスが必要です。Shizukuなしで書き込めるのはSystemの名前空間だけです。
+= Requires Write Settings special access plus the adb-granted CHANGE_CONFIGURATION permission (pm grant … android.permission.CHANGE_CONFIGURATION).
+: 「システム設定の変更」の特別なアクセスと、adbから許可するCHANGE_CONFIGURATIONの権限（pm grant … android.permission.CHANGE_CONFIGURATION）が必要です。
+= Shows over other apps; from a background trigger it needs the "display over other apps" permission. Always works when run from the app.
+: 他のアプリの上に表示します。バックグラウンドのトリガーから開くには「他のアプリの上に重ねて表示」の権限が必要です。アプリから実行した場合は必ず動作します。
+= Enable the 白い熊 自由作業盤 accessibility service in Android settings.
+: Androidの設定で、白い熊 自由作業盤のユーザー補助サービスを有効にしてください。
+= Requires Shizuku installed, started, and access granted to this app.
+: Shizukuをインストールして起動し、このアプリにアクセスを許可しておく必要があります。
+= Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.
+: モバイルデータに使うSIMを切り替えます。Shizukuをインストールして起動し、このアプリにアクセスを許可しておく必要があります。
+= Reads the active SIM slots and which one carries data.
+: 有効なSIMスロットと、どれがデータ通信に使われているかを読み取ります。
+= Needs the Phone (READ_PHONE_STATE) permission to read a SIM slot's service state and signal.
+: SIMスロットの圏内状態と電波の強さを読むには、電話（READ_PHONE_STATE）の権限が必要です。
+= Needs the Phone (CALL_PHONE) permission to send a USSD code from a SIM slot.
+: SIMスロットからUSSDコードを送るには、電話（CALL_PHONE）の権限が必要です。
+= Needs “Install unknown apps” allowed for this app. Silent on Android 12+ for an update of this app itself, and for another app from the second install on; otherwise the accessibility service presses the confirmation.
+: このアプリに「不明なアプリのインストール」を許可しておく必要があります。Android 12以降では、このアプリ自身の更新と、他のアプリの2回目以降のインストールは確認なしで行われます。それ以外は、ユーザー補助サービスが確認のボタンを押します。
+= Imports an OpenTasker bundle file into this workspace, overwriting same-name items in place.
+: OpenTaskerのバンドルファイルをこのワークスペースにインポートし、同じ名前の項目はその場で上書きします。
+= Reads which build of an installed app is on this phone.
+: インストールされているアプリが、この端末でどのビルドなのかを読み取ります。
+= Lists this workspace's projects, profiles or tasks as text.
+: このワークスペースのプロジェクト、プロファイル、タスクのいずれかを文字の一覧にします。
+= Finds the one task or profile a name means, given as name or name @ project.
+: 「名前」または「名前 @ プロジェクト」の形で指定された名前が指す、ただ1つのタスクまたはプロファイルを探します。
+= Switches one of this app's profiles, given as name or name @ project, and reports the outcome.
+: 「名前」または「名前 @ プロジェクト」の形で指定された、このアプリのプロファイルを1つ切り替え、結果を報告します。
+= Calls another app's content provider; that app decides whether to answer us.
+: 他のアプリのコンテンツプロバイダーを呼び出します。応答するかどうかは、そのアプリが決めます。
+= Copies a content URI another app has lent us into a local file.
+: 他のアプリから貸し出されたコンテンツURIを、ローカルのファイルにコピーします。
+= Opens the 健康 window on data already stored on this device. Needs no permission.
+: この端末に保存済みのデータで「健康」のウィンドウを開きます。権限は要りません。
+= Opens the 健康（Huawei） window on data already stored on this device. Needs no permission.
+: この端末に保存済みのデータで「健康（Huawei）」のウィンドウを開きます。権限は要りません。
+= Opens 健康 -- [727], the board every other band window is reached from. Needs no permission.
+: 「健康 -- [727]」を開きます。バンドのほかのウィンドウはすべて、このボードから開けます。権限は要りません。
+= Reads the Hume Band's stored health history over Bluetooth — needs the Nearby devices (Bluetooth) permission.
+: Hume Bandに保存されている健康の履歴をBluetoothで読み取ります。「付近のデバイス」（Bluetooth）の権限が必要です。
+= Reads the HUAWEI Band 11 Pro's stored health history over Bluetooth Classic RFCOMM — the band must be paired first, and it needs the Nearby devices (Bluetooth) permission.
+: HUAWEI Band 11 Proに保存されている健康の履歴を、Bluetooth ClassicのRFCOMMで読み取ります。先にバンドをペアリングしておく必要があり、「付近のデバイス」（Bluetooth）の権限も必要です。
+= Forgets the HUAWEI band on this phone — clears our bind and the Bluetooth pairing. Needs the Nearby devices (Bluetooth) permission. Release the band on the band FIRST, or it deadlocks and only a factory reset recovers it.
+: この端末からHUAWEIのバンドの登録を消します。このアプリとの結び付けとBluetoothのペアリングを解除します。「付近のデバイス」（Bluetooth）の権限が必要です。必ず先にバンド側で解除してください。そうしないとバンドが行き詰まり、初期化しないかぎり元に戻りません。
+= Sets the language and unit system shown on the paired HUAWEI band — needs the Nearby devices (Bluetooth) permission. It changes only what the band displays; no health data is read or written.
+: ペアリング済みのHUAWEIのバンドに表示する言語と単位系を設定します。「付近のデバイス」（Bluetooth）の権限が必要です。変わるのはバンドの表示だけで、健康のデータは読み書きしません。
+= Fetches the paired HUAWEI band's sleep and RR-interval files and writes them to disk — needs the Nearby devices (Bluetooth) permission. It reads the band and changes nothing on it.
+: ペアリング済みのHUAWEIのバンドから睡眠とRR間隔のファイルを取得し、ストレージに書き出します。「付近のデバイス」（Bluetooth）の権限が必要です。バンドを読むだけで、バンドの中は何も変えません。
+= Moves the paired HUAWEI band's own clock — needs the Nearby devices (Bluetooth) permission. For looking at a watch face as it renders at another hour; the next connection restores the phone's time by itself.
+: ペアリング済みのHUAWEIのバンド自身の時計を動かします。「付近のデバイス」（Bluetooth）の権限が必要です。別の時刻での文字盤の見え方を確かめるためのもので、次に接続したときに端末の時刻へ自動で戻ります。
+= Installs a previously captured watch face on the paired HUAWEI band — needs the Nearby devices (Bluetooth) permission. It writes to the band, and the band verifies a digest before accepting.
+: 以前に取り込んだ文字盤を、ペアリング済みのHUAWEIのバンドにインストールします。「付近のデバイス」（Bluetooth）の権限が必要です。バンドに書き込みを行い、バンドはダイジェストを検証してから受け入れます。
+= Changes what the paired HUAWEI band records — continuous heart rate, SpO₂, truSleep and their alerts. Needs the Nearby devices (Bluetooth) permission.
+: ペアリング済みのHUAWEIのバンドが記録する項目（常時の心拍数、SpO₂、truSleepとそれらの警告）を変更します。「付近のデバイス」（Bluetooth）の権限が必要です。
+= Pushes weather to the paired HUAWEI band's display — needs the Nearby devices (Bluetooth) permission. It sends only what the task supplies; nothing is fetched from the network.
+: ペアリング済みのHUAWEIのバンドの画面に天気を送ります。「付近のデバイス」（Bluetooth）の権限が必要です。送るのはタスクが渡した内容だけで、ネットワークからは何も取得しません。
+= Gives the paired HUAWEI band the satellite assistance data it cannot fetch itself, so a GPS fix takes seconds instead of minutes of cold search. Needs the Nearby devices (Bluetooth) permission. It serves files already on disk — it never fetches the URL the band asks for, which would make this app the band's general HTTP client.
+: ペアリング済みのHUAWEIのバンドに、バンドが自分では取得できない衛星の補助データを渡します。これにより、GPSの測位が何分もかかる一からの探索ではなく、数秒で済みます。「付近のデバイス」（Bluetooth）の権限が必要です。渡すのはストレージにすでにあるファイルだけで、バンドが求めるURLを取得することは決してありません。それをすると、このアプリがバンドの汎用HTTPクライアントになってしまうためです。
+= Sends a prompt to Anthropic's Claude and keeps the answer in a variable — needs an Anthropic API key, which the task supplies.
+: AnthropicのClaudeにプロンプトを送り、答えを変数に保存します。AnthropicのAPIキーが必要で、タスクが渡します。
+= 言語島 walk capture: records one spoken sentence per press pair (16 kHz WAV) for 白い熊 kxkb to transcribe and review — needs the Microphone permission.
+: 言語島の散歩中の録音です。2回の押下を1組として、話した文を1つずつ録音します（16 kHzのWAV）。白い熊 kxkbが書き起こして確認します。マイクの権限が必要です。
+= Opens 言語島's board: every 言語島 task as a picture tile, drag-reorderable.
+: 言語島のボードを開きます。言語島のタスクがすべて絵のタイルで並び、ドラッグで並べ替えられます。
+= Opens 言語島's 未分類 page: sentences handed in by kxkb, each with Claude's proposed island, filed with one tap.
+: 言語島の「未分類」のページを開きます。kxkbから届いた文が、Claudeの提案する島とともに並び、タップ1つで振り分けられます。
+= Opens 言語島's sentence entry: write English sentences into topic islands; its 「訳して音声を作る」 button starts their translation and voicing.
+: 言語島の文の入力画面を開きます。英語の文を話題ごとの島に書き込みます。「訳して音声を作る」ボタンで翻訳と音声の作成が始まります。
+= Translates 言語島's new sentences with Claude and has 白い熊 音声 voice them into OGG files — needs an Anthropic API key and 白い熊 音声 installed.
+: 言語島の新しい文をClaudeで翻訳し、白い熊 音声でOGGファイルの音声にします。AnthropicのAPIキーと、白い熊 音声のインストールが必要です。
+= Runs 言語島's generation and then sends every sentence to 白い熊 暗記, deleting 言語島 notes no sentence owns — needs 白い熊 暗記 installed.
+: 言語島の生成を実行したあと、すべての文を白い熊 暗記に送り、どの文にも属さない言語島のノートを削除します。白い熊 暗記のインストールが必要です。
+= Takes the Language Islands notes in 白い熊 暗記 into 言語島 once, voices them afresh and hands them back adopted — needs 白い熊 暗記, an Anthropic API key and 白い熊 音声.
+: 白い熊 暗記にあるLanguage Islandsのノートを一度だけ言語島に取り込み、音声を作り直して、取り込み済みとして返します。白い熊 暗記、AnthropicのAPIキー、白い熊 音声が必要です。
+= Opens 言語島's player: islands played sentence by sentence (Listen, Shadow, Recall), furigana on screen, a tapped word looked up in 白い熊の辞書.
+: 言語島のプレーヤーを開きます。島を1文ずつ再生し（Listen、Shadow、Recall）、画面にはふりがなが付き、タップした語は白い熊の辞書で調べられます。
+= Opens 言語島's import window: a pasted 「言語島 取込」 text of terms, examples and sentences is previewed, filed into its islands and handed to the usual run.
+: 言語島の取り込みウィンドウを開きます。貼り付けた「言語島 取込」のテキスト（用語、例文、文）を確認し、それぞれの島に振り分けて、通常の実行に渡します。
+= Opens 言語島's vocabulary reference: 白い熊's own terms by island, in both directions, searchable, each with its example sentences and 白い熊の辞書's entry.
+: 言語島の語彙の参照画面を開きます。白い熊自身の用語を島ごとに、両方向で、検索できる形で示し、それぞれに例文と白い熊の辞書の項目が付きます。
+= Opens 言語島's statistics: the listening calendar, time of day, per-island progress and which islands are due.
+: 言語島の統計を開きます。聞いた日のカレンダー、時間帯、島ごとの進み具合、復習の時期が来た島が分かります。
+= Opens 言語島's island editor: reorder, move and delete sentences, edit their English or Japanese, set a word's reading.
+: 言語島の島の編集画面を開きます。文の並べ替え、移動、削除、英語や日本語の編集、語の読みの設定ができます。
+= Has 白い熊 音声 voice Japanese sentences into OGG files at the paths given — needs 白い熊 音声 installed with All-Files access, and Shizuku so it may start its render service from the background.
+: 白い熊 音声で日本語の文を音声にし、指定したパスのOGGファイルに書き出します。「すべてのファイルへのアクセス」を許可した白い熊 音声のインストールと、その音声作成サービスをバックグラウンドから開始するためのShizukuが必要です。
+= Asks the Galileo almanac's publisher, every half hour in the background, whether something newer than the file a set was built on has appeared — and posts a notification when it has. It reads one small public file per check, touches no device, and stops by itself after a day.
+: Galileoの概略暦の配布元に、一式の作成に使ったファイルより新しいものが出ていないかを、バックグラウンドで30分ごとに問い合わせ、出ていれば通知を出します。1回の確認で読むのは小さな公開ファイル1つだけで、どの機器にも触れず、1日たつと自動で止まります。
+= Builds the band's 72-hour predicted-ephemeris set on the phone from free public orbit products, and writes it into the directory the GNSS action serves from. It downloads about 25 MB every run — there is deliberately no cache, because a kept orbit product is a wrong one a day later — and then spends several minutes of every core on the fit. It touches no device and reads nothing personal.
+: バンド用の72時間分の予測軌道暦一式を、無料で公開されている軌道データから端末上で作成し、GNSSのアクションが配布元にするディレクトリに書き込みます。実行のたびに約25 MBをダウンロードします。取っておいた軌道データは1日たてば誤ったものになるため、あえてキャッシュは持ちません。そのあと、当てはめの計算にすべてのコアを数分間使います。どの機器にも触れず、個人のデータは何も読みません。
+= Presses a control in another app by the words written on it, using the accessibility service. It reads the on-screen labels of whatever app is in front — which is what makes it work over the lock screen, where a screenshot comes back blank.
+: ユーザー補助サービスを使い、他のアプリの操作部品を、そこに書かれた文字で指定して押します。前面にあるアプリの画面上のラベルを読み取ります。そのため、スクリーンショットが真っ黒になるロック画面の上でも動作します。
+= Puts text into a text field of the app in front — a search box — using the accessibility service. Types Japanese too, which the shell's key input cannot.
+: ユーザー補助サービスを使い、前面にあるアプリの入力欄（検索ボックスなど）に文字を入れます。シェルのキー入力ではできない日本語も入力できます。
+= Reads the walks the band recorded and downloads their GPS tracks, writing a .gpx and the raw file to a directory — needs the Nearby devices (Bluetooth) permission. It reads from the band only; nothing is sent anywhere.
+: バンドが記録した散歩を読み取り、そのGPSの軌跡をダウンロードして、.gpxと元のファイルをディレクトリに書き出します。「付近のデバイス」（Bluetooth）の権限が必要です。バンドから読むだけで、どこにも何も送りません。
+= Opens a window putting the two bands side by side. It reads what has already been synced and touches no device.
+: 2つのバンドを並べて見比べるウィンドウを開きます。同期済みのデータを読むだけで、どの機器にも触れません。
+= Asks the paired HUAWEI band which services and commands it supports, and writes the answer to a file. The census and the known count queries only read; the optional unknown-command sweep may set something on the band and is off by default. Needs the Nearby devices (Bluetooth) permission.
+: ペアリング済みのHUAWEIのバンドに、対応しているサービスとコマンドを問い合わせ、答えをファイルに書き出します。一覧の取得と既知の件数の問い合わせは読むだけです。任意の未知コマンドの総当たりはバンドの何かを設定してしまうことがあり、既定では無効です。「付近のデバイス」（Bluetooth）の権限が必要です。
+= Pairs the HUAWEI Band 11 Pro with this phone and provisions it — needs the Nearby devices (Bluetooth) permission, and two confirmations that cannot be automated: one on the band, one on the phone.
+: HUAWEI Band 11 Proをこの端末とペアリングし、初期設定を行います。「付近のデバイス」（Bluetooth）の権限と、自動化できない2つの確認（バンド側で1つ、端末側で1つ）が必要です。
+= Listens for nearby Bluetooth devices to find the band's address — needs the Nearby devices (Bluetooth) permission.
+: 付近のBluetoothデバイスを探して、バンドのアドレスを見つけます。「付近のデバイス」（Bluetooth）の権限が必要です。
+= Reads the device's position into variables — needs the Location permission.
+: 端末の位置を変数に読み取ります。位置情報の権限が必要です。
+= Aborts a running speed test immediately.
+: 実行中の速度測定をただちに中止します。
+= Measures download/upload throughput over a chosen transport (mobile or WiFi), time-boxed and byte-capped.
+: 選んだ回線（モバイルまたはWi-Fi）で、ダウンロードとアップロードの速度を測ります。時間とデータ量に上限があります。
+= Records the microphone — needs the Microphone (RECORD_AUDIO) permission.
+: マイクの音声を録音します。マイク（RECORD_AUDIO）の権限が必要です。
+= Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action.
+: インポートしたTaskerのアクションを、白い熊 自由作業盤が対応しているアクションに置き換えられませんでした。
+= Imported MacroDroid action could not be mapped to a supported 白い熊 自由作業盤 action.
+: インポートしたMacroDroidのアクションを、白い熊 自由作業盤が対応しているアクションに置き換えられませんでした。
+= Android 13+ blocks direct Bluetooth enable/disable for normal apps.
+: Android 13以降では、通常のアプリがBluetoothを直接有効・無効にすることはできません。
+= Requires Bluetooth permission.
+: Bluetoothの権限が必要です。
+= Requires SMS permission; Play builds omit SMS actions for policy compliance.
+: SMSの権限が必要です。Play向けのビルドでは、ポリシーに従うためSMSのアクションを省いています。
+= SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.
+: この配布版ではSMSのアクションは利用できません。Playのポリシーに従うため、SMSと電話の状態の権限を省いているためです。
+= The Wi-Fi hotspot action needs Android 11 or newer.
+: Wi-FiテザリングのアクションにはAndroid 11以降が必要です。
+# shizukuCapability("<feature>") — the sentence as it is composed
+= WiFi toggle on Android 10+ runs through Shizuku — install and start Shizuku, then grant this app access.
+: Android 10以降でのWi-Fiの切り替えはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Airplane mode runs through Shizuku — install and start Shizuku, then grant this app access.
+: 機内モードはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Mobile data runs through Shizuku — install and start Shizuku, then grant this app access.
+: モバイルデータはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Wi-Fi hotspot runs through Shizuku — install and start Shizuku, then grant this app access.
+: Wi-FiテザリングはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Screenshot runs through Shizuku — install and start Shizuku, then grant this app access.
+: スクリーンショットはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Window mode runs through Shizuku — install and start Shizuku, then grant this app access.
+: ウィンドウモードはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Location mode runs through Shizuku — install and start Shizuku, then grant this app access.
+: 位置情報モードはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Set keyboard runs through Shizuku — install and start Shizuku, then grant this app access.
+: キーボードの設定はShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Screen wake (KEYCODE_WAKEUP) runs through Shizuku — install and start Shizuku, then grant this app access.
+: 画面の点灯（KEYCODE_WAKEUP）はShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Generate + install per-app share relays runs through Shizuku — install and start Shizuku, then grant this app access.
+: アプリごとの共有リレーの生成とインストールはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Create launcher tasks runs through Shizuku — install and start Shizuku, then grant this app access.
+: 起動タスクの作成はShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。

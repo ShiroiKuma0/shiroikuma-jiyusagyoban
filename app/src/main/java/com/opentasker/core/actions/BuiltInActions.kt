@@ -18,6 +18,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.app.R
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.suspendCancellableCoroutine
 // The fork keeps plain Action implementations alongside upstream's DeclaredAction ones in this
 // file, so both symbols stay imported.
@@ -43,7 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val title = args["title"] ?: "Notification"
+        val title = args["title"] ?: tr("Notification")
         val text = args["text"] ?: ""
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -55,7 +56,7 @@ class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
         val channelKey = args["channel"] ?: "default"
         val channelDef = NotificationChannels.resolve(channelKey)
         nm.createNotificationChannel(
-            NotificationChannel(channelDef.id, channelDef.name, channelDef.importance),
+            NotificationChannel(channelDef.id, tr(channelDef.name), channelDef.importance),
         )
 
         val channel = nm.getNotificationChannel(channelDef.id)
@@ -184,8 +185,8 @@ class ProgressNotificationAction : DeclaredAction(ActionCatalog.require("notify.
         if (progress !in 0..100) return ActionResult.Failure("progress must be an integer from 0 to 100")
         val channelDef = NotificationChannels.resolve(args["channel"] ?: "default")
         val manager = ctx.app.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel(channelDef.id, channelDef.name, channelDef.importance))
-        val title = args["title"]?.takeIf { it.isNotBlank() } ?: "Progress"
+        manager.createNotificationChannel(NotificationChannel(channelDef.id, tr(channelDef.name), channelDef.importance))
+        val title = args["title"]?.takeIf { it.isNotBlank() } ?: tr("Progress")
         val text = args["text"].orEmpty()
         val id = args["id"]?.toIntOrNull() ?: nextNotificationId.getAndIncrement()
         val tag = args["tag"]?.takeIf { it.isNotBlank() }

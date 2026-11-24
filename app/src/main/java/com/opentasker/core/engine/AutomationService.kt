@@ -59,6 +59,7 @@ import com.opentasker.core.storage.toEntity
 import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
+import com.opentasker.i18n.tr
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -1093,7 +1094,7 @@ class AutomationService : Service() {
 
     private fun startForegroundCompat() {
         val nm = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(CHANNEL, "白い熊 自由作業盤 engine", NotificationManager.IMPORTANCE_MIN)
+        val channel = NotificationChannel(CHANNEL, tr("白い熊 自由作業盤 engine"), NotificationManager.IMPORTANCE_MIN)
         nm.createNotificationChannel(channel)
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -1102,8 +1103,8 @@ class AutomationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val n: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setContentTitle("白い熊 自由作業盤 is running")
-            .setContentText("Tap to open automation status")
+            .setContentTitle(tr("白い熊 自由作業盤 is running"))
+            .setContentText(tr("Tap to open automation status"))
             // The app's own monochrome mark and accent, not a platform holo drawable: this
             // notification is visible permanently, and holo renders as a muddy alpha blob whose
             // shape is not a stable cross-OEM contract.

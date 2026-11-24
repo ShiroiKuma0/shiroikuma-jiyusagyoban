@@ -1,0 +1,978 @@
+= default pc — values land as %pc_<key>; lists of records as arrays %pc_<key>_<field> plus %pc_<key>_count; files as their copied path
+: 既定は pc です。値は %pc_<key> に、レコードの一覧は配列 %pc_<key>_<field> と %pc_<key>_count に、ファイルはコピー先のパスとして入ります
+= Directory for returned files
+: 返されたファイルの保存先ディレクトリ
+= default the app's user_files/provider
+: 既定はアプリの user_files/provider
+= Copy From URI
+: URIからコピー
+= Copy a content URI another app lent us (a received picture) into a local file
+: 他のアプリから一時的に渡されたコンテンツURI（受け取った画像など）を、ローカルのファイルにコピーします。
+= URI
+: URI
+= content://…
+: content://…
+= Target directory
+: 保存先ディレクトリ
+= default the app's user_files/bridge
+: 既定はアプリの user_files/bridge
+= File name
+: ファイル名
+= default the provider's own name
+: 既定はプロバイダー側の名前
+= default uri — writes %uri_path, %uri_name, %uri_mime, %uri_size
+: 既定は uri — %uri_path、%uri_name、%uri_mime、%uri_size に書き込みます
+= Location Mode
+: 位置情報モード
+= Turn location services on/off (via Shizuku)
+: 位置情報サービスをオン/オフにします（Shizuku経由）。
+= Set Keyboard
+: キーボードを設定
+= Switch the active input method / keyboard (via Shizuku)
+: 使用中の入力方式/キーボードを切り替えます（Shizuku経由）。
+= IME id
+: IMEのID
+= e.g. com.pkg/.InputMethodService
+: 例：com.pkg/.InputMethodService
+= Set Widget
+: ウィジェットを設定
+= Replace a styled home-screen widget's layout and re-render it
+: ホーム画面の装飾付きウィジェットのレイアウトを置き換え、描画し直します。
+= Widget name
+: ウィジェット名
+= the name set when the widget was placed
+: ウィジェットを配置したときに付けた名前
+= Template (optional)
+: テンプレート（任意）
+= a saved Widget Templates name; overrides the layout below
+: 保存済みの「ウィジェットテンプレート」の名前。下のレイアウトより優先されます
+= Layout
+: レイアウト
+= inline layout (used when no template is set); %vars are expanded
+: 直接書くレイアウト（テンプレートを指定しない場合に使用）。%vars は展開されます
+= Refresh Widgets
+: ウィジェットを更新
+= Re-render every placed styled widget. Template-bound widgets pull their template and re-expand %vars (the pull model) — run this once per minute instead of a Set Widget per location.
+: 配置済みの装飾付きウィジェットをすべて描画し直します。テンプレートに結び付いたウィジェットは、テンプレートを取り込んで %vars を展開し直します（プル方式）。配置場所ごとに「ウィジェットを設定」を実行する代わりに、これを1分に1回実行してください。
+= Show Scene
+: シーンを表示
+= Display a scene (from the Scenes tab). With the Display-over-other-apps permission it shows over other apps; its elements run tasks on tap and %vars in text are expanded.
+: シーン（「シーン」タブのもの）を表示します。「他のアプリの上に重ねて表示」の権限があれば、他のアプリの上に表示されます。要素をタップするとタスクが実行され、文字の中の %vars は展開されます。
+= the scene's name — resolves within this task's project first, so a name reused in another project still finds the right one (a numeric id also works)
+: シーンの名前 — まずこのタスクのプロジェクト内で探すので、別のプロジェクトで同じ名前が使われていても正しいものが見つかります（数値のIDも使えます）
+= Keep screen on
+: 画面を点灯したままにする
+= the overlay blocks the screen timeout while it is shown
+: 表示している間、オーバーレイが画面のタイムアウトを止めます
+= center (default), top, bottom, left or right — left/right are the edge HUDs the two placement fields below position
+: center（既定）、top、bottom、left、right のいずれか — left/right は画面端のHUDで、下の2つの配置欄で位置を決めます
+= Modal
+: モーダル
+= block the app underneath (on) vs tap-through HUD (off)
+: 下のアプリを操作できなくする（オン）か、タップが通り抜けるHUDにする（オフ）か
+= Tap outside closes
+: 外側をタップで閉じる
+= default on; off = close only via Back, a button, or timeout
+: 既定はオン。オフ = 戻る、ボタン、タイムアウトでのみ閉じます
+= Auto-dismiss (s)
+: 自動で閉じる（秒）
+= seconds before it closes itself; blank = stay
+: 自動で閉じるまでの秒数。空欄 = 表示したまま
+= Edge inset (dp)
+: 端からの距離（dp）
+= left/right only: dp pulled in from that edge, so the panel sits further towards the centre (blank/0 = flush at the edge, which is also inside the OEM's edge-gesture strip). A %variable works
+: left/right のみ：その端から内側へ寄せるdp数で、パネルがより中央寄りになります（空欄/0 = 端にぴったり。そこは端末メーカーの端ジェスチャー領域の内側でもあります）。%variable も使えます
+= Vertical centre
+: 縦方向の中心
+= left/right only: 0–1 places the scene's CENTRE at that fraction of the screen height (0.75 = three quarters down) and follows every fold state; or top / center / bottom for a third. A %variable works
+: left/right のみ：0–1 で、シーンの中心を画面の高さのその割合の位置に置き（0.75 = 上から4分の3）、どの折りたたみ状態にも追従します。top / center / bottom で3分割の位置も指定できます。%variable も使えます
+= Height fraction
+: 高さの割合
+= left/right edge strip: 0–1 of the screen height, re-sized on fold/rotation, extended to the true screen edge. Blank = wrap the scene
+: 左右の端の帯：画面の高さに対する 0–1 の割合。折りたたみや回転のたびに大きさを合わせ直し、実際の画面の端まで伸ばします。空欄 = シーンの大きさに合わせる
+= Width fraction
+: 幅の割合
+= bottom edge strip: 0–1 of the screen width. Blank = wrap the scene
+: 下端の帯：画面の幅に対する 0–1 の割合。空欄 = シーンの大きさに合わせる
+= Horizontal third
+: 横方向の位置（3分割）
+= bottom bar only: which side it sits on (default centre)
+: 下端のバーのみ：どちら側に置くか（既定は中央）
+= Full width
+: 全幅
+= span the whole screen width over the status bar, keeping the scene's height (the battery line / clock strip)
+: シーンの高さはそのままに、ステータスバーの上で画面の幅いっぱいに広げます（電池線や時計の帯）
+= Stretch to screen width
+: 画面幅に引き伸ばす
+= tap-through only: widen the card to the screen in every fold state, keeping its height — elements stretch sideways with it, text keeps its size
+: タップが通り抜ける場合のみ：どの折りたたみ状態でも、高さはそのままにカードを画面幅まで広げます — 要素は一緒に横へ伸び、文字のサイズは変わりません
+= Fullscreen
+: 全画面
+= cover the whole screen and pass every touch through — a purely visual overlay (the music edge light)
+: 画面全体を覆い、すべてのタッチを通り抜けさせます — 見た目だけのオーバーレイです（音楽の端灯）
+= Centre vertically (legacy)
+: 縦方向の中央に置く（旧式）
+= left/right only: sit at the vertical centre instead of the media-HUD drop. Superseded by Vertical centre
+: left/right のみ：メディアHUDの下がった位置ではなく、縦方向の中央に置きます。「縦方向の中心」に置き換えられました
+= Show over lockscreen
+: ロック画面の上に表示
+= render over the lockscreen without unlocking, waking the screen (shown as an Activity, so it covers the screen)
+: ロックを解除せずにロック画面の上に描画し、画面を点灯させます（アクティビティとして表示するため、画面全体を覆います）
+= Progress Panel — Show
+: 進捗パネル — 表示
+= Raise the two-pane progress panel over everything: the run's steps on top, the current step's items below, real counters, finished work ticked and dimmed above the active line, and an optional 中止 button. Declare the steps once here; afterwards just say which is current.
+: 上下2段の進捗パネルを、すべての上に表示します。上段に実行のステップ、下段に現在のステップの項目を並べ、実際の件数を示し、完了した作業は現在の行の上にチェック付きで薄く表示します。「中止」ボタンも付けられます。ステップはここで一度だけ宣言し、以降はどれが現在のものかを伝えるだけです。
+= Steps
+: ステップ
+= the outer list (e.g. the packages to back up), joined by the separator
+: 外側の一覧（例：バックアップするパッケージ）。区切り文字でつなぎます
+= Step labels
+: ステップのラベル
+= optional display names parallel to Steps; blank = the step itself (or the app's name when Packages is on)
+: 「ステップ」に対応する表示名（任意）。空欄 = ステップそのもの（「ステップをパッケージとして扱う」がオンならアプリ名）
+= how Steps / labels / items are split (default a comma)
+: 「ステップ」、ラベル、項目の区切り方（既定はカンマ）
+= Steps are packages
+: ステップをパッケージとして扱う
+= resolve each app's name and draw its icon — frozen apps included
+: 各アプリの名前を調べ、アイコンを表示します — 凍結したアプリも含みます
+= panel heading
+: パネルの見出し
+= Step counter noun
+: ステップ件数の名詞
+= e.g. アプリ → 「アプリ 7/31」
+: 例：アプリ → 「アプリ 7/31」
+= Item counter noun
+: 項目件数の名詞
+= e.g. 項目 → 「項目 3/7」
+: 例：項目 → 「項目 3/7」
+= Step lines
+: ステップの行数
+= rows visible in the top pane (default 10); the active row sits with 4 done above it
+: 上段に表示する行数（既定は10）。現在の行は、完了した4行を上に置いた位置に表示されます
+= Item lines
+: 項目の行数
+= rows visible in the bottom pane (default 8)
+: 下段に表示する行数（既定は8）
+= set to 1 when 中止 is pressed — and any waiting Send Intent gives up at once. Blank = no button
+: 「中止」が押されると1が設定されます — 待機中の「インテントを送信」も直ちに打ち切られます。空欄 = ボタンなし
+= button text (default 中止)
+: ボタンの文字（既定は「中止」）
+= Text scale
+: 文字の倍率
+= 1 = normal, 1.5 = half again — match the plan window it follows
+: 1 = 通常、1.5 = 1.5倍 — 続けて表示する計画ウィンドウに合わせます
+= Fill the screen
+: 画面いっぱいに表示
+= take the whole height, dividing it between the two panes, instead of a fixed row count
+: 行数を固定せず、高さ全体を使って上下2段に分けます
+= No item pane
+: 項目の段なし
+= the steps have no items of their own — drop the lower pane and give the step list the whole window
+: ステップに固有の項目がない場合 — 下段をなくし、ウィンドウ全体をステップの一覧に使います
+= Progress Panel — Step
+: 進捗パネル — ステップ
+= Mark one step of the progress panel. Activating a step scrolls the top pane to it and loads its items into the bottom pane; finishing it (done/fail/cancel/skip) captures those items into the row, which tapping the row later unfolds.
+: 進捗パネルのステップ1つに状態を付けます。ステップを active にすると、上段がそこまでスクロールし、その項目が下段に読み込まれます。終了（done/fail/cancel/skip）させると項目がその行に取り込まれ、あとで行をタップすると展開されます。
+= 1-based position in the list given to Show
+: 「進捗パネル — 表示」に渡した一覧の中での位置（1始まり）
+= active / done / fail / skip / cancel / pending
+: active / done / fail / skip / cancel / pending
+= Detail
+: 詳細
+= right-hand annotation — a size when it worked, a reason when it didn't
+: 右側の注記 — 成功した場合はサイズ、失敗した場合は理由
+= this step's item list, loaded into the bottom pane when the step goes active
+: このステップの項目の一覧。ステップが active になると下段に読み込まれます
+= Item labels
+: 項目のラベル
+= optional display names parallel to Items
+: 「項目」に対応する表示名（任意）
+= Item parents
+: 項目の親
+= optional parent id per item — one with a parent is drawn indented under its group
+: 項目ごとの親ID（任意）— 親のある項目は、そのグループの下に字下げして表示されます
+= Keep only
+: これだけ残す
+= optional — keep just these item keys (the selected ones); blank = all of them
+: 任意 — これらの項目キー（選択したもの）だけを残します。空欄 = すべて
+= how Items / labels are split (default a comma)
+: 「項目」とラベルの区切り方（既定はカンマ）
+= Rename step
+: ステップの名前を変更
+= optional — replace the row's display name
+: 任意 — 行の表示名を置き換えます
+= Fold-out note
+: 展開時のメモ
+= an extra line kept off the row itself and shown when the row is unfolded — e.g. where a backup was written
+: 行そのものには出さず、行を展開したときに表示する追加の1行 — 例：バックアップの書き込み先
+= Progress Panel — Item
+: 進捗パネル — 項目
+= Mark one item of the current step, and/or refresh the live counter line drawn under it (「書籍 1234/8942 · 512 MB / 4.2 GB」, straight from the app's own progress broadcast). Address the item by Item id whenever the app reports one — a number cannot be trusted as a position, because an app counts whatever it is working through at the time. Activating an item marks the ones above it done.
+: 現在のステップの項目1つに状態を付け、またはその下に表示される実況のカウンター行（「書籍 1234/8942 · 512 MB / 4.2 GB」。アプリ自身の進捗ブロードキャストの内容そのまま）を更新します。両方を同時に行うこともできます。アプリが項目のIDを報告する場合は、必ず「項目ID」で項目を指定してください — 番号は位置として信用できません。アプリは、その時点で処理しているものを数えているだけだからです。項目を active にすると、それより上の項目は done になります。
+= Item id
+: 項目ID
+= the category id the app says it is on — the reliable way to address a row
+: アプリが処理中だと伝えてきたカテゴリID — 行を指定する確実な方法です
+= Item number
+: 項目番号
+= 1-based position of the item being written NOW; only used when there is no Item id
+: いま書き込み中の項目の位置（1始まり）。「項目ID」がない場合にのみ使われます
+= Item number is out of
+: 項目番号の母数
+= the app's own total — Item number is honoured only if this equals the number of items on the pane
+: アプリ側の総数 — 「項目番号」は、これが段にある項目の数と等しい場合にのみ採用されます
+= Counter line
+: カウンター行
+= the live numbers under the active item — real counts, never a percentage
+: active な項目の下に出る実況の数値 — 実際の件数で、百分率は決して使いません
+= Bytes done
+: 処理済みバイト数
+= second counter: bytes written so far
+: 2つ目のカウンター：これまでに書き込んだバイト数
+= Bytes total
+: 合計バイト数
+= second counter: bytes expected in total
+: 2つ目のカウンター：全体で見込まれるバイト数
+= right-hand annotation for this item
+: この項目の右側の注記
+= Rename item
+: 項目の名前を変更
+= optional — replace the item's display name
+: 任意 — 項目の表示名を置き換えます
+= Progress Panel — Finish
+: 進捗パネル — 完了
+= Turn the running panel into the run's report and leave it up: the item pane folds away, the button becomes OK, and the list stays browsable — every row opening to its items, its written path, and, when it failed, the full error plus buttons to grant the app storage access or re-run just that row.
+: 実行中のパネルをその実行の報告に切り替え、表示したままにします。項目の段は畳まれ、ボタンはOKになり、一覧は引き続き見て回れます。どの行も開くと、その項目と書き込み先のパスが表示され、失敗した行ではエラーの全文に加えて、アプリにストレージへのアクセスを許可するボタンと、その行だけを再実行するボタンが表示されます。
+= appended to the live ✓/✗ counts in the header, e.g. 合計 約 122 MB
+: 見出しの実況の ✓/✗ の件数の後ろに付け加えます。例：合計 約 122 MB
+= Retry task
+: 再試行タスク
+= task name run by a row's re-run button; {key} is replaced by that row's key (e.g. 保存 ⇨ {key}). Blank = no repair buttons
+: 行の再実行ボタンで実行するタスクの名前。{key} はその行のキーに置き換えられます（例：保存 ⇨ {key}）。空欄 = 修復ボタンなし
+= Row number variable
+: 行番号の変数
+= set to the row's 1-based number just before a retry, so the task updates that row (e.g. BR_N)
+: 再試行の直前に、その行の番号（1始まり）が設定されます。これでタスクがその行を更新できます（例：BR_N）
+= Backup directory
+: バックアップのディレクトリ
+= a repair first deletes that app's UNREADABLE archives here (a killed export leaves a ZIP with no end-of-archive record); readable backups are never touched
+: 修復ではまず、ここにあるそのアプリの読み取れないアーカイブを削除します（強制終了されたエクスポートは、アーカイブ終端レコードのないZIPを残します）。読み取れるバックアップには決して触れません
+= default OK
+: 既定：OK
+= Progress Panel — Hide
+: 進捗パネル — 非表示
+= Take the progress panel down (typically right before the summary dialog).
+: 進捗パネルを閉じます（通常は概要ダイアログの直前）。
+= Hide Scene
+: シーンを非表示
+= Dismiss a shown scene — or every one of them when no scene is named.
+: 表示中のシーンを閉じます。シーンを指定しない場合は、表示中のシーンをすべて閉じます。
+= the scene to dismiss, resolved within this task's project first. Blank = dismiss EVERY shown scene
+: 閉じるシーン。まずこのタスクのプロジェクト内で探します。空欄 = 表示中のシーンをすべて閉じる
+= Duration in ms
+: ミリ秒単位の長さ
+= Run another task as a sub-task with named parameters (it reads them as {{ param.name }}). Capture its named results and ok/error status into variables under a prefix. Globals are shared; locals are isolated; max 8 levels deep.
+: 別のタスクを、名前付きのパラメータを渡してサブタスクとして実行します（タスク側は {{ param.name }} として読み取ります）。名前付きの結果と ok/error の状態を、接頭辞を付けた変数に取り込みます。グローバル変数は共有され、ローカル変数は分離されます。深さは最大8階層です。
+= Toggle WiFi
+: Wi-Fiを切り替え
+= Store results into (prefix)
+: 結果の格納先（接頭辞）
+= e.g. r_  →  %r_<name>, %r_ok, %r_error
+: 例：r_  →  %r_<name>、%r_ok、%r_error
+= Return variable
+: 戻り値の変数
+= optional: gets the value the task's Stop hands back (Tasker's Return Value Variable)
+: 任意：タスクのStopが返す値を受け取ります（Taskerの「Return Value Variable」）
+= Clear the return variable first
+: 先に戻り値の変数を消去
+= so a task that returns nothing leaves it unset
+: 何も返さないタスクの場合に、変数が未設定のままになるようにします
+= Return Values
+: 値を返す
+= Return named values to the task that called this one (via its Run Task results prefix). Values may reference this task's variables and {{ param.* }}.
+: このタスクを呼び出したタスクに、名前付きの値を返します（呼び出し側の「タスクを実行」の結果の接頭辞を通じて）。値には、このタスクの変数と {{ param.* }} を使えます。
+= Fail
+: 失敗させる
+= Stop the task with an error message. Surfaced to a caller's Run Task as %<prefix>error / %<prefix>ok=false.
+: エラーメッセージを付けてタスクを停止します。呼び出し側の「タスクを実行」には %<prefix>error / %<prefix>ok=false として伝わります。
+= Error message
+: エラーメッセージ
+= Why the task failed
+: タスクが失敗した理由
+= If
+: If
+= %battery < 20
+: %battery < 20
+= Else
+: Else
+= End If
+: End If
+= For Each
+: For Each
+= Iterate the following actions over an array variable (close with End For)
+: 続くアクションを、配列変数の各要素について繰り返します（End Forで閉じます）。
+= myList
+: myList
+= item
+: item
+= End For
+: End For
+= Return value
+: 戻り値
+= optional: handed back to the Run Task step that called this task, into its return variable
+: 任意：このタスクを呼び出した「タスクを実行」のステップに、その戻り値の変数を通じて返されます
+= Launch an activity or service via intent
+: インテントでアクティビティまたはサービスを起動します。
+= pick an app, or type a package / %var
+: アプリを選ぶか、パッケージ / %var を入力
+= comma-separated: ACTIVITY_NEW_TASK, ACTIVITY_CLEAR_TASK, ACTIVITY_CLEAR_TOP, ACTIVITY_SINGLE_TOP. CLEAR_TASK forces a fresh start — that is what makes an app already running honour the action rather than just coming forward
+: カンマ区切り：ACTIVITY_NEW_TASK、ACTIVITY_CLEAR_TASK、ACTIVITY_CLEAR_TOP、ACTIVITY_SINGLE_TOP。CLEAR_TASK は新規に起動し直させます — すでに実行中のアプリが、前面に出るだけでなくアクションに従うのはこのためです
+= Send Intent
+: インテントを送信
+= Fire an arbitrary Android intent (action, component, data URI, MIME, string extras) as an activity, service, or broadcast — e.g. the 白い熊 GNU Jami automation intents
+: 任意のAndroidインテント（アクション、コンポーネント、データURI、MIME、文字列のextra）を、アクティビティ、サービス、またはブロードキャストとして送出します（例：白い熊 GNU Jami の自動化インテント）。
+= shiroikuma.jami.action.SEND_MESSAGE or android.intent.action.VIEW
+: shiroikuma.jami.action.SEND_MESSAGE または android.intent.action.VIEW
+= Target app
+: 対象アプリ
+= pick an app, or type a package / %var (e.g. shiroikuma.jami)
+: アプリを選ぶか、パッケージ / %var を入力（例：shiroikuma.jami）
+= Component class (fully-qualified)
+: コンポーネントのクラス（完全修飾名）
+= cx.ring.automation.AutomationActivity
+: cx.ring.automation.AutomationActivity
+= jami-cmd://send/default/<hex>?text=hi&token=…
+: jami-cmd://send/default/<hex>?text=hi&token=…
+= text/plain (optional)
+: text/plain（任意）
+= Dispatch target
+: 送出先
+= activity / foreground-service / service / broadcast
+: activity / foreground-service / service / broadcast
+= blank = a String extra; int / long / float / bool send that type instead (a value that won't parse falls back to the String)
+: 空欄 = Stringのextra。int / long / float / bool を指定するとその型で送ります（解析できない値はStringとして送られます）
+= peer
+: peer
+= jami:<40-hex>
+: jami:<40-hex>
+= blank = String
+: 空欄 = String
+= Hello from a task
+: タスクからこんにちは
+= token
+: token
+= automation token
+: 自動化トークン
+= optional; decimal or 0x-hex, OR'd in
+: 任意。10進数または0xで始まる16進数。ORで合成されます
+= Result variable (broadcast)
+: 結果の変数（ブロードキャスト）
+= stores the receiver's reply. In 'receiver' mode any other string extras the target sends arrive beside it as %<result_var>_<key> — that is how a sister app returns actual values rather than just OK/ERROR
+: 受信側の応答を格納します。「receiver」モードでは、対象が送るそのほかの文字列のextraも %<result_var>_<key> として一緒に届きます — 姉妹アプリが OK/ERROR だけでなく実際の値を返す仕組みです
+= Reply channel
+: 返信経路
+= blank = ordered-broadcast result; 'receiver' = a private ResultReceiver callback (EMUI-proof, the target reads the "reply_to" extra and calls back)
+: 空欄 = 順序付きブロードキャストの結果。「receiver」= 専用のResultReceiverによるコールバック（EMUIでも確実。対象が "reply_to" のextraを読み取って呼び返します）
+= Result timeout (s)
+: 結果のタイムアウト（秒）
+= default 5, max 60 (receiver: default 30, max 600)
+: 既定は5、最大60（receiver：既定は30、最大600）
+= Give up without progress (s)
+: 進捗なしで打ち切り（秒）
+= receiver mode: stop waiting when the target's progress reports have not CHANGED for this long — it was killed, or it is hung and merely heart-beating. Blank = wait out the whole timeout
+: receiverモード：対象の進捗報告がこの時間だけ変化しなかったら待機をやめます — 強制終了されたか、固まって生存信号だけを送り続けている状態です。空欄 = タイムアウトまで待ちます
+= com.example.plugin
+: com.example.plugin
+= {"key":"value"}
+: {"key":"value"}
+= 5000
+: 5000
+= %plugin_state
+: %plugin_state
+= Plan a Termux:Tasker script run; blocked until the script backend is implemented
+: Termux:Taskerスクリプトの実行を計画します。スクリプトのバックエンドが実装されるまでは実行できません。
+= ~/.termux/tasker/my_script
+: ~/.termux/tasker/my_script
+= Optional stdin payload
+: 標準入力に渡すデータ（任意）
+= %script
+: %script
+= MacroDroid action type
+: MacroDroidのアクションの種類
+= Scan WiFi
+: Wi-Fiをスキャン
+= List nearby access points into variables — the missing half of placing the device without Play Services
+: 近くのアクセスポイントの一覧を変数に入れます — Play開発者サービスなしで端末の位置を割り出すための、欠けていた半分です。
+= %wifi — writes %wifi_count, %wifi1_ssid, %wifi1_bssid, %wifi1_level, %wifi_fresh, %wifi_age_ms
+: %wifi — %wifi_count、%wifi1_ssid、%wifi1_bssid、%wifi1_level、%wifi_fresh、%wifi_age_ms に書き込みます
+= Maximum networks
+: ネットワークの最大数
+= 1–64; default 20
+: 1–64。既定は20
+= Always-on display
+: 常時表示ディスプレイ
+= Turn the always-on display on or off — writes the secure setting through Shizuku and reads it back, so a build that accepts and ignores the write fails instead of reporting success
+: 常時表示ディスプレイをオンまたはオフにします。Shizuku経由でsecure設定に書き込んだうえで読み戻すため、書き込みを受け付けながら無視する機種では、成功と報告せずに失敗になります。
+= on/off/toggle
+: on/off/toggle
+= Turn WiFi on or off
+: Wi-Fiをオンまたはオフにします。
+= Bluetooth Audio Device
+: Bluetoothオーディオ機器
+= Check, connect, disconnect or toggle paired earphones / a headset — flashes the result
+: ペアリング済みのイヤホンやヘッドセットの確認、接続、切断、切り替えを行い、結果をトーストで表示します。
+= Device address
+: 機器のアドレス
+= e.g. C1:EB:C2:F1:FC:17 or %var
+: 例：C1:EB:C2:F1:FC:17 または %var
+= check / connect / disconnect / toggle
+: check / connect / disconnect / toggle
+= check: 1/0 · others: connected / disconnected / asked / failed: …
+: check：1/0 · その他：connected / disconnected / asked / failed: …
+= Wait (s)
+: 待機（秒）
+= default 10
+: 既定：10
+= Flash the result
+: 結果をトーストで表示
+= true (default) / false
+: true（既定） / false
+= music / ring / alarm / notification / call / system
+: music / ring / alarm / notification / call / system
+= Level
+: レベル
+= 0..max for the stream (0..100 with Percent on), or mute / unmute
+: そのストリームの 0..max（「レベルを百分率で指定」がオンなら 0..100）、または mute / unmute
+= Level is a percentage
+: レベルを百分率で指定
+= read Level as 0–100 of this stream's maximum, so one value fits every stream (they have different maxima)
+: 「レベル」を、このストリームの最大値に対する 0–100 として読み取ります。これで1つの値がどのストリームにも通用します（最大値はストリームごとに異なります）
+= Get Volume
+: 音量を取得
+= Read the current volume of a stream into a variable
+: ストリームの現在の音量を変数に読み込みます。
+= Variable name (e.g. VOL) to receive 0..max — or 0..100 with Percent on
+: 0..max を受け取る変数名（例：VOL）— 「百分率で読み取る」がオンなら 0..100
+= Read as a percentage
+: 百分率で読み取る
+= store 0–100 of this stream's maximum instead of the raw step, so the value compares across streams
+: 段階の生の値ではなく、このストリームの最大値に対する 0–100 を格納します。これで値をストリーム間で比べられます
+= Get Device State
+: 端末の状態を取得
+= Read battery %, charging, WiFi and airplane state into variables (no permissions needed)
+: 電池残量（%）、充電、Wi-Fi、機内モードの状態を変数に読み込みます（権限は不要）。
+= Battery % → variable
+: 電池残量（%） → 変数
+= var for 00..99 or 100 (e.g. BATT)
+: 00..99 または 100 を受け取る変数（例：BATT）
+= Charging → variable
+: 充電中 → 変数
+= var for true/false (e.g. CHG)
+: true/false を受け取る変数（例：CHG）
+= WiFi on → variable
+: Wi-Fiオン → 変数
+= var for true/false (e.g. WIFI)
+: true/false を受け取る変数（例：WIFI）
+= Airplane on → variable
+: 機内モードオン → 変数
+= var for true/false (e.g. AIR)
+: true/false を受け取る変数（例：AIR）
+= Screen on → variable
+: 画面オン → 変数
+= var for on/off (e.g. SCR)
+: on/off を受け取る変数（例：SCR）
+= Foreground app → variable
+: 前面のアプリ → 変数
+= var for the package name (e.g. APP)
+: パッケージ名を受け取る変数（例：APP）
+= Ringer mode → variable
+: 着信音モード → 変数
+= var for normal/vibrate/silent (e.g. RNG)
+: normal/vibrate/silent を受け取る変数（例：RNG）
+= Internet network → variable
+: インターネット接続 → 変数
+= var for true/false: a validated Wi-Fi or mobile network, never the VPN (e.g. NET)
+: true/false を受け取る変数：検証済みのWi-Fiまたはモバイルネットワークがあるかどうかで、VPNは決して含みません（例：NET）
+= Run your own shell script as the Android shell user through Shizuku. Approve its path and SHA-256 under Settings first; the approved bytes are what runs.
+: 自作のシェルスクリプトを、Shizuku経由でAndroidのshellユーザーとして実行します。先に「設定」でそのパスとSHA-256を承認してください。実行されるのは承認したバイト列そのものです。
+= Absolute path of an approved script
+: 承認済みのスクリプトの絶対パス
+= One argument per line
+: 1行に引数1つ
+= Capture prefix
+: 取得用の接頭辞
+= Variable prefix for stdout, stderr and the exit code
+: 標準出力、標準エラー出力、終了コードを入れる変数の接頭辞
+= How long the script may run
+: スクリプトの実行を許す時間
+= Turn the phone's Wi-Fi hotspot on or off through Shizuku (Android 11+). Succeeds only once Android reports the change.
+: Shizuku経由で端末のWi-Fiテザリングをオンまたはオフにします（Android 11以降）。Androidが変更を報告して初めて成功になります。
+= on, off or toggle
+: on、off、toggle のいずれか
+= Bring a WireGuard or Tailscale tunnel up or down, then watch whether the VPN really changed.
+: WireGuardまたはTailscaleのトンネルを接続または切断し、VPNが実際に変わったかどうかを見届けます。
+= Tunnel
+: トンネル
+= WireGuard tunnel name (WireGuard only)
+: WireGuardのトンネル名（WireGuardのみ）
+= Read back after writing, so a value Android ignores reports a failure.
+: 書き込み後に読み戻すので、Androidが無視した値は失敗として報告されます。
+= Get Locale
+: ロケールを取得
+= Store the current system locale into a variable (BCP-47 tag, e.g. ja-CZ)
+: 現在のシステムロケールを変数に格納します（BCP-47タグ。例：ja-CZ）。
+= Store tag into
+: タグの格納先
+= e.g. cur → %cur = ja-CZ
+: 例：cur → %cur = ja-CZ
+= Store language into
+: 言語の格納先
+= e.g. cur_lang → %cur_lang = ja
+: 例：cur_lang → %cur_lang = ja
+= Set Locale
+: ロケールを設定
+= Change the system locale persistently (no root). Needs two one-time adb grants: pm grant shiroikuma.jiyusagyoban android.permission.CHANGE_CONFIGURATION + appops set shiroikuma.jiyusagyoban WRITE_SETTINGS allow
+: システムロケールを永続的に変更します（root不要）。adbで一度だけ、次の2つを許可しておく必要があります：pm grant shiroikuma.jiyusagyoban android.permission.CHANGE_CONFIGURATION + appops set shiroikuma.jiyusagyoban WRITE_SETTINGS allow
+= Locale
+: ロケール
+= en-CZ — or ja-CZ,en-CZ to toggle (sets the one not current)
+: en-CZ — または ja-CZ,en-CZ で切り替え（現在のものでない方を設定）
+= Store set tag into
+: 設定したタグの格納先
+= variable receiving the tag actually set
+: 実際に設定されたタグを受け取る変数
+= Set DND interruption filter mode
+: おやすみモードの割り込みフィルターのモードを設定します。
+= off/priority/alarms/total_silence
+: off/priority/alarms/total_silence
+= normal/vibrate/silent
+: normal/vibrate/silent
+= Toggle Torch
+: ライトを切り替え
+= Turn camera flashlight on or off
+: カメラのライトを点灯または消灯します。
+= active/inactive
+: active/inactive
+= Kill App
+: アプリを終了
+= Force close an app
+: アプリを強制終了します。
+= Freeze App
+: アプリを凍結
+= Disable an app so it can't run (Shizuku) — it disappears until unfrozen
+: アプリを無効にして実行できないようにします（Shizuku）。凍結を解除するまで、アプリは表示されなくなります。
+= Unfreeze App
+: アプリの凍結を解除
+= Re-enable a frozen app (Shizuku)
+: 凍結したアプリをふたたび有効にします（Shizuku）。
+= Is App Frozen?
+: アプリは凍結中？
+= Store true/false — whether an app is currently frozen (disabled). A frozen app cannot receive broadcasts, so check this before talking to one, then unfreeze, do the work, and re-freeze only what was frozen.
+: アプリが現在凍結（無効化）されているかどうかを true/false で格納します。凍結したアプリはブロードキャストを受信できないため、やり取りの前にこれで確認し、凍結を解除して作業を行い、もともと凍結されていたものだけを凍結し直してください。
+= variable for true/false (default %frozen); an app that isn't installed stores empty
+: true/false を受け取る変数（既定は %frozen）。インストールされていないアプリの場合は空になります
+= Parse Backup Categories
+: バックアップのカテゴリを解析
+= Split a sister app's LIST_CATEGORIES reply (id⇥label⇥parent⇥on/off per line) into <store>_ids / _labels / _parents / _defaults — the last being what the item picker pre-ticks.
+: 姉妹アプリの LIST_CATEGORIES の応答（1行ごとに id⇥label⇥parent⇥on/off）を <store>_ids / _labels / _parents / _defaults に分けます — 最後のものは、項目の選択画面であらかじめチェックを入れる内容です。
+= Reply text
+: 応答の文字列
+= the payload with OK: already stripped
+: OK: を取り除いた後のペイロード
+= Store prefix
+: 格納先の接頭辞
+= default cat → %cat_ids, %cat_labels, %cat_parents, %cat_defaults
+: 既定は cat → %cat_ids、%cat_labels、%cat_parents、%cat_defaults
+= Backup Plan
+: バックアップ計画
+= Open a backup run as a plan instead of starting it: every app a ticked row that unfolds to its own items, all deselectable, with select/deselect-all at the top and inside each app. The button publishes the choice (%BR_RunApps / %BR_Run_<App>) and runs the task that performs it — the saved per-app selections are left untouched.
+: バックアップをすぐに始めるのではなく、計画として開きます。各アプリはチェック付きの行で、展開するとそのアプリの項目が並び、どれも選択を外せます。全選択/全解除は最上部と各アプリの中にあります。ボタンを押すと選択内容が公開され（%BR_RunApps / %BR_Run_<App>）、それを実行するタスクが動きます — アプリごとに保存された選択は変更されません。
+= Apps
+: アプリ
+= the roster, split by Separator
+: 対象アプリの一覧。「区切り文字」で分割します
+= default a space
+: 既定は空白
+= Run task
+: 実行するタスク
+= the task the button runs, e.g. 保存実行
+: ボタンで実行するタスク。例：保存実行
+= default 保存開始
+: 既定：保存開始
+= default 保存
+: 既定：保存
+= Apps ticked
+: チェックを入れるアプリ
+= saved (default) = every app ticked · none = nothing ticked, pick one or two
+: saved（既定）= すべてのアプリにチェック · none = どれにもチェックなし。1つ2つだけ選ぶ場合に
+= Destination
+: 保存先
+= shown as a tappable pill above the list, e.g. %BR_Dir; blank = no pill
+: 一覧の上に、タップできるピルとして表示されます。例：%BR_Dir。空欄 = ピルなし
+= Destination variable
+: 保存先の変数
+= where a directory chosen from the pill is written — this run only, never over the setting (default BR_RunDir)
+: ピルから選んだディレクトリの書き込み先 — 今回の実行のみで、設定は決して上書きしません（既定は BR_RunDir）
+= Backup Items — Edit All
+: バックアップ項目 — すべて編集
+= The whole roster as one item editor: every app unfolds to the items it last reported, ticked as its saved selection has them. The button writes each ticked app's choice back into %BR_Items_<App> AND into the settings task, so it becomes the default every later backup starts from. Unticking an app leaves its saved selection alone.
+: 対象アプリの一覧全体を、1つの項目エディターとして開きます。各アプリを展開すると最後に報告された項目が並び、保存された選択のとおりにチェックが入っています。ボタンを押すと、チェックの入った各アプリの選択が %BR_Items_<App> と設定タスクの両方に書き戻され、以降のすべてのバックアップの出発点となる既定になります。アプリのチェックを外しても、そのアプリの保存された選択は変わりません。
+= Settings task
+: 設定タスク
+= the 01 task the choices are baked into, e.g. 保存復元の設定 -- [979][01]
+: 選択内容を書き込む01タスク。例：保存復元の設定 -- [979][01]
+= default 保存項目
+: 既定：保存項目
+= Backup Items For Run
+: 今回のバックアップ項目
+= Store what an app should export now: the plan's per-run choice if there is one, else its saved selection, else empty (= the app's own defaults).
+: アプリが今エクスポートすべきものを格納します。計画で今回の実行用に選んだ内容があればそれ、なければ保存された選択、それもなければ空（= アプリ自身の既定）です。
+= default %items_eff
+: 既定：%items_eff
+= Prune Backups
+: バックアップを整理
+= Open the backup directory as a tick-list: one row per app with its archives newest-first, everything but the newest pre-ticked, live totals, and a delete button. Nothing is deleted until you press it.
+: バックアップのディレクトリをチェック式の一覧として開きます。アプリごとに1行で、アーカイブは新しい順に並び、最新のもの以外にはあらかじめチェックが入っています。合計はその場で更新され、削除ボタンがあります。ボタンを押すまでは何も削除されません。
+= where the .zip archives live
+: .zip アーカイブのある場所
+= the roster, split by Separator — only these apps are listed
+: 対象アプリの一覧。「区切り文字」で分割します — ここにあるアプリだけが表示されます
+= how Apps is split (default a space)
+: 「アプリ」の区切り方（既定は空白）
+= Keep newest
+: 残す最新の数
+= how many newest archives per app start UNticked (default 1)
+: アプリごとに、新しい方からいくつのアーカイブをチェックなしにしておくか（既定は1）
+= panel heading (default 保存の整理)
+: パネルの見出し（既定は「保存の整理」）
+= Visible rows
+: 表示する行数
+= default 14
+: 既定：14
+= Share Apps (relay generator)
+: 共有アプリ（中継の生成）
+= Open the Share apps screen: pick an app, edit its name + icon, and generate a per-app share-sheet tile (a tiny relay APK) that unfreezes the app and forwards the shared content to it.
+: 「共有アプリ」画面を開きます。アプリを選び、名前とアイコンを編集して、アプリごとの共有シート用タイル（小さな中継APK）を生成します。このタイルはアプリの凍結を解除し、共有された内容をそのアプリに転送します。
+= Flash Bubble Add
+: 明滅バブルを追加
+= Show a flash bubble for an app down the Desktop's LEFT edge (通知明滅) — new apps stack below existing ones and push the kill-all icon to the bottom. Tap / long-tap behavior is set in UI customization → Flash bubbles.
+: ホーム画面の左端に沿って、アプリの明滅バブルを表示します（通知明滅）。新しいアプリは既存のものの下に積まれ、一括停止アイコンを一番下へ押し下げます。タップ/長押しの動作は「UIのカスタマイズ」→「明滅バブル」で設定します。
+= pick an app, or type a package / %var (usually %NOTIF_PACKAGE)
+: アプリを選ぶか、パッケージ / %var を入力（通常は %NOTIF_PACKAGE）
+= bubble label; blank = the app's launcher label
+: バブルのラベル。空欄 = アプリのランチャー上のラベル
+= Flash Bubble Remove
+: 明滅バブルを削除
+= Remove one app's flash bubble (no-op if it isn't shown)
+: アプリ1つの明滅バブルを削除します（表示されていなければ何もしません）。
+= pick an app, or type a package / %var (usually %APP_PACKAGE)
+: アプリを選ぶか、パッケージ / %var を入力（通常は %APP_PACKAGE）
+= Flash Bubbles Clear
+: 明滅バブルをすべて消去
+= Remove every flash bubble AND the kill-all icon (the 無効 / full-reset path)
+: すべての明滅バブルと一括停止アイコンを消去します（「無効」/完全リセットの経路）。
+= Flash Kill Icon Show
+: 明滅の一括停止アイコンを表示
+= Show the kill-all-flashes icon below the flash bubbles; tapping it runs the configured kill-all task (same as tapping the flash-ongoing notification) and hides itself, keeping the app bubbles
+: 明滅バブルの下に、明滅の一括停止アイコンを表示します。タップすると、設定済みの一括停止タスクを実行し（明滅中の通知をタップした場合と同じ）、アイコン自身は消えますが、アプリのバブルは残ります。
+= Flash Kill Icon Hide
+: 明滅の一括停止アイコンを非表示
+= Hide the kill-all-flashes icon (the app bubbles stay)
+: 明滅の一括停止アイコンを隠します（アプリのバブルは残ります）。
+= Freeze Bubble Add
+: 凍結バブルを追加
+= Queue a re-freeze bubble for an app down the Desktop's RIGHT edge (凍結融解). Running a task on the roster already queues one — this is for an app thawed some other way, or a bubble whose freeze set is not what any task thawed. Tap / long-tap / ↗ each run a workspace task
+: ホーム画面の右端に沿って、アプリの再凍結バブルを並べます（凍結融解）。対象一覧にあるタスクを実行すればバブルは自動で追加されます — これは、別の方法で凍結を解除したアプリや、どのタスクが解除したものとも異なる凍結対象を持つバブルのためのものです。タップ / 長押し / ↗ は、それぞれワークスペースのタスクを実行します。
+= the app the bubble is FOR — its icon, label and dedupe key
+: このバブルの対象アプリ — アイコン、ラベル、重複判定のキーになります
+= bubble label; blank = the app's own label (read so a frozen app still has one)
+: バブルのラベル。空欄 = アプリ自身のラベル（凍結したアプリでも取得できる方法で読み取ります）
+= Also freeze
+: あわせて凍結
+= space-separated extra packages this bubble should re-freeze; blank = just the app above
+: このバブルで一緒に凍結し直すパッケージ（空白区切り）。空欄 = 上のアプリのみ
+= Freeze Bubble Remove
+: 凍結バブルを削除
+= Drop one app's freeze bubble WITHOUT freezing it — the long-tap, from a task. A no-op when that app has no bubble
+: アプリ1つの凍結バブルを、凍結せずに取り除きます — 長押しと同じことをタスクから行います。そのアプリにバブルがなければ何もしません。
+= Freeze Bubbles Clear
+: 凍結バブルをすべて消去
+= Drop every pending freeze bubble. Nothing is frozen — the apps stay thawed, so this clears the Desktop rather than giving up on re-freezing them
+: 保留中の凍結バブルをすべて取り除きます。何も凍結されず、アプリは凍結解除のまま残ります。再凍結を取りやめるというより、ホーム画面を片付けるための操作です。
+= Make Launcher Tasks
+: 起動タスクを作成
+= Pick apps; create an unfreeze-then-launch task for each in a project group.
+: アプリを選び、それぞれについて「凍結を解除して起動する」タスクをプロジェクトのグループ内に作成します。
+= Project
+: プロジェクト
+= Task name suffix
+: タスク名の接尾辞
+= Freeze-bubble roster
+: 凍結バブルの対象一覧
+= e.g. Toketsu_Bubbles — adds two ticked boxes (make the launch task / show the freeze bubble) for the apps ticked in this run; the bubble box appends them to this space-separated variable
+: 例：Toketsu_Bubbles — 今回チェックしたアプリについて、チェック済みのボックスが2つ（起動タスクを作成 / 凍結バブルを表示）追加されます。バブルのボックスは、それらのアプリをこの空白区切りの変数に追記します
+= Backup Through The Door
+: プロバイダー経由でバックアップ
+= Export a sister app through its automation provider: we open the file, it writes into our descriptor — so the app needs no storage permission.
+: 姉妹アプリを、その自動化プロバイダーを通じてエクスポートします。こちらでファイルを開き、相手がこちらのファイル記述子に書き込むので、そのアプリにストレージの権限は要りません。
+= the app to export, e.g. shiroikuma.mise
+: エクスポートするアプリ。例：shiroikuma.mise
+= Directory
+: ディレクトリ
+= where to write; the name becomes <basename>_<yyyy-MM-dd_HH-mm-ss>.zip
+: 書き込み先。名前は <basename>_<yyyy-MM-dd_HH-mm-ss>.zip になります
+= File basename
+: ファイルのベース名
+= default: shiroikuma-<last segment of the package>
+: 既定：shiroikuma-<パッケージ名の最後の部分>
+= Full path
+: フルパス
+= overrides Directory/basename when set
+: 設定すると「ディレクトリ」とベース名より優先されます
+= comma-separated category ids; empty = the app's default set
+: カテゴリIDをカンマ区切りで。空 = アプリの既定の組み合わせ
+= Token
+: トークン
+= only if that app asks for one; passed but ignored when it does not
+: 相手のアプリが求める場合のみ。求められない場合は、渡しても無視されます
+= Progress action
+: 進捗のアクション
+= broadcast action for progress lines, e.g. %BR_PROGRESS
+: 進捗の行を送るブロードキャストのアクション。例：%BR_PROGRESS
+= default 600
+: 既定：600
+= writes <p>_line, <p>_ok, <p>_path, <p>_bytes, <p>_job (default: bk)
+: <p>_line、<p>_ok、<p>_path、<p>_bytes、<p>_job に書き込みます（既定：bk）
+= Foreground allowance
+: フォアグラウンドの一時許可
+= default grants the app a TEMPORARY power allowance so its service may start; false skips it
+: 既定では、サービスを開始できるよう、アプリに一時的な電源の許可を与えます。false にすると省略します
+= Pick Freeze Bubbles
+: 凍結バブルを選択
+= Tick which launcher tasks pop a re-freeze bubble on the Desktop (the ones already on are pre-ticked and shown first). Name a variable and the answer is written there as a space-separated package list — the roster then lives in a settings task you can read and edit, not in a hidden per-task flag
+: どの起動タスクがホーム画面に再凍結バブルを出すかを、チェックで選びます（すでにオンのものはあらかじめチェックが入り、先頭に表示されます）。変数を指定すると、答えが空白区切りのパッケージ一覧としてそこに書き込まれます — こうすると対象一覧は、タスクごとの隠れたフラグではなく、読んで編集できる設定タスクの中に置かれます。
+= narrow the list to this project; empty = every project
+: 一覧をこのプロジェクトに絞り込みます。空 = すべてのプロジェクト
+= narrow it further to this Tasks-tab group; empty = the whole project
+: さらに「タスク」タブのこのグループに絞り込みます。空 = プロジェクト全体
+= Write the roster to
+: 対象一覧の書き込み先
+= e.g. Toketsu_Bubbles — a space-separated package list, pre-ticked from the same variable. Empty = the old per-task flag
+: 例：Toketsu_Bubbles — 空白区切りのパッケージ一覧で、同じ変数をもとにあらかじめチェックが入ります。空 = 従来のタスクごとのフラグ
+= dialog title (default: Freeze bubbles)
+: ダイアログのタイトル（既定：Freeze bubbles）
+= Copy Launcher Shortcut
+: 起動ショートカットをコピー
+= Tap an app in the grid of launcher tasks: its task goes on the clipboard for 白い熊 雷起動盤's 「貼り付け」 add item, and the dialog closes
+: 起動タスクのグリッドでアプリをタップすると、そのタスクがクリップボードに入り、白い熊 雷起動盤の「貼り付け」での項目追加に使えます。ダイアログは閉じます。
+= dialog title (default: Copy for 貼り付け)
+: ダイアログのタイトル（既定：Copy for 貼り付け）
+= Pick Apps → Variable
+: アプリを選択 → 変数
+= Multi-select apps (the variable's current packages pre-ticked and shown first); write the chosen packages back to the variable.
+: アプリを複数選択します（変数に今あるパッケージはあらかじめチェックが入り、先頭に表示されます）。選んだパッケージを変数に書き戻します。
+= read pre-selection from + write back, e.g. SC_Blacklist
+: あらかじめ選択する内容の読み取り元で、書き戻し先でもあります。例：SC_Blacklist
+= dialog title
+: ダイアログのタイトル
+= joins the packages (default: space)
+: パッケージをつなぐ文字（既定：空白）
+= Include this app
+: このアプリを含める
+= true = 白い熊 自由作業盤 itself appears in the grid (for backup-target lists); default hides it
+: true = 白い熊 自由作業盤 自身もグリッドに表示します（バックアップ対象の一覧用）。既定では表示しません
+= Pick From List → Variable
+: 一覧から選択 → 変数
+= Multi-select arbitrary items with checkboxes (全選択 master toggle on top, sub-options indented under their parent; the variable's current values pre-ticked); write the chosen values back to the variable.
+: 任意の項目をチェックボックスで複数選択します（最上部に「全選択」の一括切り替え、下位の選択肢は親の下に字下げ、変数に今ある値はあらかじめチェック済み）。選んだ値を変数に書き戻します。
+= read pre-selection from + write back, e.g. BR_Items_Jami
+: あらかじめ選択する内容の読み取り元で、書き戻し先でもあります。例：BR_Items_Jami
+= separator-joined values, e.g. workspace,appearance,widgets
+: 区切り文字でつないだ値。例：workspace,appearance,widgets
+= Labels
+: ラベル
+= optional display labels, parallel to Items
+: 「項目」に対応する表示用ラベル（任意）
+= Parents
+: 親
+= optional parent ids, parallel to Items (blank = top-level); children indent + follow their parent's toggle
+: 「項目」に対応する親ID（任意。空欄 = 最上位）。子は字下げされ、親の切り替えに従います
+= splits Items/Labels/Parents and joins the result (default: comma)
+: 「項目」/「ラベル」/「親」を分割し、結果をつなぎます（既定：カンマ）
+= optional; cancel after this many seconds
+: 任意。この秒数が過ぎるとキャンセルします
+= Form Dialog
+: フォームダイアログ
+= Many labelled settings in one dialog — text, choice (pills or drop-down), colour swatches, a live badge preview, sections and notes, each with an ⓘ explanation. Every field edits the variable it names: opens on its current value, writes back on OK only.
+: ラベル付きの設定をいくつも1つのダイアログにまとめます — 文字入力、選択（ピルまたはドロップダウン）、色見本、バッジの実況プレビュー、セクションとメモがあり、それぞれに ⓘ の説明を付けられます。各入力欄は、そこで指定した変数を編集します。現在の値で開き、OKを押したときにだけ書き戻します。
+= Intro
+: 導入文
+= optional line under the title
+: タイトルの下に表示する1行（任意）
+= Fields (JSON)
+: 入力欄（JSON）
+= [{"type":"text","var":"MyName","label":"Name","info":"…","default":"…"}, {"type":"choice","var":"Mode","options":["a","b"]}, …] — types section, note, text, choice (options/values or options_array/values_array, none), color, badge (text/fill/ink/border = vars)
+: [{"type":"text","var":"MyName","label":"Name","info":"…","default":"…"}, {"type":"choice","var":"Mode","options":["a","b"]}, …] — 種類は section、note、text、choice（options/values または options_array/values_array、none）、color、badge（text/fill/ink/border = 変数）
+= Skip label
+: スキップのラベル
+= optional middle button: close without saving, %<prefix>_button = skip
+: 中央のボタン（任意）：保存せずに閉じます。%<prefix>_button = skip
+= default Cancel
+: 既定：Cancel
+= %<prefix>_button = ok / skip / cancel (default form)
+: %<prefix>_button = ok / skip / cancel（既定は form）
+= Pick One App → Variable
+: アプリを1つ選択 → 変数
+= Pick a single app from the icon-tile grid (one tap chooses), optionally restricted to a given package list; the package lands in the store variable.
+: アイコンタイルのグリッドからアプリを1つ選びます（1回のタップで決定）。指定したパッケージ一覧に限定することもできます。選んだパッケージは格納先の変数に入ります。
+= Store variable
+: 格納先の変数
+= receives the picked package (default: picked); cancel stores empty
+: 選んだパッケージを受け取ります（既定：picked）。キャンセルすると空になります
+= Packages
+: パッケージ
+= optional whitespace-joined restriction, e.g. %BR_Apps; empty = all user apps
+: 対象を限定する空白区切りの一覧（任意）。例：%BR_Apps。空 = すべてのユーザーアプリ
+= Window
+: ウィンドウ
+= split_right opens the picker in the right half of a split (needs Shizuku; falls back to full screen) and cancels it once hidden
+: split_right は、選択画面を分割画面の右半分に開き（Shizukuが必要。使えない場合は全画面）、隠れたらキャンセルします
+= Previous App
+: 前のアプリ
+= Switch to the most recent app before this one (alt-tab). Needs Usage access.
+: このアプリの前に使っていた直近のアプリに切り替えます（Alt+Tab相当）。「使用状況へのアクセス」が必要です。
+= Next App
+: 次のアプリ
+= Step forward through the recent-apps cycle. Needs Usage access.
+: 最近使ったアプリの並びを1つ先へ進みます。「使用状況へのアクセス」が必要です。
+= Window Mode
+: ウィンドウモード
+= Move the full-screen app on top (or a named app) into a Huawei floating window or one half of split screen — Huawei Home's diagonal swipe-up gestures, for any launcher. For the app on top it presses HOME, then re-launches its own task in the new mode, its state kept; a named app is started straight into the mode, no HOME (so it can fill the other half of a split). Needs Shizuku; Huawei/EMUI only
+: 最前面の全画面アプリ（または指定したアプリ）を、Huaweiのフローティングウィンドウ、または分割画面の片側に移します — Huaweiホームの斜め上スワイプのジェスチャーを、どのランチャーでも使えるようにするものです。最前面のアプリの場合は、HOMEを押してから、そのアプリ自身のタスクを新しいモードで起動し直し、状態は保たれます。指定したアプリの場合は、HOMEを押さずに直接そのモードで起動します（分割画面のもう半分を埋められます）。Shizukuが必要です。Huawei/EMUI専用です。
+= float = floating window; split_left / split_right = that half of split screen
+: float = フローティングウィンドウ。split_left / split_right = 分割画面のその半分
+= blank (default) = the full-screen app on top; or a package name, e.g. %picked for the second half of a split
+: 空欄（既定）= 最前面の全画面アプリ。またはパッケージ名。例：分割画面のもう半分には %picked
+= Delay after HOME (ms)
+: HOMEの後の遅延（ms）
+= default 300; 0–3000; unused with a named package
+: 既定は300。0–3000。パッケージを指定した場合は使いません
+= Store package in
+: パッケージの格納先
+= variable (default: window_app)
+: 変数（既定：window_app）
+= https://example.com
+: https://example.com
+= Capture the screen to a file via Shizuku
+: Shizuku経由で画面をファイルに撮影します。
+= optional output path (default: app external files)
+: 出力先のパス（任意。既定：アプリの外部ファイル領域）
+= Store path in
+: パスの格納先
+= variable for the saved path (default: screenshot_path)
+: 保存先のパスを受け取る変数（既定：screenshot_path）
+= %var
+: %var
+= *.txt
+: *.txt
+= HTTP GET
+: HTTP GET
+= HTTP POST
+: HTTP POST
+= Wake-on-LAN
+: Wake-on-LAN
+= MAC Address
+: MACアドレス
+= e.g. AA:BB:CC:DD:EE:FF
+: 例：AA:BB:CC:DD:EE:FF
+= media (default); notification/ring/system follow the ringer mode — vibrate/silent mutes them
+: media（既定）。notification/ring/system は着信音モードに従い、vibrate/silent では鳴りません
+= Wait for playback to finish
+: 再生の終了を待つ
+= true (default) blocks the task until the sound ends; false plays it in the background so vibration/overlays run at the same time
+: true（既定）では、音が終わるまでタスクを止めます。false ではバックグラウンドで再生するので、バイブレーションやオーバーレイを同時に動かせます
+= Loop
+: ループ
+= true repeats the sound until it is stopped or the time limit runs out
+: true にすると、停止されるか制限時間が切れるまで音を繰り返します
+= Stop after (seconds)
+: 停止までの時間（秒）
+= optional time limit — the ceiling on a looped sound
+: 制限時間（任意）— ループさせた音の上限です
+= optional; Stop Sound with the same name silences it from any task. Playing a name already sounding restarts it
+: 任意。同じ名前で「音を停止」を実行すると、どのタスクからでも止められます。すでに鳴っている名前を再生すると、最初から鳴らし直します
+= Stop a named sound this app is playing, or send a media STOP key
+: このアプリが再生している名前付きの音を停止するか、メディアのSTOPキーを送ります。
+= the Name given to Play Sound (* = all of ours); empty sends a media STOP key to the music app
+: 「音を再生」で付けた名前（* = このアプリの音すべて）。空の場合は音楽アプリにメディアのSTOPキーを送ります
+= Toggle media play/pause
+: メディアの再生/一時停止を切り替えます。
+= Start Recording
+: 録音を開始
+= Start a voice recording (AAC/m4a). No-op if already recording.
+: 音声の録音（AAC/m4a）を開始します。すでに録音中の場合は何もしません。
+= e.g. %Pkey_Dir or /sdcard/Recordings; blank = app directory
+: 例：%Pkey_Dir または /sdcard/Recordings。空欄 = アプリのディレクトリ
+= Stop Recording
+: 録音を停止
+= Stop the in-progress voice recording and save it (exposes %path).
+: 進行中の音声の録音を停止して保存します（%path に出力）。
+= Vibrate the device — one-shot, or a message-style multi-buzz pattern
+: 端末を振動させます。1回だけの振動か、メッセージ着信のように複数回震えるパターンを指定できます。
+= One-shot; ignored when a pattern is given
+: 1回だけの振動。パターンを指定した場合は無視されます
+= Pattern (ms, comma-separated)
+: パターン（ms、カンマ区切り）
+= OFF,ON alternating, first = delay — e.g. 0,150,100,150 = buzz-pause-buzz
+: オフ、オンを交互に並べ、最初の値は開始までの遅延 — 例：0,150,100,150 = 振動・休止・振動
+= Power Off
+: 電源を切る
+= Shut down the device (via Shizuku).
+: 端末の電源を切ります（Shizuku経由）。
+= default: Contact; also sets name, phone, email, arrays, and count
+: 既定：Contact。name、phone、email、配列、count も設定します
+= Set Zen rule
+: おやすみモードのルールを設定
+= Create or update an owned DND rule with Android 15 device effects
+: このアプリが所有するおやすみモードのルールを、Android 15のデバイス効果付きで作成または更新します。
+= stable key, for example focus_evening
+: 変わらないキー。例：focus_evening
+= name shown in Android DND settings
+: Androidのおやすみモードの設定に表示される名前
+= whether Android may activate this rule
+: Androidがこのルールを有効化してよいかどうか
+= Clear Zen rule
+: おやすみモードのルールを消去
+= Remove an OpenTasker-owned DND rule
+: OpenTaskerが所有するおやすみモードのルールを削除します。
+= the stable key used by Set Zen rule
+: 「おやすみモードのルールを設定」で使った、変わらないキー
+= com.example.app
+: com.example.app
+= Unique channel, e.g. quiet-hours
+: 一意のチャンネル。例：quiet-hours
+= Defaults to IME; writes _CURRENT, _ENABLED, and _COUNT
+: 既定は IME。_CURRENT、_ENABLED、_COUNT に書き込みます
+= Home Assistant Webhook
+: Home AssistantのWebhook
+= JSON object, maximum 16 KB; payload is redacted from display
+: JSONオブジェクト、最大16 KB。ペイロードは表示では伏せられます
+= Only for private-LAN endpoints; ACCESS_LOCAL_NETWORK and host policy still apply
+: プライベートLANのエンドポイント専用。ACCESS_LOCAL_NETWORK とホストのポリシーは引き続き適用されます
+= Enabled by default; cleartext is limited to private/local hosts
+: 既定で有効。暗号化なしの通信はプライベート/ローカルのホストに限られます
+= UTF-8 payload, maximum 64 KB; redacted from display
+: UTF-8のペイロード、最大64 KB。表示では伏せられます
+= QoS
+: QoS
+= 0 or 1; QoS 1 waits for PUBACK
+: 0 または 1。QoS 1 は PUBACK を待ちます
+= Try
+: Try
+= 1–5; retries require an idempotent action
+: 1–5。再試行には冪等なアクションが必要です
+= Catch
+: Catch
+= End Try
+: End Try

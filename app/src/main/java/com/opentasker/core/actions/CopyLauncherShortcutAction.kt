@@ -8,6 +8,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.i18n.tr
 import com.opentasker.widget.TaskShortcutClip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,7 +35,7 @@ class CopyLauncherShortcutAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val projectName = ctx.variables.expand(args["project"].orEmpty()).trim()
         val groupName = ctx.variables.expand(args["group"].orEmpty()).trim()
-        val title = ctx.variables.expand(args["title"].orEmpty()).trim().ifEmpty { "Copy for 貼り付け" }
+        val title = ctx.variables.expand(args["title"].orEmpty()).trim().ifEmpty { tr("Copy for 貼り付け") }
         val db = OpenTaskerApp_NoHilt.db
 
         // package → the names of the launcher tasks in scope that open it, in name order.

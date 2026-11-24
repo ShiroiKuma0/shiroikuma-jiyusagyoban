@@ -1,0 +1,784 @@
+= Notification
+: 通知
+= Show Notification
+: 通知を表示
+= Post a notification with channel, persistence, and replacement controls
+: チャンネル、常駐、置き換えを指定して通知を出します。
+= Title
+: タイトル
+= Notification title
+: 通知のタイトル
+= Message
+: 本文
+= Notification body
+: 通知の本文
+= Channel
+: チャンネル
+= Persistent
+: 常駐
+= Tag
+: タグ
+= Replacement tag (same tag replaces)
+: 置き換え用のタグ（同じタグの通知を置き換え）
+= Notification ID (same ID replaces)
+: 通知ID（同じIDの通知を置き換え）
+= Tap task
+: タップ時のタスク
+= Button 1 label
+: ボタン1のラベル
+= Action button label
+: アクションボタンのラベル
+= Button 1 task
+: ボタン1のタスク
+= Button 2 label
+: ボタン2のラベル
+= Second button label
+: 2つ目のボタンのラベル
+= Button 2 task
+: ボタン2のタスク
+= Button 3 label
+: ボタン3のラベル
+= Third button label
+: 3つ目のボタンのラベル
+= Button 3 task
+: ボタン3のタスク
+= Cancel Notification
+: 通知を取り消し
+= Cancel a notification by tag and/or ID
+: タグまたはID、あるいはその両方を指定して通知を取り消します。
+= Notification tag to cancel
+: 取り消す通知のタグ
+= Notification ID to cancel
+: 取り消す通知のID
+= App
+: アプリ
+= Variable
+: 変数
+= Set Variable
+: 変数を設定
+= Set a variable to a new value
+: 変数に新しい値を設定します。
+= Variable name
+: 変数名
+= %var name
+: %var 形式の名前
+= Value
+: 値
+= Supports %expansion
+: %expansion（変数の展開）に対応
+= Read Data
+: データを読み取り
+= Source text
+: 元の文字列
+= Format
+: 形式
+= Result variable
+: 結果の変数
+= Format Date/Time
+: 日時を書式化
+= Pattern
+: パターン
+= Time zone
+: タイムゾーン
+= Parse Date/Time
+: 日時を解析
+= Text
+: 文字
+= Add to Date/Time
+: 日時に加算
+= Amount
+: 量
+= Unit
+: 単位
+= Regex pattern
+: 正規表現パターン
+= Replacement
+: 置換後の文字列
+= Split Text
+: 文字列を分割
+= Join Text
+: 文字列を結合
+= Array variable
+: 配列変数
+= Delimiter
+: 区切り文字
+= Substring
+: 部分文字列
+= Start index
+: 開始位置
+= End index
+: 終了位置
+= Multiple Variables Set
+: 複数の変数を設定
+= Names
+: 名前
+= Values
+: 値
+= Names splitter
+: 名前の区切り文字
+= Values splitter
+: 値の区切り文字
+= Keep existing
+: 既存のものを残す
+= Text Length
+: 文字列の長さ
+= Latitude
+: 緯度
+= Longitude
+: 経度
+= Flow
+: フロー
+= Profile Status
+: プロファイルの状態
+= Profile
+: プロファイル
+= State
+: 状態
+= Media
+: メディア
+= Beep
+: ビープ音
+= Frequency (Hz)
+: 周波数（Hz）
+= Duration (ms)
+: 長さ（ms）
+= Stream
+: ストリーム
+= Rewind
+: 巻き戻し
+= Fast Forward
+: 早送り
+= Anchor
+: アンカー
+= Label
+: ラベル
+= Step number
+: ステップ番号
+= Stop Task
+: タスクを停止
+= Task
+: タスク
+= Network
+: ネットワーク
+= HTTP Request
+: HTTPリクエスト
+= Method
+: メソッド
+= Query parameters
+: クエリパラメータ
+= Content type
+: コンテンツタイプ
+= Tasks
+: タスク
+= Timeout (seconds)
+: タイムアウト（秒）
+= Task name
+: タスク名
+= Persist Variable
+: 変数を永続化
+= Source variable
+: 元の変数
+= Global name
+: グローバル変数名
+= Auto-uppercased from source if omitted
+: 省略すると、元の名前を大文字にしたものになります。
+= Variable Clear
+: 変数を消去
+= Variable Split
+: 変数を分割
+= Splitter
+: 区切り文字
+= Variable Join
+: 変数を結合
+= Joiner
+: 結合文字
+= Variable Convert
+: 変数を変換
+= Store result in
+: 結果の格納先
+= Array Push
+: 配列に挿入
+= Position
+: 位置
+= Array Pop
+: 配列から取り出し
+= Array Clear
+: 配列を消去
+= Array Process
+: 配列を処理
+= Type
+: 種類
+= File
+: ファイル
+= From
+: 期間の開始
+= To
+: 期間の終了
+= System
+: システム
+= Set Clipboard
+: クリップボードに設定
+= Get Clipboard
+: クリップボードを取得
+= Store in
+: 保存先
+= Set Wallpaper
+: 壁紙を設定
+= Settings
+: 設定
+= Take Screenshot
+: スクリーンショットを撮影
+= MIME type
+: MIMEタイプ
+= Profile name
+: プロファイル名
+= Setting name
+: 設定名
+= Scenes
+: シーン
+= Variable prefix
+: 変数の接頭辞
+= Mode
+: モード
+= Image
+: 画像
+= Script
+: スクリプト
+= Output variable
+: 出力先の変数
+= Screenshots
+: スクリーンショット
+= Days
+: 日
+= Add Calendar Event
+: カレンダーに予定を追加
+= Add an event to a calendar and put the new event id in %event_id
+: カレンダーに予定を追加し、新しい予定のIDを %event_id に入れます。
+= Calendar
+: カレンダー
+= Its name as your calendar app shows it, or its id
+: カレンダーアプリに表示される名前、またはそのID
+= Start
+: 開始
+= now, epoch milliseconds, 2026-11-22 or 2026-11-22 09:30
+: now、エポックミリ秒、2026-11-22、または 2026-11-22 09:30
+= End
+: 終了
+= Written like Start. For an all-day event, the last day. Blank uses Duration
+: 「開始」と同じ書き方です。終日の予定では最終日を指定します。空欄の場合は「所要時間」を使います。
+= Duration (minutes)
+: 所要時間（分）
+= 60 by default. All-day events take an End day instead
+: 既定は60です。終日の予定では、代わりに「終了」の日を指定します。
+= All day
+: 終日
+= Description
+: 説明
+= Location
+: 位置情報
+= event by default, so the new event id lands in %event_id
+: 既定は event で、新しい予定のIDは %event_id に入ります。
+= Find Calendar Events
+: カレンダーの予定を検索
+= Read the events in a time window into %event_count, %event_titles, %event_starts and more
+: 指定した期間の予定を %event_count、%event_titles、%event_starts などに読み込みます。
+= now by default. Also epoch milliseconds, 2026-11-22 or 2026-11-22 09:30
+: 既定は now です。エポックミリ秒、2026-11-22、2026-11-22 09:30 も使えます。
+= A day after From by default, and at most a year after it
+: 既定は「期間の開始」の1日後で、最長でその1年後までです。
+= A name or id to look in. Blank looks in every calendar
+: 検索するカレンダーの名前またはID。空欄の場合はすべてのカレンダーを検索します。
+= Most events
+: 予定の最大件数
+= 10 by default, 50 at most
+: 既定は10、最大50
+= event by default. Titles and locations are kept hidden in the run log
+: 既定は event です。タイトルと場所は実行ログでは伏せられます。
+= Read Setting
+: 設定を読み取る
+= Read one Android setting by name into a variable. Reading needs no access, but Android hides some names from apps.
+: Androidの設定を1つ、名前を指定して変数に読み込みます。読み取りに権限は不要ですが、Androidが一部の名前をアプリから隠しています。
+= Table
+: テーブル
+= Where the setting lives. Most are Secure or Global.
+: 設定が保存されている場所です。ほとんどはSecureかGlobalです。
+= location_mode, screen_off_timeout, etc.
+: location_mode、screen_off_timeout など
+= Get Location
+: 位置情報を取得
+= Name
+: 名前
+= Scene name
+: シーン名
+= Summary
+: 概要
+= Button label
+: ボタンのラベル
+= Say (Text-to-Speech)
+: 読み上げ（TTS）
+= Speak text aloud using the device speaker
+: テキストを端末のスピーカーで読み上げます。
+= Text to speak
+: 読み上げるテキスト
+= Wait
+: 待機
+= Pause task execution for a specified duration
+: 指定した時間だけタスクの実行を一時停止します。
+= Milliseconds
+: ミリ秒
+= Run Task
+: タスクを実行
+= Task id or name
+: タスクのIDまたは名前
+= Run the following actions only when the condition is true (close with End If)
+: 条件が成り立つ場合にのみ、続くアクションを実行します（End Ifで閉じます）。
+= Condition
+: 条件
+= Alternate branch executed when the matching If was false
+: 対応するIfの条件が成り立たなかった場合に実行される分岐です。
+= Closes the matching If/Else block
+: 対応するIf/Elseブロックを閉じます。
+= Array variable name
+: 配列変数の名前
+= Item variable name
+: 項目の変数名
+= Closes the matching For Each loop
+: 対応するFor Eachループを閉じます。
+= Stop
+: 停止
+= Halt the rest of the task immediately
+: タスクの残りを直ちに中止します。
+= Launch Intent
+: インテントを起動
+= Intent action
+: インテントのアクション
+= MAIN, VIEW, etc.
+: MAIN、VIEW など
+= Intent category
+: インテントのカテゴリ
+= Optional
+: 任意
+= Intent flags
+: インテントのフラグ
+= Data URI
+: データURI
+= default
+: 既定
+= Plugin
+: プラグイン
+= Locale Plugin Setting
+: Localeプラグインの設定
+= Dispatch an explicit Locale/Tasker-compatible setting plugin request
+: Locale/Tasker互換の設定プラグインに、明示的な要求を送出します。
+= Plugin package
+: プラグインのパッケージ
+= Bundle JSON
+: バンドルJSON
+= Blurb
+: 要約
+= Short user-visible summary
+: ユーザーに表示される短い要約
+= Timeout ms
+: タイムアウト（ms）
+= Locale Plugin Condition
+: Localeプラグインの条件
+= Query an explicit Locale/Tasker-compatible condition plugin and store its state
+: Locale/Tasker互換の条件プラグインに明示的に問い合わせ、その状態を保存します。
+= Fail unless satisfied
+: 条件が満たされなければ失敗とする
+= Run Termux Script
+: Termuxスクリプトを実行
+= Executable
+: 実行ファイル
+= Arguments
+: 引数
+= Optional shell-style arguments
+: シェル形式の引数（任意）
+= Working directory
+: 作業ディレクトリ
+= Optional Termux working directory
+: Termuxの作業ディレクトリ（任意）
+= Standard input
+: 標準入力
+= Output variable prefix
+: 出力変数の接頭辞
+= Import
+: インポート
+= Unsupported MacroDroid Action
+: 非対応のMacroDroidアクション
+= Placeholder for a MacroDroid action that could not be safely mapped during import
+: インポート時に安全に対応付けられなかったMacroDroidアクションの代わりに置かれる仮のアクションです。
+= Import note
+: インポートのメモ
+= Unsupported Tasker Action
+: 非対応のTaskerアクション
+= Placeholder for a Tasker action that could not be safely mapped during import
+: インポート時に安全に対応付けられなかったTaskerアクションの代わりに置かれる仮のアクションです。
+= Tasker action code
+: Taskerのアクションコード
+= Toggle Bluetooth
+: Bluetoothを切り替え
+= Turn Bluetooth on or off
+: Bluetoothをオンまたはオフにします。
+= Set Brightness
+: 明るさを設定
+= Set screen brightness level
+: 画面の明るさを設定します。
+= Brightness (0-255)
+: 明るさ（0-255）
+= Set Volume
+: 音量を設定
+= Adjust volume for a stream
+: ストリームの音量を調整します。
+= Store in variable
+: 保存先の変数
+= Toggle Airplane Mode
+: 機内モードを切り替え
+= Turn Airplane mode on or off
+: 機内モードをオンまたはオフにします。
+= Run Shizuku Script
+: Shizukuスクリプトを実行
+= Script path
+: スクリプトのパス
+= Timeout (ms)
+: タイムアウト（ms）
+= Toggle Wi-Fi Hotspot
+: Wi-Fiテザリングを切り替え
+= Connect or Disconnect VPN
+: VPNを接続または切断
+= VPN app
+: VPNアプリ
+= Write Setting
+: 設定を書き込む
+= Change one Android setting by name. Global and Secure need one-time access granted from a computer; System uses Modify system settings.
+: Androidの設定を1つ、名前を指定して変更します。GlobalとSecureは、パソコンから一度だけ許可しておく必要があります。Systemは「システム設定の変更」の権限を使います。
+= Toggle Mobile Data
+: モバイルデータ通信を切り替え
+= Turn mobile data on or off
+: モバイルデータ通信をオンまたはオフにします。
+= Set Screen Timeout
+: 画面のタイムアウトを設定
+= Set screen sleep timeout duration
+: 画面が消灯するまでの時間を設定します。
+= 1000, 30000, etc.
+: 1000、30000 など
+= Set Do Not Disturb
+: おやすみモードを設定
+= Set Ringer Mode
+: 着信音モードを設定
+= Set device ringer mode
+: デバイスの着信音モードを設定します。
+= Set Tile State
+: タイルの状態を設定
+= Update Quick Settings tile state
+: クイック設定タイルの状態を更新します。
+= Tile label text
+: タイルのラベルの文字
+= Launch App
+: アプリを起動
+= Launch an installed application
+: インストール済みのアプリを起動します。
+= Group
+: グループ
+= Go Home
+: ホームに戻る
+= Return to launcher home screen
+: ランチャーのホーム画面に戻ります。
+= Open URL
+: URLを開く
+= Open a URL in the browser
+: URLをブラウザで開きます。
+= Send SMS
+: SMSを送信
+= Send a text message
+: テキストメッセージを送信します。
+= Phone number
+: 電話番号
+= Read File
+: ファイルを読み込む
+= Read file contents into a variable
+: ファイルの内容を変数に読み込みます。
+= File path
+: ファイルのパス
+= Write File
+: ファイルに書き込む
+= Write contents to a file (overwrites)
+: 内容をファイルに書き込みます（上書き）。
+= Content
+: 内容
+= Append to File
+: ファイルに追記
+= Append contents to a file
+: 内容をファイルの末尾に追記します。
+= Delete File
+: ファイルを削除
+= Delete a file
+: ファイルを削除します。
+= List Files
+: ファイルを一覧
+= List directory contents into a variable
+: ディレクトリの内容の一覧を変数に入れます。
+= Directory path
+: ディレクトリのパス
+= Filename pattern
+: ファイル名のパターン
+= Perform an HTTP GET request
+: HTTP GETリクエストを実行します。
+= Store response in
+: レスポンスの保存先
+= Allow HTTP
+: HTTPを許可
+= Allow plain HTTP for LAN/private-network hosts only
+: LAN/プライベートネットワーク上のホストに限り、暗号化なしのHTTPを許可します。
+= Perform an HTTP POST request
+: HTTP POSTリクエストを実行します。
+= Request body
+: リクエスト本文
+= Ping Host
+: ホストにping
+= Ping a network host
+: ネットワーク上のホストにpingを送ります。
+= Host address
+: ホストのアドレス
+= Default: 5 (1-30)
+: 既定：5（1-30）
+= Stores true/false (default: result)
+: true/false を保存します（既定：result）
+= Download File
+: ファイルをダウンロード
+= Download a file from URL
+: URLからファイルをダウンロードします。
+= Save to path
+: 保存先のパス
+= Default: 30 (1-300)
+: 既定：30（1-300）
+= Size limit (bytes)
+: サイズの上限（バイト）
+= Default and maximum: 52428800 (50 MB)
+: 既定かつ最大: 52428800（50 MB）
+= Send a magic packet to wake a device on the local network
+: マジックパケットを送信して、ローカルネットワーク上のデバイスを起動します。
+= Broadcast IP
+: ブロードキャストIP
+= Default: 255.255.255.255
+: 既定：255.255.255.255
+= Port
+: ポート
+= Default: 9
+: 既定：9
+= Play Sound
+: 音を再生
+= Play a sound file
+: 音声ファイルを再生します。
+= Sound file path
+: 音声ファイルのパス
+= Volume (0-100)
+: 音量（0-100）
+= Optional; uses current volume when empty
+: 任意。空の場合は現在の音量を使います。
+= Stop Sound
+: 音を停止
+= Pause Sound
+: 音を一時停止
+= Pause playback
+: 再生を一時停止します。
+= Next Track
+: 次の曲
+= Play next track
+: 次の曲を再生します。
+= Previous Track
+: 前の曲
+= Play previous track
+: 前の曲を再生します。
+= Play/Pause
+: 再生/一時停止
+= Mute
+: 消音
+= Mute audio
+: 音声を消音します。
+= music, ring, notification, alarm, system, call (default: music)
+: music、ring、notification、alarm、system、call（既定：music）
+= Vibrate
+: バイブレーション
+= Reboot Device
+: デバイスを再起動
+= Reboot the device
+: デバイスを再起動します。
+= Lock Device
+: デバイスをロック
+= Lock the device screen
+: デバイスの画面をロックします。
+= Turn Screen Off
+: 画面を消灯
+= Turn off the display
+: ディスプレイを消灯します。
+= Wake Device
+: デバイスを起こす
+= Wake the device (turn on screen)
+: デバイスを起こします（画面を点灯）。
+= Log Message
+: ログにメッセージを記録
+= Write message to task log
+: メッセージをタスクのログに書き込みます。
+= Progress Notification
+: 進捗の通知
+= Post ordered progress feedback with an Android 16 fallback
+: 順を追った進捗を通知で知らせます。Android 16より前では代わりの表示になります。
+= Optional status text
+: 状況を伝える文（任意）
+= Progress
+: 進捗
+= 0 to 100
+: 0～100
+= Segments
+: 区間
+= Optional comma-separated positive lengths
+: 正の長さをカンマ区切りで（任意）
+= quiet, default, or urgent
+: quiet、default、urgent のいずれか
+= Optional replacement tag
+: 置き換え用のタグ（任意）
+= Optional notification ID
+: 通知ID（任意）
+= Lookup Contact
+: 連絡先を検索
+= Resolve a contact name, phone number, or email into sensitive variables
+: 連絡先の名前、電話番号、メールアドレスを調べて、機密扱いの変数に入れます。
+= Name, phone, or email
+: 名前、電話番号、またはメールアドレス
+= Search text; maximum 128 characters
+: 検索する文字列。最大128文字
+= Lookup mode
+: 検索方法
+= Picker is the default on Android 17+; permission is for unattended runs
+: Android 17以降では選択画面が既定です。権限による方法は無人実行向けです。
+= Rule ID
+: ルールID
+= Rule name
+: ルール名
+= Enabled
+: 有効
+= Grayscale display
+: グレースケール表示
+= Dim wallpaper
+: 壁紙を暗くする
+= Night mode
+: 夜間モード
+= Archive App
+: アプリをアーカイブ
+= Archive an installed application while retaining its user data
+: インストール済みのアプリを、ユーザーデータを残したままアーカイブします。
+= Package name
+: パッケージ名
+= Unarchive App
+: アプリのアーカイブを解除
+= Request restoration of an archived application
+: アーカイブしたアプリの復元を要求します。
+= Publish Shortcut
+: ショートカットを公開
+= Create a dynamic or pinned launcher shortcut for a task
+: タスクの動的ショートカット、またはランチャーに固定するショートカットを作成します。
+= Shortcut ID
+: ショートカットID
+= Stable ID used to update this shortcut
+: このショートカットの更新に使う、変わらないID
+= Task to run when the shortcut is tapped
+: ショートカットをタップしたときに実行するタスク
+= Label shown by the launcher
+: ランチャーに表示されるラベル
+= Dynamic updates immediately; pinned asks the launcher
+: 「動的」はすぐに更新されます。「固定」はランチャーに確認を求めます。
+= Temporary State
+: 一時的な状態
+= Apply a reversible setting and restore it later
+: 元に戻せる設定を適用し、あとで元に戻します。
+= Setting
+: 設定
+= Setting arguments (JSON)
+: 設定の引数（JSON）
+= Example: {"brightness":"80"}
+: 例：{"brightness":"80"}
+= Revert key
+: 復帰キー
+= Duration (seconds)
+: 継続時間（秒）
+= 1 to 604800 seconds
+: 1～604800秒
+= Get Keyboard Info
+: キーボード情報を取得
+= Report current and enabled keyboards
+: 現在のキーボードと有効なキーボードを報告します。
+= Output variable base
+: 出力変数のベース名
+= Send a bounded JSON event to a Home Assistant webhook with transient retry
+: 上限付きのJSONイベントをHome AssistantのWebhookに送信します。一時的な失敗は再試行します。
+= Webhook URL
+: WebhookのURL
+= HTTPS webhook URL; the secret path is redacted from display
+: HTTPSのWebhook URL。秘密のパス部分は表示では伏せられます。
+= JSON payload
+: JSONペイロード
+= Home Assistant message/command
+: Home Assistantのメッセージ/コマンド
+= Optional Companion notification message, such as command_broadcast_intent; use with data
+: Companionの通知メッセージ（任意）。例：command_broadcast_intent。data と組み合わせて使います。
+= Home Assistant data
+: Home Assistantのデータ
+= Optional JSON object paired with message; secrets are redacted from display
+: message と対になるJSONオブジェクト（任意）。秘密の値は表示では伏せられます。
+= Default: 15 (1-30)
+: 既定：15（1-30）
+= Retries
+: 再試行回数
+= Transient failures only; default: 2 (0-3)
+: 一時的な失敗のみ。既定：2（0-3）
+= Retry backoff (ms)
+: 再試行までの待機（ms）
+= Initial delay; exponential and capped at 10 seconds (100-5000)
+: 最初の遅延。指数的に延び、上限は10秒です（100-5000）。
+= MQTT Publish
+: MQTTで発行
+= Publish a bounded message to an MQTT 3.1.1 broker using the platform socket/TLS stack
+: プラットフォームのソケット/TLSスタックを使い、上限付きのメッセージをMQTT 3.1.1ブローカーに発行します。
+= Broker host
+: ブローカーのホスト
+= Hostname or IP address
+: ホスト名またはIPアドレス
+= Broker port
+: ブローカーのポート
+= Default: 8883 with TLS, 1883 without TLS
+: 既定：TLSありは8883、TLSなしは1883
+= Use TLS
+: TLSを使う
+= Topic
+: トピック
+= Publish topic, without + or # wildcards
+: 発行先のトピック。ワイルドカードの + と # は使えません。
+= Payload
+: ペイロード
+= Retain
+: 保持（Retain）
+= Ask the broker to retain the last message
+: 最後のメッセージを保持するようブローカーに求めます。
+= Username
+: ユーザー名
+= Optional broker username
+: ブローカーのユーザー名（任意）
+= Password
+: パスワード
+= Optional broker password; always redacted
+: ブローカーのパスワード（任意）。必ず伏せられます。
+= Connect, handshake, and acknowledgement timeout (1-30)
+: 接続、ハンドシェイク、受信確認のタイムアウト（1-30）
+= Run a bounded, retryable block and optionally handle its failure with Catch
+: 回数に上限のある、再試行可能なブロックを実行します。失敗した場合はCatchで処理することもできます。
+= Maximum attempts
+: 最大試行回数
+= Base backoff (ms)
+: 再試行の基本間隔（ms）
+= 0–60000; exponential between retries
+: 0–60000。再試行のたびに指数的に延びます。
+= Handle a failed Try block using FLOW_ERROR_* variables
+: 失敗したTryブロックを、FLOW_ERROR_* 変数を使って処理します。
+= Closes the matching Try/Catch block
+: 対応するTry/Catchブロックを閉じます。

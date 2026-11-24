@@ -70,6 +70,7 @@ import com.opentasker.ui.components.SelectionCheck
 import com.opentasker.ui.components.selectableItem
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.ThemeStore
+import com.opentasker.i18n.tr
 
 private val SENSITIVE_NAMES = setOf("password", "token", "secret", "key", "credential", "auth")
 
@@ -137,17 +138,17 @@ fun VariablesScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            label = { Text("Search variables") },
+            label = { Text(tr("Search variables")) },
             singleLine = true,
             trailingIcon = {
-                Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Filled.Search, contentDescription = tr("Search"), tint = MaterialTheme.colorScheme.primary)
             },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
         if (filtered.isEmpty()) {
             Text(
-                text = if (variables.isEmpty()) "No global variables set" else "No matches",
+                text = if (variables.isEmpty()) tr("No global variables set") else tr("No matches"),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),
             )
@@ -201,7 +202,7 @@ fun VariablesScreen(
             onSave = { newValue ->
                 onUpdate(target.projectId, target.name, newValue)
                 editTarget = null
-                onMessage("Updated ${target.name}")
+                onMessage(tr("Updated %1\$s", target.name))
             },
         )
     }
@@ -234,12 +235,12 @@ private fun VariableSummaryCard(
                     )
                 }
                 VariablePill(
-                    label = "$visibleCount shown",
+                    label = tr("%1\$s shown", visibleCount),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                VariableMetric("$totalCount", "Saved", Modifier.weight(1f))
+                VariableMetric("$totalCount", tr("Saved"), Modifier.weight(1f))
                 VariableMetric("$sensitiveCount", stringResource(R.string.label_masked), Modifier.weight(1f))
             }
         }
@@ -266,7 +267,7 @@ private fun VariableEmptyState(title: String, body: String, onCreate: (() -> Uni
         ) {
             Icon(
                 Icons.Filled.Info,
-                contentDescription = "Info",
+                contentDescription = tr("Info"),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp),
             )
@@ -316,47 +317,47 @@ private fun DeadGlobalsSection(report: DeadGlobalsReport, projects: List<Project
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text(
-                text = "Clean up dead globals" + if (dead > 0) " ($dead)" else "",
+                text = if (dead > 0) tr("Clean up dead globals (%1\$s)", dead) else tr("Clean up dead globals"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Icon(
                 if (expanded) Icons.Filled.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight,
-                contentDescription = if (expanded) "Collapse cleanup" else "Expand cleanup",
+                contentDescription = if (expanded) tr("Collapse cleanup") else tr("Expand cleanup"),
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
         if (expanded) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 // Each category is tappable to reveal exactly which variables it covers.
-                DeadCatRow("Shadow-copies (dup of a project-global)", report.shadowCopies.size, "delete",
+                DeadCatRow(tr("Shadow-copies (dup of a project-global)"), report.shadowCopies.size, tr("delete"),
                     report.shadowCopies.isNotEmpty(), showShadow) { showShadow = !showShadow }
                 if (showShadow) report.shadowCopies.forEach { s ->
-                    DeadItemRow("%${s.variable.name}", "→ ${projName[s.twinProjectId] ?: "project #${s.twinProjectId}"}", s.variable.value)
+                    DeadItemRow("%${s.variable.name}", "→ ${projName[s.twinProjectId] ?: tr("project #%1\$s", s.twinProjectId)}", s.variable.value)
                 }
-                DeadCatRow("Orphans (referenced nowhere)", report.orphans.size, "delete",
+                DeadCatRow(tr("Orphans (referenced nowhere)"), report.orphans.size, tr("delete"),
                     report.orphans.isNotEmpty(), showOrphan) { showOrphan = !showOrphan }
                 if (showOrphan) report.orphans.forEach { v -> DeadItemRow("%${v.name}", "", v.value) }
-                DeadCatRow("Dangling project-globals (dead project)", report.dangling.size, "delete",
+                DeadCatRow(tr("Dangling project-globals (dead project)"), report.dangling.size, tr("delete"),
                     report.dangling.isNotEmpty(), showDangling) { showDangling = !showDangling }
-                if (showDangling) report.dangling.forEach { v -> DeadItemRow("%${v.name}", "✗ proj #${v.projectId}", v.value) }
-                DeadCatRow("Proper globals (in use)", report.proper.size, "keep", false, false, null)
+                if (showDangling) report.dangling.forEach { v -> DeadItemRow("%${v.name}", tr("✗ proj #%1\$s", v.projectId), v.value) }
+                DeadCatRow(tr("Proper globals (in use)"), report.proper.size, tr("keep"), false, false, null)
                 Button(
                     onClick = { confirm = true },
                     enabled = dead > 0,
                     modifier = Modifier.padding(top = 8.dp),
-                ) { Text(if (dead > 0) "Delete $dead dead global${if (dead == 1) "" else "s"}" else "Nothing to clean") }
+                ) { Text(if (dead == 1) tr("Delete 1 dead global") else if (dead > 0) tr("Delete %1\$s dead globals", dead) else tr("Nothing to clean")) }
             }
         }
     }
     if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
-            title = { Text("Delete $dead dead global${if (dead == 1) "" else "s"}?") },
-            text = { Text("${report.shadowCopies.size} shadow-copies + ${report.orphans.size} orphans + ${report.dangling.size} dangling (dead-project) globals. ${report.proper.size} proper globals stay; every live project copy is untouched.") },
-            confirmButton = { Button(onClick = { confirm = false; onCleanup() }) { Text("Delete") } },
-            dismissButton = { OutlinedButton(onClick = { confirm = false }) { Text("Cancel") } },
+            title = { Text(if (dead == 1) tr("Delete 1 dead global?") else tr("Delete %1\$s dead globals?", dead)) },
+            text = { Text(tr("%1\$s shadow-copies + %2\$s orphans + %3\$s dangling (dead-project) globals. %4\$s proper globals stay; every live project copy is untouched.", report.shadowCopies.size, report.orphans.size, report.dangling.size, report.proper.size)) },
+            confirmButton = { Button(onClick = { confirm = false; onCleanup() }) { Text(tr("Delete")) } },
+            dismissButton = { OutlinedButton(onClick = { confirm = false }) { Text(tr("Cancel")) } },
         )
     }
 }
@@ -421,7 +422,7 @@ private fun ScopeSectionHeader(label: String, count: Int, expanded: Boolean, onT
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = "$label ($count)",
+            text = tr("%1\$s (%2\$s)", tr(label), count),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             textDecoration = TextDecoration.Underline,
@@ -429,7 +430,7 @@ private fun ScopeSectionHeader(label: String, count: Int, expanded: Boolean, onT
         )
         Icon(
             if (expanded) Icons.Filled.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight,
-            contentDescription = if (expanded) "Collapse $label" else "Expand $label",
+            contentDescription = if (expanded) tr("Collapse %1\$s", tr(label)) else tr("Expand %1\$s", tr(label)),
             tint = MaterialTheme.colorScheme.primary,
         )
     }
@@ -505,7 +506,7 @@ private fun VariableRow(
                 }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse variable" else "Expand variable",
+                    contentDescription = if (expanded) tr("Collapse variable") else tr("Expand variable"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -519,7 +520,7 @@ private fun VariableRow(
                 )
                 // The scope/type, shown only when unfolded (under the value).
                 Text(
-                    text = if (variable.projectId == 0L) "super-global" else "project-global",
+                    text = if (variable.projectId == 0L) tr("super-global") else tr("project-global"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -529,10 +530,10 @@ private fun VariableRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit variable")
+                        Icon(Icons.Filled.Edit, contentDescription = tr("Edit variable"))
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete variable")
+                        Icon(Icons.Filled.Delete, contentDescription = tr("Delete variable"))
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.opentasker.ui.components
 
+import com.opentasker.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +45,7 @@ fun RgbaColorPickerDialog(
     val argb = (a shl 24) or (r shl 16) or (g shl 8) or b
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Color") },
+        title = { Text(tr("Color")) },
         text = {
             androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
@@ -66,11 +67,11 @@ fun RgbaColorPickerDialog(
                 )
             }
         },
-        confirmButton = { Button(onClick = { onConfirm("#%08X".format(argb)) }) { Text("Apply") } },
+        confirmButton = { Button(onClick = { onConfirm("#%08X".format(argb)) }) { Text(tr("Apply")) } },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedButton(onClick = onClear) { Text("Default") }
-                OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+                OutlinedButton(onClick = onClear) { Text(tr("Default")) }
+                OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) }
             }
         },
     )

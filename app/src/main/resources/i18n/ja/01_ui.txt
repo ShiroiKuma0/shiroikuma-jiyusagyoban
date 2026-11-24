@@ -1,0 +1,30 @@
+# 01_ui — app/, automation/, progress/, scenes/, ui/charts (first part)
+
+# SceneActivity.kt — the labels a scene element shows when its own label is left empty
+= Button
+: ボタン
+= Slider
+: スライダー
+= Text
+: 文字
+= Checkbox
+: チェックボックス
+= Toggle
+: トグル
+= Select
+: 選択
+= Image
+: 画像
+
+# WiFiNetworkMonitor.kt — why a connected network has no name. Kept in English in the state store
+# (the monitor publishes it); translated where the reason is shown.
+= Android only shows the Wi-Fi name to apps with precise location access. Open Setup and allow precise location.
+: AndroidがWi-Fiの名前を見せるのは、正確な位置情報を許可されたアプリだけです。セットアップを開いて、正確な位置情報を許可してください。
+= Android hides the Wi-Fi name while Location is turned off. Turn Location on to match a network by name.
+: 位置情報がオフの間、AndroidはWi-Fiの名前を隠します。ネットワークを名前で照合するには、位置情報をオンにしてください。
+= Android hides the Wi-Fi name from apps in the background. Open Setup and allow location all the time.
+: Androidは、バックグラウンドのアプリにWi-Fiの名前を見せません。セットアップを開いて、位置情報を「常に許可」にしてください。
+= Android did not report a name for this Wi-Fi network.
+: AndroidからこのWi-Fiネットワークの名前が通知されませんでした。
+= OpenTasker asks Android for the Wi-Fi name only while an enabled profile compares it.
+: OpenTaskerがAndroidにWi-Fiの名前を問い合わせるのは、有効なプロファイルが名前を比較している間だけです。

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -116,7 +117,7 @@ internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTy
         ContextType.entries.map { type ->
             LocalizedContextType(
                 type = type,
-                title = type.name.lowercase().replaceFirstChar { it.uppercase() },
+                title = tr(type.name.lowercase().replaceFirstChar { it.uppercase() }),
                 description = contextDescription(type),
             )
         }
@@ -225,7 +226,7 @@ internal fun ContextConfigDialog(
         // These forms carry many fields, and discarding them has no undo because nothing was
         // saved yet.
         properties = DialogProperties(dismissOnClickOutside = false),
-        title = { Text(state.type.name.lowercase().replaceFirstChar { it.uppercase() }) },
+        title = { Text(tr(state.type.name.lowercase().replaceFirstChar { it.uppercase() })) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
@@ -355,53 +356,53 @@ internal fun contextHasInvalidValues(type: ContextType, config: Map<String, Stri
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {
-    ContextType.APPLICATION -> listOf(ActionField("package", "Package name", required = true, hint = "com.example.app (personal profile only)"))
+    ContextType.APPLICATION -> listOf(ActionField("package", tr("Package name"), required = true, hint = tr("com.example.app (personal profile only)")))
     ContextType.TIME -> listOf(
-        ActionField("start", "Start HH:mm", required = true, hint = "09:00"),
-        ActionField("end", "End HH:mm", required = true, hint = "17:00"),
+        ActionField("start", tr("Start HH:mm"), required = true, hint = "09:00"),
+        ActionField("end", tr("End HH:mm"), required = true, hint = "17:00"),
     )
-    ContextType.DAY -> listOf(ActionField("days", "Days", required = true, hint = "weekdays, weekends, MON-FRI"))
+    ContextType.DAY -> listOf(ActionField("days", tr("Days"), required = true, hint = "weekdays, weekends, MON-FRI"))
     ContextType.LOCATION -> listOf(
-        ActionField("latitude", "Latitude", FieldType.NUMBER, required = true),
-        ActionField("longitude", "Longitude", FieldType.NUMBER, required = true),
-        ActionField("radiusMeters", "Radius meters", FieldType.NUMBER, required = true, hint = "100"),
-        ActionField("maxAccuracyMeters", "Max accuracy meters", FieldType.NUMBER, hint = "50"),
-        ActionField("dwellSeconds", "Dwell seconds", FieldType.NUMBER, hint = "300"),
-        ActionField("outside", "Match when outside", FieldType.CHECKBOX, hint = "Fire when away from this place instead of at it (with dwell)"),
+        ActionField("latitude", tr("Latitude"), FieldType.NUMBER, required = true),
+        ActionField("longitude", tr("Longitude"), FieldType.NUMBER, required = true),
+        ActionField("radiusMeters", tr("Radius meters"), FieldType.NUMBER, required = true, hint = "100"),
+        ActionField("maxAccuracyMeters", tr("Max accuracy meters"), FieldType.NUMBER, hint = "50"),
+        ActionField("dwellSeconds", tr("Dwell seconds"), FieldType.NUMBER, hint = "300"),
+        ActionField("outside", tr("Match when outside"), FieldType.CHECKBOX, hint = tr("Fire when away from this place instead of at it (with dwell)")),
     )
     ContextType.STATE -> listOf(
-        ActionField("key", "State key", required = true, hint = "battery_level, charging, headphones, screen"),
-        ActionField("operator", "Operator", hint = "=, >=, <=, >, <"),
-        ActionField("value", "Expected value", required = true, hint = "true/false, connected/disconnected, on/off, 80"),
+        ActionField("key", tr("State key"), required = true, hint = "battery_level, charging, headphones, screen"),
+        ActionField("operator", tr("Operator"), hint = "=, >=, <=, >, <"),
+        ActionField("value", tr("Expected value"), required = true, hint = "true/false, connected/disconnected, on/off, 80"),
     )
     ContextType.EVENT -> listOf(
-        ActionField("event", "Event type", required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, fold, app_foreground, hardware_key"),
-        ActionField("state", "Event state", hint = "during, upcoming, connected, disconnected"),
-        ActionField("fold", "Fold posture", hint = "for event=fold: folded, semi, unfolded"),
-        ActionField("key", "Hardware key", hint = "for event=hardware_key: volume_up, volume_down, power"),
-        ActionField("press", "Press type", hint = "for event=hardware_key: short, long"),
-        ActionField("calendar", "Calendar name", hint = "Work"),
-        ActionField("beforeMinutes", "Before minutes", FieldType.NUMBER, hint = "15"),
-        ActionField("package", "Package allowlist", hint = "com.example.app, com.chat.app"),
+        ActionField("event", tr("Event type"), required = true, hint = "boot_completed, notification, nfc, bluetooth, calendar, sunrise, sunset, shake, package_added, package_removed, package_replaced, orientation, fold, app_foreground, hardware_key"),
+        ActionField("state", tr("Event state"), hint = "during, upcoming, connected, disconnected"),
+        ActionField("fold", tr("Fold posture"), hint = tr("for event=fold: folded, semi, unfolded")),
+        ActionField("key", tr("Hardware key"), hint = tr("for event=hardware_key: volume_up, volume_down, power")),
+        ActionField("press", tr("Press type"), hint = tr("for event=hardware_key: short, long")),
+        ActionField("calendar", tr("Calendar name"), hint = "Work"),
+        ActionField("beforeMinutes", tr("Before minutes"), FieldType.NUMBER, hint = "15"),
+        ActionField("package", tr("Package allowlist"), hint = "com.example.app, com.chat.app"),
         // The broadcast trigger has always read config["action"] in AutomationService; upstream added
         // the editor field for it in 0.2.93. Sender and extra filters stay out — this fork's
         // BroadcastContextEvents does not match on them.
-        ActionField("action", "Broadcast action", hint = "for event=broadcast: com.example.ACTION (comma-separated for several)"),
-        ActionField("tagId", "NFC tag ID", hint = "04AABBCC"),
-        ActionField("latitude", "Latitude", FieldType.NUMBER, hint = "40.7128"),
-        ActionField("longitude", "Longitude", FieldType.NUMBER, hint = "-74.0060"),
-        ActionField("offsetMinutes", "Sun offset minutes", FieldType.NUMBER, hint = "-30"),
-        ActionField("windowMinutes", "Sun window minutes", FieldType.NUMBER, hint = "5"),
-        ActionField("title", "Title contains", hint = "Optional notification title text"),
-        ActionField("body", "Body contains", hint = "Optional notification body text"),
-        ActionField("filter", "Any metadata filter", hint = "Optional text/package/action filter"),
-        ActionField("regex", "Use regex matching", FieldType.CHECKBOX),
+        ActionField("action", tr("Broadcast action"), hint = tr("for event=broadcast: com.example.ACTION (comma-separated for several)")),
+        ActionField("tagId", tr("NFC tag ID"), hint = "04AABBCC"),
+        ActionField("latitude", tr("Latitude"), FieldType.NUMBER, hint = "40.7128"),
+        ActionField("longitude", tr("Longitude"), FieldType.NUMBER, hint = "-74.0060"),
+        ActionField("offsetMinutes", tr("Sun offset minutes"), FieldType.NUMBER, hint = "-30"),
+        ActionField("windowMinutes", tr("Sun window minutes"), FieldType.NUMBER, hint = "5"),
+        ActionField("title", tr("Title contains"), hint = tr("Optional notification title text")),
+        ActionField("body", tr("Body contains"), hint = tr("Optional notification body text")),
+        ActionField("filter", tr("Any metadata filter"), hint = tr("Optional text/package/action filter")),
+        ActionField("regex", tr("Use regex matching"), FieldType.CHECKBOX),
     )
     ContextType.PLUGIN -> listOf(
-        ActionField("package", "Plugin package", required = true, hint = "com.example.plugin"),
-        ActionField("bundleJson", "Plugin config JSON", hint = "{\"key\":\"value\"}"),
-        ActionField("blurb", "Description", hint = "Optional label from plugin config"),
-        ActionField("timeoutMs", "Query timeout ms", FieldType.NUMBER, hint = "5000"),
+        ActionField("package", tr("Plugin package"), required = true, hint = "com.example.plugin"),
+        ActionField("bundleJson", tr("Plugin config JSON"), hint = "{\"key\":\"value\"}"),
+        ActionField("blurb", tr("Description"), hint = tr("Optional label from plugin config")),
+        ActionField("timeoutMs", tr("Query timeout ms"), FieldType.NUMBER, hint = "5000"),
     )
 }
 
@@ -475,7 +476,7 @@ internal fun DayScheduleInput(value: String, onChange: (String) -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 rowDays.forEach { day ->
                     DayPresetButton(
-                        label = day,
+                        label = tr(day),
                         selected = day in selected,
                         onClick = {
                             val next = if (day in selected) selected - day else selected + day
@@ -596,11 +597,11 @@ internal fun EventPresetRow(
 }
 
 internal fun contextDescription(type: ContextType): String = when (type) {
-    ContextType.APPLICATION -> "Matches when an app is detected in the foreground."
-    ContextType.TIME -> "Matches during a clock time window."
-    ContextType.DAY -> "Matches on selected days, presets, or weekday/weekend ranges."
-    ContextType.LOCATION -> "Matches near a latitude/longitude radius with optional accuracy and dwell checks."
-    ContextType.STATE -> "Matches a device state such as battery level, charging, headphones, or screen."
-    ContextType.EVENT -> "Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries."
-    ContextType.PLUGIN -> "Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached."
+    ContextType.APPLICATION -> tr("Matches when an app is detected in the foreground.")
+    ContextType.TIME -> tr("Matches during a clock time window.")
+    ContextType.DAY -> tr("Matches on selected days, presets, or weekday/weekend ranges.")
+    ContextType.LOCATION -> tr("Matches near a latitude/longitude radius with optional accuracy and dwell checks.")
+    ContextType.STATE -> tr("Matches a device state such as battery level, charging, headphones, or screen.")
+    ContextType.EVENT -> tr("Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries.")
+    ContextType.PLUGIN -> tr("Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.")
 }

@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -183,7 +184,7 @@ private fun ChipLabelWithAlert(text: String, alert: Boolean) {
 internal fun HealthAlertIcon(modifier: Modifier = Modifier, size: Dp = 18.dp) {
     Icon(
         Icons.Filled.Error,
-        contentDescription = "Contains blocked tasks",
+        contentDescription = tr("Contains blocked tasks"),
         tint = MaterialTheme.colorScheme.error,
         modifier = modifier.size(size),
     )
@@ -226,7 +227,7 @@ internal fun ProjectFilterChips(
             FilterChip(
                 selected = filter == ProjectFilter.Unfiled,
                 onClick = { onSelect(ProjectFilter.Unfiled) },
-                label = { ChipLabelWithAlert("Unfiled", null in alertProjectIds) },
+                label = { ChipLabelWithAlert(tr("Unfiled"), null in alertProjectIds) },
             )
         }
         items(order, key = { it.id }) { project ->
@@ -501,7 +502,7 @@ internal fun ProfilesScreen(
 
     if (showMoveDialog) {
         ProjectPickerDialog(
-            title = "Move ${selectedIds.size} profile${plural(selectedIds.size)}",
+            title = if (selectedIds.size == 1) tr("Move 1 profile") else tr("Move %1\$s profiles", selectedIds.size),
             projects = projects,
             currentProjectId = currentProjectId,
             onPick = { pid ->
@@ -665,7 +666,7 @@ internal fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit)
 @Composable
 internal fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
     val issueSummary = issues.take(3).joinToString(separator = "; ") { issue ->
-        "${issue.recordType.label} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
+        "${tr(issue.recordType.label)} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
     }
     val remaining = issues.size - 3
     val suffix = if (remaining > 0) "; ${stringResource(R.string.label_more_count, remaining)}" else ""
@@ -776,7 +777,7 @@ private fun ProfileCard(
                 Spacer(Modifier.width(4.dp))
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse profile" else "Expand profile",
+                    contentDescription = if (expanded) tr("Collapse profile") else tr("Expand profile"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -1035,7 +1036,7 @@ internal fun TasksScreen(
 
     if (showMoveDialog) {
         ProjectPickerDialog(
-            title = "Move ${selectedIds.size} task${plural(selectedIds.size)}",
+            title = if (selectedIds.size == 1) tr("Move 1 task") else tr("Move %1\$s tasks", selectedIds.size),
             projects = projects,
             currentProjectId = currentProjectId,
             onPick = { pid ->
@@ -1222,7 +1223,7 @@ private fun TaskCard(
                         ) {
                             Icon(
                                 Icons.Filled.Add,
-                                contentDescription = "Add task icon",
+                                contentDescription = tr("Add task icon"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                                 modifier = Modifier.size(16.dp),
                             )
@@ -1247,7 +1248,7 @@ private fun TaskCard(
                             // disabled action row.
                             modifier = Modifier.alpha(if (task.enabled) 1f else 0.45f),
                         )
-                        if (!task.enabled) StatusPill("OFF", MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!task.enabled) StatusPill(tr("OFF"), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     // Collapsed: just the task name. Expanded: the priority / collision line.
                     if (expanded) {
@@ -1263,18 +1264,18 @@ private fun TaskCard(
                 if (!selectionActive) {
                     Box {
                         IconButton(onClick = { taskMenu = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Task menu", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Filled.MoreVert, contentDescription = tr("Task menu"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         ThemedDropdownMenu(expanded = taskMenu, onDismissRequest = { taskMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Rename") },
+                                text = { Text(tr("Rename")) },
                                 onClick = { taskMenu = false; showRename = true },
                                 icon = Icons.Filled.DriveFileRenameOutline,
                                 role = IconRole.WRITE,
                                 opens = true,
                             )
                             DropdownMenuItem(
-                                text = { Text("Edit") },
+                                text = { Text(tr("Edit")) },
                                 onClick = { taskMenu = false; onEdit() },
                                 icon = Icons.Filled.Edit,
                                 role = IconRole.WRITE,
@@ -1285,7 +1286,7 @@ private fun TaskCard(
                             // shortcut or the bridge alike, because the gate is in the one place
                             // every run funnels through.
                             DropdownMenuItem(
-                                text = { Text("Enabled") },
+                                text = { Text(tr("Enabled")) },
                                 onClick = { taskMenu = false; onToggleEnabled(!task.enabled) },
                                 icon = Icons.Filled.PowerSettingsNew,
                                 role = IconRole.CONNECT,
@@ -1296,7 +1297,7 @@ private fun TaskCard(
                 }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse task" else "Expand task",
+                    contentDescription = if (expanded) tr("Collapse task") else tr("Expand task"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -1304,10 +1305,10 @@ private fun TaskCard(
                 var name by remember { mutableStateOf(task.name) }
                 AlertDialog(
                     onDismissRequest = { showRename = false },
-                    title = { Text("Rename task") },
+                    title = { Text(tr("Rename task")) },
                     text = { OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true) },
-                    confirmButton = { Button(onClick = { onRename(name); showRename = false }) { Text("Save") } },
-                    dismissButton = { OutlinedButton(onClick = { showRename = false }) { Text("Cancel") } },
+                    confirmButton = { Button(onClick = { onRename(name); showRename = false }) { Text(tr("Save")) } },
+                    dismissButton = { OutlinedButton(onClick = { showRename = false }) { Text(tr("Cancel")) } },
                 )
             }
             if (expanded) {
@@ -1500,7 +1501,7 @@ internal fun ActionRow(
                     } else {
                         StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
                     }
-                    if (!action.enabled) StatusPill("OFF", MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!action.enabled) StatusPill(tr("OFF"), MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         Modifier.weight(1f)
                             .clip(RoundedCornerShape(8.dp))
@@ -1518,7 +1519,7 @@ internal fun ActionRow(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            action.label ?: metadata?.name ?: action.type,
+                            action.label?.takeUnless { it == metadata?.name } ?: metadata?.name?.let { tr(it) } ?: action.type,
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = themePrefs.actionLabelSizeSp.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1533,7 +1534,7 @@ internal fun ActionRow(
                 // (key)+value pairs are packed.
                 if (action.args.isEmpty()) {
                     Text(
-                        metadata?.description ?: stringResource(R.string.workspace_no_arguments),
+                        metadata?.description?.let { tr(it) } ?: stringResource(R.string.workspace_no_arguments),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1639,13 +1640,13 @@ internal fun ActionRow(
                         role = IconRole.CONNECT,
                     )
                 }
-                DropdownMenuItem(text = { Text("Clone") }, onClick = onClone, icon = Icons.Filled.ControlPointDuplicate, role = IconRole.SHARE)
-                DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy, icon = Icons.Filled.ContentCopy, role = IconRole.SHARE)
-                DropdownMenuItem(text = { Text("Cut") }, onClick = onCut, icon = Icons.Filled.ContentCut, role = IconRole.SHARE)
-                DropdownMenuItem(text = { Text("Delete") }, onClick = onDeleteSelection, icon = Icons.Filled.Delete, destructive = true)
+                DropdownMenuItem(text = { Text(tr("Clone")) }, onClick = onClone, icon = Icons.Filled.ControlPointDuplicate, role = IconRole.SHARE)
+                DropdownMenuItem(text = { Text(tr("Copy")) }, onClick = onCopy, icon = Icons.Filled.ContentCopy, role = IconRole.SHARE)
+                DropdownMenuItem(text = { Text(tr("Cut")) }, onClick = onCut, icon = Icons.Filled.ContentCut, role = IconRole.SHARE)
+                DropdownMenuItem(text = { Text(tr("Delete")) }, onClick = onDeleteSelection, icon = Icons.Filled.Delete, destructive = true)
                 MenuDivider()
                 DropdownMenuItem(
-                    text = { Text("Enabled") },
+                    text = { Text(tr("Enabled")) },
                     onClick = { onMenuDismiss(); onToggleEnabled() },
                     icon = Icons.Filled.PowerSettingsNew,
                     role = IconRole.CONNECT,
@@ -1653,8 +1654,8 @@ internal fun ActionRow(
                 )
                 if (!clipboardEmpty) {
                     MenuDivider()
-                    DropdownMenuItem(text = { Text("Paste before") }, onClick = onPasteBefore, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE)
-                    DropdownMenuItem(text = { Text("Paste after") }, onClick = onPaste, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE)
+                    DropdownMenuItem(text = { Text(tr("Paste before")) }, onClick = onPasteBefore, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE)
+                    DropdownMenuItem(text = { Text(tr("Paste after")) }, onClick = onPaste, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE)
                 }
             }
         }
@@ -1711,7 +1712,7 @@ private fun RowScope.ArgPill(
             maxLines = 6,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { committing = true; onCommit(text) }),
-            trailingIcon = { IconButton(onClick = { committing = true; onCommit(text) }) { Icon(Icons.Filled.Check, contentDescription = "Save") } },
+            trailingIcon = { IconButton(onClick = { committing = true; onCommit(text) }) { Icon(Icons.Filled.Check, contentDescription = tr("Save")) } },
             modifier = (if (valueWeight) Modifier.weight(1f) else Modifier.widthIn(min = 120.dp, max = 220.dp))
                 .focusRequester(focusRequester)
                 .onFocusChanged { fs ->
@@ -1725,10 +1726,10 @@ private fun RowScope.ArgPill(
         if (showConfirm) {
             AlertDialog(
                 onDismissRequest = { showConfirm = false; onCancel() },
-                title = { Text("Save changes?") },
-                text = { Text("“$argKey” was edited but not saved.") },
-                confirmButton = { Button(onClick = { showConfirm = false; onCommit(text) }) { Text("Save") } },
-                dismissButton = { OutlinedButton(onClick = { showConfirm = false; onCancel() }) { Text("Discard") } },
+                title = { Text(tr("Save changes?")) },
+                text = { Text(tr("“%1\$s” was edited but not saved.", argKey)) },
+                confirmButton = { Button(onClick = { showConfirm = false; onCommit(text) }) { Text(tr("Save")) } },
+                dismissButton = { OutlinedButton(onClick = { showConfirm = false; onCancel() }) { Text(tr("Discard")) } },
             )
         }
     } else {
@@ -1775,7 +1776,7 @@ private fun ContextRow(
             horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(context.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
+                Text(tr(context.type.name.lowercase().replaceFirstChar { it.uppercase() }), style = MaterialTheme.typography.titleSmall)
                 Text(
                     contextConfigSummary(context),
                     style = MaterialTheme.typography.bodySmall,
@@ -1797,7 +1798,6 @@ private fun ContextRow(
     }
 }
 
-private fun plural(count: Int): String = if (count == 1) "" else "s"
 
 /** Shown before the name while the task runs — on the folded card too, which is where it is looked for. */
 @Composable

@@ -11,6 +11,7 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.TaskEntity
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -49,7 +50,7 @@ class PickFreezeBubblesAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val projectName = ctx.variables.expand(args["project"].orEmpty()).trim()
         val groupName = ctx.variables.expand(args["group"].orEmpty()).trim()
-        val title = ctx.variables.expand(args["title"].orEmpty()).trim().ifEmpty { "Freeze bubbles" }
+        val title = ctx.variables.expand(args["title"].orEmpty()).trim().ifEmpty { tr("Freeze bubbles") }
         // Where the answer is written. A variable name means the roster lives in the workspace — in
         // 凍結融解's 01 settings task — and this action only publishes it; blank keeps the legacy
         // per-task flag. See [ROSTER_NOTE].

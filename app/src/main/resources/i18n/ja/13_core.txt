@@ -1,0 +1,390 @@
+# 13_core — engine and device code (core/engine/variables … core/templates)
+
+# AutomationFlowGraph.kt
+= no warnings
+: 警告なし
+= 1 warning
+: 警告1件
+= %1$s warnings
+: 警告%1$s件
+= Missing enter task
+: 開始タスクが見つかりません
+= Missing exit task
+: 終了タスクが見つかりません
+
+# AutomationTargetReceiver.kt — InternalTaskRunSource.runLogLabel and DEFAULT_RUN_SOURCE (shown in the run log)
+= Locale plugin
+: Localeプラグイン
+= Scene overlay
+: シーンのオーバーレイ
+= Quick Settings tile
+: クイック設定タイル
+= App function
+: アプリ関数
+= External intent
+: 外部インテント
+
+# AutomationReferenceIndex.kt — GlobalFallbackTask.ownerName
+= Global settings
+: 全体の設定
+
+# HuaweiGnssServer.kt
+= Transferring
+: 転送中
+= Refused
+: 拒否されました
+
+# HuaweiRfcommClient.kt
+= already paired
+: ペア設定済み
+= requesting
+: 要求中
+= paired
+: ペア設定しました
+= pairing
+: ペア設定中
+
+# HuaweiSyncRunner.kt
+= Cancelled
+: キャンセルしました
+= Waiting for the watch
+: ウォッチを待っています
+= The watch asked
+: ウォッチから要求がありました
+= The watch never asked
+: ウォッチからの要求はありませんでした
+= The watch asked again
+: ウォッチから再び要求がありました
+= Done
+: 完了
+= Waiting for the watch to ask again
+: ウォッチの次の要求を待っています
+= accept on the watch, then on the phone
+: ウォッチで承認してから、端末で承認してください
+= re-binding — the watch forgot this phone
+: 再登録中 — ウォッチがこの端末を忘れています
+= Health's reconnect
+: 「Health」の再接続
+= the watch is still talking — staying on the line
+: ウォッチがまだ通信中のため、接続を保っています
+
+# PredictedSet.kt
+= Downloading
+: ダウンロード中
+= Downloaded
+: ダウンロード完了
+= Reading the orbit products
+: 軌道データを読み込み中
+= Fitting %1$s
+: %1$sを当てはめ中
+= Writing GLONASS
+: GLONASSを書き出し中
+= Building the almanac file
+: 概略暦ファイルを作成中
+= Writing
+: 書き出し中
+= Built
+: 作成完了
+= Integrating BeiDou
+: BeiDouを積分中
+= Fitting BeiDou
+: BeiDouを当てはめ中
+= Starting
+: 開始中
+
+# GnssForecastReminder.kt, HuaweiBondWatch.kt, OnseWarning.kt — CHANNEL_NAME
+= 白い熊 自由作業盤 urgent
+: 白い熊 自由作業盤 緊急
+
+# LocationPolicyDisclosures.kt
+= Needed for live Location contexts and WiFi SSID visibility on modern Android. Approximate access can emit lower-precision fixes; background precision cannot exceed the foreground precision the user grants.
+: 位置情報のコンテキストをその場で動かすためと、新しいAndroidでWi-FiのSSIDを読み取るために必要です。おおよその位置情報では測位の精度が下がります。バックグラウンドでの精度は、フォアグラウンドで許可した精度を超えられません。
+= Only approximate location is allowed right now. WiFi network names and small geofences need precise location, so tap Request and choose Precise.
+: 現在はおおよその位置情報だけが許可されています。Wi-Fiネットワーク名と小さなジオフェンスには正確な位置情報が必要なため、「許可を求める」をタップして「正確」を選んでください。
+= Android 11+ grants background location from app settings instead of the foreground permission dialog.
+: Android 11以降では、バックグラウンドの位置情報は、フォアグラウンドの権限ダイアログではなくアプリの設定から許可します。
+= Android 10 can route users from the permission flow to the app's location settings.
+: Android 10では、権限の確認の流れからアプリの位置情報の設定へ進めます。
+= Needed only when geofence automations must keep evaluating after 白い熊 自由作業盤 is no longer visible. %1$s Users can decline and keep using foreground-only automations. Public reliability still needs device verification.
+: 白い熊 自由作業盤が表示されなくなった後も、ジオフェンスの自動化を評価し続ける必要がある場合にだけ必要です。%1$s 拒否しても、フォアグラウンドだけの自動化は引き続き使えます。実際の信頼性は、端末ごとの確認がまだ必要です。
+= Location permission is granted, but GPS and network location providers are disabled.
+: 位置情報の権限は許可されていますが、GPSとネットワークの位置情報プロバイダーが無効になっています。
+= Live FOSS location source is registered with precise foreground and background location permission.
+: FOSSの位置情報ソースは、フォアグラウンドとバックグラウンドの正確な位置情報の権限で登録されています。
+= Live FOSS location source is registered with approximate foreground and background location permission. Background precision follows the user's foreground precision choice.
+: FOSSの位置情報ソースは、フォアグラウンドとバックグラウンドのおおよその位置情報の権限で登録されています。バックグラウンドでの精度は、フォアグラウンドで選んだ精度に従います。
+= Live FOSS location source can emit while 白い熊 自由作業盤 is running; background location from app settings is still needed for long-running geofence reliability.
+: FOSSの位置情報ソースは、白い熊 自由作業盤の実行中に位置を通知できます。長時間にわたってジオフェンスを確実に動かすには、アプリの設定からバックグラウンドの位置情報を許可する必要があります。
+= Live FOSS location source can emit approximate fixes while 白い熊 自由作業盤 is running; background location from app settings and precise access are still missing.
+: FOSSの位置情報ソースは、白い熊 自由作業盤の実行中におおよその位置を通知できます。アプリの設定からのバックグラウンドの位置情報と、正確な位置情報へのアクセスがまだ許可されていません。
+= Foreground location permission is missing; live location contexts remain blocked until setup is complete.
+: フォアグラウンドの位置情報の権限がありません。セットアップが完了するまで、位置情報のコンテキストは止められたままになります。
+=  Android 14+ location foreground-service use remains gated to these granted location prerequisites.
+: Android 14以降では、位置情報のフォアグラウンドサービスは、ここで許可された位置情報の権限がそろっている場合にだけ使えます。
+
+# OemBatteryGuidance.kt
+= One UI may put 白い熊 自由作業盤 to sleep. Exclude it from sleeping apps for reliable automation.
+: One UIは白い熊 自由作業盤をスリープ状態にすることがあります。自動化を確実に動かすには、スリープ状態のアプリから外してください。
+= Settings > Battery and device care > Battery > Background usage limits.
+: 「設定」>「バッテリーとデバイスケア」>「バッテリー」>「バックグラウンドでの使用を制限」を開きます。
+= Turn off "Put unused apps to sleep" or add 白い熊 自由作業盤 to "Never sleeping apps".
+: 「未使用のアプリをスリープ」をオフにするか、白い熊 自由作業盤を「スリープ状態にしないアプリ」に追加します。
+= Remove 白い熊 自由作業盤 from "Sleeping apps" and "Deep sleeping apps" if listed.
+: 白い熊 自由作業盤が「スリープ状態のアプリ」や「ディープスリープ状態のアプリ」にある場合は、そこから外します。
+= Settings > Apps > 白い熊 自由作業盤 > Battery: set to "Unrestricted".
+: 「設定」>「アプリ」>「白い熊 自由作業盤」>「バッテリー」で「制限なし」を選びます。
+= MIUI/HyperOS blocks background autostart by default. Grant Autostart or automations will not fire.
+: MIUI/HyperOSは、既定でバックグラウンドからの自動起動を止めます。「自動起動」を許可しないと、自動化が実行されません。
+= Security > Permissions > Autostart: enable 白い熊 自由作業盤.
+: 「セキュリティ」>「権限」>「自動起動」で白い熊 自由作業盤を有効にします。
+= Settings > Apps > 白い熊 自由作業盤 > Battery saver: set to "No restrictions".
+: 「設定」>「アプリ」>「白い熊 自由作業盤」>「バッテリーセーバー」で「制限なし」を選びます。
+= Recent apps: lock 白い熊 自由作業盤 (pull down on the card) so it is not killed.
+: 最近使ったアプリの画面で白い熊 自由作業盤をロックし（カードを下に引きます）、終了されないようにします。
+= Disable "MIUI optimization" only if automations still fail after the above.
+: ここまでの手順でも自動化が動かない場合にだけ、「MIUIの最適化」を無効にします。
+= OxygenOS aggressively manages background apps. Disable optimization and enable auto-launch.
+: OxygenOSはバックグラウンドのアプリを厳しく管理します。最適化を無効にし、自動起動を有効にしてください。
+= Settings > Battery > Battery optimization > 白い熊 自由作業盤: "Don't optimize".
+: 「設定」>「バッテリー」>「電池の最適化」>「白い熊 自由作業盤」で「最適化しない」を選びます。
+= Settings > Apps > Auto-launch / Startup manager: enable 白い熊 自由作業盤 where present.
+: 「設定」>「アプリ」>「自動起動」または「起動管理」がある場合は、白い熊 自由作業盤を有効にします。
+= Recent apps: lock 白い熊 自由作業盤 so deep optimization does not kill it.
+: 最近使ったアプリの画面で白い熊 自由作業盤をロックし、高度な最適化で終了されないようにします。
+= Disable "Advanced optimization" / "Sleep standby optimization" if available.
+: 「高度な最適化」や「スリープ待機の最適化」がある場合は、無効にします。
+= ColorOS startup management blocks background apps. Enable auto-startup and allow background.
+: ColorOSの起動管理は、バックグラウンドのアプリを止めます。自動起動を有効にし、バックグラウンドでの動作を許可してください。
+= Settings > App management > 白い熊 自由作業盤 > Allow auto startup.
+: 「設定」>「アプリ管理」>「白い熊 自由作業盤」で「自動起動を許可」を選びます。
+= Settings > Battery > 白い熊 自由作業盤 > Allow background activity / High background power.
+: 「設定」>「バッテリー」>「白い熊 自由作業盤」で「バックグラウンドでの動作を許可」または「バックグラウンドでの高い電力消費」を選びます。
+= Phone Manager > Privacy permissions > Startup manager: enable 白い熊 自由作業盤.
+: 「フォンマネージャー」>「プライバシーの権限」>「起動管理」で白い熊 自由作業盤を有効にします。
+= Recent apps: lock 白い熊 自由作業盤 so it is not cleared.
+: 最近使ったアプリの画面で白い熊 自由作業盤をロックし、消去されないようにします。
+= Realme UI (ColorOS-based) blocks background autostart. Enable startup and background activity.
+: Realme UI（ColorOSが基になっています）は、バックグラウンドからの自動起動を止めます。起動とバックグラウンドでの動作を有効にしてください。
+= Settings > Battery > 白い熊 自由作業盤 > Allow background activity.
+: 「設定」>「バッテリー」>「白い熊 自由作業盤」で「バックグラウンドでの動作を許可」を選びます。
+= Phone Manager > Startup manager: enable 白い熊 自由作業盤.
+: 「フォンマネージャー」>「起動管理」で白い熊 自由作業盤を有効にします。
+= Recent apps: lock 白い熊 自由作業盤 so it survives memory cleanup.
+: 最近使ったアプリの画面で白い熊 自由作業盤をロックし、メモリの整理で終了されないようにします。
+= Vivo blocks background startup by default. Allow auto-start and high background power.
+: Vivoは、既定でバックグラウンドからの起動を止めます。自動起動と、バックグラウンドでの高い電力消費を許可してください。
+= Settings > Battery > Background power consumption management: allow 白い熊 自由作業盤.
+: 「設定」>「バッテリー」>「バックグラウンドの電力消費の管理」で白い熊 自由作業盤を許可します。
+= i Manager > App manager > Autostart manager: enable 白い熊 自由作業盤.
+: 「iマネージャー」>「アプリ管理」>「自動起動の管理」で白い熊 自由作業盤を有効にします。
+= Settings > Apps > 白い熊 自由作業盤 > Battery: allow background activity.
+: 「設定」>「アプリ」>「白い熊 自由作業盤」>「バッテリー」で、バックグラウンドでの動作を許可します。
+= EMUI/MagicOS uses Protected apps and manual app launch. Set 白い熊 自由作業盤 to manage manually.
+: EMUI/MagicOSは、「保護されたアプリ」とアプリ起動の手動管理を使います。白い熊 自由作業盤を「手動で管理」に設定してください。
+= Settings > Apps > 白い熊 自由作業盤 > Battery > App launch: turn off "Manage automatically".
+: 「設定」>「アプリ」>「白い熊 自由作業盤」>「バッテリー」>「アプリ起動」で「自動的に管理」をオフにします。
+= Enable Auto-launch, Secondary launch, and Run in background manually.
+: 「自動起動」「他のアプリによる起動」「バックグラウンドで実行」を手動でオンにします。
+= Phone Manager > Protected apps: enable 白い熊 自由作業盤 (older EMUI).
+: 「フォンマネージャー」>「保護されたアプリ」で白い熊 自由作業盤を有効にします（古いEMUIの場合）。
+= Settings > Battery: disable aggressive power-saving modes.
+: 「設定」>「バッテリー」で、強力な省電力モードを無効にします。
+= Flyme restricts background apps. Allow background running and standby for 白い熊 自由作業盤.
+: Flymeはバックグラウンドのアプリを制限します。白い熊 自由作業盤に、バックグラウンドでの実行と待機を許可してください。
+= Settings > Apps > 白い熊 自由作業盤 > permissions: allow run in background.
+: 「設定」>「アプリ」>「白い熊 自由作業盤」>「権限」で、バックグラウンドでの実行を許可します。
+= Phone Manager > Permissions > Background management: allow 白い熊 自由作業盤.
+: 「フォンマネージャー」>「権限」>「バックグラウンド管理」で白い熊 自由作業盤を許可します。
+= Battery: disable standby intelligent power saving for 白い熊 自由作業盤.
+: 「バッテリー」で、白い熊 自由作業盤に対する待機中のスマート省電力を無効にします。
+= ZenUI Auto-start Manager can block 白い熊 自由作業盤. Allow auto-start and disable cleanup.
+: ZenUIの「自動起動マネージャー」が白い熊 自由作業盤を止めることがあります。自動起動を許可し、整理の対象から外してください。
+= Auto-start Manager / Mobile Manager: allow 白い熊 自由作業盤.
+: 「自動起動マネージャー」または「モバイルマネージャー」で白い熊 自由作業盤を許可します。
+= Settings > Battery: disable aggressive cleanup for 白い熊 自由作業盤.
+: 「設定」>「バッテリー」で、白い熊 自由作業盤に対する強力な整理を無効にします。
+= Settings > Apps > 白い熊 自由作業盤 > Battery: do not optimize.
+: 「設定」>「アプリ」>「白い熊 自由作業盤」>「バッテリー」で、最適化しない設定にします。
+= Stock Android
+: 標準のAndroid
+= This device follows stock Android battery behavior. The battery-optimization exemption is usually enough.
+: この端末の電池の扱いは、標準のAndroidと同じです。たいていは、電池の最適化の対象外にするだけで足ります。
+= Keep the battery-optimization exemption granted above.
+: 上で許可した、電池の最適化の対象外の設定をそのままにしておきます。
+= Your device
+: お使いの端末
+= This OEM is not specifically recognized. Disable battery optimization and look for an autostart toggle.
+: このメーカーは個別には判別できません。電池の最適化を無効にし、自動起動のスイッチを探してください。
+= Look for an "Autostart", "Auto-launch", or "Background activity" toggle in app or battery settings.
+: アプリやバッテリーの設定で、「自動起動」や「バックグラウンドでの動作」といったスイッチを探します。
+= Lock 白い熊 自由作業盤 in recent apps so the system does not clear it.
+: 最近使ったアプリの画面で白い熊 自由作業盤をロックし、システムに消去されないようにします。
+
+# AndroidAudioHardening.kt
+= Android 17+ allows this only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground service, or for alarm-usage audio with exact-alarm access. %1$s
+: Android 17以降でこの操作ができるのは、白い熊 自由作業盤が表示されているとき、使用中の扱いになるフォアグラウンドサービスから行うとき、または正確なアラームの権限があってアラーム用の音声を使うときだけです。%1$s
+= Android 17+ allows media-key dispatch only while 白い熊 自由作業盤 is visible or from a while-in-use eligible foreground service. %1$s
+: Android 17以降でメディアキーを送れるのは、白い熊 自由作業盤が表示されているとき、または使用中の扱いになるフォアグラウンドサービスから送るときだけです。%1$s
+= Android 17+ allows volume changes only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground service, or on the alarm stream with exact-alarm access. %1$s
+: Android 17以降で音量を変更できるのは、白い熊 自由作業盤が表示されているとき、使用中の扱いになるフォアグラウンドサービスから行うとき、または正確なアラームの権限があってアラームの音量を変えるときだけです。%1$s
+
+# LocaleConditionEditActivity.kt
+= Application
+: アプリ
+= Time
+: 時刻
+= Day
+: 曜日
+= Location
+: 位置情報
+= Device state
+: デバイスの状態
+= Event
+: イベント
+= Plugin condition
+: プラグインの条件
+
+# LocaleConditionTarget.kt
+= Profile active: %1$s
+: プロファイルが有効：%1$s
+= Context satisfied: profile %1$s, context %2$s
+: コンテキストが成立：プロファイル %1$s、コンテキスト %2$s
+= %1$s %2$s configured value
+: %1$s %2$s 設定した値
+
+# ShizukuPowerBackend.kt
+= Shizuku is not running and no Shizuku manager is installed.
+: Shizukuが動作しておらず、Shizukuの管理アプリもインストールされていません。
+= Shizuku power mode is off. Turn it on here to use elevated actions.
+: Shizuku強化モードはオフです。高い権限が必要なアクションを使うには、ここでオンにしてください。
+= Shizuku manager is installed but the service is not running.
+: Shizukuの管理アプリはインストールされていますが、サービスが動作していません。
+= Shizuku is running but OpenTasker needs permission.
+: Shizukuは動作していますが、OpenTaskerに権限が必要です。
+= Shizuku permission is granted, but this build has no privileged user-service transport. Elevated actions cannot run until the transport is available.
+: Shizukuの権限は許可されていますが、このビルドには特権付きの補助サービスへの接続手段がありません。それが使えるようになるまで、高い権限が必要なアクションは実行できません。
+= Shizuku is active, permission is granted, and a privileged transport is available.
+: Shizukuは動作中で、権限が許可されており、特権付きの補助サービスにも接続できます。
+= This action requires Shizuku permission and its privileged user-service transport.
+: このアクションには、Shizukuの権限と、特権付きの補助サービスへの接続が必要です。
+# riskByAction
+= Turning it on cuts calls, mobile data and usually Wi-Fi until something turns it back off.
+: オンにすると、何かがオフに戻すまで、通話とモバイルデータ、たいていはWi-Fiも切れます。
+= Turning it off stops anything that needs data, including remote access to this phone.
+: オフにすると、この端末への遠隔アクセスを含め、データ通信が必要なものがすべて止まります。
+= A display that stays on uses more battery.
+: 画面を点けたままにすると、電池の消費が増えます。
+= It saves whatever is on screen to OpenTasker's storage, passwords and messages included.
+: 画面に映っているものを、パスワードやメッセージも含めてそのままOpenTaskerのストレージに保存します。
+= The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.
+: 端末は警告なしにすぐ再起動し、保存していない作業は失われます。起動時のトリガーに再起動のタスクを付けると、再起動を繰り返すことがあります。
+= The screen goes dark even if someone is using the phone, and it may lock.
+: 誰かが端末を使っていても画面が消え、ロックされることがあります。
+= The screen turns on untouched, showing whatever is on the lock screen and using battery.
+: 触れていないのに画面が点き、ロック画面の内容が表示され、電池を消費します。
+= Anyone with the saved password can join, and connected devices use your mobile data.
+: 保存されているパスワードを知っている人は誰でも接続でき、接続した機器はモバイルデータを使います。
+
+# SceneValidation.kt
+= Scene dimensions must be positive.
+: シーンの大きさは正の値にしてください。
+= Scene has no elements.
+: シーンに要素がありません。
+= %1$s element %2$s
+: %1$s要素 %2$s
+= %1$s has non-positive size.
+: %1$sのサイズが正の値ではありません。
+= %1$s starts outside the scene.
+: %1$sの始点がシーンの外にあります。
+= %1$s extends beyond scene bounds.
+: %1$sがシーンの範囲からはみ出しています。
+= %1$s references missing tap task %2$s.
+: %1$sが参照するタップ時のタスク %2$s が見つかりません。
+= %1$s references missing long-press task %2$s.
+: %1$sが参照する長押し時のタスク %2$s が見つかりません。
+= slider minimum must be an integer
+: スライダーの最小値は整数にしてください
+= slider maximum must be an integer
+: スライダーの最大値は整数にしてください
+= slider value must be an integer
+: スライダーの値は整数にしてください
+= slider minimum must not exceed maximum
+: スライダーの最小値は最大値以下にしてください
+= slider value must be between minimum and maximum
+: スライダーの値は最小値と最大値の間にしてください
+= image source must be a supported content or resource URI
+: 画像の参照先は、対応しているコンテンツURIまたはリソースURIにしてください
+= image must be marked decorative or have a content description
+: 画像は装飾用に指定するか、内容の説明を付けてください
+
+# TermuxScriptBackend.kt
+= Termux is not installed.
+: Termuxがインストールされていません。
+= Termux %1$s or newer is required for bounded results.
+: 上限付きの結果を受け取るには、Termux %1$s以降が必要です。
+= Termux 0.109 or newer is required for bounded results.
+: 上限付きの結果を受け取るには、Termux 0.109以降が必要です。
+= Termux is installed, but OpenTasker lacks RUN_COMMAND permission.
+: Termuxはインストールされていますが、OpenTaskerにRUN_COMMANDの権限がありません。
+= Termux is installed and RUN_COMMAND permission is granted.
+: Termuxはインストールされており、RUN_COMMANDの権限も許可されています。
+= Requires Termux 0.109 or newer with RUN_COMMAND permission.
+: Termux 0.109以降と、RUN_COMMANDの権限が必要です。
+
+# GlobalSearch.kt
+= Secret variable
+: 秘密の変数
+= Global variable
+: グローバル変数
+= 1 action
+: アクション1件
+= %1$s actions
+: アクション%1$s件
+= %1$s • action %2$s
+: %1$s • アクション %2$s
+= Profile • %1$s
+: プロファイル • %1$s
+= Profile
+: プロファイル
+= 1 element
+: 要素1件
+= %1$s elements
+: 要素%1$s件
+
+# ShareForwardActivity.kt
+= %1$s is no longer installed
+: %1$sはもうインストールされていません
+= Could not unfreeze %1$s
+: %1$sの凍結を解除できませんでした
+= Could not copy the shared content
+: 共有された内容をコピーできませんでした
+= %1$s cannot receive this content
+: %1$sはこの内容を受け取れません
+= %1$s rejected the shared content — turn on "copy files when forwarding"
+: %1$sが共有された内容を拒否しました — 「転送時にファイルをコピー」をオンにしてください
+
+# RelayGenerator.kt
+= signature mismatch
+: 署名が一致しません
+
+# RelayInstaller.kt
+= Shizuku unavailable
+: Shizukuを利用できません
+
+# PrivilegedShell.kt
+= Shizuku is running but has not granted access — allow it and tap again
+: Shizukuは動作していますが、アクセスが許可されていません — 許可してから、もう一度タップしてください
+= Shizuku is not running
+: Shizukuが動作していません
+= no root (su) on this phone
+: この端末にはroot（su）がありません
+= no answer from su in %1$s s
+: suから%1$s秒以内に応答がありませんでした
+
+# OcrScript.kt / ModelSlot.kt — labels (the ModelSlot descriptions are in 08_ui.txt)
+= Latin
+: ラテン文字
+= Cyrillic
+: キリル文字
+= Detector
+: 検出器

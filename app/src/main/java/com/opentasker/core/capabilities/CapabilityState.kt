@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.opentasker.core.power.ShizukuPowerBackend
+import com.opentasker.i18n.tr
 
 /**
  * Live, per-device evaluation of a [CapabilityRequirement] — is the underlying permission / service
@@ -106,69 +107,69 @@ object CapabilityState {
     /** A neutral one-line statement of what the action needs (no imperative "go enable it" tone). */
     fun requirementNote(req: CapabilityRequirement): String = when (req) {
         CapabilityRequirement.None -> ""
-        CapabilityRequirement.Accessibility -> "Needs the accessibility service enabled in System Settings."
-        CapabilityRequirement.Shizuku -> "Needs Shizuku installed and running."
-        CapabilityRequirement.WriteSettings -> "Needs the Modify system settings permission."
-        CapabilityRequirement.Overlay -> "Needs the display-over-other-apps permission."
-        CapabilityRequirement.PostNotifications -> "Needs notification permission."
-        CapabilityRequirement.NotificationListener -> "Needs notification access."
-        CapabilityRequirement.Dnd -> "Needs Do Not Disturb access."
-        CapabilityRequirement.AllFiles -> "Needs All files access to read files outside the app (e.g. tones in shared storage)."
-        CapabilityRequirement.DeviceAdmin -> "Needs Device admin enabled."
-        CapabilityRequirement.Microphone -> "Needs the Microphone permission."
-        CapabilityRequirement.Location -> "Needs the Location permission."
-        CapabilityRequirement.Bluetooth -> "Needs the Nearby devices (Bluetooth) permission."
+        CapabilityRequirement.Accessibility -> tr("Needs the accessibility service enabled in System Settings.")
+        CapabilityRequirement.Shizuku -> tr("Needs Shizuku installed and running.")
+        CapabilityRequirement.WriteSettings -> tr("Needs the Modify system settings permission.")
+        CapabilityRequirement.Overlay -> tr("Needs the display-over-other-apps permission.")
+        CapabilityRequirement.PostNotifications -> tr("Needs notification permission.")
+        CapabilityRequirement.NotificationListener -> tr("Needs notification access.")
+        CapabilityRequirement.Dnd -> tr("Needs Do Not Disturb access.")
+        CapabilityRequirement.AllFiles -> tr("Needs All files access to read files outside the app (e.g. tones in shared storage).")
+        CapabilityRequirement.DeviceAdmin -> tr("Needs Device admin enabled.")
+        CapabilityRequirement.Microphone -> tr("Needs the Microphone permission.")
+        CapabilityRequirement.Location -> tr("Needs the Location permission.")
+        CapabilityRequirement.Bluetooth -> tr("Needs the Nearby devices (Bluetooth) permission.")
     }
 
     /** Short status-pill text for the current state of [req] (granted vs. not). */
     fun statusLabel(req: CapabilityRequirement, met: Boolean): String = when (req) {
         CapabilityRequirement.None -> ""
-        CapabilityRequirement.Accessibility -> if (met) "Accessibility enabled" else "Accessibility off"
-        CapabilityRequirement.Shizuku -> if (met) "Shizuku detected" else "Shizuku not installed"
-        CapabilityRequirement.WriteSettings -> if (met) "Modify settings allowed" else "Modify settings off"
-        CapabilityRequirement.Overlay -> if (met) "Display over apps allowed" else "Display over apps off"
-        CapabilityRequirement.PostNotifications -> if (met) "Notifications allowed" else "Notifications off"
-        CapabilityRequirement.NotificationListener -> if (met) "Notification access on" else "Notification access off"
-        CapabilityRequirement.Dnd -> if (met) "Do Not Disturb access on" else "Do Not Disturb access off"
-        CapabilityRequirement.AllFiles -> if (met) "All files access on" else "All files access off"
-        CapabilityRequirement.DeviceAdmin -> if (met) "Device admin on" else "Device admin off"
-        CapabilityRequirement.Microphone -> if (met) "Microphone allowed" else "Microphone off"
-        CapabilityRequirement.Location -> if (met) "Location allowed" else "Location off"
-        CapabilityRequirement.Bluetooth -> if (met) "Bluetooth allowed" else "Bluetooth off"
+        CapabilityRequirement.Accessibility -> if (met) tr("Accessibility enabled") else tr("Accessibility off")
+        CapabilityRequirement.Shizuku -> if (met) tr("Shizuku detected") else tr("Shizuku not installed")
+        CapabilityRequirement.WriteSettings -> if (met) tr("Modify settings allowed") else tr("Modify settings off")
+        CapabilityRequirement.Overlay -> if (met) tr("Display over apps allowed") else tr("Display over apps off")
+        CapabilityRequirement.PostNotifications -> if (met) tr("Notifications allowed") else tr("Notifications off")
+        CapabilityRequirement.NotificationListener -> if (met) tr("Notification access on") else tr("Notification access off")
+        CapabilityRequirement.Dnd -> if (met) tr("Do Not Disturb access on") else tr("Do Not Disturb access off")
+        CapabilityRequirement.AllFiles -> if (met) tr("All files access on") else tr("All files access off")
+        CapabilityRequirement.DeviceAdmin -> if (met) tr("Device admin on") else tr("Device admin off")
+        CapabilityRequirement.Microphone -> if (met) tr("Microphone allowed") else tr("Microphone off")
+        CapabilityRequirement.Location -> if (met) tr("Location allowed") else tr("Location off")
+        CapabilityRequirement.Bluetooth -> if (met) tr("Bluetooth allowed") else tr("Bluetooth off")
     }
 
     /** Short button text for the fix action. */
     fun fixLabel(req: CapabilityRequirement): String = when (req) {
-        CapabilityRequirement.None -> "Open settings"
-        CapabilityRequirement.Accessibility -> "Enable accessibility"
-        CapabilityRequirement.Shizuku -> "Set up Shizuku"
-        CapabilityRequirement.WriteSettings -> "Allow modify settings"
-        CapabilityRequirement.Overlay -> "Allow display over apps"
-        CapabilityRequirement.NotificationListener -> "Enable notification access"
-        CapabilityRequirement.Dnd -> "Grant Do Not Disturb access"
-        CapabilityRequirement.PostNotifications -> "Grant notification access"
-        CapabilityRequirement.AllFiles -> "Grant All files access"
-        CapabilityRequirement.DeviceAdmin -> "Enable device admin"
-        CapabilityRequirement.Microphone -> "Grant microphone"
-        CapabilityRequirement.Location -> "Grant location"
-        CapabilityRequirement.Bluetooth -> "Grant Bluetooth"
+        CapabilityRequirement.None -> tr("Open settings")
+        CapabilityRequirement.Accessibility -> tr("Enable accessibility")
+        CapabilityRequirement.Shizuku -> tr("Set up Shizuku")
+        CapabilityRequirement.WriteSettings -> tr("Allow modify settings")
+        CapabilityRequirement.Overlay -> tr("Allow display over apps")
+        CapabilityRequirement.NotificationListener -> tr("Enable notification access")
+        CapabilityRequirement.Dnd -> tr("Grant Do Not Disturb access")
+        CapabilityRequirement.PostNotifications -> tr("Grant notification access")
+        CapabilityRequirement.AllFiles -> tr("Grant All files access")
+        CapabilityRequirement.DeviceAdmin -> tr("Enable device admin")
+        CapabilityRequirement.Microphone -> tr("Grant microphone")
+        CapabilityRequirement.Location -> tr("Grant location")
+        CapabilityRequirement.Bluetooth -> tr("Grant Bluetooth")
     }
 
     /** Short noun for a permission, for the run-time block dialog (“needs: Accessibility”). */
     fun shortLabel(req: CapabilityRequirement): String = when (req) {
         CapabilityRequirement.None -> ""
-        CapabilityRequirement.Accessibility -> "Accessibility"
-        CapabilityRequirement.Shizuku -> "Shizuku"
-        CapabilityRequirement.WriteSettings -> "Modify system settings"
-        CapabilityRequirement.Overlay -> "Display over other apps"
-        CapabilityRequirement.PostNotifications -> "Notifications"
-        CapabilityRequirement.NotificationListener -> "Notification access"
-        CapabilityRequirement.Dnd -> "Do Not Disturb access"
-        CapabilityRequirement.AllFiles -> "All files access"
-        CapabilityRequirement.DeviceAdmin -> "Device admin"
-        CapabilityRequirement.Microphone -> "Microphone"
-        CapabilityRequirement.Location -> "Location"
-        CapabilityRequirement.Bluetooth -> "Bluetooth"
+        CapabilityRequirement.Accessibility -> tr("Accessibility")
+        CapabilityRequirement.Shizuku -> tr("Shizuku")
+        CapabilityRequirement.WriteSettings -> tr("Modify system settings")
+        CapabilityRequirement.Overlay -> tr("Display over other apps")
+        CapabilityRequirement.PostNotifications -> tr("Notifications")
+        CapabilityRequirement.NotificationListener -> tr("Notification access")
+        CapabilityRequirement.Dnd -> tr("Do Not Disturb access")
+        CapabilityRequirement.AllFiles -> tr("All files access")
+        CapabilityRequirement.DeviceAdmin -> tr("Device admin")
+        CapabilityRequirement.Microphone -> tr("Microphone")
+        CapabilityRequirement.Location -> tr("Location")
+        CapabilityRequirement.Bluetooth -> tr("Bluetooth")
     }
 
     /**
@@ -182,10 +183,7 @@ object CapabilityState {
     fun blockedDetail(req: CapabilityRequirement, context: Context): String? = when (req) {
         CapabilityRequirement.Accessibility ->
             if (ShiroiKumaAccessibilityService.isEnabledButNotRunning(context)) {
-                "It IS switched on in System Settings — but Android is not running it. That happens " +
-                    "when the service is killed and the system marks it crashed; it will not start " +
-                    "again on its own.\n\nFix: open Accessibility settings below, turn 白い熊 自由作業盤 " +
-                    "OFF and then ON again."
+                tr("It IS switched on in System Settings — but Android is not running it. That happens when the service is killed and the system marks it crashed; it will not start again on its own.\n\nFix: open Accessibility settings below, turn 白い熊 自由作業盤 OFF and then ON again.")
             } else {
                 null
             }

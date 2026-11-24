@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,7 +40,7 @@ internal fun FrameworkIconPickerDialog(onDismiss: () -> Unit, onPick: (String) -
     AlertDialog(
         modifier = dialogBorder(),
         onDismissRequest = onDismiss,
-        title = { Text("System icon") },
+        title = { Text(tr("System icon")) },
         text = {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(56.dp),

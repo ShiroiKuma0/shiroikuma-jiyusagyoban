@@ -14,6 +14,7 @@ import com.opentasker.app.R
 import com.opentasker.core.actions.NotificationActionReceiver
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.shizuku.ShizukuShell
+import com.opentasker.i18n.tr
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -218,7 +219,7 @@ object HuaweiBondWatch {
         }
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CHANNEL_ID, tr(CHANNEL_NAME), NotificationManager.IMPORTANCE_HIGH),
         )
         val seen = if (change.seenMs > 0) hhmm(change.seenMs) else "—"
         val at = hhmm(change.noticedMs)

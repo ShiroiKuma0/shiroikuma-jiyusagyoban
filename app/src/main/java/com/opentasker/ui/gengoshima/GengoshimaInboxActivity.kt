@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -146,7 +147,7 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                     else r.copy(islandId = null, newIslandName = p.new_name.trim(), newIslandRegister = p.new_register.trim(), proposed = 1)
                 },
             )
-        }.onFailure { if (it !is kotlinx.coroutines.CancellationException) problem = "島の提案ができませんでした / no proposal: ${it.message}" }
+        }.onFailure { if (it !is kotlinx.coroutines.CancellationException) problem = tr("島の提案ができませんでした / no proposal: %1\$s", it.message) }
         } finally { proposing = false }
     }
 
@@ -184,9 +185,9 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                 Text("言語島 — 未分類 (${list.size}" + (if (czech > 0) " · CS $czech" else "") + ")", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text(
                     when {
-                        proposing -> "Claude が島を考えています… / Claude is choosing islands…"
-                        selected.isNotEmpty() -> "${selected.size} 文を選択中 / selected"
-                        else -> "島を押すと変更、長押しで複数選択 / tap an island to change it, long-press to select"
+                        proposing -> tr("Claude が島を考えています… / Claude is choosing islands…")
+                        selected.isNotEmpty() -> tr("%1\$s 文を選択中 / selected", selected.size)
+                        else -> tr("島を押すと変更、長押しで複数選択 / tap an island to change it, long-press to select")
                     },
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -197,7 +198,7 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
 
         if (selected.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { picker = PickFor.Selected }) { Text("島を変える / Move") }
+                Button(onClick = { picker = PickFor.Selected }) { Text(tr("島を変える / Move")) }
                 OutlinedButton(onClick = { selected = list.map { it.uuid }.toSet() }) { Text("全選択") }
                 OutlinedButton(onClick = { selected = emptySet() }) { Text("解除") }
             }
@@ -211,15 +212,15 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
         }
 
         filed?.let { n ->
-            Text("$n 文を島に入れました / filed.", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(tr("%1\$s 文を島に入れました / filed.", n), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Button(onClick = onGenerate, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                Text("訳して音声を作る / Translate & voice", fontSize = 18.sp)
+                Text(tr("訳して音声を作る / Translate & voice"), fontSize = 18.sp)
             }
         }
 
         if (rows != null && list.isEmpty() && filed == null) {
             Text(
-                "未分類の文はありません。kxkb で確認した文がここに届きます。\nNothing waiting — sentences reviewed in kxkb arrive here.",
+                tr("未分類の文はありません。kxkb で確認した文がここに届きます。\nNothing waiting — sentences reviewed in kxkb arrive here."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -270,14 +271,14 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                         val current = dao.inbox()
                         db.withTransaction { InboxFiling.file(dao, current) }
                     }.onSuccess { filed = it; selected = emptySet() }
-                        .onFailure { problem = "確定できませんでした / could not file: ${it.message}" }
+                        .onFailure { problem = tr("確定できませんでした / could not file: %1\$s", it.message) }
                 }
             },
             enabled = list.isNotEmpty() && unfiled == 0 && !proposing,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         ) {
             Text(
-                if (unfiled > 0) "島のない文が $unfiled あります / $unfiled without an island" else "すべて確定 / File all",
+                if (unfiled > 0) tr("島のない文が %1\$s あります / %1\$s without an island", unfiled) else tr("すべて確定 / File all"),
                 fontSize = 18.sp,
             )
         }
@@ -332,7 +333,7 @@ private fun IslandPicker(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("島を選ぶ / Choose an island") },
+        title = { Text(tr("島を選ぶ / Choose an island")) },
         text = {
             LazyColumn(Modifier.heightIn(max = 480.dp)) {
                 items(pendingNew, key = { "n${it.first}|${it.second}" }) { (name, register) ->

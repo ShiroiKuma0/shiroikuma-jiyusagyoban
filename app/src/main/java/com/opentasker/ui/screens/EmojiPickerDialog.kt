@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
@@ -47,14 +48,14 @@ internal fun EmojiPickerDialog(initial: String, onDismiss: () -> Unit, onConfirm
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Emoji icon") },
+        title = { Text(tr("Emoji icon")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(16) },
-                    label = { Text("Emoji or characters") },
-                    supportingText = { Text("Use your keyboard's emoji button, or tap one below.") },
+                    label = { Text(tr("Emoji or characters")) },
+                    supportingText = { Text(tr("Use your keyboard's emoji button, or tap one below.")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -83,8 +84,8 @@ internal fun EmojiPickerDialog(initial: String, onDismiss: () -> Unit, onConfirm
             }
         },
         confirmButton = {
-            OutlinedButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text("Use") }
+            OutlinedButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text(tr("Use")) }
         },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }

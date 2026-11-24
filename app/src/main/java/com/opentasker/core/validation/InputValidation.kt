@@ -1,5 +1,6 @@
 package com.opentasker.core.validation
 
+import com.opentasker.i18n.tr
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileConcurrencyPolicy
@@ -28,33 +29,33 @@ object InputValidation {
         val errors = mutableListOf<ValidationError>()
         
         if (profile.name.isBlank()) {
-            errors.add(ValidationError("name", "Profile name cannot be empty"))
+            errors.add(ValidationError("name", tr("Profile name cannot be empty")))
         }
         if (profile.name.length > MAX_NAME_LENGTH) {
-            errors.add(ValidationError("name", "Profile name exceeds $MAX_NAME_LENGTH characters"))
+            errors.add(ValidationError("name", tr("Profile name exceeds %1\$s characters", MAX_NAME_LENGTH)))
         }
         val exitTaskId = profile.exitTaskId
         if (exitTaskId != null && exitTaskId <= 0L) {
-            errors.add(ValidationError("exitTaskId", "Exit task id must be positive"))
+            errors.add(ValidationError("exitTaskId", tr("Exit task id must be positive")))
         }
         // 0 is the one way to say there is no enter task.
         if (profile.enterTaskId < 0) {
-            errors.add(ValidationError("enterTaskId", "Enter task id must not be negative"))
+            errors.add(ValidationError("enterTaskId", tr("Enter task id must not be negative")))
         } else if (profile.enterTaskId == 0L && (exitTaskId == null || exitTaskId <= 0L)) {
-            errors.add(ValidationError("enterTaskId", "An enter or exit task must be set"))
+            errors.add(ValidationError("enterTaskId", tr("An enter or exit task must be set")))
         }
         val fallbackTaskId = profile.fallbackTaskId
         if (fallbackTaskId != null && fallbackTaskId <= 0L) {
-            errors.add(ValidationError("fallbackTaskId", "Fallback task id must be positive"))
+            errors.add(ValidationError("fallbackTaskId", tr("Fallback task id must be positive")))
         }
         if (profile.cooldownSec < 0 || profile.cooldownSec > MAX_COOLDOWN_SEC) {
-            errors.add(ValidationError("cooldownSec", "Cooldown must be between 0 and $MAX_COOLDOWN_SEC seconds"))
+            errors.add(ValidationError("cooldownSec", tr("Cooldown must be between 0 and %1\$s seconds", MAX_COOLDOWN_SEC)))
         }
         if (profile.priority !in MIN_PROFILE_PRIORITY..MAX_PROFILE_PRIORITY) {
             errors.add(
                 ValidationError(
                     "priority",
-                    "Profile priority must be between $MIN_PROFILE_PRIORITY and $MAX_PROFILE_PRIORITY",
+                    tr("Profile priority must be between %1\$s and %2\$s", MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY),
                 ),
             )
         }
@@ -62,7 +63,7 @@ object InputValidation {
             errors.add(
                 ValidationError(
                     "gracePeriodSec",
-                    "Grace period must be between 0 and $MAX_GRACE_PERIOD_SEC seconds",
+                    tr("Grace period must be between 0 and %1\$s seconds", MAX_GRACE_PERIOD_SEC),
                 ),
             )
         }
@@ -72,7 +73,7 @@ object InputValidation {
             errors.add(
                 ValidationError(
                     "maxActiveExecutions",
-                    "Profile active limit must be between $MIN_PROFILE_MAX_ACTIVE and $MAX_PROFILE_MAX_ACTIVE",
+                    tr("Profile active limit must be between %1\$s and %2\$s", MIN_PROFILE_MAX_ACTIVE, MAX_PROFILE_MAX_ACTIVE),
                 ),
             )
         }
@@ -82,19 +83,19 @@ object InputValidation {
             errors.add(
                 ValidationError(
                     "burstLimit",
-                    "Profile burst limit must be between $MIN_PROFILE_BURST_LIMIT and $MAX_PROFILE_BURST_LIMIT",
+                    tr("Profile burst limit must be between %1\$s and %2\$s", MIN_PROFILE_BURST_LIMIT, MAX_PROFILE_BURST_LIMIT),
                 ),
             )
         }
         val expiresAtMs = profile.expiresAtMs
         when (profile.lifetime) {
             ProfileLifetime.UNTIL_DATE -> if (expiresAtMs == null || expiresAtMs <= 0L) {
-                errors.add(ValidationError("expiresAtMs", "An expiry date is required for date-limited profiles"))
+                errors.add(ValidationError("expiresAtMs", tr("An expiry date is required for date-limited profiles")))
             }
             ProfileLifetime.NEVER, ProfileLifetime.ONCE -> Unit
         }
         if (profile.contexts.isEmpty()) {
-            errors.add(ValidationError("contexts", "Profile must have at least one context"))
+            errors.add(ValidationError("contexts", tr("Profile must have at least one context")))
         }
         
         return errors
@@ -104,16 +105,16 @@ object InputValidation {
         val errors = mutableListOf<ValidationError>()
         
         if (task.name.isBlank()) {
-            errors.add(ValidationError("name", "Task name cannot be empty"))
+            errors.add(ValidationError("name", tr("Task name cannot be empty")))
         }
         if (task.name.length > MAX_NAME_LENGTH) {
-            errors.add(ValidationError("name", "Task name exceeds $MAX_NAME_LENGTH characters"))
+            errors.add(ValidationError("name", tr("Task name exceeds %1\$s characters", MAX_NAME_LENGTH)))
         }
         if (task.priority < 0 || task.priority > 10) {
-            errors.add(ValidationError("priority", "Priority must be between 0 and 10"))
+            errors.add(ValidationError("priority", tr("Priority must be between 0 and 10")))
         }
         if (task.actions.isEmpty()) {
-            errors.add(ValidationError("actions", "Task must have at least one action"))
+            errors.add(ValidationError("actions", tr("Task must have at least one action")))
         }
         
         return errors
@@ -123,11 +124,11 @@ object InputValidation {
         val errors = mutableListOf<ValidationError>()
         
         if (action.type.isBlank()) {
-            errors.add(ValidationError("type", "Action type cannot be empty"))
+            errors.add(ValidationError("type", tr("Action type cannot be empty")))
         }
         val label = action.label
         if (label != null && label.length > MAX_NAME_LENGTH) {
-            errors.add(ValidationError("label", "Action label exceeds $MAX_NAME_LENGTH characters"))
+            errors.add(ValidationError("label", tr("Action label exceeds %1\$s characters", MAX_NAME_LENGTH)))
         }
         
         return errors

@@ -2,6 +2,7 @@ package com.opentasker.core.diff
 
 import android.content.res.Resources
 import com.opentasker.app.R
+import com.opentasker.i18n.tr
 
 /** Resolves semantic-diff field labels and stable enum values at the localized UI boundary. */
 interface SemanticDiffStrings {
@@ -63,7 +64,7 @@ private class ResourceSemanticDiffStrings(
                 segment.removePrefix("Parameter "),
             )
         }
-        val resource = PATH_RESOURCES[segment] ?: return segment
+        val resource = PATH_RESOURCES[segment] ?: return tr(segment)
         return resources.getString(resource)
     }
 

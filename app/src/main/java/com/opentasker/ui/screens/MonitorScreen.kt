@@ -80,6 +80,7 @@ import java.util.Date
 import java.util.Locale
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.outcome
+import com.opentasker.i18n.tr
 
 private val GREEN = Color(0xFF00E676)
 private val RED = Color(0xFFFF5252)
@@ -174,20 +175,20 @@ fun MonitorScreen(
                         Dot(statusColor, 14.dp)
                         Text(
                             when {
-                                !running -> "Engine STOPPED"
-                                stale -> "Engine STALLED"
-                                else -> "Engine RUNNING"
+                                !running -> tr("Engine STOPPED")
+                                stale -> tr("Engine STALLED")
+                                else -> tr("Engine RUNNING")
                             },
                             fontWeight = FontWeight.Bold, fontSize = 18.sp, color = statusColor,
                         )
                     }
                     if (stale) {
-                        Text("No tick for ${rel(sinceTick)} — auto-recovering within ~2.5 min.", color = RED, fontSize = 13.sp)
+                        Text(tr("No tick for %1\$s — auto-recovering within ~2.5 min.", rel(sinceTick)), color = RED, fontSize = 13.sp)
                     }
-                    Vital("Last tick", if (lastTick <= 0L) "—" else "${rel(sinceTick)} ago", statusColor)
-                    Vital("Uptime", if (startedAt <= 0L) "—" else rel(now - startedAt), null)
-                    Vital("Overlays on screen", overlays.size.toString(), if (overlays.isEmpty()) AMBER else GREEN)
-                    Vital("Enabled profiles", enabled.size.toString(), null)
+                    Vital(tr("Last tick"), if (lastTick <= 0L) "—" else tr("%1\$s ago", rel(sinceTick)), statusColor)
+                    Vital(tr("Uptime"), if (startedAt <= 0L) "—" else rel(now - startedAt), null)
+                    Vital(tr("Overlays on screen"), overlays.size.toString(), if (overlays.isEmpty()) AMBER else GREEN)
+                    Vital(tr("Enabled profiles"), enabled.size.toString(), null)
                 }
             }
         }
@@ -195,17 +196,15 @@ fun MonitorScreen(
         // --- live now: the one honest list of what this app currently has up, each row stoppable. Same
         //     data the shutdown report shows, deliberately — but available without exiting, which is
         //     when you actually want to look at something that shouldn't be running. ---
-        item { FoldHeader("Live now (${live.size})", openLive) { toggle("live") } }
+        item { FoldHeader(tr("Live now (%1\$s)", live.size), openLive) { toggle("live") } }
         if (openLive) {
             item {
                 Hint(
-                    "In-flight tasks, scenes, bubbles and panels — everything the app is holding open right " +
-                        "now, with the engine itself at the top. Tap ✕ to stop one. After a teardown this " +
-                        "should be empty except the engine; anything else left here is a leak.",
+                    tr("In-flight tasks, scenes, bubbles and panels — everything the app is holding open right now, with the engine itself at the top. Tap ✕ to stop one. After a teardown this should be empty except the engine; anything else left here is a leak."),
                 )
             }
             if (live.isEmpty()) {
-                item { Hint("Nothing is running — not even the engine.") }
+                item { Hint(tr("Nothing is running — not even the engine.")) }
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
@@ -223,9 +222,9 @@ fun MonitorScreen(
                                 maxLines = 1,
                                 modifier = Modifier.weight(1f),
                             )
-                            Text("${entry.kind.title} · ${entry.detail}", color = role(UiRole.LIST_NOTE), fontSize = 13.sp)
+                            Text("${tr(entry.kind.title)} · ${entry.detail}", color = role(UiRole.LIST_NOTE), fontSize = 13.sp)
                             IconButton(onClick = { entry.stop(context) }) {
-                                Icon(Icons.Filled.Close, contentDescription = "Stop ${entry.label}", tint = RED)
+                                Icon(Icons.Filled.Close, contentDescription = tr("Stop %1\$s", entry.label), tint = RED)
                             }
                         }
                     }
@@ -255,7 +254,7 @@ fun MonitorScreen(
                     )
                     Spacer(Modifier.size(4.dp))
                     Text(
-                        "Run on start",
+                        tr("Run on start"),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
@@ -265,13 +264,13 @@ fun MonitorScreen(
                 }
                 if (openRunStart) {
                     Text(
-                        "These run automatically on every fresh engine start (after an app update, reboot, or auto-recovery), so your overlays/state come back without running 起動 by hand — add your master 起動完了 ⇨ 起動.",
+                        tr("These run automatically on every fresh engine start (after an app update, reboot, or auto-recovery), so your overlays/state come back without running 起動 by hand — add your master 起動完了 ⇨ 起動."),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                     )
                 }
                 if (autoTasks.isEmpty()) {
-                    Text("Nothing set to auto-run.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(tr("Nothing set to auto-run."), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
                 autoTasks.forEach { t ->
                     Row(
@@ -282,14 +281,14 @@ fun MonitorScreen(
                         Dot(AMBER, 8.dp)
                         Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
                         IconButton(onClick = { AutoStartSettings.remove(context, t.name) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
+                            Icon(Icons.Filled.Close, contentDescription = tr("Remove"), tint = RED)
                         }
                     }
                 }
                 TextButton(onClick = { pickerFor = "start" }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.size(4.dp))
-                    Text("Add task…")
+                    Text(tr("Add task…"))
                 }
             }
         }
@@ -315,7 +314,7 @@ fun MonitorScreen(
                     )
                     Spacer(Modifier.size(4.dp))
                     Text(
-                        "Run on exit",
+                        tr("Run on exit"),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
@@ -325,16 +324,14 @@ fun MonitorScreen(
                 }
                 if (openRunExit) {
                     Text(
-                        "These run — in order, up to 30s each — when you pick “Exit app fully” from the top-bar " +
-                            "⋮ menu, before anything is forced down. Add your master teardown (e.g. 起動完了 ⇨ 終了). " +
-                            "Whatever is still running afterwards is listed for you, and written to the run log.",
+                        tr("These run — in order, up to 30s each — when you pick “Exit app fully” from the top-bar ⋮ menu, before anything is forced down. Add your master teardown (e.g. 起動完了 ⇨ 終了). Whatever is still running afterwards is listed for you, and written to the run log."),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                     )
                 }
                 if (exitTasks.isEmpty()) {
                     Text(
-                        "Nothing set to run on exit — the shutdown will just force everything down.",
+                        tr("Nothing set to run on exit — the shutdown will just force everything down."),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                     )
@@ -348,14 +345,14 @@ fun MonitorScreen(
                         Dot(AMBER, 8.dp)
                         Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
                         IconButton(onClick = { ShutdownSettings.remove(context, t.name) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
+                            Icon(Icons.Filled.Close, contentDescription = tr("Remove"), tint = RED)
                         }
                     }
                 }
                 TextButton(onClick = { pickerFor = "exit" }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.size(4.dp))
-                    Text("Add task…")
+                    Text(tr("Add task…"))
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
                 // Boot behaviour lives here because it is the other half of the same question: does the
@@ -366,12 +363,12 @@ fun MonitorScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Start engine on boot", color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp)
+                        Text(tr("Start engine on boot"), color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp)
                         Text(
                             if (bootStart) {
-                                "On — a reboot starts the engine, and lifts a shutdown."
+                                tr("On — a reboot starts the engine, and lifts a shutdown.")
                             } else {
-                                "Off — after a reboot nothing runs until you open the app."
+                                tr("Off — after a reboot nothing runs until you open the app.")
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
@@ -388,18 +385,18 @@ fun MonitorScreen(
         val runWindow = runLogs.sortedByDescending { it.timestamp }.take(500)
         val taskAgg = runWindow
             .groupBy { it.taskName.ifBlank { "task #${it.taskId}" } }
-            .map { (name, runs) ->
+            .map { (_, runs) ->
                 // Count real failures only. A Skipped run (collision / admission gate) and a Cancelled
                 // one both store success = false, so the raw flag reddened a task row for runs that
                 // never started — exactly what a mid-drag slider skip produces.
-                TaskActivity(name, runs.size, runs.maxOf { it.timestamp }, runs.count { it.outcome() == RunLogOutcome.Failed })
+                TaskActivity(runs.first().taskName.ifBlank { tr("task #%1\$s", runs.first().taskId) }, runs.size, runs.maxOf { it.timestamp }, runs.count { it.outcome() == RunLogOutcome.Failed })
             }
             .sortedByDescending { it.lastAt }
-        item { FoldHeader("Task activity (${taskAgg.size} task${if (taskAgg.size == 1) "" else "s"})", openRuns) { toggle("runs") } }
+        item { FoldHeader(if (taskAgg.size == 1) tr("Task activity (1 task)") else tr("Task activity (%1\$s tasks)", taskAgg.size), openRuns) { toggle("runs") } }
         if (openRuns) {
-            item { Hint("Each task collapsed across the last ${runWindow.size} runs: how many times it fired and when it last ran. Green = all OK; red = at least one run failed.") }
+            item { Hint(tr("Each task collapsed across the last %1\$s runs: how many times it fired and when it last ran. Green = all OK; red = at least one run failed.", runWindow.size)) }
             if (taskAgg.isEmpty()) {
-                item { Hint("No task runs recorded yet.") }
+                item { Hint(tr("No task runs recorded yet.")) }
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
@@ -407,7 +404,7 @@ fun MonitorScreen(
                         StatusRow(
                             color = if (a.fails > 0) RED else GREEN,
                             name = a.name,
-                            detail = "${a.count}× · last ${rel(now - a.lastAt)} ago" + if (a.fails > 0) " · ${a.fails} failed" else "",
+                            detail = if (a.fails > 0) tr("%1\$s× · last %2\$s ago · %3\$s failed", a.count, rel(now - a.lastAt), a.fails) else tr("%1\$s× · last %2\$s ago", a.count, rel(now - a.lastAt)),
                             detailColor = if (a.fails > 0) RED else role(UiRole.LIST_NOTE),
                             vpad = 0.dp,
                         )
@@ -419,25 +416,25 @@ fun MonitorScreen(
         // --- widget pulls: which placed widgets the last widget.refresh re-rendered (pull vs static) ---
         val widgetEntries = WidgetRefreshLog.entries
         val widgetAt = WidgetRefreshLog.lastAt
-        item { FoldHeader("Widget pulls — last tick (${widgetEntries.size})", openWidgets) { toggle("widgets") } }
+        item { FoldHeader(tr("Widget pulls — last tick (%1\$s)", widgetEntries.size), openWidgets) { toggle("widgets") } }
         if (openWidgets) {
-            item { Hint("The per-minute tick runs Refresh Widgets, re-rendering every placed widget. A “pull” widget (template-bound, green) re-reads globals each tick; a “static” one (grey) keeps a fixed layout and never updates — that's why a clock/battery would stay frozen.") }
+            item { Hint(tr("The per-minute tick runs Refresh Widgets, re-rendering every placed widget. A “pull” widget (template-bound, green) re-reads globals each tick; a “static” one (grey) keeps a fixed layout and never updates — that's why a clock/battery would stay frozen.")) }
             if (widgetAt == 0L) {
-                item { Hint("No Refresh Widgets has run this session yet. If the clock/battery stay stale, the per-minute tick isn't calling it — check the clock task fired under Recent task runs above.") }
+                item { Hint(tr("No Refresh Widgets has run this session yet. If the clock/battery stay stale, the per-minute tick isn't calling it — check the clock task fired under Recent task runs above.")) }
             } else {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
                         StatusRow(
                             color = if (running) GREEN else GREY,
-                            name = "Last pull",
-                            detail = "${rel(now - widgetAt)} ago · ${widgetEntries.count { it.isPull }} pull / ${widgetEntries.count { !it.isPull }} static",
+                            name = tr("Last pull"),
+                            detail = tr("%1\$s ago · %2\$s pull / %3\$s static", rel(now - widgetAt), widgetEntries.count { it.isPull }, widgetEntries.count { !it.isPull }),
                             vpad = 0.dp,
                         )
                         widgetEntries.forEach { e ->
                             StatusRow(
                                 color = if (e.isPull) GREEN else GREY,
                                 name = e.label,
-                                detail = if (e.isPull) "pull" else "static — won't update",
+                                detail = if (e.isPull) tr("pull") else tr("static — won't update"),
                                 vpad = 0.dp,
                             )
                         }
@@ -446,23 +443,23 @@ fun MonitorScreen(
             }
         }
 
-        item { FoldHeader("On-screen overlays (${overlays.size})", openOverlays) { toggle("overlays") } }
+        item { FoldHeader(tr("On-screen overlays (%1\$s)", overlays.size), openOverlays) { toggle("overlays") } }
         if (openOverlays) {
             if (overlays.isEmpty()) {
-                item { Hint("Nothing is drawn on screen. After an app restart the overlays are gone until re-shown — run 起動完了 ⇨ 起動 (or set it to auto-run below).") }
+                item { Hint(tr("Nothing is drawn on screen. After an app restart the overlays are gone until re-shown — run 起動完了 ⇨ 起動 (or set it to auto-run below).")) }
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
-                    overlays.forEach { name -> StatusRow(GREEN, name, "shown", vpad = 0.dp) }
+                    overlays.forEach { name -> StatusRow(GREEN, name, tr("shown"), vpad = 0.dp) }
                 }
             }
         }
 
-        item { FoldHeader("Enabled profiles (${enabled.size})", openProfiles) { toggle("profiles") } }
+        item { FoldHeader(tr("Enabled profiles (%1\$s)", enabled.size), openProfiles) { toggle("profiles") } }
         if (openProfiles) {
-            item { Hint("Armed triggers. “ran” means the trigger fired (e.g. data updated) — it does NOT mean its overlay is on screen; that's the “On-screen overlays” section above.") }
+            item { Hint(tr("Armed triggers. “ran” means the trigger fired (e.g. data updated) — it does NOT mean its overlay is on screen; that's the “On-screen overlays” section above.")) }
             if (enabled.isEmpty()) {
-                item { Hint("No enabled profiles — nothing is being watched.") }
+                item { Hint(tr("No enabled profiles — nothing is being watched.")) }
             }
             // Grey, not green: a trigger firing is not the same as its overlay being drawn (the green
             // "fired" misread as "working" when the 電池線 line was actually gone). Red only if the
@@ -475,7 +472,7 @@ fun MonitorScreen(
                         StatusRow(
                             color = if (!running) RED else GREY,
                             name = p.name,
-                            detail = if (fired == null) "idle · not run yet" else "ran ${rel(ago)} ago",
+                            detail = if (fired == null) tr("idle · not run yet") else tr("ran %1\$s ago", rel(ago)),
                             vpad = 0.dp,
                         )
                     }
@@ -483,19 +480,19 @@ fun MonitorScreen(
             }
         }
 
-        item { FoldHeader("History", openHistory) { toggle("history") } }
+        item { FoldHeader(tr("History"), openHistory) { toggle("history") } }
         if (openHistory) {
             if (events.isEmpty()) {
-                item { Hint("No restarts or recoveries recorded yet.") }
+                item { Hint(tr("No restarts or recoveries recorded yet.")) }
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
                     events.forEach { e ->
                         val (label, color) = when (e.kind) {
-                            EngineHeartbeat.HeartbeatEvent.Kind.STARTED -> "Engine started" to GREEN
-                            EngineHeartbeat.HeartbeatEvent.Kind.REARMED -> "Re-armed — engine had died for ${rel(e.staleMs)}" to RED
-                            EngineHeartbeat.HeartbeatEvent.Kind.RESURRECTED -> "Resurrected — process had been killed" to AMBER
-                            EngineHeartbeat.HeartbeatEvent.Kind.MATCHER_RESTART -> "Recovered “${e.label}” (matcher restarted)" to AMBER
+                            EngineHeartbeat.HeartbeatEvent.Kind.STARTED -> tr("Engine started") to GREEN
+                            EngineHeartbeat.HeartbeatEvent.Kind.REARMED -> tr("Re-armed — engine had died for %1\$s", rel(e.staleMs)) to RED
+                            EngineHeartbeat.HeartbeatEvent.Kind.RESURRECTED -> tr("Resurrected — process had been killed") to AMBER
+                            EngineHeartbeat.HeartbeatEvent.Kind.MATCHER_RESTART -> tr("Recovered “%1\$s” (matcher restarted)", e.label) to AMBER
                         }
                         StatusRow(color, label, CLOCK_FMT.format(Date(e.atMs)), detailColor = MaterialTheme.colorScheme.onSurfaceVariant, vpad = 0.dp)
                     }
@@ -506,10 +503,10 @@ fun MonitorScreen(
         // --- device state: every super-global (%ALLCAPS), refreshed each second — so a stuck %CHARGING
         // or a stale %BATT (vs the real battery) is visible at a glance ---
         val globals = PersistentGlobalScope.snapshot(0L).toSortedMap()
-        item { FoldHeader("Device state — globals (${globals.size})", openGlobals) { toggle("globals") } }
+        item { FoldHeader(tr("Device state — globals (%1\$s)", globals.size), openGlobals) { toggle("globals") } }
         if (openGlobals) {
             if (globals.isEmpty()) {
-                item { Hint("No globals set yet.") }
+                item { Hint(tr("No globals set yet.")) }
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(themePrefs.monitorRowPadDp.dp)) {
@@ -557,14 +554,14 @@ fun MonitorScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            if (forExit) "Run on exit — pick a task" else "Run on start — pick a task",
+                            if (forExit) tr("Run on exit — pick a task") else tr("Run on start — pick a task"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = role(UiRole.DIALOG_TITLE),
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = { expanded = if (allOpen) emptySet() else groups.map { it.first }.toSet() }) {
-                            Text(if (allOpen) "Collapse all" else "Expand all")
+                            Text(if (allOpen) tr("Collapse all") else tr("Expand all"))
                         }
                     }
                     LazyColumn(Modifier.heightIn(max = 400.dp)) {
@@ -584,7 +581,8 @@ fun MonitorScreen(
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
                                     Spacer(Modifier.size(6.dp))
-                                    Text(name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                                    // The Unfiled bucket (tasks of no known project) is our heading; a project's name is the user's.
+                                    Text(if (ts.first().projectId !in knownIds) tr(name) else name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                                     Text("${ts.size}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                                 }
                             }
@@ -610,7 +608,7 @@ fun MonitorScreen(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        OutlinedButton(onClick = { pickerFor = null }) { Text("Close") }
+                        OutlinedButton(onClick = { pickerFor = null }) { Text(tr("Close")) }
                     }
                 }
             }
@@ -669,8 +667,8 @@ private fun Hint(text: String) {
 private fun rel(ms: Long): String {
     val s = ms / 1000
     return when {
-        s < 60 -> "${s}s"
-        s < 3600 -> "${s / 60}m ${s % 60}s"
-        else -> "${s / 3600}h ${(s % 3600) / 60}m"
+        s < 60 -> tr("%1\$ss", s)
+        s < 3600 -> tr("%1\$sm %2\$ss", s / 60, s % 60)
+        else -> tr("%1\$sh %2\$sm", s / 3600, (s % 3600) / 60)
     }
 }

@@ -3,6 +3,7 @@ package com.opentasker.core.scripting
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import com.opentasker.i18n.tr
 
 object TermuxScriptBackend {
     const val ACTION_ID = "script.termux.run"
@@ -40,10 +41,10 @@ object TermuxScriptBackend {
             else -> TermuxScriptState.Ready
         }
         val summary = when (state) {
-            TermuxScriptState.TermuxMissing -> "Termux is not installed."
-            TermuxScriptState.VersionUnsupported -> "Termux $MINIMUM_RESULT_VERSION or newer is required for bounded results."
-            TermuxScriptState.PermissionRequired -> "Termux is installed, but OpenTasker lacks RUN_COMMAND permission."
-            TermuxScriptState.Ready -> "Termux is installed and RUN_COMMAND permission is granted."
+            TermuxScriptState.TermuxMissing -> tr("Termux is not installed.")
+            TermuxScriptState.VersionUnsupported -> tr("Termux %1\$s or newer is required for bounded results.", MINIMUM_RESULT_VERSION)
+            TermuxScriptState.PermissionRequired -> tr("Termux is installed, but OpenTasker lacks RUN_COMMAND permission.")
+            TermuxScriptState.Ready -> tr("Termux is installed and RUN_COMMAND permission is granted.")
         }
         return TermuxScriptStatus(
             state = state,
@@ -55,7 +56,7 @@ object TermuxScriptBackend {
         if (actionId == ACTION_ID) {
             TermuxScriptHint(
                 actionId = actionId,
-                message = "Requires Termux 0.109 or newer with RUN_COMMAND permission.",
+                message = tr("Requires Termux 0.109 or newer with RUN_COMMAND permission."),
             )
         } else {
             null

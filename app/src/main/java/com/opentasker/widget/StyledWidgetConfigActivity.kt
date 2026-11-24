@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
 import androidx.compose.material3.MaterialTheme
@@ -89,19 +90,19 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                         Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text("Configure widget", style = MaterialTheme.typography.titleLarge)
+                        Text(tr("Configure widget"), style = MaterialTheme.typography.titleLarge)
                         OutlinedTextField(
                             value = name, onValueChange = { name = it },
-                            label = { Text("Widget name") },
-                            supportingText = { Text("Tasks target this with the Set Widget action.") },
+                            label = { Text(tr("Widget name")) },
+                            supportingText = { Text(tr("Tasks target this with the Set Widget action.")) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
                         Box(Modifier.fillMaxWidth()) {
                             OutlinedButton(onClick = { tapMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (tapTask.isBlank()) "Tap task: none" else "Tap task: $tapTask")
+                                Text(if (tapTask.isBlank()) tr("Tap task: none") else tr("Tap task: %1\$s", tapTask))
                             }
                             ThemedDropdownMenu(expanded = tapMenu, onDismissRequest = { tapMenu = false }) {
-                                DropdownMenuItem(text = { Text("None") }, onClick = { tapTask = ""; tapMenu = false }, choice = true)
+                                DropdownMenuItem(text = { Text(tr("None")) }, onClick = { tapTask = ""; tapMenu = false }, choice = true)
                                 taskNames.forEach { n ->
                                     DropdownMenuItem(text = { Text(n) }, onClick = { tapTask = n; tapMenu = false }, choice = true)
                                 }
@@ -109,10 +110,10 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                         }
                         Box(Modifier.fillMaxWidth()) {
                             OutlinedButton(onClick = { templateMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (template.isBlank()) "Content: Custom layout" else "Content: template \"$template\"")
+                                Text(if (template.isBlank()) tr("Content: Custom layout") else tr("Content: template \"%1\$s\"", template))
                             }
                             ThemedDropdownMenu(expanded = templateMenu, onDismissRequest = { templateMenu = false }) {
-                                DropdownMenuItem(text = { Text("Custom layout (edit below)") }, onClick = { template = ""; templateMenu = false }, choice = true)
+                                DropdownMenuItem(text = { Text(tr("Custom layout (edit below)")) }, onClick = { template = ""; templateMenu = false }, choice = true)
                                 templateNames.forEach { n ->
                                     DropdownMenuItem(text = { Text(n) }, onClick = { template = n; templateMenu = false }, choice = true)
                                 }
@@ -120,25 +121,25 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                         }
                         if (template.isBlank()) {
                             OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Edit layout visually")
+                                Text(tr("Edit layout visually"))
                             }
                             OutlinedTextField(
                                 value = layout, onValueChange = { layout = it },
-                                label = { Text("Layout (JSON, advanced)") },
+                                label = { Text(tr("Layout (JSON, advanced)")) },
                                 minLines = 4, modifier = Modifier.fillMaxWidth(),
                             )
                         } else {
                             Text(
-                                "This widget renders the \"$template\" template, re-expanded by the Refresh Widgets action (e.g. the per-minute clock tick).",
+                                tr("This widget renders the \"%1\$s\" template, re-expanded by the Refresh Widgets action (e.g. the per-minute clock tick).", template),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { save(name, template, tapTask, layout) }, modifier = Modifier.fillMaxWidth(0.6f)) {
-                                Text("Add widget")
+                                Text(tr("Add widget"))
                             }
-                            OutlinedButton(onClick = { finish() }) { Text("Cancel") }
+                            OutlinedButton(onClick = { finish() }) { Text(tr("Cancel")) }
                         }
                     }
                 }

@@ -34,6 +34,7 @@ import com.opentasker.core.platform.AudioUsageEligibility
 import com.opentasker.core.power.ShellResult
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.power.ShizukuShellRunner
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -154,8 +155,8 @@ class BluetoothAudioAction : DeclaredAction(ActionCatalog.require("bluetooth.aud
             return ActionResult.Success
         }
         if (!adapter.isEnabled) {
-            return if (mode == "check") answer("0", "NOT CONNECTED — Bluetooth is off")
-            else answer("failed: Bluetooth is off", "$mode FAILED — Bluetooth is off")
+            return if (mode == "check") answer("0", tr("NOT CONNECTED — Bluetooth is off"))
+            else answer("failed: Bluetooth is off", tr("%1\$s FAILED — Bluetooth is off", mode))
         }
         val device = adapter.getRemoteDevice(address)
         label = runCatching { device.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: address
@@ -166,17 +167,17 @@ class BluetoothAudioAction : DeclaredAction(ActionCatalog.require("bluetooth.aud
             fun connected() = profiles.any { it.getConnectionState(device) == BluetoothProfile.STATE_CONNECTED }
             val now = connected()
             val wantConnected = when (mode) {
-                "check" -> return answer(if (now) "1" else "0", if (now) "CONNECTED" else "NOT CONNECTED")
+                "check" -> return answer(if (now) "1" else "0", if (now) tr("CONNECTED") else tr("NOT CONNECTED"))
                 "connect" -> true
                 "disconnect" -> false
                 else -> !now
             }
             if (now == wantConnected) {
-                return if (now) answer("connected", "already CONNECTED") else answer("disconnected", "not connected — nothing to do")
+                return if (now) answer("connected", tr("already CONNECTED")) else answer("disconnected", tr("not connected — nothing to do"))
             }
             val verb = if (wantConnected) "connect" else "disconnect"
             if (wantConnected && device.bondState != BluetoothDevice.BOND_BONDED) {
-                return answer("failed: not paired with this phone", "connect FAILED — not paired with this phone")
+                return answer("failed: not paired with this phone", tr("connect FAILED — not paired with this phone"))
             }
             val asked = profiles.map { p ->
                 runCatching { p.javaClass.getMethod(verb, BluetoothDevice::class.java).invoke(p, device) as? Boolean ?: false }
@@ -185,7 +186,7 @@ class BluetoothAudioAction : DeclaredAction(ActionCatalog.require("bluetooth.aud
                 val why = asked.firstNotNullOfOrNull { it.exceptionOrNull() }
                     ?.let { (it.cause ?: it).let { e -> e.javaClass.simpleName + (e.message?.let { m -> ": $m" } ?: "") } }
                     ?: "the system refused"
-                return answer("failed: $why", "$verb FAILED — $why")
+                return answer("failed: $why", tr("%1\$s FAILED — %2\$s", verb, why))
             }
             val waitS = (args["wait"]?.toLongOrNull() ?: 10L).coerceIn(1L, 60L)
             val moved = withTimeoutOrNull(waitS * 1000L) {
@@ -193,9 +194,9 @@ class BluetoothAudioAction : DeclaredAction(ActionCatalog.require("bluetooth.aud
                 true
             } ?: false
             return when {
-                !moved -> answer("asked", "$verb asked — no change after $waitS s")
-                wantConnected -> answer("connected", "CONNECTED")
-                else -> answer("disconnected", "DISCONNECTED")
+                !moved -> answer("asked", tr("%1\$s asked — no change after %2\$s s", verb, waitS))
+                wantConnected -> answer("connected", tr("CONNECTED"))
+                else -> answer("disconnected", tr("DISCONNECTED"))
             }
         } finally {
             a2dp?.let { adapter.closeProfileProxy(BluetoothProfile.A2DP, it) }

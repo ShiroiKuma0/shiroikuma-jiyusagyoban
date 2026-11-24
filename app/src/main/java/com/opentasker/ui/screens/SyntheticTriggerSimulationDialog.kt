@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -237,7 +238,7 @@ private fun SyntheticContextCard(result: SyntheticContextResult) {
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        stringResource(R.string.synthetic_trigger_template, result.template.description),
+                        stringResource(R.string.synthetic_trigger_template, tr(result.template.description)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -275,11 +276,11 @@ private fun SyntheticContextCard(result: SyntheticContextResult) {
 }
 
 private fun contextTypeLabel(type: ContextType): String = when (type) {
-    ContextType.APPLICATION -> "Application"
-    ContextType.TIME -> "Time"
-    ContextType.DAY -> "Day"
-    ContextType.LOCATION -> "Location"
-    ContextType.STATE -> "Device state"
-    ContextType.EVENT -> "Event"
-    ContextType.PLUGIN -> "Plugin condition"
+    ContextType.APPLICATION -> tr("Application")
+    ContextType.TIME -> tr("Time")
+    ContextType.DAY -> tr("Day")
+    ContextType.LOCATION -> tr("Location")
+    ContextType.STATE -> tr("Device state")
+    ContextType.EVENT -> tr("Event")
+    ContextType.PLUGIN -> tr("Plugin condition")
 }

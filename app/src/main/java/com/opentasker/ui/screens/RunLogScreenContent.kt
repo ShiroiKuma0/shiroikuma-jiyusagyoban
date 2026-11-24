@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -130,8 +131,8 @@ internal fun RunLogScreenContent(
         if (latestFailure != null) {
             item {
                 InlineNotice(
-                    title = "Last failure: ${latestFailure.taskName}",
-                    body = latestFailure.message.ifBlank { "Tap the matching entry below for the full trace." },
+                    title = tr("Last failure: %1\$s", latestFailure.taskName),
+                    body = latestFailure.message.ifBlank { tr("Tap the matching entry below for the full trace.") },
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -248,13 +249,13 @@ private fun RunLogRetentionCard(
                                     Spacer(Modifier.size(16.dp))
                                 }
                                 Text(
-                                    option.label,
+                                    tr(option.label),
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 )
                             }
                             Text(
-                                option.description,
+                                tr(option.description),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,
@@ -377,7 +378,7 @@ private fun RunLogFilterCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
                     RunLogFilterChip(
-                        label = filter.label,
+                        label = tr(filter.label),
                         selected = statusFilter == filter,
                         onClick = { onStatusFilterChange(filter) },
                     )
@@ -457,9 +458,9 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
                 }
                 StatusPill(
                     when {
-                        failures > 0 -> "$failures failed"
-                        skipped > 0 -> "$skipped skipped"
-                        else -> "Healthy"
+                        failures > 0 -> tr("%1\$s failed", failures)
+                        skipped > 0 -> tr("%1\$s skipped", skipped)
+                        else -> tr("Healthy")
                     },
                     when {
                         failures > 0 -> MaterialTheme.colorScheme.error
@@ -476,7 +477,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
             }
             latest?.let {
                 Text(
-                    "Latest: ${it.taskName}",
+                    tr("Latest: %1\$s", it.taskName),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -510,7 +511,7 @@ private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, 
         RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
     }
     val sourceText = entry.source?.let { key ->
-        val name = RunLogSource.displayName(key)
+        val name = tr(RunLogSource.displayName(key))
         entry.sourceLabel?.let { "$name: $it" } ?: name
     } ?: diagnostics.source
     Card(
@@ -583,7 +584,7 @@ private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, 
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill(outcome.label, accent) }
+                item { StatusPill(tr(outcome.label), accent) }
                 item { StatusPill("${entry.durationMs} ms", accent) }
             }
             Column(Modifier.fillMaxWidth()) {
@@ -633,12 +634,12 @@ private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, 
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            entry.heldPolicy?.let { "Held — refused by $it" } ?: "Held",
+                            entry.heldPolicy?.let { tr("Held — refused by %1\$s", it) } ?: tr("Held"),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(enabled = !runBusy, onClick = { onReplayHeld(entry) }) { Text("Replay") }
+                        TextButton(enabled = !runBusy, onClick = { onReplayHeld(entry) }) { Text(tr("Replay")) }
                     }
                 }
             }
@@ -656,7 +657,7 @@ internal fun runLogTraceTitle(trace: RunLogActionDiagnostic): String? =
 
 @Composable
 private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
-    val title = runLogTraceTitle(trace) ?: trace.label
+    val title = runLogTraceTitle(trace)?.let { tr(it) } ?: trace.label
     val color = when (trace.status) {
         ActionTraceStatus.SUCCESS -> MaterialTheme.colorScheme.primary
         ActionTraceStatus.FAILURE -> MaterialTheme.colorScheme.error
@@ -668,7 +669,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
     ) {
-        StatusPill(trace.status.readableName(), color)
+        StatusPill(tr(trace.status.readableName()), color)
         Column(Modifier.weight(1f)) {
             Text(
                 stringResource(R.string.run_log_trace_indexed, trace.index + 1, title),
@@ -685,7 +686,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             )
             trace.argumentSummary?.let { summary ->
                 Text(
-                    "Expanded: $summary",
+                    tr("Expanded: %1\$s", summary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -695,7 +696,8 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             if (trace.templateWarningCount > 0) {
                 Spacer(Modifier.height(4.dp))
                 StatusPill(
-                    "${trace.templateWarningCount} template warning${plural(trace.templateWarningCount)}",
+                    if (trace.templateWarningCount == 1) tr("1 template warning")
+                    else tr("%1\$s template warnings", trace.templateWarningCount),
                     MaterialTheme.colorScheme.error,
                 )
             }
@@ -766,7 +768,7 @@ private fun ExpressionDebugger(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    "${expressions.size} expression${plural(expressions.size)}",
+                    if (expressions.size == 1) tr("1 expression") else tr("%1\$s expressions", expressions.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -813,7 +815,7 @@ private fun ExpressionDebugger(
             }
             if (!expanded && expressions.size > 3) {
                 Text(
-                    "${expressions.size - 3} more",
+                    tr("%1\$s more", expressions.size - 3),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -65,6 +65,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.transfer.ItemConflictStrategy
 import com.opentasker.core.transfer.ProjectImportChoice
+import com.opentasker.i18n.tr
 import com.opentasker.widget.WidgetTemplate
 
 /** The two synthetic top-level folders that hold items with no (nameable) project. */
@@ -282,7 +283,7 @@ internal fun ImportReviewScreen(
         ) {
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Text(
-                    "Review import",
+                    tr("Review import"),
                     style = MaterialTheme.typography.headlineSmall,
                     fontSize = prefs.importHeaderSp.sp,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -302,7 +303,7 @@ internal fun ImportReviewScreen(
                     if (warnings.isNotEmpty()) {
                         item(key = "warnings") {
                             ImportWarnNotice(
-                                title = "Warnings",
+                                title = tr("Warnings"),
                                 body = warnings.joinToString("\n"),
                                 color = if (plan.canImport) MaterialTheme.colorScheme.tertiary
                                 else MaterialTheme.colorScheme.error,
@@ -313,9 +314,9 @@ internal fun ImportReviewScreen(
                     if (!plan.canImport) {
                         item(key = "cannot-import") {
                             InlineNotice(
-                                title = "Cannot import",
+                                title = tr("Cannot import"),
                                 body = plan.warnings.joinToString("\n")
-                                    .ifBlank { "Import is not compatible with this build." },
+                                    .ifBlank { tr("Import is not compatible with this build.") },
                                 color = MaterialTheme.colorScheme.error,
                             )
                         }
@@ -325,16 +326,16 @@ internal fun ImportReviewScreen(
                     item(key = "global-controls") {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                "Items that already exist",
+                                tr("Items that already exist"),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontSize = prefs.importSectionSp.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             StrategyChoice(
                                 options = listOf(
-                                    ItemConflictStrategy.OVERWRITE_DELETE to "Overwrite in place",
-                                    ItemConflictStrategy.RENAME to "Keep both (rename new)",
-                                    ItemConflictStrategy.OVERWRITE_BACKUP to "Overwrite + backup (rename old)",
+                                    ItemConflictStrategy.OVERWRITE_DELETE to tr("Overwrite in place"),
+                                    ItemConflictStrategy.RENAME to tr("Keep both (rename new)"),
+                                    ItemConflictStrategy.OVERWRITE_BACKUP to tr("Overwrite + backup (rename old)"),
                                 ),
                                 selected = itemStrategy,
                                 onSelect = { itemStrategy = it },
@@ -408,7 +409,7 @@ internal fun ImportReviewScreen(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
+                    OutlinedButton(enabled = !busy, onClick = onCancel) { Text(tr("Cancel")) }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         enabled = plan.canImport && !busy,
@@ -421,7 +422,7 @@ internal fun ImportReviewScreen(
                             onImport(itemStrategy, overrides.toMap(), effectiveChoices)
                         },
                     ) {
-                        Text(if (busy) "Importing…" else "Import")
+                        Text(if (busy) tr("Importing…") else tr("Import"))
                     }
                 }
             }
@@ -494,7 +495,8 @@ private fun FolderHeader(
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                folder.name,
+                // The synthetic Unfiled / Variables headings are ours; a project's name is the user's.
+                if (folder.kind == FolderKind.SPECIAL) tr(folder.name) else folder.name,
                 style = MaterialTheme.typography.titleMedium,
                 fontSize = titleSp.sp,
                 // A project not present locally is highlighted in the conflict colour (it'll be created).
@@ -504,7 +506,7 @@ private fun FolderHeader(
             )
             if (folder.kind == FolderKind.EXISTING) {
                 Text(
-                    "existing project",
+                    tr("existing project"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -516,13 +518,13 @@ private fun FolderHeader(
                 selected = choice,
                 options = if (folder.kind == FolderKind.EXISTING)
                     listOf(
-                        ProjectImportChoice.INTO_EXISTING to "Into existing",
-                        ProjectImportChoice.CREATE to "Create new",
+                        ProjectImportChoice.INTO_EXISTING to tr("Into existing"),
+                        ProjectImportChoice.CREATE to tr("Create new"),
                     )
                 else
                     listOf(
-                        ProjectImportChoice.CREATE to "Create",
-                        ProjectImportChoice.UNFILED to "Unfiled",
+                        ProjectImportChoice.CREATE to tr("Create"),
+                        ProjectImportChoice.UNFILED to tr("Unfiled"),
                     ),
                 titleSp = titleSp,
                 onSelect = onChoice,
@@ -592,7 +594,7 @@ private fun TypeSubHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "$label ($count)",
+            tr("%1\$s (%2\$s)", tr(label), count),
             style = MaterialTheme.typography.labelLarge,
             fontSize = (sectionSp - 2).coerceAtLeast(10).sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -600,7 +602,7 @@ private fun TypeSubHeader(
         )
         if (conflicts > 0) {
             Text(
-                "$conflicts already exist",
+                tr("%1\$s already exist", conflicts),
                 style = MaterialTheme.typography.labelMedium,
                 color = conflictColor,
             )
@@ -642,7 +644,7 @@ private fun GroupNodeHeader(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            if (isNew) "new group · will be created" else "existing group",
+            if (isNew) tr("new group · will be created") else tr("existing group"),
             style = MaterialTheme.typography.labelSmall,
             color = if (isNew) conflictColor else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -682,7 +684,7 @@ private fun ReviewItemRow(
             // Conflicting row: a red warning triangle OUTSIDE (left of) the pill, then the strategy pill.
             Icon(
                 Icons.Filled.Warning,
-                contentDescription = "Already exists",
+                contentDescription = tr("Already exists"),
                 tint = role(UiRole.WARNING),
                 modifier = Modifier.size(itemSp.dp),
             )
@@ -697,7 +699,7 @@ private fun ReviewItemRow(
         } else {
             // Non-conflicting row: a plain "New".
             Text(
-                "New",
+                tr("New"),
                 style = MaterialTheme.typography.labelMedium,
                 fontSize = itemSp.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -794,7 +796,7 @@ private fun ImportWarnNotice(title: String, body: String, color: Color, bodySp: 
 private fun StatLine(label: String, count: Int, exists: Int, conflictColor: Color, headerSp: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            "$label:",
+            tr("%1\$s:", tr(label)),
             fontSize = headerSp.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width((headerSp * 6).dp),   // label column — count starts here (slightly less indented)
@@ -814,7 +816,7 @@ private fun StatLine(label: String, count: Int, exists: Int, conflictColor: Colo
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                "$exists exist${if (exists == 1) "s" else ""}",
+                if (exists == 1) tr("1 exists") else tr("%1\$s exist", exists),
                 fontSize = headerSp.sp,
                 color = conflictColor,
             )
@@ -823,13 +825,13 @@ private fun StatLine(label: String, count: Int, exists: Int, conflictColor: Colo
 }
 
 private fun itemStrategyShortLabel(s: ItemConflictStrategy): String = when (s) {
-    ItemConflictStrategy.OVERWRITE_DELETE -> "Overwrite"
-    ItemConflictStrategy.RENAME -> "Keep both"
-    ItemConflictStrategy.OVERWRITE_BACKUP -> "Backup"
+    ItemConflictStrategy.OVERWRITE_DELETE -> tr("Overwrite")
+    ItemConflictStrategy.RENAME -> tr("Keep both")
+    ItemConflictStrategy.OVERWRITE_BACKUP -> tr("Backup")
 }
 
 private fun itemStrategyLongLabel(s: ItemConflictStrategy): String = when (s) {
-    ItemConflictStrategy.OVERWRITE_DELETE -> "Overwrite in place"
-    ItemConflictStrategy.RENAME -> "Keep both (rename new)"
-    ItemConflictStrategy.OVERWRITE_BACKUP -> "Overwrite + backup (rename old)"
+    ItemConflictStrategy.OVERWRITE_DELETE -> tr("Overwrite in place")
+    ItemConflictStrategy.RENAME -> tr("Keep both (rename new)")
+    ItemConflictStrategy.OVERWRITE_BACKUP -> tr("Overwrite + backup (rename old)")
 }

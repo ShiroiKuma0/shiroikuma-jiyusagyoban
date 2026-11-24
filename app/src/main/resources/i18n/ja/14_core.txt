@@ -1,0 +1,332 @@
+# ProfileTemplates.kt — the template gallery (titles, summaries, categories, safety notes, input labels and hints)
+# These live in ProfileTemplateCatalog.all (evaluated once) and are shown by ui/screens/EditorDialogs.kt.
+
+# -- titles
+= Work-hours focus
+: 勤務時間の集中
+= Headphones media
+: ヘッドホン接続時のメディア音量
+= Low-battery saver
+: 電池残量低下時の節電
+= WiFi arrival
+: Wi-Fi接続で到着を通知
+= Location evidence log
+: 位置情報の検証ログ
+= App usage reminder
+: アプリ使用時間のお知らせ
+= Find my phone
+: 端末を探す
+= Meeting mode from calendar
+: カレンダーによる会議モード
+= Nightstand NFC sleep mode
+: 枕元のNFCタグで就寝モード
+= Search incoming phone numbers
+: 着信した電話番号を検索
+= Search incoming phone numbers automatically
+: 着信した電話番号を自動で検索
+= WireGuard off at home
+: 自宅ではWireGuardを切断
+= Tailscale off at home
+: 自宅ではTailscaleを切断
+= Day wallpaper at sunrise
+: 日の出に昼の壁紙
+= Night wallpaper at sunset
+: 日の入りに夜の壁紙
+
+# -- summaries
+= Lower notification volume and log when the work window starts.
+: 勤務時間が始まると通知音量を下げ、ログに記録します。
+= Set a safe media volume when headphones connect.
+: ヘッドホンを接続したとき、メディア音量を安全な大きさにします。
+= Dim brightness and log when battery drops under a chosen threshold.
+: 電池残量が指定したしきい値を下回ると、画面を暗くしてログに記録します。
+= Run a notification/log pattern when a trusted SSID is detected.
+: 信頼できるSSIDを検出すると、通知を表示してログに記録します。
+= Log when the device enters a configured test radius for Location verification.
+: 位置情報の検証用に、端末が設定した範囲に入るとログに記録します。
+= Wait after an app opens, then show a reminder notification.
+: アプリを開いてから一定時間待ち、お知らせの通知を表示します。
+= Pattern for a future external trigger that vibrates and raises volume.
+: 将来の外部トリガー向けのひな形です。振動させて音量を上げます。
+= Lower notification volume while a named calendar has a busy event.
+: 指定したカレンダーに予定が入っている間、通知音量を下げます。
+= Dim screen and lower media volume when a known NFC tag is scanned.
+: 登録したNFCタグを読み取ると、画面を暗くしてメディア音量を下げます。
+= Search unknown incoming phone numbers using a configurable search engine.
+: 知らない番号からの着信を、指定した検索エンジンで検索します。
+= Open a search for unknown incoming phone numbers as soon as the phone rings.
+: 知らない番号から着信があると、すぐにその番号の検索を開きます。
+= Turn a WireGuard tunnel off on your home Wi-Fi and back on when you leave it.
+: 自宅のWi-Fiに接続している間はWireGuardのトンネルを切断し、離れると再び接続します。
+= Disconnect Tailscale on your home Wi-Fi and reconnect when you leave it.
+: 自宅のWi-Fiに接続している間はTailscaleを切断し、離れると再び接続します。
+= Switch to your daytime wallpaper when the sun comes up.
+: 日が昇ると昼用の壁紙に切り替えます。
+= Switch to your nighttime wallpaper when the sun goes down.
+: 日が沈むと夜用の壁紙に切り替えます。
+
+# -- categories
+= Focus
+: 集中
+= Media
+: メディア
+= Battery
+: 電池
+= Location-lite
+: 簡易位置情報
+= Location
+: 位置情報
+= Habits
+: 習慣
+= Safety
+: 安全
+= Calendar
+: カレンダー
+= Sleep
+: 睡眠
+= Calls
+: 通話
+= Network
+: ネットワーク
+= Display
+: ディスプレイ
+
+# -- safety notes
+= Creates a disabled profile. Review Do Not Disturb and volume access before enabling.
+: 無効の状態でプロファイルを作成します。有効にする前に、おやすみモードと音量へのアクセスを確認してください。
+= Creates a disabled profile and may need Do Not Disturb and volume access.
+: 無効の状態でプロファイルを作成します。おやすみモードと音量へのアクセスが必要な場合があります。
+= Creates a disabled profile and needs Write Settings access for brightness.
+: 無効の状態でプロファイルを作成します。明るさを変えるには「システム設定の変更」の許可が必要です。
+= Creates a disabled profile and may need nearby Wi-Fi or location permission.
+: 無効の状態でプロファイルを作成します。付近のWi-Fiデバイスまたは位置情報の権限が必要な場合があります。
+= Creates a disabled profile. Requires foreground/background location permissions and device Location before enabling.
+: 無効の状態でプロファイルを作成します。有効にする前に、フォアグラウンドとバックグラウンドの位置情報の権限、および端末の位置情報を有効にしておく必要があります。
+= Creates a disabled profile and requires Usage Access plus notification permission.
+: 無効の状態でプロファイルを作成します。使用状況へのアクセスと通知の権限が必要です。
+= Blocked until external trigger intents are exposed safely.
+: 外部トリガーのインテントを安全に公開できるようになるまで、利用できません。
+= Creates a disabled profile. Requires Calendar access plus Do Not Disturb and volume access before enabling.
+: 無効の状態でプロファイルを作成します。有効にする前に、カレンダーへのアクセスと、おやすみモードおよび音量へのアクセスが必要です。
+= Creates a disabled profile. Requires NFC hardware and Write Settings/volume access before enabling.
+: 無効の状態でプロファイルを作成します。有効にする前に、NFC対応の端末と、「システム設定の変更」および音量へのアクセスが必要です。
+= Creates a disabled profile. Needs Phone state, Call log, Contacts and notifications before enabling. The number leaves your phone only when you tap Search. Hidden callers and your contacts are never searched.
+: 無効の状態でプロファイルを作成します。有効にする前に、電話の状態、通話履歴、連絡先、通知の権限が必要です。番号が端末の外に送られるのは「検索」をタップしたときだけです。非通知の着信と連絡先に登録された番号は検索しません。
+= Creates a disabled profile. Needs Phone state, Call log, Contacts, notifications and Display over other apps before enabling. Every unknown caller's number goes to the search site without asking. Without Display over other apps Android won't open the browser, so the notification stays as the way to search by hand. Hidden callers and your contacts are never searched.
+: 無効の状態でプロファイルを作成します。有効にする前に、電話の状態、通話履歴、連絡先、通知の権限と「他のアプリの上に重ねて表示」が必要です。知らない番号はすべて、確認なしで検索サイトに送られます。「他のアプリの上に重ねて表示」がないとAndroidはブラウザを開かないため、手動で検索できるよう通知が残ります。非通知の着信と連絡先に登録された番号は検索しません。
+= Creates a disabled profile. Needs location access to read the Wi-Fi name, WireGuard tunnel control in Setup, and Allow remote control apps turned on in the WireGuard settings. It only changes the VPN as you join or leave that network.
+: 無効の状態でプロファイルを作成します。Wi-Fi名を読み取るための位置情報へのアクセス、セットアップでのWireGuardトンネル制御の許可、WireGuardの設定で「Allow remote control apps」を有効にすることが必要です。VPNを切り替えるのは、そのネットワークに接続したときと離れたときだけです。
+= Creates a disabled profile. Needs location access to read the Wi-Fi name, and you need to be logged in to Tailscale. It only changes the VPN as you join or leave that network.
+: 無効の状態でプロファイルを作成します。Wi-Fi名を読み取るための位置情報へのアクセスと、Tailscaleへのログインが必要です。VPNを切り替えるのは、そのネットワークに接続したときと離れたときだけです。
+= Creates a disabled profile. Before turning it on, open its action and pick the image with Browse, since OpenTasker can't read a typed photo path by itself. Sun times come from the latitude and longitude you enter, so no location access is needed.
+: 無効の状態でプロファイルを作成します。OpenTaskerは手入力した写真のパスをそのままでは読み取れないため、有効にする前にアクションを開き、「参照」で画像を選んでください。日の出と日の入りの時刻は入力した緯度と経度から求めるので、位置情報へのアクセスは不要です。
+
+# -- input labels
+= Start time
+: 開始時刻
+= End time
+: 終了時刻
+= Notification volume
+: 通知音量
+= Media volume
+: メディア音量
+= Battery threshold
+: 電池残量のしきい値
+= Brightness
+: 明るさ
+= WiFi SSID
+: Wi-FiのSSID
+= Message
+: 本文
+= Latitude
+: 緯度
+= Longitude
+: 経度
+= Radius meters
+: 半径（メートル）
+= Max accuracy meters
+: 精度の上限（メートル）
+= Dwell seconds
+: 滞在時間（秒）
+= App package
+: アプリのパッケージ
+= Delay milliseconds
+: 遅延（ミリ秒）
+= Reminder
+: お知らせの本文
+= Trigger action
+: トリガーのインテントアクション
+= Calendar name
+: カレンダー名
+= NFC tag ID
+: NFCタグのID
+= Search URL
+: 検索URL
+= Home Wi-Fi name
+: 自宅のWi-Fi名
+= Tunnel name
+: トンネル名
+= Day image
+: 昼の画像
+= Night image
+: 夜の画像
+
+# -- input hints (HH:mm, 0-100, 0-255 and com.example.app are literal and need no entry)
+= Percent
+: パーセント
+= Exact SSID
+: SSIDを正確に入力
+= Decimal degrees
+: 10進数の度
+= Decimal degrees; your town is close enough
+: 10進数の度（お住まいの町の値で十分です）
+= Meters
+: メートル
+= 0 disables dwell
+: 0で滞在時間の判定なし
+= 900000 = 15 minutes
+: 900000 = 15分
+= Scan a tag and copy its ID from Inspector
+: タグを読み取り、インスペクターからIDをコピー
+= {number} becomes the caller's number
+: {number}が発信者の番号に置き換わります
+= Exactly as WireGuard shows it
+: WireGuardの表示どおりに入力
+= Pick it with Browse in the action after installing
+: 追加後、アクションの「参照」で選択
+
+# -- input sections
+= General
+: 全般
+= Search
+: 検索
+= NFC
+: NFC
+
+# -- input validation (instantiate() / validationError())
+= Missing blueprint values: %1$s
+: 入力されていない項目があります：%1$s
+= Invalid blueprint values: %1$s
+: 入力値が正しくありません：%1$s
+= %1$s: %2$s
+: %1$s：%2$s
+= enter an Android package name
+: Androidのパッケージ名を入力してください
+= must be at most 32 characters
+: 32文字以内で入力してください
+= cannot contain control characters
+: 制御文字は使えません
+= use latitude,longitude
+: 「緯度,経度」の形式で入力してください
+= choose a positive task id
+: 正の数のタスクIDを指定してください
+= use a valid variable name
+: 有効な変数名を入力してください
+= use HH:mm
+: HH:mmの形式で入力してください
+= must start with https://
+: https://で始まる必要があります
+= must include {number} where the caller's number goes
+: 発信者の番号が入る位置に{number}を含めてください
+= cannot contain spaces
+: 空白は使えません
+= must be numeric
+: 数値で入力してください
+= must be at least %1$s
+: %1$s以上で入力してください
+= must be at most %1$s
+: %1$s以下で入力してください
+
+# InputValidation.kt
+= Profile name cannot be empty
+: プロファイル名は空にできません。
+= Profile name exceeds %1$s characters
+: プロファイル名が%1$s文字を超えています。
+= Exit task id must be positive
+: 終了タスクのIDは正の数でなければなりません。
+= Enter task id must not be negative
+: 開始タスクのIDに負の数は使えません。
+= An enter or exit task must be set
+: 開始タスクまたは終了タスクを設定してください。
+= Fallback task id must be positive
+: 代替タスクのIDは正の数でなければなりません。
+= Cooldown must be between 0 and %1$s seconds
+: クールダウンは0〜%1$s秒の範囲で指定してください。
+= Profile priority must be between %1$s and %2$s
+: プロファイルの優先度は%1$s〜%2$sの範囲で指定してください。
+= Grace period must be between 0 and %1$s seconds
+: 猶予時間は0〜%1$s秒の範囲で指定してください。
+= Profile active limit must be between %1$s and %2$s
+: プロファイルの同時実行数の上限は%1$s〜%2$sの範囲で指定してください。
+= Profile burst limit must be between %1$s and %2$s
+: プロファイルの連続実行数の上限は%1$s〜%2$sの範囲で指定してください。
+= An expiry date is required for date-limited profiles
+: 期限付きのプロファイルには有効期限の日付が必要です。
+= Profile must have at least one context
+: プロファイルにはコンテキストが1つ以上必要です。
+= Task name cannot be empty
+: タスク名は空にできません。
+= Task name exceeds %1$s characters
+: タスク名が%1$s文字を超えています。
+= Priority must be between 0 and 10
+: 優先度は0〜10の範囲で指定してください。
+= Task must have at least one action
+: タスクにはアクションが1つ以上必要です。
+= Action type cannot be empty
+: アクションの種類は空にできません。
+= Action label exceeds %1$s characters
+: アクションのラベルが%1$s文字を超えています。
+
+# MacroDroidImportPlanner.kt
+= No importable MacroDroid macros were found.
+: インポートできるMacroDroidのマクロが見つかりませんでした。
+# constant, kept in the bundle's metadata.warnings; shown by the import review
+= Imported MacroDroid profiles are disabled by default. Review triggers, actions, placeholders, and required permissions before enabling them.
+: MacroDroidからインポートしたプロファイルは、既定で無効になります。有効にする前に、トリガー、アクション、仮のステップ、必要な権限を確認してください。
+
+# TaskerImportPlanner.kt
+= No importable Tasker tasks, profiles, variables, or scenes were found.
+: インポートできるTaskerのタスク、プロファイル、変数、シーンが見つかりませんでした。
+# constant, kept in the bundle's metadata.warnings; shown by the import review
+= Imported Tasker profiles are disabled by default; review contexts, actions, and required permissions before enabling them.
+: Taskerからインポートしたプロファイルは、既定で無効になります。有効にする前に、コンテキスト、アクション、必要な権限を確認してください。
+
+# SettingsBackup.kt — the categories of the export / import picker (enum Cat, shown via tr(cat.label))
+= Workspace programming — projects · tasks · profiles · scenes · variables
+: ワークスペースの内容 — プロジェクト · タスク · プロファイル · シーン · 変数
+= UI theme (colours · fonts)
+: UIテーマ（色 · フォント）
+= Widgets (templates · bindings)
+: ウィジェット（テンプレート · 割り当て）
+= Bubbles (freeze · flash)
+: バブル（凍結 · 明滅）
+= App settings (sort · projects · logs · picker)
+: アプリの設定（並べ替え · プロジェクト · ログ · 選択画面）
+= Share tiles (共有アプリ工房)
+: 共有タイル（共有アプリ工房）
+= Task icons
+: タスクのアイコン
+= 健康 — ratings · notes · 機能訓練 · marked sessions
+: 健康 — 評価 · メモ · 機能訓練 · 印を付けたセッション
+= 健康 measurements — every sample, sleep, sync and workout row
+: 健康の測定データ — すべての測定値、睡眠、同期、ワークアウトの記録
+= 健康 base maps — the cutouts 地図 drew, one per area
+: 健康の基本地図 — 地図が描いた切り抜き、地域ごとに1枚
+= 言語島 — islands · sentences · translations · history · audio
+: 言語島 — 島 · 文 · 翻訳 · 履歴 · 音声
+
+# SettingsBackup.kt — export summary and import result lines
+= 1 category
+: 1カテゴリ
+= %1$s categories
+: %1$sカテゴリ
+= %1$s: %2$s tasks · %3$s profiles · %4$s scenes · %5$s variables
+: %1$s：タスク%2$s件 · プロファイル%3$s件 · シーン%4$s件 · 変数%5$s件
+= %1$s: %2$s rows
+: %1$s：%2$s行
+= %1$s: %2$s keys
+: %1$s：キー%2$s件
+=  · %1$s files
+:  · ファイル%1$s件
+=  · %1$s keys
+:  · キー%1$s件

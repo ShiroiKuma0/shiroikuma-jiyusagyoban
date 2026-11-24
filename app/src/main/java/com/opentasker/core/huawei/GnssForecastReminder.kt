@@ -19,6 +19,7 @@ import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
 import com.opentasker.core.scheduling.ExactAlarmSupport
+import com.opentasker.i18n.tr
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -416,7 +417,7 @@ object GnssForecastReminder {
         }
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CHANNEL_ID, tr(CHANNEL_NAME), NotificationManager.IMPORTANCE_HIGH),
         )
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)

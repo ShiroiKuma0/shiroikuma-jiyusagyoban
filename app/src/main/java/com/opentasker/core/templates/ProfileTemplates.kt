@@ -1,6 +1,7 @@
 package com.opentasker.core.templates
 
 import com.opentasker.core.contexts.CalendarSunEventPresets
+import com.opentasker.i18n.tr
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
@@ -121,14 +122,14 @@ data class AutomationBlueprint(
         val values = defaults() + slotValues.mapValues { it.value.trim() }
         val missing = inputs.filter { it.required && values[it.key].isNullOrBlank() }
         require(missing.isEmpty()) {
-            "Missing blueprint values: ${missing.joinToString { it.label }}"
+            tr("Missing blueprint values: %1\$s", missing.joinToString { tr(it.label) })
         }
         val invalid = inputs.mapNotNull { input ->
             val value = values[input.key].orEmpty()
-            input.validationError(value)?.let { "${input.label}: $it" }
+            input.validationError(value)?.let { tr("%1\$s: %2\$s", tr(input.label), it) }
         }
         require(invalid.isEmpty()) {
-            "Invalid blueprint values: ${invalid.joinToString()}"
+            tr("Invalid blueprint values: %1\$s", invalid.joinToString())
         }
 
         val expansions = values + runtimePlaceholders
@@ -186,24 +187,24 @@ fun BlueprintInput.validationError(value: String): String? {
     if (value.isBlank() && !required) return null
     return when (selector) {
         BlueprintSelectorKind.TEXT -> null
-        BlueprintSelectorKind.APP -> if (value.matches(APP_ID_PATTERN)) null else "enter an Android package name"
+        BlueprintSelectorKind.APP -> if (value.matches(APP_ID_PATTERN)) null else tr("enter an Android package name")
         BlueprintSelectorKind.WIFI_SSID -> when {
-            value.length > 32 -> "must be at most 32 characters"
-            value.any(Char::isISOControl) -> "cannot contain control characters"
+            value.length > 32 -> tr("must be at most 32 characters")
+            value.any(Char::isISOControl) -> tr("cannot contain control characters")
             else -> null
         }
         BlueprintSelectorKind.LOCATION -> {
             val coordinates = value.split(',', limit = 2).map { it.trim().toDoubleOrNull() }
             if (coordinates.size == 2 && coordinates.all { it != null } &&
                 coordinates[0]!! in -90.0..90.0 && coordinates[1]!! in -180.0..180.0
-            ) null else "use latitude,longitude"
+            ) null else tr("use latitude,longitude")
         }
         BlueprintSelectorKind.TASK_REFERENCE -> {
-            if (value.toLongOrNull()?.let { it > 0L } == true) null else "choose a positive task id"
+            if (value.toLongOrNull()?.let { it > 0L } == true) null else tr("choose a positive task id")
         }
         BlueprintSelectorKind.VARIABLE -> {
             if (VariableNamePolicy.normalizeForScope(value, isGlobal = false) != null) null
-            else "use a valid variable name"
+            else tr("use a valid variable name")
         }
         BlueprintSelectorKind.DURATION -> numericError(value, wholeNumber = true, defaultMaximum = 86_400_000.0)
         BlueprintSelectorKind.INTEGER -> numericError(value, wholeNumber = true)
@@ -212,13 +213,13 @@ fun BlueprintInput.validationError(value: String): String? {
             LocalTime.parse(value, DateTimeFormatter.ofPattern("HH:mm"))
             null
         } catch (_: DateTimeParseException) {
-            "use HH:mm"
+            tr("use HH:mm")
         }
         BlueprintSelectorKind.CALLER_SEARCH_URL -> when {
             !value.startsWith("https://", ignoreCase = true) && !value.startsWith("http://", ignoreCase = true) ->
-                "must start with https://"
-            "{number}" !in value -> "must include {number} where the caller's number goes"
-            value.any { it.isWhitespace() || it.isISOControl() } -> "cannot contain spaces"
+                tr("must start with https://")
+            "{number}" !in value -> tr("must include {number} where the caller's number goes")
+            value.any { it.isWhitespace() || it.isISOControl() } -> tr("cannot contain spaces")
             else -> null
         }
     }
@@ -226,11 +227,11 @@ fun BlueprintInput.validationError(value: String): String? {
 
 private fun BlueprintInput.numericError(value: String, wholeNumber: Boolean, defaultMaximum: Double? = null): String? {
     val number = (if (wholeNumber) value.toLongOrNull()?.toDouble() else value.toDoubleOrNull())
-        ?: return "must be numeric"
+        ?: return tr("must be numeric")
     val upperBound = maximum ?: defaultMaximum
     return when {
-        minimum != null && number < minimum -> "must be at least ${minimum.stripTrailingZero()}"
-        upperBound != null && number > upperBound -> "must be at most ${upperBound.stripTrailingZero()}"
+        minimum != null && number < minimum -> tr("must be at least %1\$s", minimum.stripTrailingZero())
+        upperBound != null && number > upperBound -> tr("must be at most %1\$s", upperBound.stripTrailingZero())
         else -> null
     }
 }

@@ -20,8 +20,8 @@ class SetupLocationRequestContractTest {
     fun theLocationRowAsksForPreciseLocationTheWayAndroidAccepts() {
         val row = ProductionSources.block(
             "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
-            "title = \"Foreground location\"",
-            "title = \"Nearby WiFi devices\"",
+            "title = tr(\"Foreground location\")",
+            "title = tr(\"Nearby WiFi devices\")",
         )
 
         assertTrue(

@@ -1,6 +1,7 @@
 package com.opentasker.core.share.relay
 
 import com.opentasker.core.shizuku.ShizukuShell
+import com.opentasker.i18n.tr
 import java.io.File
 
 /**
@@ -19,7 +20,7 @@ object RelayInstaller {
     }
 
     fun install(apk: File): Result {
-        if (!ShizukuShell.available()) return Result.Failure("Shizuku unavailable")
+        if (!ShizukuShell.available()) return Result.Failure(tr("Shizuku unavailable"))
         val size = apk.length()
 
         val create = runCatching { ShizukuShell.exec("pm install-create -r -t") }
@@ -52,7 +53,7 @@ object RelayInstaller {
     }
 
     fun uninstall(relayPackage: String): Result {
-        if (!ShizukuShell.available()) return Result.Failure("Shizuku unavailable")
+        if (!ShizukuShell.available()) return Result.Failure(tr("Shizuku unavailable"))
         val r = runCatching { ShizukuShell.exec("pm uninstall $relayPackage") }
             .getOrElse { return Result.Failure("uninstall: ${it.message}") }
         return if (r.stdout.contains("Success")) Result.Success

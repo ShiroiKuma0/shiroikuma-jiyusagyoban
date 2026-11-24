@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -421,11 +422,11 @@ private fun operatorLabel(operator: LocaleConditionOperator): String = stringRes
 )
 
 private fun contextLabel(type: com.opentasker.core.model.ContextType): String = when (type) {
-    com.opentasker.core.model.ContextType.APPLICATION -> "Application"
-    com.opentasker.core.model.ContextType.TIME -> "Time"
-    com.opentasker.core.model.ContextType.DAY -> "Day"
-    com.opentasker.core.model.ContextType.LOCATION -> "Location"
-    com.opentasker.core.model.ContextType.STATE -> "Device state"
-    com.opentasker.core.model.ContextType.EVENT -> "Event"
-    com.opentasker.core.model.ContextType.PLUGIN -> "Plugin condition"
+    com.opentasker.core.model.ContextType.APPLICATION -> tr("Application")
+    com.opentasker.core.model.ContextType.TIME -> tr("Time")
+    com.opentasker.core.model.ContextType.DAY -> tr("Day")
+    com.opentasker.core.model.ContextType.LOCATION -> tr("Location")
+    com.opentasker.core.model.ContextType.STATE -> tr("Device state")
+    com.opentasker.core.model.ContextType.EVENT -> tr("Event")
+    com.opentasker.core.model.ContextType.PLUGIN -> tr("Plugin condition")
 }

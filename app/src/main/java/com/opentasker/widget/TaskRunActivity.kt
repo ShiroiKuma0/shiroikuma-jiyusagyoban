@@ -16,6 +16,7 @@ import com.opentasker.core.engine.ExecutionAdmissionRegistry
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.logSkippedRun
 import com.opentasker.core.storage.recoveryMessage
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,13 +33,13 @@ class TaskRunActivity : Activity() {
         val taskName = intent.getStringExtra(EXTRA_TASK_NAME)?.trim().orEmpty()
         val source = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_SHORTCUT
         if (taskId < 0 && taskName.isEmpty()) {
-            finishWithMessage("Invalid task")
+            finishWithMessage(tr("Invalid task"))
             return
         }
         // A widget or launcher-shortcut tap must not resurrect an app the user has exited — say so
         // instead of running the task, which would drag the whole engine back up with it.
         if (EngineShutdown.refuse(this, "widget / shortcut tap")) {
-            finishWithMessage("白い熊 自由作業盤 は停止中 — open the app to start it")
+            finishWithMessage(tr("白い熊 自由作業盤 は停止中 — open the app to start it"))
             return
         }
 
@@ -59,7 +60,7 @@ class TaskRunActivity : Activity() {
                 // Resolve by name first (survives re-imports), else by id.
                 val entity = if (taskName.isNotEmpty()) db.taskDao().getByName(taskName) else db.taskDao().getById(taskId)
                 if (entity == null) {
-                    runOnUiThread { finishWithMessage("Task not found") }
+                    runOnUiThread { finishWithMessage(tr("Task not found")) }
                     return@launch
                 }
                 // Upstream's corrupt-row guard: a task whose stored JSON no longer decodes is logged
@@ -70,7 +71,7 @@ class TaskRunActivity : Activity() {
                     AppLogger.error(TAG, reason)
                     logSkippedRun(db, decoded.value, source, reason)
                     runOnUiThread {
-                        finishWithMessage("${decoded.value.name} is corrupt; restore a database backup")
+                        finishWithMessage(tr("%1\$s is corrupt; restore a database backup", decoded.value.name))
                     }
                     return@launch
                 }
@@ -109,7 +110,7 @@ class TaskRunActivity : Activity() {
                 }
             } catch (e: Exception) {
                 AppLogger.error(TAG, "Task run failed", e)
-                runOnUiThread { finishWithMessage("Task run failed") }
+                runOnUiThread { finishWithMessage(tr("Task run failed")) }
             } finally {
                 RunningWidgetTasks.finish(runKey)
             }

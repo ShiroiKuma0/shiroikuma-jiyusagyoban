@@ -1,0 +1,487 @@
+# 07_ui — ui/screens: PermissionOnboardingScreen … SyntheticTriggerSimulationDialog
+# PermissionOnboardingScreen.kt
+= Task health — all tasks can run
+: タスクの状態 — すべてのタスクを実行できます
+= Task health — 1 task blocked
+: タスクの状態 — タスク1件が実行できません
+= Task health — %1$s tasks blocked
+: タスクの状態 — タスク%1$s件が実行できません
+= Show in Tasks
+: 「タスク」で表示
+= Setup checklist
+: セットアップの確認項目
+= 白い熊 自由作業盤 can run with missing access, but affected automations stay gated until setup is complete.
+: 白い熊 自由作業盤はアクセスの許可が足りなくても動作しますが、影響を受ける自動化はセットアップが完了するまで止められたままになります。
+= Ready
+: 準備完了
+= %1$s pending
+: 未完了 %1$s件
+= Android no longer asks for this one — set it under 権限 (Permissions); off and on again if it already reads 許可.
+: Androidはこの権限をもう確認しません。「権限」で設定してください。すでに「許可」になっている場合は、いったん外してから許可し直してください。
+= %1$s is already ready.
+: %1$sはすでに準備完了です。
+= %1$s: granting…
+: %1$s：許可しています…
+= %1$s: granted through %2$s.
+: %1$s：%2$s経由で許可しました。
+= %1$s: not granted — %2$s.
+: %1$s：許可されませんでした — %2$s。
+= Enable so 物理鍵 lockdown (screen.lockdown) can lock the device.
+: 物理鍵のロックダウン（screen.lockdown）で端末をロックできるよう、有効にしてください。
+= Notifications
+: 通知
+= Required for foreground-service visibility and user-facing notification actions on Android 13 and newer.
+: Android 13以降で、フォアグラウンドサービスの表示と、画面に出る通知のアクションに必要です。
+= Request
+: 要求
+= Foreground service, notification actions
+: フォアグラウンドサービス、通知のアクション
+= Microphone
+: マイク
+= Required for the voice-recording actions (e.g. the 物理鍵 record-on-keypress task).
+: 音声録音のアクション（例：物理鍵の、キーを押して録音するタスク）に必要です。
+= Voice recording (audio.record.*)
+: 音声録音 (audio.record.*)
+= Device admin (lockdown)
+: デバイス管理者（ロックダウン）
+= Lets the 物理鍵 lockdown action lock the device and require your PIN/password (biometrics disabled until the next credential entry).
+: 物理鍵のロックダウンのアクションが端末をロックし、PINまたはパスワードを要求できるようにします（次に認証情報を入力するまで、生体認証は無効になります）。
+= Enable
+: 有効にする
+= 物理鍵 システムロック (screen.lockdown)
+: 物理鍵 システムロック (screen.lockdown)
+= Exact alarms
+: 正確なアラーム
+= Allows precise scheduled automations. If denied, 白い熊 自由作業盤 falls back to inexact delivery windows.
+: スケジュールされた自動化を正確な時刻に実行できるようにします。拒否した場合、白い熊 自由作業盤はおおよその時間帯での実行に切り替えます。
+= Open settings
+: 設定を開く
+= Time triggers, schedules
+: 時刻トリガー、スケジュール
+= Battery optimization
+: 電池の最適化
+= OEM and Android battery managers can stop background automation. Exempting 白い熊 自由作業盤 improves reliability. %1$s
+: メーカーやAndroidの電池管理機能が、バックグラウンドの自動化を止めることがあります。白い熊 自由作業盤を対象外にすると、動作が安定します。%1$s
+= Long-running automation service
+: 長時間動作する自動化サービス
+= %1$s background guidance
+: %1$sのバックグラウンド動作の手引き
+= Detected %1$s (reliability risk: %2$s). Battery-optimization exemption alone is often not enough on this OEM.
+: %1$sを検出しました（安定動作へのリスク：%2$s）。このメーカーの端末では、電池の最適化の対象外にするだけでは足りないことがよくあります。
+= For more help, see %1$s
+: 詳しくは%1$sをご覧ください。
+= Reliable background automation on %1$s
+: %1$sでの安定したバックグラウンド自動化
+= Install unknown apps
+: 不明なアプリのインストール
+= Lets a task install or update an app from an APK file — the remote update of a 携帯 relay phone (“/install” in a SIM's Jami group). An update of 白い熊 自由作業盤 itself, or of an app it installed before, then needs no tap. On Samsung, “Auto Blocker” must be off as well.
+: タスクがAPKファイルからアプリをインストールまたは更新できるようにします。携帯の中継端末を遠隔で更新するためのものです（SIMのJamiグループでの「/install」）。許可すると、白い熊 自由作業盤自体の更新や、以前にこのアプリがインストールしたアプリの更新には、タップが要らなくなります。Samsungの端末では、「Auto Blocker」もオフにする必要があります。
+= Remote updates (package.install)
+: 遠隔更新 (package.install)
+= Usage access
+: 使用状況へのアクセス
+= Needed to detect foreground apps without an accessibility service.
+: ユーザー補助サービスを使わずに、前面のアプリを検出するために必要です。
+= Application contexts
+: アプリのコンテキスト
+= Notification access
+: 通知へのアクセス
+= Needed for notification-text triggers and rich notification matching.
+: 通知の文面によるトリガーと、通知の詳細な照合に必要です。
+= Notification triggers
+: 通知トリガー
+= Calendar access
+: カレンダーへのアクセス
+= Needed for local calendar-window triggers. 白い熊 自由作業盤 only emits redacted calendar metadata to matching.
+: 端末内のカレンダーの予定時間によるトリガーに必要です。白い熊 自由作業盤が照合に渡すのは、伏せ字にしたカレンダーのメタデータだけです。
+= Calendar triggers
+: カレンダーのトリガー
+= Phone (SIMs and numbers)
+: 電話（SIMと電話番号）
+= Needed to read the SIM slots, their service state and their numbers, and the call state, and to dial — a USSD code is dialled. 携帯 uses it to tell which SIM is in which slot, and for /balance, /forward and /ussd.
+: SIMスロットとその通信状態、電話番号、通話の状態を読み取るため、また発信するために必要です（USSDコードは発信して送ります）。携帯は、どのSIMがどのスロットにあるかの判別と、/balance、/forward、/ussdにこれを使います。
+= If Request shows no dialog, the app's page in Settings (アプリ情報) opens instead. Under 権限, 電話 (Phone) covers the phone state, the phone numbers and dialing: if it already reads 許可, set it to 許可しない and back to 許可.
+: 「要求」を押してもダイアログが出ない場合は、代わりに設定の「アプリ情報」が開きます。「権限」の「電話」が、電話の状態、電話番号、発信をまとめて扱います。すでに「許可」になっている場合は、いったん「許可しない」にしてから「許可」に戻してください。
+= SIM actions, USSD, call-state trigger, 携帯
+: SIMのアクション、USSD、通話状態のトリガー、携帯
+= Overlay access
+: オーバーレイへのアクセス
+= Needed for scene overlays, freeze bubbles, and other controls displayed over other apps.
+: シーンのオーバーレイ、凍結バブル、そのほか他のアプリの上に重ねて表示する操作部品に必要です。
+= Scenes, freeze bubbles, overlay UI
+: シーン、凍結バブル、オーバーレイ表示
+= Modify system settings
+: システム設定の変更
+= Write Settings special access. The locale switch (system.set_locale) needs it — updatePersistentConfiguration enforces this appop on top of CHANGE_CONFIGURATION.
+: 「システム設定の変更」の特別なアクセスです。ロケールの切り替え（system.set_locale）に必要です。updatePersistentConfigurationは、CHANGE_CONFIGURATIONに加えてこのappopも確認します。
+= Locale switch (system.set_locale), brightness, setting.put
+: ロケールの切り替え (system.set_locale)、明るさ、setting.put
+= Change configuration (locale)
+: 構成の変更（ロケール）
+= System permission for the locale switch. Android has no dialog and no settings page for it: Grant runs the command below through Shizuku when it is running, otherwise through root. Without either, run it once over adb. The grant survives reboots and updates.
+: ロケールの切り替えのためのシステム権限です。Androidにはこの権限のダイアログも設定画面もありません。「許可」を押すと、Shizukuが動作中ならShizuku経由で、そうでなければroot経由で下のコマンドを実行します。どちらも使えない場合は、adbで一度実行してください。許可は再起動や更新の後も残ります。
+= Grant (Shizuku or root)
+: 許可（Shizukuまたはroot）
+= Locale switch (system.set_locale)
+: ロケールの切り替え (system.set_locale)
+= All files access
+: すべてのファイルへのアクセス
+= Needed to read files outside the app — e.g. custom notification tones stored in shared storage (the 通知明滅 Jami tone).
+: アプリの外にあるファイルを読み取るために必要です。例：共有ストレージに置いた独自の通知音（通知明滅のJamiの通知音）。
+= Custom tones, file actions on shared storage
+: 独自の通知音、共有ストレージでのファイルのアクション
+= Accessibility service
+: ユーザー補助サービス
+= Lets 白い熊 自由作業盤 perform global navigation — Back, Home, Recents, notification/quick-settings panels — used by the edge-bar gestures.
+: 白い熊 自由作業盤が、戻る、ホーム、最近使ったアプリ、通知パネルやクイック設定パネルといった全体のナビゲーション操作を行えるようにします。画面端のバーのジェスチャーで使います。
+= Back / Home / Recents actions
+: 戻る / ホーム / 最近使ったアプリのアクション
+= Foreground location
+: フォアグラウンドの位置情報
+= Location and WiFi contexts
+: 位置情報とWi-Fiのコンテキスト
+= Nearby WiFi devices
+: 付近のWi-Fiデバイス
+= Needed on Android 13 and newer for WiFi-aware automations. SSID visibility can still require location access.
+: Android 13以降で、Wi-Fiを利用する自動化に必要です。SSIDを見るには、さらに位置情報へのアクセスが必要な場合があります。
+= WiFi contexts
+: Wi-Fiのコンテキスト
+= Background location
+: バックグラウンドの位置情報
+= Open app settings
+: アプリの設定を開く
+= Background location radius evaluation
+: バックグラウンドでの位置情報の範囲判定
+= Bluetooth connect
+: Bluetooth接続
+= Needed on Android 12 and newer for Bluetooth device actions and context checks.
+: Android 12以降で、Bluetoothデバイスのアクションとコンテキストの確認に必要です。
+= Bluetooth actions
+: Bluetoothのアクション
+= Local network access
+: ローカルネットワークへのアクセス
+= Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.
+: Android 17以降では、LAN上の機器との通信（HTTP、Ping、Wake-on-LAN、MQTT、mDNS）にこの権限が必要です。権限がないと、ローカルアドレスを対象とするネットワークのアクションは失敗します。
+= LAN network actions
+: LANのネットワークアクション
+= SMS send
+: SMSの送信
+= Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.
+: SMSのアクションがメッセージを送信する前に必要です。SMSの自動化は、内容を明示した、自分で作成したものだけにしてください。
+= SMS actions
+: SMSのアクション
+= Do Not Disturb access
+: おやすみモードへのアクセス
+= Needed before 白い熊 自由作業盤 can change interruption filters or DND-related settings.
+: 白い熊 自由作業盤が割り込みの制限や、おやすみモード関連の設定を変更するために必要です。
+= DND actions
+: おやすみモードのアクション
+= Shizuku
+: Shizuku
+= Shizuku is running and access is granted — shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber are ready.
+: Shizukuは動作中で、アクセスも許可されています。シェルコマンド、画面の点灯、スクリーンショット、アプリの凍結と解除、物理鍵のキー取得を使えます。
+= Shizuku is running but 白い熊 自由作業盤 has not been granted access — tap Grant to pop Shizuku's permission dialog.
+: Shizukuは動作していますが、白い熊 自由作業盤にアクセスが許可されていません。「アクセスを許可」をタップすると、Shizukuの権限ダイアログが開きます。
+= Shizuku is installed but not running — start it from the Shizuku app.
+: Shizukuはインストールされていますが、動作していません。Shizukuアプリから開始してください。
+= Shizuku is not installed. It powers shell commands, screen wake, screenshot, app freeze/unfreeze and the 物理鍵 key grabber. The button opens 白い熊 Shizuku's GitHub page.
+: Shizukuがインストールされていません。シェルコマンド、画面の点灯、スクリーンショット、アプリの凍結と解除、物理鍵のキー取得はShizukuで動きます。ボタンを押すと、白い熊 ShizukuのGitHubページが開きます。
+= Open Shizuku
+: Shizukuを開く
+= Grant access
+: アクセスを許可
+= Get 白い熊 Shizuku
+: 白い熊 Shizukuを入手
+= Shell, wake, screenshot, freeze, 物理鍵
+: シェル、画面の点灯、スクリーンショット、凍結、物理鍵
+= Termux script bridge
+: Termuxスクリプト連携
+= %1$s Script actions dispatch through Termux's RUN_COMMAND intent.
+: %1$s スクリプトのアクションは、TermuxのRUN_COMMANDインテントで送出されます。
+= Open setup guide
+: 初期設定ガイドを開く
+= Grant RUN_COMMAND
+: RUN_COMMANDを許可
+= Script actions
+: スクリプトのアクション
+= App visibility
+: アプリの可視性
+= Android package visibility limits app lookup. If app selection fails, review app-info permissions and future query filters.
+: Androidのパッケージの可視性により、アプリの検索が制限されます。アプリを選択できない場合は、アプリ情報の権限と、今後のクエリの絞り込み条件を見直してください。
+= App launch and app context selection
+: アプリの起動とアプリのコンテキストの選択
+= Find it under Security → Advanced → Device admin apps (詳細設定 → 端末管理アプリ).
+: 「セキュリティ」→「詳細設定」→「端末管理アプリ」にあります。
+= Settings screen is unavailable on this device: %1$s
+: この端末では設定画面を利用できません：%1$s
+= no handler
+: 対応するアプリがありません
+= Settings screen could not be opened: %1$s
+: 設定画面を開けませんでした：%1$s
+= permission denied
+: 権限が拒否されました
+= low
+: 低
+= medium
+: 中
+= high
+: 高
+= severe
+: 深刻
+= Could not open the OEM settings screen directly; opened the online guide instead.
+: メーカーの設定画面を直接開けなかったため、代わりにオンラインの手引きを開きました。
+= No app can open the guidance page: %1$s
+: 手引きのページを開けるアプリがありません：%1$s
+# ProjectsScreen.kt
+= All
+: すべて
+= Unfiled
+: 未分類
+= Project
+: プロジェクト
+= Choose project
+: プロジェクトを選択
+= Selected
+: 選択中
+= Export everything…
+: すべてエクスポート…
+= Manage projects…
+: プロジェクトを管理…
+= Manual
+: 手動
+= A–Z
+: A–Z
+= No projects yet. Create one to group profiles, tasks, and scenes.
+: プロジェクトはまだありません。作成すると、プロファイル、タスク、シーンをまとめられます。
+= Drag to reorder
+: ドラッグして並べ替え
+= 1 item
+: 項目1件
+= %1$s items
+: 項目%1$s件
+= Export project
+: プロジェクトをエクスポート
+= Edit
+: 編集
+= Delete
+: 削除
+= New project
+: 新しいプロジェクト
+= Edit project
+: プロジェクトを編集
+= Name
+: 名前
+= A project with that name already exists.
+: 同じ名前のプロジェクトがすでにあります。
+= Color
+: 色
+= Create
+: 作成
+= Save
+: 保存
+= Cancel
+: キャンセル
+= Delete "%1$s"?
+: 「%1$s」を削除しますか？
+= This project has no items.
+: このプロジェクトに項目はありません。
+= This project has 1 item. Move it to Unfiled, or delete it too.
+: このプロジェクトには項目が1件あります。「未分類」に移動するか、一緒に削除してください。
+= This project has %1$s items. Move them to Unfiled, or delete them too.
+: このプロジェクトには項目が%1$s件あります。「未分類」に移動するか、一緒に削除してください。
+= Move items to Unfiled
+: 項目を「未分類」に移動
+= Delete items too
+: 項目も削除
+= Current
+: 現在
+# RunLogScreenContent.kt
+= Last failure: %1$s
+: 直近の失敗：%1$s
+= Tap the matching entry below for the full trace.
+: 下の該当する項目をタップすると、詳しい記録を見られます。
+= %1$s failed
+: 失敗%1$s件
+= %1$s skipped
+: スキップ%1$s件
+= Healthy
+: 正常
+= Latest: %1$s
+: 最新：%1$s
+= Held — refused by %1$s
+: 保留 — %1$sにより拒否
+= Held
+: 保留
+= Replay
+: 再実行
+= Expanded: %1$s
+: 展開後：%1$s
+= 1 template warning
+: テンプレートの警告1件
+= %1$s template warnings
+: テンプレートの警告%1$s件
+= 1 expression
+: 式1個
+= %1$s expressions
+: 式%1$s個
+= %1$s more
+: ほか%1$s件
+# SceneLibraryScreen.kt
+= Scene updated
+: シーンを更新しました
+= Element added
+: 要素を追加しました
+= Element updated
+: 要素を更新しました
+= Element removed
+: 要素を削除しました
+= Element moved
+: 要素を移動しました
+= Move 1 scene
+: シーン1件を移動
+= Move %1$s scenes
+: シーン%1$s件を移動
+=  - 1 issue
+:  - 問題1件
+=  - %1$s issues
+:  - 問題%1$s件
+= Edit scene properties
+: シーンのプロパティを編集
+= Collapse scene
+: シーンを折りたたむ
+= Expand scene
+: シーンを展開
+= Add Element
+: 要素を追加
+= Edit Element
+: 要素を編集
+= Create Scene
+: シーンを作成
+= Edit Scene
+: シーンを編集
+= Scene name
+: シーン名
+= Another scene in this project already has that name.
+: このプロジェクトには、同じ名前のシーンがすでにあります。
+= Width dp
+: 幅 dp
+= Height dp
+: 高さ dp
+= Panel
+: パネル
+= Background colour
+: 背景の色
+= Corner (dp)
+: 角の丸み (dp)
+= Scrim %
+: スクリム %
+= Border colour
+: 枠線の色
+= Border (dp)
+: 枠線 (dp)
+= Blanks use the theme: background = black, text/borders = yellow. Scrim is the dim behind a modal scene (0 = clear, 100 = black); border 0 = none.
+: 空欄の場合はテーマに従います：背景 = 黒、文字と枠線 = 黄色。スクリムは、モーダルのシーンの後ろを暗くする度合いです（0 = 透明、100 = 黒）。枠線0 = なし。
+= Default presentation
+: 既定の表示方法
+= Top
+: 上
+= Center
+: 中央
+= Bottom
+: 下
+= Modal (block underneath)
+: モーダル（下の画面を操作不可にする）
+= Tap outside dismisses
+: 外側をタップで閉じる
+= How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input).
+: scene.showでposition/modal/dismissを省略したときの、このシーンの表示方法です。アクションの引数で明示した場合は、そちらが優先されます。モーダルでないシーンは、タップが下に通り抜けるHUDになります（文字入力はできません）。
+= Default
+: 既定
+# SetupWarning.kt
+= 設定が外れています · 1 setup item switched off
+: 設定が1件外れています
+= 設定が外れています · %1$s setup items switched off
+: 設定が%1$s件外れています
+= 設定はすべて有効です · All setup items are on
+: 設定はすべて有効です
+= 1 setup item is switched off. Tasks that depend on it fail until it is switched back on.
+: セットアップ項目が1件外れています。有効に戻すまで、これに依存するタスクは失敗します。
+= %1$s setup items are switched off. Tasks that depend on them fail until they are switched back on.
+: セットアップ項目が%1$s件外れています。有効に戻すまで、これらに依存するタスクは失敗します。
+= 後で — 通知に残す · Later — keep as a notification
+: 後で — 通知に残す
+# ShareAppsScreen.kt
+= Share apps
+: 共有先アプリ
+= Back
+: 戻る
+= Each app here gets its own tile in the system share sheet. Sharing to it unfreezes the app (Shizuku), forwards the content, and drops a re-freeze bubble.
+: ここに追加したアプリは、システムの共有シートにそれぞれのタイルが表示されます。そのタイルに共有すると、アプリの凍結を解除し（Shizuku）、内容を転送して、再凍結用のバブルを表示します。
+= Shizuku is needed to install and remove relays.
+: 中継アプリのインストールと削除にはShizukuが必要です。
+= Grant
+: 許可
+= %1$s: installed
+: %1$s：インストールしました
+= Shizuku unavailable
+: Shizukuを利用できません
+= Add apps
+: アプリを追加
+= Maximum %1$s reached
+: 上限の%1$s件に達しました
+= Copy files when forwarding
+: 転送時にファイルをコピー
+= Route shared files through this app's storage — for receivers that reject a passed-on grant.
+: 共有されたファイルを、このアプリのストレージを経由させて渡します。引き継いだアクセス許可を受け付けない共有先のためのものです。
+= Add share targets
+: 共有先を追加
+= Icon — %1$s
+: アイコン — %1$s
+= Edit icon
+: アイコンを編集
+= Tile name
+: タイルの名前
+= Reinstall
+: 再インストール
+= Regenerate
+: 再生成
+= Generate
+: 生成
+= Remove
+: 外す
+= not generated
+: 未生成
+= ✓ installed
+: ✓ インストール済み
+= needs regenerate
+: 再生成が必要
+# SyntheticTriggerSimulationDialog.kt
+= Application
+: アプリ
+= Time
+: 時刻
+= Day
+: 曜日
+= Location
+: 位置情報
+= Device state
+: デバイスの状態
+= Event
+: イベント
+= Plugin condition
+: プラグインの条件
+
+# RunLogFilters.kt — RunLogStatusFilter labels (shown via tr(filter.label))
+= Succeeded
+: 成功
+= Failed
+: 失敗
+= Skipped
+: スキップ
+# RunLogScreenContent.kt — ActionTraceStatus.readableName() (shown via tr())
+= Success
+: 成功
+= Failure
+: 失敗
+= Timeout
+: タイムアウト

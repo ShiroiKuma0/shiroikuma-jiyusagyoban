@@ -1,5 +1,6 @@
 package com.opentasker.core.shizuku
 
+import com.opentasker.i18n.tr
 import java.util.concurrent.TimeUnit
 
 /**
@@ -25,15 +26,15 @@ object PrivilegedShell {
             }
             ShizukuShell.isRunning() -> {
                 ShizukuShell.requestPermission()
-                problems += "Shizuku is running but has not granted access — allow it and tap again"
+                problems += tr("Shizuku is running but has not granted access — allow it and tap again")
             }
-            else -> problems += "Shizuku is not running"
+            else -> problems += tr("Shizuku is not running")
         }
         val root = runCatching { viaRoot(command) }
         root.getOrNull()?.let { (exit, err) ->
             if (exit == 0) return Outcome(true, "root", "")
             problems += "root: " + err.ifEmpty { "exit $exit" }
-        } ?: run { problems += "no root (su) on this phone" }
+        } ?: run { problems += tr("no root (su) on this phone") }
         return Outcome(false, "", problems.joinToString("; "))
     }
 
@@ -44,7 +45,7 @@ object PrivilegedShell {
         // A root manager may show its own prompt first, so wait for it — but never for ever.
         if (!process.waitFor(SU_TIMEOUT_S, TimeUnit.SECONDS)) {
             process.destroy()
-            return -1 to "no answer from su in $SU_TIMEOUT_S s"
+            return -1 to tr("no answer from su in %1\$s s", SU_TIMEOUT_S)
         }
         val err = runCatching { process.errorStream.bufferedReader().use { it.readText() } }.getOrDefault("")
         return process.exitValue() to err.trim().take(200)

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import com.opentasker.ui.components.OutlinedButton
 import android.content.Context
@@ -287,7 +288,7 @@ internal fun AppMultiSelectDialog(
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        title.ifBlank { "Select apps" },
+                        title.ifBlank { tr("Select apps") },
                         style = MaterialTheme.typography.titleMedium,
                         color = role(UiRole.DIALOG_TITLE),
                         modifier = Modifier.weight(1f),
@@ -295,7 +296,7 @@ internal fun AppMultiSelectDialog(
                     IconButton(onClick = { showSizing = !showSizing }) {
                         Icon(
                             Icons.Filled.Tune,
-                            contentDescription = "Tile sizing",
+                            contentDescription = tr("Tile sizing"),
                             tint = if (showSizing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -303,25 +304,25 @@ internal fun AppMultiSelectDialog(
                 if (showSizing) {
                     // Inline sizing panel: −/+ steppers + bold toggle, persisted immediately.
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SizeStepper("Icon", iconDp, 32, 160, 8) { iconDp = it; persist() }
-                        SizeStepper("Label", labelSp, 7, 28, 1) { labelSp = it; persist() }
-                        SizeStepper("ID", pkgSp, 6, 20, 1) { pkgSp = it; persist() }
+                        SizeStepper(tr("Icon"), iconDp, 32, 160, 8) { iconDp = it; persist() }
+                        SizeStepper(tr("Label"), labelSp, 7, 28, 1) { labelSp = it; persist() }
+                        SizeStepper(tr("ID"), pkgSp, 6, 20, 1) { pkgSp = it; persist() }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        SizeStepper("Pad↕", padV, 0, 32, 2) { padV = it; persist() }
-                        SizeStepper("Pad↔", padH, 0, 32, 2) { padH = it; persist() }
+                        SizeStepper(tr("Pad↕"), padV, 0, 32, 2) { padV = it; persist() }
+                        SizeStepper(tr("Pad↔"), padH, 0, 32, 2) { padH = it; persist() }
                         // An on/off setting is a switch, never a pill that grows a tick.
-                        Text("Bold", fontWeight = if (labelBold) FontWeight.Bold else FontWeight.Normal)
+                        Text(tr("Bold"), fontWeight = if (labelBold) FontWeight.Bold else FontWeight.Normal)
                         ThemedSwitch(checked = labelBold, onCheckedChange = { labelBold = it; persist() })
                     }
                     if (restrictPackages == null) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             ThemedSwitch(checked = showSystem, onCheckedChange = { showSystem = it; persist() })
                             Spacer(Modifier.width(8.dp))
-                            Text("System apps")
+                            Text(tr("System apps"))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "List preinstalled apps too — gallery, dialer, …",
+                                tr("List preinstalled apps too — gallery, dialer, …"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -333,8 +334,8 @@ internal fun AppMultiSelectDialog(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search (name or app id)") },
-                    placeholder = { Text("name, or a full package id to add it") },
+                    label = { Text(tr("Search (name or app id)")) },
+                    placeholder = { Text(tr("name, or a full package id to add it")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -371,7 +372,7 @@ internal fun AppMultiSelectDialog(
                         extras.add(0, PickableApp(typed, typed))
                         selected[typed] = typed
                         query = ""
-                    }) { Text("＋ Add “$typed”") }
+                    }) { Text(tr("＋ Add “%1\$s”", typed)) }
                 }
                 if (list == null) {
                     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -391,14 +392,14 @@ internal fun AppMultiSelectDialog(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                if (query.isBlank()) "No apps to show." else "Nothing matches “$query”.",
+                                if (query.isBlank()) tr("No apps to show.") else tr("Nothing matches “%1\$s”.", query),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                             if (restrictPackages == null && !showSystem) {
                                 TextButton(onClick = { showSystem = true; persist() }) {
-                                    Text("Search preinstalled system apps too")
+                                    Text(tr("Search preinstalled system apps too"))
                                 }
                             }
                         }
@@ -452,12 +453,12 @@ internal fun AppMultiSelectDialog(
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    OutlinedButton(onClick = onCancel) { Text("Cancel") }
+                    OutlinedButton(onClick = onCancel) { Text(tr("Cancel")) }
                     if (!singleSelect) {
                         Spacer(Modifier.width(8.dp))
                         Button(onClick = {
                             onConfirm(selected.map { (pkg, label) -> pkg to label }, toggleOn.toList())
-                        }) { Text("OK (${selected.size})") }
+                        }) { Text(tr("OK (%1\$s)", selected.size)) }
                     }
                 }
             }
@@ -535,7 +536,7 @@ private fun SelectableAppTile(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = "Selected",
+                        contentDescription = tr("Selected"),
                         tint = role(UiRole.CHECK_ON),
                         modifier = Modifier.size(18.dp),
                     )

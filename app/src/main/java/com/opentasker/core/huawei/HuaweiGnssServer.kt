@@ -1,5 +1,6 @@
 package com.opentasker.core.huawei
 
+import com.opentasker.i18n.tr
 import java.security.MessageDigest
 
 /**
@@ -73,7 +74,7 @@ object HuaweiGnssServer {
             val svc = HuaweiCommands.SVC_GNSS_FILES
             when (f.commandId) {
                 HuaweiCommands.GNSS_LIST -> {
-                    onProgress("Transferring", "Offering: " + files.keys.joinToString(", "))
+                    onProgress(tr("Transferring"), "Offering: " + files.keys.joinToString(", "))
                     // NOTE: no result tag on this one — the capture's answer is tag 1 alone.
                     session.send(svc, HuaweiCommands.GNSS_LIST, HuaweiProtocol.tlv(1, files.keys.joinToString(";")))
                 }
@@ -83,10 +84,10 @@ object HuaweiGnssServer {
                 }
                 HuaweiCommands.GNSS_PICK -> {
                     current = str(1)
-                    onProgress("Transferring", "It chose ${current ?: "?"}")
+                    onProgress(tr("Transferring"), "It chose ${current ?: "?"}")
                     val data = files[current]
                     if (data == null) {
-                        onProgress("Refused", "It asked for $current, which we do not have")
+                        onProgress(tr("Refused"), "It asked for $current, which we do not have")
                         return Step.UNKNOWN_FILE
                     }
                     // Size and CRC, and again no result tag.
@@ -119,7 +120,7 @@ object HuaweiGnssServer {
                         sent += n; seq++
                     }
                     bytes += sent
-                    onProgress("Transferring", "  sent $sent B of ${current ?: name}  ($bytes B total)")
+                    onProgress(tr("Transferring"), "  sent $sent B of ${current ?: name}  ($bytes B total)")
                 }
                 HuaweiCommands.GNSS_DONE -> {
                     session.send(svc, HuaweiCommands.GNSS_DONE, ok())

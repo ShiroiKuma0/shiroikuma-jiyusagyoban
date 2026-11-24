@@ -1,0 +1,607 @@
+# 09_ui — ui/screens (Variables, Widget templates), ui/theme (ThemeStore, UiRoles)
+
+# VariablesScreen.kt
+= Search variables
+: 変数を検索
+= Search
+: 検索
+= No global variables set
+: グローバル変数は設定されていません
+= No matches
+: 一致するものがありません
+= Updated %1$s
+: %1$sを更新しました
+= %1$s shown
+: %1$s件を表示
+= Saved
+: 保存済み
+= Info
+: 情報
+# The two scope headings of the list (group keys in the code, translated where the heading is drawn)
+= Global
+: グローバル
+= Project-global
+: プロジェクトグローバル
+= %1$s (%2$s)
+: %1$s（%2$s）
+= Collapse %1$s
+: %1$sを折りたたむ
+= Expand %1$s
+: %1$sを展開
+= Clean up dead globals
+: 不要なグローバル変数を整理
+= Clean up dead globals (%1$s)
+: 不要なグローバル変数を整理（%1$s）
+= Collapse cleanup
+: 整理を折りたたむ
+= Expand cleanup
+: 整理を展開
+= Shadow-copies (dup of a project-global)
+: 重複コピー（プロジェクトグローバル変数と同じもの）
+= Orphans (referenced nowhere)
+: 孤立した変数（どこからも参照されていない）
+= Dangling project-globals (dead project)
+: 行き場のないプロジェクトグローバル変数（プロジェクトが存在しない）
+= Proper globals (in use)
+: 正規のグローバル変数（使用中）
+= delete
+: 削除
+= keep
+: 保持
+= project #%1$s
+: プロジェクト #%1$s
+= ✗ proj #%1$s
+: ✗ プロジェクト #%1$s
+= Delete 1 dead global
+: 不要なグローバル変数1件を削除
+= Delete %1$s dead globals
+: 不要なグローバル変数%1$s件を削除
+= Nothing to clean
+: 整理するものはありません
+= Delete 1 dead global?
+: 不要なグローバル変数1件を削除しますか？
+= Delete %1$s dead globals?
+: 不要なグローバル変数%1$s件を削除しますか？
+= %1$s shadow-copies + %2$s orphans + %3$s dangling (dead-project) globals. %4$s proper globals stay; every live project copy is untouched.
+: 重複コピー%1$s件、孤立した変数%2$s件、行き場のない（プロジェクトが存在しない）グローバル変数%3$s件を削除します。正規のグローバル変数%4$s件は残り、現存するプロジェクトのコピーには一切触れません。
+= Delete
+: 削除
+= Cancel
+: キャンセル
+= Collapse variable
+: 変数を折りたたむ
+= Expand variable
+: 変数を展開
+= super-global
+: スーパーグローバル
+= project-global
+: プロジェクトグローバル
+= Edit variable
+: 変数を編集
+= Delete variable
+: 変数を削除
+
+# WidgetTemplatesScreen.kt
+= No templates yet. Create one, design it in the editor, then point a Set Widget action at it by name.
+: テンプレートはまだありません。作成してエディターでデザインし、「Set Widget」アクションで名前を指定してください。
+= Collapse template
+: テンプレートを折りたたむ
+= Expand template
+: テンプレートを展開
+= Edit template
+: テンプレートを編集
+= Copy layout JSON
+: レイアウトのJSONをコピー
+= Delete template
+: テンプレートを削除
+= New template
+: 新しいテンプレート
+= Template name
+: テンプレート名
+= A template with that name already exists.
+: その名前のテンプレートはすでにあります。
+= Design
+: デザイン
+
+# ThemeStore.kt — the two built-in entries of the font picker
+= System default
+: システムの既定
+= Monospace
+: 等幅
+
+# UiRoles.kt — RoleSection titles (the page that draws them wraps section.title)
+= Text
+: 文字
+= Buttons
+: ボタン
+= Dialogs
+: ダイアログ
+= Switches
+: スイッチ
+= Check boxes and radio buttons
+: チェックボックスとラジオボタン
+= Menus
+: メニュー
+= Lists and pickers
+: 一覧と選択画面
+= This page
+: このページ
+= Bars and tabs
+: バーとタブ
+= Scenes
+: シーン
+= Widgets and notifications
+: ウィジェットと通知
+= Progress panel
+: 進行状況パネル
+= 「健康」 screens
+: 「健康」の画面
+= 「言語島」 screens
+: 「言語島」の画面
+= Screens — shared entries
+: 画面 — 共通の項目
+
+# UiRoles.kt — UiRole labels and notes (the page wraps role.label and role.note)
+# ---- text
+= Explanations
+: 説明文
+= The description under a setting, and the rule at its left
+: 設定の下の説明文と、その左の縦線
+= Section headings
+: セクションの見出し
+= The heading of a section on a settings page
+: 設定ページのセクションの見出し
+
+# ---- buttons
+= Main button · frame
+: メインボタン · 枠
+= The thick frame of a block's main action
+: ブロックの主なアクションの太い枠
+= Main button · label
+: メインボタン · ラベル
+= The bold label of a block's main action
+: ブロックの主なアクションの太字のラベル
+= Button · frame
+: ボタン · 枠
+= The thin frame of every other action
+: それ以外のアクションの細い枠
+= Button · label
+: ボタン · ラベル
+= The label of every other action
+: それ以外のアクションのラベル
+= Frame and label of an action that deletes, and the icon of such a menu row
+: 削除するアクションの枠とラベル、および削除するメニュー行のアイコン
+= Floating button · ring
+: フローティングボタン · 輪
+= The ring of the round + button
+: 丸い「+」ボタンの輪
+= Floating button · glyph
+: フローティングボタン · 記号
+= The + inside the round button
+: 丸いボタンの中の「+」
+= Floating button · ground
+: フローティングボタン · 地
+= What shows inside the ring
+: 輪の内側に見える部分
+
+# ---- dialogs
+= Dialog · ground
+: ダイアログ · 地
+= The panel of every dialog
+: すべてのダイアログのパネル
+= Dialog · frame
+: ダイアログ · 枠
+= The line round every dialog
+: すべてのダイアログを囲む線
+= Dialog · title
+: ダイアログ · タイトル
+= A dialog's heading
+: ダイアログの見出し
+= Dialog · text
+: ダイアログ · 文字
+= A dialog's own text
+: ダイアログの本文
+= Dialog · icon
+: ダイアログ · アイコン
+= The icon above a dialog's title
+: ダイアログのタイトルの上のアイコン
+
+# ---- switches
+= On · outline
+: オン · 輪郭
+= The outline of a switch that is on
+: オンのスイッチの輪郭
+= On · dot
+: オン · 点
+= The dot of a switch that is on
+: オンのスイッチの点
+= Off · outline
+: オフ · 輪郭
+= The outline of a switch that is off — an opaque darker yellow, not a faded one
+: オフのスイッチの輪郭 — 薄めた黄色ではなく、不透明な暗めの黄色
+= Off · dot
+: オフ · 点
+= The dot of a switch that is off
+: オフのスイッチの点
+
+# ---- selection marks
+= Check box · chosen
+: チェックボックス · 選択中
+= The box of a chosen entry
+: 選んだ項目の四角
+= Check box · mark
+: チェックボックス · 印
+= The tick inside a chosen box
+: 選んだ四角の中のチェック印
+= Check box · not chosen
+: チェックボックス · 未選択
+= The empty box
+: 空の四角
+= Radio button · chosen
+: ラジオボタン · 選択中
+= The chosen one of a group
+: グループの中で選ばれているもの
+= Radio button · not chosen
+: ラジオボタン · 未選択
+= The others of a group
+: グループのそれ以外のもの
+
+# ---- menus
+= Menu · ground
+: メニュー · 地
+= The panel of a popup menu
+: ポップアップメニューのパネル
+= Menu · frame
+: メニュー · 枠
+= The line round a popup menu
+: ポップアップメニューを囲む線
+= Menu row · frame
+: メニューの行 · 枠
+= The pill of an action row
+: アクションの行のピル
+= Menu row · label
+: メニューの行 · ラベル
+= The words of a menu row
+: メニューの行の文字
+= Menu · divider
+: メニュー · 区切り線
+= The line between two groups of rows
+: 行のグループの間の線
+= Icon · run, start, connect
+: アイコン · 実行、開始、接続
+= Rows that run or start something, place a call, load
+: 何かを実行・開始する行、電話をかける行、読み込む行
+= Icon · write, edit
+: アイコン · 書く、編集
+= Rows that write, rename, edit or reply
+: 書く行、名前を変更する行、編集する行、返信する行
+= Icon · person, group, project
+: アイコン · 人、グループ、プロジェクト
+= Rows about a person, a group or a project
+: 人、グループ、プロジェクトに関する行
+= Icon · copy, share, export
+: アイコン · コピー、共有、エクスポート
+= Rows that copy, move, share, export or import
+: コピー、移動、共有、エクスポート、インポートする行
+= Icon · view, open, settings
+: アイコン · 表示、開く、設定
+= Rows that view or open a page, or lead to settings
+: ページを表示する・開く行、設定へ進む行
+= Icon · stop, disable, leave
+: アイコン · 停止、無効、退出
+= Rows that stop, disable, block, close or leave
+: 停止、無効化、ブロックする行、閉じる・退出する行
+
+# ---- lists and pickers
+= List · divider
+: 一覧 · 区切り線
+= The line between two groups of a list or a picker
+: 一覧や選択画面のグループの間の線
+= Picker row · frame
+: 選択画面の行 · 枠
+= The frame of a row in a picker
+: 選択画面の行の枠
+= List · label
+: 一覧 · ラベル
+= The first line of a list row
+: 一覧の行の一行目
+= List · second line
+: 一覧 · 二行目
+= The second line of a list row
+: 一覧の行の二行目
+= List · chosen mark
+: 一覧 · 選択の印
+= The ✓ beside the chosen entry of a choice list
+: 選択一覧で、選んだ項目の横に付く✓
+= Badge · ground
+: バッジ · 地
+= The ground of a badge in a form or a list when it is given no colour
+: フォームや一覧で、色の指定がないバッジの地
+= Warning
+: 警告
+= A warning tag or note: needs setup, unsupported, a conflict
+: 警告のタグや注記：セットアップが必要、非対応、競合
+
+# ---- this page
+= Section divider
+: セクションの区切り線
+= The thin line above each section
+: 各セクションの上の細い線
+= Index chip · frame
+: 目次チップ · 枠
+= The chips of the index at the top
+: 上部の目次のチップ
+= Index chip · label
+: 目次チップ · ラベル
+= The words on the index chips
+: 目次チップの文字
+= Setting · label
+: 設定 · ラベル
+= The bold label of a setting
+: 設定の太字のラベル
+= Setting · value
+: 設定 · 値
+= The value shown at a setting's right
+: 設定の右に表示される値
+= Section icon · the base
+: セクションのアイコン · 基本
+= Sections about what the app is, and its settings
+: アプリそのものと、その設定に関するセクション
+= Section icon · controls
+: セクションのアイコン · 操作部品
+= Sections about what you operate: buttons, switches, marks
+: 操作するものに関するセクション：ボタン、スイッチ、印
+= Section icon · words
+: セクションのアイコン · 言葉
+= Sections about what is written and read: text, fonts, editors
+: 書くもの・読むものに関するセクション：文字、フォント、エディター
+= Section icon · the frame
+: セクションのアイコン · 枠組み
+= Sections about the frame and its boxes: lists, bars, borders
+: 枠組みとその箱に関するセクション：一覧、バー、枠線
+= Section icon · reaching out
+: セクションのアイコン · 働きかけ
+= Sections where the app asks, offers or hands over: dialogs, menus, export
+: アプリが尋ねる・差し出す・引き渡すセクション：ダイアログ、メニュー、エクスポート
+= Section icon · warning
+: セクションのアイコン · 警告
+= Sections that reset or wipe
+: リセットや消去を行うセクション
+= Section icon · a brief flash
+: セクションのアイコン · 一瞬の表示
+= The one section about what flashes up and goes
+: 一瞬現れて消えるものに関する、ただ一つのセクション
+
+# ---- bars and tabs
+= Tabs · ink
+: タブ · 描画色
+= Lines and labels of the paper tabs
+: 紙のタブの線とラベル
+= Tabs · ground
+: タブ · 地
+= The paper of the tabs
+: タブの紙の部分
+= Top bar · title
+: 上部バー · タイトル
+= The title in the top bar
+: 上部バーのタイトル
+= Top bar · icons
+: 上部バー · アイコン
+= The glyph buttons of the top bar
+: 上部バーの記号ボタン
+
+# ---- scenes
+= Scene · text
+: シーン · 文字
+= Text of a scene element that sets no colour of its own
+: 自分の色を指定していないシーンの要素の文字
+= Scene · ground
+: シーン · 地
+= The ground of a scene that sets none
+: 地を指定していないシーンの地
+= Scene · element ground
+: シーン · 要素の地
+= The ground of an element that sets none
+: 地を指定していない要素の地
+= Scene · button frame
+: シーン · ボタンの枠
+= The pill of a scene button that sets no colour
+: 色を指定していないシーンのボタンのピル
+= Scene · button label
+: シーン · ボタンのラベル
+= The label of a scene button that sets no colour
+: 色を指定していないシーンのボタンのラベル
+= Scene · border
+: シーン · 枠線
+= The border of a scene or an element that asks for one and names no colour
+: 枠線を付ける指定があり、色の指定がないシーンや要素の枠線
+= Scene · slider fill
+: シーン · スライダーの塗り
+= The filled part of a slider that sets no colour
+: 色を指定していないスライダーの塗られた部分
+= Scene · note
+: シーン · 注記
+= The note shown for an element the overlay cannot draw
+: オーバーレイが描画できない要素の代わりに表示される注記
+
+# ---- widgets and notifications
+= Notification · accent
+: 通知 · アクセント色
+= The colour Android gives this app's notifications
+: Androidがこのアプリの通知に付ける色
+= Task widget · ground
+: タスクウィジェット · 地
+= The ground of the home-screen task widget
+: ホーム画面のタスクウィジェットの地
+= Task widget · frame
+: タスクウィジェット · 枠
+= The frame of the home-screen task widget
+: ホーム画面のタスクウィジェットの枠
+= Task widget · text
+: タスクウィジェット · 文字
+= The task's name on the widget
+: ウィジェットに表示されるタスクの名前
+= Task widget · second line
+: タスクウィジェット · 二行目
+= The smaller line on the widget
+: ウィジェットの小さい方の行
+= Task widget · icon
+: タスクウィジェット · アイコン
+= The run icon on the widget
+: ウィジェットの実行アイコン
+
+# ---- the progress panel
+= Panel · ground
+: パネル · 地
+= The ground of the progress panel
+: 進行状況パネルの地
+= Panel · frame
+: パネル · 枠
+= The frame of the progress panel
+: 進行状況パネルの枠
+= Panel · title
+: パネル · タイトル
+= The heading of the progress panel
+: 進行状況パネルの見出し
+= Panel · text
+: パネル · 文字
+= Lines of the progress panel
+: 進行状況パネルの各行
+= Panel · active row
+: パネル · 実行中の行
+= The wash behind the row that is running, drawn at one fifth strength
+: 実行中の行の背後の淡い塗り（5分の1の濃さで描画）
+= Panel · failure
+: パネル · 失敗
+= A line of the panel that reports a failure
+: 失敗を知らせるパネルの行
+
+# ---- 健康
+= Annotation · ink
+: 注釈 · 描画色
+= Frame and words of everything 白い熊 wrote on a chart: notes, marks, sessions
+: 白い熊がグラフに書き込んだものすべての枠と文字：メモ、印、セッション
+= Annotation · ground
+: 注釈 · 地
+= The ground an annotation brings with it, so that it reads on any colour
+: どんな色の上でも読めるように、注釈が自分で持つ地
+= The explanation ink of the health screens — a soft cyan, apart from every series colour
+: 「健康」の画面の説明文の色 — どの系列の色とも異なる、淡いシアン
+= Tracks and quiet grids
+: トラックと控えめな目盛線
+= The empty track behind a bar and the quiet grid of a card, drawn faintly
+: バーの背後の空のトラックと、カードの控えめな目盛線（薄く描画）
+
+# ---- 言語島
+= Language chip · ground
+: 言語チップ · 地
+= The filled chip that marks the second language, and a count badge
+: 第二言語を示す塗りつぶしのチップと、件数のバッジ
+= Language chip · label
+: 言語チップ · ラベル
+= The letters on that chip
+: そのチップの文字
+= Board tile · frame
+: ボードのタイル · 枠
+= The frame of an ordinary tile on the board; a wide tile takes the accent
+: ボード上の通常のタイルの枠。幅の広いタイルはアクセント色になります
+
+# ---- screens: the Material scheme entries
+= Primary
+: プライマリ
+= Accent of upstream's screens: icons, marks, highlighted text
+: OpenTasker由来の画面のアクセント色：アイコン、印、強調された文字
+= On primary
+: プライマリ上
+= What is drawn on a primary-coloured ground
+: プライマリ色の地の上に描かれるもの
+= Primary container
+: プライマリコンテナ
+= A panel that stands for the accent
+: アクセント色を表すパネル
+= On primary container
+: プライマリコンテナ上
+= What is drawn on such a panel
+: そのようなパネルの上に描かれるもの
+= Secondary
+: セカンダリ
+= The second accent of upstream's screens
+: OpenTasker由来の画面の第二のアクセント色
+= On secondary
+: セカンダリ上
+= What is drawn on a secondary-coloured ground
+: セカンダリ色の地の上に描かれるもの
+= Secondary container
+: セカンダリコンテナ
+= A panel that stands for the second accent
+: 第二のアクセント色を表すパネル
+= On secondary container
+: セカンダリコンテナ上
+= Tertiary
+: ターシャリ
+= The third accent of upstream's screens
+: OpenTasker由来の画面の第三のアクセント色
+= On tertiary
+: ターシャリ上
+= What is drawn on a tertiary-coloured ground
+: ターシャリ色の地の上に描かれるもの
+= Tertiary container
+: ターシャリコンテナ
+= A panel that stands for the third accent
+: 第三のアクセント色を表すパネル
+= On tertiary container
+: ターシャリコンテナ上
+= Error
+: エラー
+= Errors and failures on upstream's screens
+: OpenTasker由来の画面のエラーと失敗
+=[role] On error
+: エラー上
+= What is drawn on an error-coloured ground
+: エラー色の地の上に描かれるもの
+= Error container
+: エラーコンテナ
+= A panel that reports an error
+: エラーを知らせるパネル
+= On error container
+: エラーコンテナ上
+= On background
+: 背景上
+= Text drawn straight on the background
+: 背景に直接描かれる文字
+= On surface
+: サーフェス上
+= Text on cards and panels
+: カードやパネルの上の文字
+= Surface variant
+: サーフェスバリアント
+= The ground of chips, fields and quiet panels
+: チップ、入力欄、控えめなパネルの地
+= On surface variant
+: サーフェスバリアント上
+= Second lines, hints and icon tints of upstream's screens
+: OpenTasker由来の画面の二行目、ヒント、アイコンの色
+= Raised panels
+: 浮き上がったパネル
+= The ground of popups, sheets and other raised panels
+: ポップアップ、シートなど、浮き上がったパネルの地
+= Inverse surface
+: 反転サーフェス
+= The ground of a snackbar
+: スナックバーの地
+= Inverse on surface
+: 反転サーフェス上
+= Text on a snackbar
+: スナックバーの文字
+= Outline
+: アウトライン
+= Frames of fields and cards
+: 入力欄とカードの枠
+= Outline variant
+: アウトラインバリアント
+= Quiet dividers and frames
+: 控えめな区切り線と枠
+= Scrim
+: スクリム
+= The shade behind a dialog
+: ダイアログの背後の陰

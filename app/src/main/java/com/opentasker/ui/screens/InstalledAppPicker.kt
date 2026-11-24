@@ -57,6 +57,7 @@ import com.opentasker.core.apps.InstalledApp
 import com.opentasker.core.apps.InstalledAppRepository
 import com.opentasker.core.apps.InstalledAppSearch
 import com.opentasker.core.apps.PackageNamePolicy
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,14 +80,14 @@ internal fun InstalledAppFieldInput(
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
-            label = { Text(label) },
+            label = { Text(tr(label)) },
             isError = invalid,
             supportingText = {
                 Text(
                     when {
                         invalid -> stringResource(R.string.app_picker_invalid_package)
                         required && value.isBlank() -> stringResource(R.string.label_required)
-                        else -> hint.orEmpty()
+                        else -> tr(hint.orEmpty())
                     },
                 )
             },

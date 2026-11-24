@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.R
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.i18n.tr
 
 /**
  * The notification raised when 白い熊 音声 cannot be made to render — with a button that opens it,
@@ -48,7 +49,7 @@ object OnseWarning {
         }
         val nm = app.getSystemService(NotificationManager::class.java) ?: return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(CHANNEL_ID, tr(CHANNEL_NAME), NotificationManager.IMPORTANCE_HIGH),
         )
         val text = buildString {
             append("白い熊 音声 を裏から起動できませんでした。\n")

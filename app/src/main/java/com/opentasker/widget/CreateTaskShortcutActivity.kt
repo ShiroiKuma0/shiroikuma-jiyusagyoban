@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -203,13 +204,13 @@ private fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
 
     val sizes = remember(prefs) { PickerSizes.from(prefs) }
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp)) {
-        Text("Pick a task", style = MaterialTheme.typography.titleLarge, fontFamily = font)
+        Text(tr("Pick a task"), style = MaterialTheme.typography.titleLarge, fontFamily = font)
         Spacer(Modifier.size(8.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 list == null -> Unit
                 list.isEmpty() -> Text(
-                    "No tasks yet. Create one in 白い熊 自由作業盤 first.",
+                    tr("No tasks yet. Create one in 白い熊 自由作業盤 first."),
                     fontFamily = font, fontSize = sizes.itemSp.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -234,7 +235,7 @@ private fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
                 contentColor = MaterialTheme.colorScheme.primary,            // yellow label
             ),
         ) {
-            Text("Cancel", fontFamily = font, fontSize = sizes.itemSp.sp)
+            Text(tr("Cancel"), fontFamily = font, fontSize = sizes.itemSp.sp)
         }
     }
 }
@@ -247,7 +248,7 @@ private fun ProjectBlock(
     val sizes = remember(prefs) { PickerSizes.from(prefs) }
     val open = "p:${node.key}" in expanded
     Column(Modifier.fillMaxWidth()) {
-        PickerHeader(node.title, node.taskCount, open, isProject = true, prefs, font) { onToggle("p:${node.key}") }
+        PickerHeader(if (node.key == UNFILED_KEY) tr(node.title) else node.title, node.taskCount, open, isProject = true, prefs, font) { onToggle("p:${node.key}") }
         if (open) {
             Column(
                 Modifier.fillMaxWidth().padding(start = prefs.pickerIndentDp.dp, top = sizes.padDp.dp),
@@ -326,7 +327,7 @@ private fun PickerHeader(
         Spacer(Modifier.width(6.dp))
         Icon(
             if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-            contentDescription = if (open) "Collapse" else "Expand",
+            contentDescription = if (open) tr("Collapse") else tr("Expand"),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

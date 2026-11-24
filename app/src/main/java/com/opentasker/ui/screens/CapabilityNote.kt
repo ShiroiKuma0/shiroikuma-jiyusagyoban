@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -47,7 +48,7 @@ internal fun CapabilityNote(capability: ActionCapability, modifier: Modifier = M
         // and there's nothing to toggle, so just surface the reason in red when not supported.
         if (capability.level != CapabilityLevel.Supported) {
             Text(
-                capability.reason,
+                tr(capability.reason),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = modifier,

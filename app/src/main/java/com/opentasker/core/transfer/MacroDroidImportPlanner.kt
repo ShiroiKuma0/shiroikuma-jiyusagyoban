@@ -1,6 +1,7 @@
 package com.opentasker.core.transfer
 
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.i18n.tr
 
 private const val MACRODROID_DISABLED_PROFILE_WARNING =
     "Imported MacroDroid profiles are disabled by default. Review triggers, actions, placeholders, and required permissions before enabling them."
@@ -12,7 +13,7 @@ object MacroDroidImportPlanner {
         val emptyWarning = if (hasImportableContent) {
             emptyList()
         } else {
-            listOf("No importable MacroDroid macros were found.")
+            listOf(tr("No importable MacroDroid macros were found."))
         }
         return TaskerImportPreview(
             sourceTaskCount = report.sourceMacroCount,

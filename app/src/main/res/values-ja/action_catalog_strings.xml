@@ -1,0 +1,837 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Generated from stable action catalog keys; values are the translatable presentation layer. -->
+    <string name="catalog_action_notify_show_name" formatted="false">通知を表示</string>
+    <string name="catalog_action_notify_show_description" formatted="false">チャンネル、常駐、置き換えを指定して通知を出します。</string>
+    <string name="catalog_category_notification" formatted="false">通知</string>
+    <string name="catalog_action_notify_show_field_title_label" formatted="false">タイトル</string>
+    <string name="catalog_action_notify_show_field_title_hint" formatted="false">通知のタイトル</string>
+    <string name="catalog_action_notify_show_field_text_label" formatted="false">本文</string>
+    <string name="catalog_action_notify_show_field_text_hint" formatted="false">通知の本文</string>
+    <string name="catalog_action_notify_show_field_channel_label" formatted="false">チャンネル</string>
+    <string name="catalog_action_notify_show_field_channel_hint" formatted="false">quiet / default / urgent</string>
+    <string name="catalog_action_notify_show_field_persistent_label" formatted="false">常駐</string>
+    <string name="catalog_action_notify_show_field_persistent_hint" formatted="false">取り消すまで表示し続ける</string>
+    <string name="catalog_action_notify_show_field_tag_label" formatted="false">タグ</string>
+    <string name="catalog_action_notify_show_field_tag_hint" formatted="false">置き換え用のタグ（同じタグの通知を置き換え）</string>
+    <string name="catalog_action_notify_show_field_id_label" formatted="false">ID</string>
+    <string name="catalog_action_notify_show_field_id_hint" formatted="false">通知ID（同じIDの通知を置き換え）</string>
+    <string name="catalog_action_notify_show_field_button1_label_label" formatted="false">ボタン1のラベル</string>
+    <string name="catalog_action_notify_show_field_button1_label_hint" formatted="false">アクションボタンのラベル</string>
+    <string name="catalog_action_notify_show_field_button1_task_id_label" formatted="false">ボタン1のタスク</string>
+    <string name="catalog_action_notify_show_field_button1_task_id_hint" formatted="false">タップ時に実行するタスク</string>
+    <string name="catalog_action_notify_show_field_button2_label_label" formatted="false">ボタン2のラベル</string>
+    <string name="catalog_action_notify_show_field_button2_label_hint" formatted="false">2つ目のボタンのラベル</string>
+    <string name="catalog_action_notify_show_field_button2_task_id_label" formatted="false">ボタン2のタスク</string>
+    <string name="catalog_action_notify_show_field_button2_task_id_hint" formatted="false">タップ時に実行するタスク</string>
+    <string name="catalog_action_notify_show_field_button3_label_label" formatted="false">ボタン3のラベル</string>
+    <string name="catalog_action_notify_show_field_button3_label_hint" formatted="false">3つ目のボタンのラベル</string>
+    <string name="catalog_action_notify_show_field_button3_task_id_label" formatted="false">ボタン3のタスク</string>
+    <string name="catalog_action_notify_show_field_button3_task_id_hint" formatted="false">タップ時に実行するタスク</string>
+    <string name="catalog_action_notify_show_field_button1_url_label" formatted="false">ボタン1のリンク</string>
+    <string name="catalog_action_notify_show_field_button1_url_hint" formatted="false">タップ時に開くウェブアドレス。タスクが未設定の場合に使われます。</string>
+    <string name="catalog_action_notify_show_field_button2_url_label" formatted="false">ボタン2のリンク</string>
+    <string name="catalog_action_notify_show_field_button2_url_hint" formatted="false">タップ時に開くウェブアドレス。タスクが未設定の場合に使われます。</string>
+    <string name="catalog_action_notify_show_field_button3_url_label" formatted="false">ボタン3のリンク</string>
+    <string name="catalog_action_notify_show_field_button3_url_hint" formatted="false">タップ時に開くウェブアドレス。タスクが未設定の場合に使われます。</string>
+    <string name="catalog_action_notify_cancel_name" formatted="false">通知を取り消し</string>
+    <string name="catalog_action_notify_cancel_description" formatted="false">タグまたはID、あるいはその両方を指定して通知を取り消します。</string>
+    <string name="catalog_action_notify_cancel_field_tag_label" formatted="false">タグ</string>
+    <string name="catalog_action_notify_cancel_field_tag_hint" formatted="false">取り消す通知のタグ</string>
+    <string name="catalog_action_notify_cancel_field_id_label" formatted="false">ID</string>
+    <string name="catalog_action_notify_cancel_field_id_hint" formatted="false">取り消す通知のID</string>
+    <string name="catalog_action_var_set_name" formatted="false">変数を設定</string>
+    <string name="catalog_action_var_set_description" formatted="false">変数に新しい値を設定します。</string>
+    <string name="catalog_category_variable" formatted="false">変数</string>
+    <string name="catalog_action_var_set_field_name_label" formatted="false">変数名</string>
+    <string name="catalog_action_var_set_field_name_hint" formatted="false">%var 形式の名前</string>
+    <string name="catalog_action_var_set_field_value_label" formatted="false">値</string>
+    <string name="catalog_action_var_set_field_value_hint" formatted="false">%expansion（変数の展開）に対応</string>
+    <string name="catalog_action_var_set_multiple_name" formatted="false">複数の変数を設定</string>
+    <string name="catalog_action_var_set_multiple_description" formatted="false">複数の変数を一度に設定します。それぞれの名前に、同じ位置にある値が入ります。</string>
+    <string name="catalog_action_var_set_multiple_field_names_label" formatted="false">名前</string>
+    <string name="catalog_action_var_set_multiple_field_names_hint" formatted="false">1行に1つずつ %name を書きます。値が空で2行以上ある場合は、%count,0 のように、値の区切り文字に続けて名前ごとに値を書けます。</string>
+    <string name="catalog_action_var_set_multiple_field_values_label" formatted="false">値</string>
+    <string name="catalog_action_var_set_multiple_field_values_hint" formatted="false">名前と同じ順に、1行に1つずつ値を書きます。値のない名前の変数は未設定になります。</string>
+    <string name="catalog_action_var_set_multiple_field_names_splitter_label" formatted="false">名前の区切り文字</string>
+    <string name="catalog_action_var_set_multiple_field_values_splitter_label" formatted="false">値の区切り文字</string>
+    <string name="catalog_action_var_set_multiple_field_splitter_hint" formatted="false">項目を区切る文字列。空欄の場合は改行、1行しかないときはカンマで区切ります。</string>
+    <string name="catalog_action_var_set_multiple_field_keep_existing_label" formatted="false">既存の値を保持</string>
+    <string name="catalog_action_var_set_multiple_field_keep_existing_hint" formatted="false">すでに値のある変数は変更しません。</string>
+    <string name="catalog_action_var_persist_name" formatted="false">変数を永続化</string>
+    <string name="catalog_action_var_persist_description" formatted="false">変数の現在の値をグローバル変数にコピーし、タスクの実行をまたいで保持します。</string>
+    <string name="catalog_action_var_persist_field_name_label" formatted="false">元の変数</string>
+    <string name="catalog_action_var_persist_field_name_hint" formatted="false">ローカル変数の名前</string>
+    <string name="catalog_action_var_persist_field_global_name_label" formatted="false">グローバル変数名</string>
+    <string name="catalog_action_var_persist_field_global_name_hint" formatted="false">省略すると、元の名前を大文字にしたものになります。</string>
+    <string name="catalog_action_var_clear_name" formatted="false">変数を消去</string>
+    <string name="catalog_action_var_clear_description" formatted="false">1つの変数、パターンに一致するすべての変数、またはすべてのローカル変数を未設定にします。</string>
+    <string name="catalog_action_var_clear_field_name_label" formatted="false">名前またはパターン</string>
+    <string name="catalog_action_var_clear_field_name_hint" formatted="false">%name、配列の最後の要素を指す %arr(&lt;)、JSON変数の項目を1つ削除する %json.key、またはパターン照合を使う %item* を指定します。空欄にすると、すべてのローカル変数を消去します。</string>
+    <string name="catalog_action_var_clear_field_pattern_label" formatted="false">パターン照合</string>
+    <string name="catalog_action_var_clear_field_pattern_hint" formatted="false">%item* や %a/%b のように、名前が一致するすべての変数を消去します。</string>
+    <string name="catalog_action_var_clear_field_local_only_label" formatted="false">ローカル変数のみ</string>
+    <string name="catalog_action_var_clear_field_local_only_hint" formatted="false">パターン照合のとき、グローバル変数は消去しません。</string>
+    <string name="catalog_action_var_clear_field_clear_all_label" formatted="false">すべての変数を消去</string>
+    <string name="catalog_action_var_clear_field_clear_all_hint" formatted="false">名前が空欄のとき、すべてのグローバル変数も消去します。</string>
+    <string name="catalog_action_clipboard_get_name" formatted="false">クリップボードを取得</string>
+    <string name="catalog_action_clipboard_get_description" formatted="false">システムのクリップボードの文字列を、機密扱いの変数に読み込みます。</string>
+    <string name="catalog_action_clipboard_get_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_clipboard_get_field_var_hint" formatted="false">既定：Clipboard（%Clipboard_has_text も設定）</string>
+    <string name="catalog_action_clipboard_set_name" formatted="false">クリップボードに設定</string>
+    <string name="catalog_action_clipboard_set_description" formatted="false">長さに上限のある文字列をシステムのクリップボードに書き込みます。</string>
+    <string name="catalog_action_clipboard_set_field_text_label" formatted="false">文字列</string>
+    <string name="catalog_action_clipboard_set_field_text_hint" formatted="false">最大64 KiB。クリップボードの内容はログに記録されません。</string>
+    <string name="catalog_action_contacts_lookup_name" formatted="false">連絡先を検索</string>
+    <string name="catalog_action_contacts_lookup_description" formatted="false">連絡先の名前、電話番号、メールアドレスを調べて、機密扱いの変数に入れます。</string>
+    <string name="catalog_action_contacts_lookup_field_query_label" formatted="false">名前、電話番号、またはメールアドレス</string>
+    <string name="catalog_action_contacts_lookup_field_query_hint" formatted="false">検索する文字列。最大128文字</string>
+    <string name="catalog_action_contacts_lookup_field_mode_label" formatted="false">検索方法</string>
+    <string name="catalog_action_contacts_lookup_field_mode_hint" formatted="false">Android 17以降では選択画面が既定です。権限による方法は無人実行向けです。</string>
+    <string name="catalog_action_contacts_lookup_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_calendar_event_add_name" formatted="false">カレンダーに予定を追加</string>
+    <string name="catalog_action_calendar_event_add_description" formatted="false">カレンダーに予定を追加し、新しい予定のIDを %event_id に入れます。</string>
+    <string name="catalog_action_calendar_event_add_field_calendar_label" formatted="false">カレンダー</string>
+    <string name="catalog_action_calendar_event_add_field_calendar_hint" formatted="false">カレンダーアプリに表示される名前、またはそのID</string>
+    <string name="catalog_action_calendar_event_add_field_title_label" formatted="false">タイトル</string>
+    <string name="catalog_action_calendar_event_add_field_start_label" formatted="false">開始</string>
+    <string name="catalog_action_calendar_event_add_field_start_hint" formatted="false">now、エポックミリ秒、2026-11-22、または 2026-11-22 09:30</string>
+    <string name="catalog_action_calendar_event_add_field_end_label" formatted="false">終了</string>
+    <string name="catalog_action_calendar_event_add_field_end_hint" formatted="false">「開始」と同じ書き方です。終日の予定では最終日を指定します。空欄の場合は「所要時間」を使います。</string>
+    <string name="catalog_action_calendar_event_add_field_duration_label" formatted="false">所要時間（分）</string>
+    <string name="catalog_action_calendar_event_add_field_duration_hint" formatted="false">既定は60です。終日の予定では、代わりに「終了」の日を指定します。</string>
+    <string name="catalog_action_calendar_event_add_field_all_day_label" formatted="false">終日</string>
+    <string name="catalog_action_calendar_event_add_field_description_label" formatted="false">説明</string>
+    <string name="catalog_action_calendar_event_add_field_location_label" formatted="false">場所</string>
+    <string name="catalog_action_calendar_event_add_field_var_label" formatted="false">変数の接頭辞</string>
+    <string name="catalog_action_calendar_event_add_field_var_hint" formatted="false">既定は event で、新しい予定のIDは %event_id に入ります。</string>
+    <string name="catalog_action_calendar_event_query_name" formatted="false">カレンダーの予定を検索</string>
+    <string name="catalog_action_calendar_event_query_description" formatted="false">指定した期間の予定を %event_count、%event_titles、%event_starts などに読み込みます。</string>
+    <string name="catalog_action_calendar_event_query_field_from_label" formatted="false">期間の開始</string>
+    <string name="catalog_action_calendar_event_query_field_from_hint" formatted="false">既定は now です。エポックミリ秒、2026-11-22、2026-11-22 09:30 も使えます。</string>
+    <string name="catalog_action_calendar_event_query_field_to_label" formatted="false">期間の終了</string>
+    <string name="catalog_action_calendar_event_query_field_to_hint" formatted="false">既定は「期間の開始」の1日後で、最長でその1年後までです。</string>
+    <string name="catalog_action_calendar_event_query_field_calendar_label" formatted="false">カレンダー</string>
+    <string name="catalog_action_calendar_event_query_field_calendar_hint" formatted="false">検索するカレンダーの名前またはID。空欄の場合はすべてのカレンダーを検索します。</string>
+    <string name="catalog_action_calendar_event_query_field_max_label" formatted="false">予定の最大件数</string>
+    <string name="catalog_action_calendar_event_query_field_max_hint" formatted="false">既定は10、最大50</string>
+    <string name="catalog_action_calendar_event_query_field_var_label" formatted="false">変数の接頭辞</string>
+    <string name="catalog_action_calendar_event_query_field_var_hint" formatted="false">既定は event です。タイトルと場所は実行ログでは伏せられます。</string>
+    <string name="catalog_action_contacts_lookup_field_var_hint" formatted="false">既定：Contact。name、phone、email、各配列、count も設定します。</string>
+    <string name="action_option_contacts_permission" formatted="false">権限（無人実行）</string>
+    <string name="action_option_contacts_picker" formatted="false">システムの選択画面（Android 17以降）</string>
+    <string name="action_option_location_fix" formatted="false">新たに測位</string>
+    <string name="action_option_location_last_known" formatted="false">最後に取得した位置のみ</string>
+    <string name="catalog_action_data_read_name" formatted="false">データを読み取り</string>
+    <string name="catalog_action_data_read_description" formatted="false">JSON、CSV、XML、HTMLを解析して変数に入れます。HTTPの応答やファイルの処理に便利です。</string>
+    <string name="catalog_action_data_read_field_source_label" formatted="false">元データ</string>
+    <string name="catalog_action_data_read_field_source_hint" formatted="false">%response またはファイルの内容</string>
+    <string name="catalog_action_data_read_field_format_label" formatted="false">形式</string>
+    <string name="catalog_action_data_read_field_format_hint" formatted="false">json（既定）、csv、xml、または html</string>
+    <string name="catalog_action_data_read_field_path_label" formatted="false">セレクター</string>
+    <string name="catalog_action_data_read_field_path_hint" formatted="false">JSON items[0].name · CSV 列 c またはセル r,c · XML root/item/name · HTML CSSセレクター</string>
+    <string name="catalog_action_data_read_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_data_read_field_var_hint" formatted="false">既定：data（配列 %var と %var_count も設定）</string>
+    <string name="catalog_action_datetime_format_name" formatted="false">日時を書式化</string>
+    <string name="catalog_action_datetime_format_description" formatted="false">エポックミリ秒の時刻（または現在時刻）を文字列に書式化します。</string>
+    <string name="catalog_action_datetime_format_field_time_label" formatted="false">時刻</string>
+    <string name="catalog_action_datetime_format_field_time_hint" formatted="false">エポックミリ秒、または now（既定）</string>
+    <string name="catalog_action_datetime_format_field_format_label" formatted="false">パターン</string>
+    <string name="catalog_action_datetime_format_field_format_hint" formatted="false">既定：yyyy-MM-dd HH:mm:ss</string>
+    <string name="catalog_action_datetime_format_field_zone_label" formatted="false">タイムゾーン</string>
+    <string name="catalog_action_datetime_format_field_zone_hint" formatted="false">例：UTC、America/New_York（任意）</string>
+    <string name="catalog_action_datetime_format_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_datetime_format_field_var_hint" formatted="false">既定：datetime</string>
+    <string name="catalog_action_datetime_parse_name" formatted="false">日時を解析</string>
+    <string name="catalog_action_datetime_parse_description" formatted="false">日時の文字列を解析してエポックミリ秒にします。</string>
+    <string name="catalog_action_datetime_parse_field_text_label" formatted="false">文字列</string>
+    <string name="catalog_action_datetime_parse_field_text_hint" formatted="false">例：2026-07-14 09:30</string>
+    <string name="catalog_action_datetime_parse_field_format_label" formatted="false">パターン</string>
+    <string name="catalog_action_datetime_parse_field_format_hint" formatted="false">例：yyyy-MM-dd HH:mm</string>
+    <string name="catalog_action_datetime_parse_field_zone_label" formatted="false">タイムゾーン</string>
+    <string name="catalog_action_datetime_parse_field_zone_hint" formatted="false">任意</string>
+    <string name="catalog_action_datetime_parse_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_datetime_parse_field_var_hint" formatted="false">既定：datetime（エポックミリ秒）</string>
+    <string name="catalog_action_datetime_add_name" formatted="false">日時に加算</string>
+    <string name="catalog_action_datetime_add_description" formatted="false">エポックミリ秒の時刻に、時間の長さを足したり引いたりします。</string>
+    <string name="catalog_action_datetime_add_field_time_label" formatted="false">時刻</string>
+    <string name="catalog_action_datetime_add_field_time_hint" formatted="false">エポックミリ秒、または now（既定）</string>
+    <string name="catalog_action_datetime_add_field_amount_label" formatted="false">量</string>
+    <string name="catalog_action_datetime_add_field_amount_hint" formatted="false">整数。負の値も使えます。</string>
+    <string name="catalog_action_datetime_add_field_unit_label" formatted="false">単位</string>
+    <string name="catalog_action_datetime_add_field_unit_hint" formatted="false">seconds/minutes/hours/days/weeks/months/years</string>
+    <string name="catalog_action_datetime_add_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_datetime_add_field_var_hint" formatted="false">既定：datetime（エポックミリ秒）</string>
+    <string name="catalog_action_text_match_name" formatted="false">文字列を照合（正規表現）</string>
+    <string name="catalog_action_text_match_description" formatted="false">正規表現に最初に一致した箇所を探します。キャプチャは出力先の配列に入ります（%var(1)=グループ1）。</string>
+    <string name="catalog_action_text_match_field_source_label" formatted="false">元の文字列</string>
+    <string name="catalog_action_text_match_field_pattern_label" formatted="false">正規表現パターン</string>
+    <string name="catalog_action_text_match_field_pattern_hint" formatted="false">正規表現（RE2構文）</string>
+    <string name="catalog_action_text_match_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_text_match_field_var_hint" formatted="false">既定：match（配列と %var_count も設定）</string>
+    <string name="catalog_action_text_replace_name" formatted="false">文字列を置換（正規表現）</string>
+    <string name="catalog_action_text_replace_description" formatted="false">正規表現に一致した箇所を置換するか、配列に格納します。$1 形式のグループ参照に対応しています。</string>
+    <string name="catalog_action_text_replace_field_source_label" formatted="false">元の文字列</string>
+    <string name="catalog_action_text_replace_field_pattern_label" formatted="false">正規表現パターン</string>
+    <string name="catalog_action_text_replace_field_replacement_label" formatted="false">置換後の文字列</string>
+    <string name="catalog_action_text_replace_field_replacement_hint" formatted="false">$1、$2、… が使えます。</string>
+    <string name="catalog_action_text_replace_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_text_replace_field_var_hint" formatted="false">既定：result</string>
+    <string name="catalog_action_text_replace_field_first_only_label" formatted="false">最初の一致のみ</string>
+    <string name="catalog_action_text_replace_field_first_only_hint" formatted="false">最初に一致した箇所だけを置換し、格納します。</string>
+    <string name="catalog_action_text_replace_field_matches_label" formatted="false">一致を配列に格納</string>
+    <string name="catalog_action_text_replace_field_matches_hint" formatted="false">%found に、一致した箇所が %found1、%found2 … の順に入ります。</string>
+    <string name="catalog_action_text_replace_field_search_only_label" formatted="false">一致の検索のみ</string>
+    <string name="catalog_action_text_replace_field_search_only_hint" formatted="false">一致した箇所を格納し、出力先の変数は変更しません。</string>
+    <string name="catalog_action_text_replace_field_in_place_label" formatted="false">出力先の変数をその場で書き換え</string>
+    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">Taskerの「Search Replace」と同じ動作です。変数が未設定なら失敗し、一致したときだけ変更し、何も残らなければ未設定にします。</string>
+    <string name="catalog_action_text_split_name" formatted="false">文字列を分割</string>
+    <string name="catalog_action_text_split_description" formatted="false">固定の区切り文字または正規表現パターンで分割し、配列にします。</string>
+    <string name="catalog_action_text_split_field_source_label" formatted="false">元の文字列</string>
+    <string name="catalog_action_text_split_field_delimiter_label" formatted="false">区切り文字</string>
+    <string name="catalog_action_text_split_field_delimiter_hint" formatted="false">分割の目印にする文字列（正規表現パターンも使えます）</string>
+    <string name="catalog_action_text_split_field_pattern_label" formatted="false">正規表現パターン</string>
+    <string name="catalog_action_text_split_field_pattern_hint" formatted="false">分割の目印にする正規表現（区切り文字より優先）</string>
+    <string name="catalog_action_text_split_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_text_split_field_var_hint" formatted="false">既定：parts（配列と %var_count）</string>
+    <string name="catalog_action_text_join_name" formatted="false">文字列を結合</string>
+    <string name="catalog_action_text_join_description" formatted="false">配列変数を1つの文字列に結合します。</string>
+    <string name="catalog_action_text_join_field_array_label" formatted="false">配列変数</string>
+    <string name="catalog_action_text_join_field_array_hint" formatted="false">配列の名前（分割や読み取りで作ったもの）</string>
+    <string name="catalog_action_text_join_field_delimiter_label" formatted="false">区切り文字</string>
+    <string name="catalog_action_text_join_field_delimiter_hint" formatted="false">既定：,</string>
+    <string name="catalog_action_text_join_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_text_join_field_var_hint" formatted="false">既定：joined</string>
+    <string name="catalog_action_text_substring_name" formatted="false">部分文字列</string>
+    <string name="catalog_action_text_substring_description" formatted="false">文字の位置を指定して文字列の一部を取り出します（範囲外の指定は端に丸められます）。</string>
+    <string name="catalog_action_text_substring_field_source_label" formatted="false">元の文字列</string>
+    <string name="catalog_action_text_substring_field_start_label" formatted="false">開始位置</string>
+    <string name="catalog_action_text_substring_field_start_hint" formatted="false">0から数えます</string>
+    <string name="catalog_action_text_substring_field_end_label" formatted="false">終了位置</string>
+    <string name="catalog_action_text_substring_field_end_hint" formatted="false">この位置の文字は含みません。空欄にすると文字列の末尾までになります。</string>
+    <string name="catalog_action_text_substring_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_text_substring_field_var_hint" formatted="false">既定：substring</string>
+    <string name="catalog_action_text_length_name" formatted="false">文字列の長さ</string>
+    <string name="catalog_action_text_length_description" formatted="false">文字列の文字数を数えます。</string>
+    <string name="catalog_action_text_length_field_source_label" formatted="false">文字列</string>
+    <string name="catalog_action_text_length_field_var_label" formatted="false">出力先の変数</string>
+    <string name="catalog_action_text_length_field_var_hint" formatted="false">既定：length</string>
+    <string name="catalog_action_var_split_name" formatted="false">変数を分割</string>
+    <string name="catalog_action_var_split_description" formatted="false">Taskerと同じように、変数を番号付きの要素に分割します（%text1、%text2、…）。</string>
+    <string name="catalog_action_var_split_field_name_label" formatted="false">名前</string>
+    <string name="catalog_action_var_split_field_name_hint" formatted="false">%text が %text1、%text2、… になります。</string>
+    <string name="catalog_action_var_split_field_values_label" formatted="false">値</string>
+    <string name="catalog_action_var_split_field_values_hint" formatted="false">Taskerの「Array Set」のように、変数自体の値の代わりにこの文字列を分割します。</string>
+    <string name="catalog_action_var_split_field_splitter_label" formatted="false">区切り文字</string>
+    <string name="catalog_action_var_split_field_splitter_hint" formatted="false">空欄の場合は空白と改行で分割します。</string>
+    <string name="catalog_action_var_split_field_regex_label" formatted="false">区切り文字を正規表現として扱う</string>
+    <string name="catalog_action_var_split_field_delete_base_label" formatted="false">分割後に変数を削除</string>
+    <string name="catalog_action_var_join_name" formatted="false">変数を結合</string>
+    <string name="catalog_action_var_join_description" formatted="false">番号付きの要素（%arr1、%arr2、…）を1つの変数に結合し直します。</string>
+    <string name="catalog_action_var_join_field_name_label" formatted="false">名前</string>
+    <string name="catalog_action_var_join_field_name_hint" formatted="false">%arr を指定すると、%arr1、%arr2、… を結合して %arr に入れます。</string>
+    <string name="catalog_action_var_join_field_joiner_label" formatted="false">結合文字</string>
+    <string name="catalog_action_var_join_field_delete_parts_label" formatted="false">結合後に要素を削除</string>
+    <string name="catalog_action_var_convert_name" formatted="false">変数を変換</string>
+    <string name="catalog_action_var_convert_description" formatted="false">バイトからメガバイト、秒から日付、文字列からBase64など、変数の値を変換します。</string>
+    <string name="catalog_action_var_convert_field_name_label" formatted="false">変数</string>
+    <string name="catalog_action_var_convert_field_name_hint" formatted="false">%name（この変数の値を変換します）</string>
+    <string name="catalog_action_var_convert_field_function_label" formatted="false">変換の種類</string>
+    <string name="catalog_action_var_convert_field_var_label" formatted="false">結果の格納先</string>
+    <string name="catalog_action_var_convert_field_var_hint" formatted="false">空欄にすると、変数自体の値を置き換えます。</string>
+    <string name="catalog_action_var_convert_field_url_safe_label" formatted="false">URLセーフBase64（Base64デコードのみ）</string>
+    <string name="catalog_action_array_push_name" formatted="false">配列に挿入</string>
+    <string name="catalog_action_array_push_description" formatted="false">配列に値を挿入し、それ以降の要素を後ろへずらします。</string>
+    <string name="catalog_action_array_push_field_array_label" formatted="false">配列</string>
+    <string name="catalog_action_array_push_field_array_hint" formatted="false">%arr（要素は %arr1、%arr2、…）</string>
+    <string name="catalog_action_array_push_field_position_label" formatted="false">位置</string>
+    <string name="catalog_action_array_push_field_position_hint" formatted="false">既定：1。末尾を超える位置を指定すると末尾に追加します。</string>
+    <string name="catalog_action_array_push_field_value_label" formatted="false">値</string>
+    <string name="catalog_action_array_push_field_fill_spaces_label" formatted="false">空きを埋める</string>
+    <string name="catalog_action_array_push_field_fill_spaces_hint" formatted="false">最初の空きまでの要素だけをずらします。</string>
+    <string name="catalog_action_array_pop_name" formatted="false">配列から取り出し</string>
+    <string name="catalog_action_array_pop_description" formatted="false">配列から要素を1つ取り除き、それ以降の要素を前へ詰めます。</string>
+    <string name="catalog_action_array_pop_field_array_label" formatted="false">配列</string>
+    <string name="catalog_action_array_pop_field_array_hint" formatted="false">%arr（要素は %arr1、%arr2、…）</string>
+    <string name="catalog_action_array_pop_field_position_label" formatted="false">位置</string>
+    <string name="catalog_action_array_pop_field_position_hint" formatted="false">既定：1。末尾を超える位置を指定すると最後の要素を取り出します。</string>
+    <string name="catalog_action_array_pop_field_to_var_label" formatted="false">格納先の変数</string>
+    <string name="catalog_action_array_pop_field_to_var_hint" formatted="false">任意。取り除いた値が入ります。</string>
+    <string name="catalog_action_array_clear_name" formatted="false">配列を消去</string>
+    <string name="catalog_action_array_clear_description" formatted="false">配列のすべての要素を未設定にします。</string>
+    <string name="catalog_action_array_clear_field_array_label" formatted="false">配列</string>
+    <string name="catalog_action_array_clear_field_array_hint" formatted="false">%arr（要素は %arr1、%arr2、…）</string>
+    <string name="catalog_action_array_process_name" formatted="false">配列を処理</string>
+    <string name="catalog_action_array_process_description" formatted="false">配列の要素全体に対して、並べ替え、逆順、回転、シャッフル、重複の除去、空きの詰めを行います。</string>
+    <string name="catalog_action_array_process_field_array_label" formatted="false">配列</string>
+    <string name="catalog_action_array_process_field_array_hint" formatted="false">%arr（要素は %arr1、%arr2、…）</string>
+    <string name="catalog_action_array_process_field_type_label" formatted="false">操作</string>
+    <string name="catalog_action_sun_times_name" formatted="false">日の出・日の入りの時刻を取得</string>
+    <string name="catalog_action_sun_times_description" formatted="false">Taskerと同じように、場所と日付から日の出、日の入り、薄明、南中の時刻を求めます。</string>
+    <string name="catalog_action_sun_times_field_latitude_label" formatted="false">緯度</string>
+    <string name="catalog_action_sun_times_field_latitude_hint" formatted="false">北緯を度で指定します。南緯は負の値です。空欄にすると端末の位置情報を使います。</string>
+    <string name="catalog_action_sun_times_field_longitude_label" formatted="false">経度</string>
+    <string name="catalog_action_sun_times_field_longitude_hint" formatted="false">東経を度で指定します。西経は負の値です。空欄にすると端末の位置情報を使います。</string>
+    <string name="catalog_action_sun_times_field_time_label" formatted="false">日</string>
+    <string name="catalog_action_sun_times_field_time_hint" formatted="false">その日のうちの任意の時刻を、1970年からの経過秒数で指定します。空欄にすると今日になります。</string>
+    <string name="catalog_action_sun_times_field_elevations_label" formatted="false">任意の太陽高度</string>
+    <string name="catalog_action_sun_times_field_elevations_hint" formatted="false">地平線からの角度を度で指定します。地平線より下は負の値です。1行に1つ、またはカンマ区切りで入力します。それぞれの時刻は %ss_custom_morning と %ss_custom_evening に入ります。</string>
+    <string name="catalog_action_sun_times_field_var_label" formatted="false">変数の接頭辞</string>
+    <string name="catalog_action_sun_times_field_var_hint" formatted="false">既定は ss で、%ss_sunrise、%ss_sunset などになります。時刻は1970年からの経過秒数です。</string>
+    <string name="catalog_action_location_get_name" formatted="false">位置情報を取得</string>
+    <string name="catalog_action_location_get_description" formatted="false">端末の現在地を %location_lat、%location_lon、%location_accuracy、%location_age に読み込みます。</string>
+    <string name="catalog_action_location_get_field_mode_label" formatted="false">モード</string>
+    <string name="catalog_action_location_get_field_mode_hint" formatted="false">「新しく測位」はGPSとネットワークの位置情報に問い合わせます。「最後の既知の位置」は端末がすでに持っている位置を読むだけで、電池を消費しません。</string>
+    <string name="catalog_action_location_get_field_accuracy_label" formatted="false">精度（メートル）</string>
+    <string name="catalog_action_location_get_field_accuracy_hint" formatted="false">この精度以上の測位結果が得られるまで待ちます。空欄にすると最初の結果を使います。</string>
+    <string name="catalog_action_location_get_field_timeout_label" formatted="false">タイムアウト（秒）</string>
+    <string name="catalog_action_location_get_field_timeout_hint" formatted="false">新しい測位を待つ時間です。1～120で指定します。既定は30です。</string>
+    <string name="catalog_action_location_get_field_var_label" formatted="false">変数の接頭辞</string>
+    <string name="catalog_action_location_get_field_var_hint" formatted="false">既定は location です。緯度と経度は実行ログでは伏せられます。</string>
+    <string name="catalog_action_tts_speak_name" formatted="false">読み上げ（TTS）</string>
+    <string name="catalog_action_tts_speak_description" formatted="false">テキストを端末のスピーカーで読み上げます。</string>
+    <string name="catalog_action_tts_speak_field_text_label" formatted="false">読み上げるテキスト</string>
+    <string name="catalog_action_tts_speak_field_stream_label" formatted="false">音声ストリーム</string>
+    <string name="catalog_action_tts_speak_field_stream_hint" formatted="false">既定は「音楽」です。「着信音」と「通知」は着信音または通知の音量を使い、バイブまたはサイレントのときは鳴りません。おやすみモードで消音されることもあります。Android 17では、バックグラウンドで開始されたタスクの音声は「アラーム」でしか聞こえません。これには正確なアラームの権限が必要で、アラームの音量に従います。</string>
+    <string name="catalog_action_flow_wait_name" formatted="false">待機</string>
+    <string name="catalog_action_flow_wait_description" formatted="false">指定した時間だけタスクの実行を一時停止します。</string>
+    <string name="catalog_category_flow" formatted="false">フロー</string>
+    <string name="catalog_action_flow_wait_field_millis_label" formatted="false">ミリ秒</string>
+    <string name="catalog_action_flow_wait_field_millis_hint" formatted="false">ミリ秒単位の時間</string>
+    <string name="catalog_action_profile_set_name" formatted="false">プロファイルの状態</string>
+    <string name="catalog_action_profile_set_description" formatted="false">名前を指定してプロファイルを有効または無効にします。</string>
+    <string name="catalog_action_profile_set_field_profile_label" formatted="false">プロファイル名</string>
+    <string name="catalog_action_profile_set_field_profile_hint" formatted="false">プロファイル一覧に表示されているとおりに入力します。確認待ちのプロファイルなど、アプリが有効にしないプロファイルは、ここでも無効のままです。</string>
+    <string name="catalog_action_profile_set_field_state_label" formatted="false">設定する状態</string>
+    <string name="catalog_action_task_run_name" formatted="false">タスクを実行</string>
+    <string name="catalog_action_task_run_description" formatted="false">別のタスクをサブタスクとして実行します。最大8階層までです。追加した入力は、そのタスクの変数になります。</string>
+    <string name="catalog_action_task_run_field_task_label" formatted="false">タスクのIDまたは名前</string>
+    <string name="catalog_action_task_run_field_task_hint" formatted="false">Wi-Fiを切り替え</string>
+    <string name="catalog_action_task_run_field_return_variable_label" formatted="false">戻り値の保存先</string>
+    <string name="catalog_action_task_run_field_return_variable_hint" formatted="false">%result</string>
+    <string name="catalog_action_task_run_field_reset_return_variable_label" formatted="false">タスクの実行前に消去する</string>
+    <string name="catalog_action_task_run_field_reset_return_variable_hint" formatted="false">タスクが何も返さなかった場合、変数は古い値を保持せず、未設定のままになります。</string>
+    <string name="catalog_action_task_stop_name" formatted="false">タスクを停止</string>
+    <string name="catalog_action_task_stop_description" formatted="false">実行中の別のタスクを停止します。このタスク自身を指定すると、Stopと同じくここで終了します。</string>
+    <string name="catalog_action_task_stop_field_task_label" formatted="false">タスクのIDまたは名前</string>
+    <string name="catalog_action_task_stop_field_task_hint" formatted="false">アラームを繰り返す</string>
+    <string name="catalog_action_flow_if_name" formatted="false">If</string>
+    <string name="catalog_action_flow_if_description" formatted="false">条件が成り立つ場合にのみ、続くアクションを実行します（End Ifで閉じます）。</string>
+    <string name="catalog_action_flow_if_field_condition_label" formatted="false">条件</string>
+    <string name="catalog_action_flow_if_field_condition_hint" formatted="false">%battery &lt; 20</string>
+    <string name="catalog_action_flow_else_name" formatted="false">Else</string>
+    <string name="catalog_action_flow_else_description" formatted="false">対応するIfの条件が成り立たなかった場合に実行される分岐です。</string>
+    <string name="catalog_action_flow_endif_name" formatted="false">End If</string>
+    <string name="catalog_action_flow_endif_description" formatted="false">対応するIf/Elseブロックを閉じます。</string>
+    <string name="catalog_action_flow_foreach_name" formatted="false">For Each</string>
+    <string name="catalog_action_flow_foreach_description" formatted="false">配列変数または値の一覧に対して、続くアクションを繰り返します（End Forで閉じます）。</string>
+    <string name="catalog_action_flow_foreach_field_list_label" formatted="false">配列変数の名前</string>
+    <string name="catalog_action_flow_foreach_field_list_hint" formatted="false">myList</string>
+    <string name="catalog_action_flow_foreach_field_values_label" formatted="false">または次の値（配列を指定しない場合に使用）</string>
+    <string name="catalog_action_flow_foreach_field_values_hint" formatted="false">1:10, apple, %fruit, %arr()</string>
+    <string name="catalog_action_flow_foreach_field_var_label" formatted="false">項目の変数名</string>
+    <string name="catalog_action_flow_foreach_field_var_hint" formatted="false">item</string>
+    <string name="catalog_action_flow_endfor_name" formatted="false">End For</string>
+    <string name="catalog_action_flow_endfor_description" formatted="false">対応するFor Eachループを閉じます。</string>
+      <string name="catalog_action_flow_stop_name" formatted="false">Stop</string>
+      <string name="catalog_action_flow_stop_description" formatted="false">タスクの残りを直ちに中止します。</string>
+      <string name="catalog_action_flow_stop_field_value_label" formatted="false">このタスクを実行したタスクに返す値</string>
+      <string name="catalog_action_flow_stop_field_value_hint" formatted="false">%total</string>
+      <string name="catalog_action_flow_try_name" formatted="false">Try</string>
+      <string name="catalog_action_flow_try_description" formatted="false">回数に上限のある、再試行可能なブロックを実行します。失敗した場合はCatchで処理することもできます。</string>
+      <string name="catalog_action_flow_try_field_max_attempts_label" formatted="false">最大試行回数</string>
+      <string name="catalog_action_flow_try_field_max_attempts_hint" formatted="false">1–5。再試行できるアクションは、下のブロックの確認欄に表示されます。</string>
+      <string name="catalog_action_flow_try_field_backoff_label" formatted="false">再試行の基本間隔（ms）</string>
+      <string name="catalog_action_flow_try_field_backoff_hint" formatted="false">0–60000。再試行のたびに指数的に延びます。</string>
+      <string name="flow_try_retry_summary_empty" formatted="false">再試行の対象は、このブロック内に追加した冪等なアクションだけです。</string>
+      <string name="flow_try_retryable_summary" formatted="false">再試行できるアクション：%1$s</string>
+      <string name="flow_try_non_retryable_summary" formatted="false">再試行しないアクション：%1$s</string>
+      <string name="catalog_action_flow_catch_name" formatted="false">Catch</string>
+      <string name="catalog_action_flow_catch_description" formatted="false">失敗したTryブロックを、FLOW_ERROR_* 変数を使って処理します。</string>
+      <string name="catalog_action_flow_endtry_name" formatted="false">End Try</string>
+      <string name="catalog_action_flow_endtry_description" formatted="false">対応するTry/Catchブロックを閉じます。</string>
+      <string name="catalog_action_flow_goto_name" formatted="false">Go To</string>
+      <string name="catalog_action_flow_goto_description" formatted="false">このタスク内の別のステップへ、番号またはラベルを指定して飛びます。</string>
+      <string name="catalog_action_flow_goto_field_step_label" formatted="false">ステップ番号</string>
+      <string name="catalog_action_flow_goto_field_step_hint" formatted="false">1から数えます。%step のような変数も使えます。</string>
+      <string name="catalog_action_flow_goto_field_label_label" formatted="false">ステップのラベル</string>
+      <string name="catalog_action_flow_goto_field_label_hint" formatted="false">このラベルを持つ最初のステップへ飛びます。設定すると、番号の代わりに使われます。</string>
+      <string name="catalog_action_flow_goto_field_to_label" formatted="false">飛び先</string>
+      <string name="catalog_action_flow_goto_field_to_hint" formatted="false">「なし」はステップ番号またはラベルで飛びます。それ以外は、このステップが入っているFor EachまたはIfに対して働き、番号とラベルより優先されます。</string>
+      <string name="catalog_action_flow_goto_to_loop_top" formatted="false">ループの先頭（次の項目）</string>
+      <string name="catalog_action_flow_goto_to_loop_end" formatted="false">ループの外</string>
+      <string name="catalog_action_flow_goto_to_if_end" formatted="false">Ifの終わり</string>
+      <string name="catalog_action_flow_anchor_name" formatted="false">アンカー</string>
+      <string name="catalog_action_flow_anchor_description" formatted="false">何もしません。Go Toの飛び先になるよう、ラベルを付けて使います。</string>
+      <string name="catalog_action_intent_launch_name" formatted="false">インテントを起動</string>
+    <string name="catalog_action_intent_launch_description" formatted="false">アクティビティ、ブロードキャスト、サービスのいずれかのインテントを、制限付きで送出します。</string>
+    <string name="catalog_category_app" formatted="false">アプリ</string>
+    <string name="catalog_action_intent_launch_field_package_label" formatted="false">パッケージ名</string>
+    <string name="catalog_action_intent_launch_field_package_hint" formatted="false">com.example.app</string>
+    <string name="catalog_action_intent_launch_field_action_label" formatted="false">インテントのアクション</string>
+    <string name="catalog_action_intent_launch_field_action_hint" formatted="false">MAIN、VIEW など</string>
+    <string name="catalog_action_intent_launch_field_category_label" formatted="false">インテントのカテゴリ</string>
+    <string name="catalog_action_intent_launch_field_category_hint" formatted="false">任意</string>
+    <string name="catalog_action_intent_launch_field_mode_label" formatted="false">送出方法</string>
+    <string name="catalog_action_intent_launch_field_mode_hint" formatted="false">Androidの明示的なコンポーネントの種類を選びます。</string>
+    <string name="catalog_action_intent_launch_field_component_label" formatted="false">コンポーネントのクラス</string>
+    <string name="catalog_action_intent_launch_field_component_hint" formatted="false">com.example.app.MainActivity</string>
+    <string name="catalog_action_intent_launch_field_uri_label" formatted="false">データURI</string>
+    <string name="catalog_action_intent_launch_field_uri_hint" formatted="false">https://example.com または content://…</string>
+    <string name="catalog_action_intent_launch_field_mime_label" formatted="false">MIMEタイプ</string>
+    <string name="catalog_action_intent_launch_field_mime_hint" formatted="false">text/plain または */*</string>
+    <string name="catalog_action_intent_launch_field_flags_label" formatted="false">インテントのフラグ</string>
+    <string name="catalog_action_intent_launch_field_flags_hint" formatted="false">activity_clear_top, grant_read_uri（データURIを使う場合は必須）</string>
+    <string name="catalog_action_intent_launch_field_extras_label" formatted="false">基本型のエクストラ</string>
+    <string name="catalog_action_intent_launch_field_extras_hint" formatted="false">key=string:value、key=int:1、または key=bool:true</string>
+    <string name="catalog_action_intent_launch_field_result_variable_label" formatted="false">順序付きブロードキャストの結果変数</string>
+    <string name="catalog_action_intent_launch_field_result_variable_hint" formatted="false">ブロードキャストの結果コードを入れる変数（任意）</string>
+    <string name="action_option_intent_activity" formatted="false">アクティビティ</string>
+    <string name="action_option_intent_broadcast" formatted="false">ブロードキャスト</string>
+    <string name="action_option_intent_service" formatted="false">サービス</string>
+    <string name="catalog_action_plugin_locale_fire_name" formatted="false">Localeプラグインの設定</string>
+    <string name="catalog_action_plugin_locale_fire_description" formatted="false">Locale/Tasker互換の設定プラグインに、明示的な要求を送出します。</string>
+    <string name="catalog_category_plugin" formatted="false">プラグイン</string>
+    <string name="catalog_action_plugin_locale_fire_field_package_label" formatted="false">プラグインのパッケージ</string>
+    <string name="catalog_action_plugin_locale_fire_field_package_hint" formatted="false">com.example.plugin</string>
+    <string name="catalog_action_plugin_locale_fire_field_bundlejson_label" formatted="false">バンドルJSON</string>
+    <string name="catalog_action_plugin_locale_fire_field_bundlejson_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
+    <string name="catalog_action_plugin_locale_fire_field_blurb_label" formatted="false">要約</string>
+    <string name="catalog_action_plugin_locale_fire_field_blurb_hint" formatted="false">ユーザーに表示される短い要約</string>
+    <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">タイムアウト（ms）</string>
+    <string name="catalog_action_plugin_locale_fire_field_timeoutms_hint" formatted="false">5000</string>
+    <string name="catalog_action_plugin_locale_query_name" formatted="false">Localeプラグインの条件</string>
+    <string name="catalog_action_plugin_locale_query_description" formatted="false">Locale/Tasker互換の条件プラグインに明示的に問い合わせ、その状態を保存します。</string>
+    <string name="catalog_action_plugin_locale_query_field_package_label" formatted="false">プラグインのパッケージ</string>
+    <string name="catalog_action_plugin_locale_query_field_package_hint" formatted="false">com.example.plugin</string>
+    <string name="catalog_action_plugin_locale_query_field_bundlejson_label" formatted="false">バンドルJSON</string>
+    <string name="catalog_action_plugin_locale_query_field_bundlejson_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
+    <string name="catalog_action_plugin_locale_query_field_blurb_label" formatted="false">要約</string>
+    <string name="catalog_action_plugin_locale_query_field_blurb_hint" formatted="false">ユーザーに表示される短い要約</string>
+    <string name="catalog_action_plugin_locale_query_field_timeoutms_label" formatted="false">タイムアウト（ms）</string>
+    <string name="catalog_action_plugin_locale_query_field_timeoutms_hint" formatted="false">5000</string>
+    <string name="catalog_action_plugin_locale_query_field_resultvariable_label" formatted="false">結果の変数</string>
+    <string name="catalog_action_plugin_locale_query_field_resultvariable_hint" formatted="false">%plugin_state</string>
+    <string name="catalog_action_plugin_locale_query_field_requiresatisfied_label" formatted="false">条件が満たされなければ失敗とする</string>
+    <string name="catalog_action_script_shizuku_run_name" formatted="false">Shizukuスクリプトを実行</string>
+    <string name="catalog_action_script_shizuku_run_description" formatted="false">承認済みのシェルスクリプトをShizuku経由で実行します。出力を上限付きで取り込むこともできます。</string>
+    <string name="catalog_action_script_shizuku_run_field_path_label" formatted="false">スクリプトのパス</string>
+    <string name="catalog_action_script_shizuku_run_field_path_hint" formatted="false">/data/local/tmp/my_script.sh</string>
+    <string name="catalog_action_script_shizuku_run_field_arguments_label" formatted="false">引数</string>
+    <string name="catalog_action_script_shizuku_run_field_arguments_hint" formatted="false">シェル形式の引数（任意）</string>
+    <string name="catalog_action_script_shizuku_run_field_captureprefix_label" formatted="false">出力変数の接頭辞</string>
+    <string name="catalog_action_script_shizuku_run_field_captureprefix_hint" formatted="false">%script</string>
+    <string name="catalog_action_script_shizuku_run_field_timeoutms_label" formatted="false">タイムアウト（ms）</string>
+    <string name="catalog_action_script_shizuku_run_field_timeoutms_hint" formatted="false">30000（1000～120000）</string>
+    <string name="catalog_action_script_termux_run_name" formatted="false">Termuxスクリプトを実行</string>
+    <string name="catalog_action_script_termux_run_description" formatted="false">承認済みのTermuxスクリプトを実行します。出力を上限付きで取り込むこともできます。</string>
+    <string name="catalog_category_script" formatted="false">スクリプト</string>
+    <string name="catalog_action_script_termux_run_field_executable_label" formatted="false">実行ファイル</string>
+    <string name="catalog_action_script_termux_run_field_executable_hint" formatted="false">~/.termux/tasker/my_script</string>
+    <string name="catalog_action_script_termux_run_field_arguments_label" formatted="false">引数</string>
+    <string name="catalog_action_script_termux_run_field_arguments_hint" formatted="false">シェル形式の引数（任意）</string>
+    <string name="catalog_action_script_termux_run_field_workingdirectory_label" formatted="false">作業ディレクトリ</string>
+    <string name="catalog_action_script_termux_run_field_workingdirectory_hint" formatted="false">Termuxの作業ディレクトリ（任意）</string>
+    <string name="catalog_action_script_termux_run_field_stdin_label" formatted="false">標準入力</string>
+    <string name="catalog_action_script_termux_run_field_stdin_hint" formatted="false">コマンドの入力に送るテキスト（任意）</string>
+    <string name="catalog_action_script_termux_run_field_captureprefix_label" formatted="false">出力変数の接頭辞</string>
+    <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
+    <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">タイムアウト（ms）</string>
+    <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000（1000～120000）</string>
+    <string name="catalog_action_tasker_unsupported_name" formatted="false">非対応のTaskerアクション</string>
+    <string name="catalog_action_tasker_unsupported_description" formatted="false">インポート時に安全に対応付けられなかったTaskerアクションの代わりに置かれる仮のアクションです。</string>
+    <string name="catalog_category_import" formatted="false">インポート</string>
+    <string name="catalog_action_tasker_unsupported_field_taskercode_label" formatted="false">Taskerのアクションコード</string>
+    <string name="catalog_action_tasker_unsupported_field_summary_label" formatted="false">インポートのメモ</string>
+    <string name="catalog_action_macrodroid_unsupported_name" formatted="false">非対応のMacroDroidアクション</string>
+    <string name="catalog_action_macrodroid_unsupported_description" formatted="false">インポート時に安全に対応付けられなかったMacroDroidアクションの代わりに置かれる仮のアクションです。</string>
+    <string name="catalog_action_macrodroid_unsupported_field_classtype_label" formatted="false">MacroDroidのクラス</string>
+    <string name="catalog_action_macrodroid_unsupported_field_summary_label" formatted="false">インポートのメモ</string>
+    <string name="catalog_action_wifi_toggle_name" formatted="false">Wi-Fiを切り替え</string>
+    <string name="catalog_action_wifi_toggle_description" formatted="false">Wi-Fiをオンまたはオフにします。</string>
+    <string name="catalog_category_settings" formatted="false">設定</string>
+    <string name="catalog_action_wifi_toggle_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_wifi_toggle_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_bluetooth_toggle_name" formatted="false">Bluetoothを切り替え</string>
+    <string name="catalog_action_bluetooth_toggle_description" formatted="false">Bluetoothをオンまたはオフにします。</string>
+    <string name="catalog_action_bluetooth_toggle_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_bluetooth_toggle_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_brightness_set_name" formatted="false">明るさを設定</string>
+    <string name="catalog_action_brightness_set_description" formatted="false">画面の明るさを設定します。</string>
+    <string name="catalog_action_brightness_set_field_brightness_label" formatted="false">明るさ（0-255）</string>
+    <string name="catalog_action_state_temporary_name" formatted="false">一時的な状態</string>
+    <string name="catalog_action_state_temporary_description" formatted="false">元に戻せる設定を適用し、あとで元に戻します。</string>
+    <string name="catalog_action_state_temporary_field_target_action_label" formatted="false">設定</string>
+    <string name="catalog_action_state_temporary_field_target_args_label" formatted="false">設定の引数（JSON）</string>
+    <string name="catalog_action_state_temporary_field_target_args_hint" formatted="false">例：{&quot;brightness&quot;:&quot;80&quot;}</string>
+    <string name="catalog_action_state_temporary_field_key_label" formatted="false">復帰キー</string>
+    <string name="catalog_action_state_temporary_field_key_hint" formatted="false">他と重複しない識別名（例：quiet-hours）</string>
+    <string name="catalog_action_state_temporary_field_duration_label" formatted="false">継続時間（秒）</string>
+    <string name="catalog_action_state_temporary_field_duration_hint" formatted="false">1～604800秒</string>
+    <string name="catalog_action_ime_info_name" formatted="false">キーボード情報を取得</string>
+    <string name="catalog_action_ime_info_description" formatted="false">現在のキーボードと有効なキーボードを報告します。</string>
+    <string name="catalog_action_ime_info_field_var_label" formatted="false">出力変数のベース名</string>
+    <string name="catalog_action_ime_info_field_var_hint" formatted="false">既定は IME で、%IME_CURRENT、%IME_ENABLED、%IME_COUNT になります。</string>
+    <string name="catalog_action_ime_set_name" formatted="false">キーボードを切り替え</string>
+    <string name="catalog_action_ime_set_description" formatted="false">キーボードを検証し、システムの選択画面を開きます。</string>
+    <string name="catalog_action_ime_set_field_ime_id_label" formatted="false">キーボードのIDまたはパッケージ</string>
+    <string name="catalog_action_ime_set_field_ime_id_hint" formatted="false">「キーボード情報を取得」で得られるキーボードID</string>
+    <string name="catalog_action_volume_set_name" formatted="false">音量を設定</string>
+    <string name="catalog_action_volume_set_description" formatted="false">ストリームの音量を調整します。</string>
+    <string name="catalog_action_volume_set_field_stream_label" formatted="false">ストリーム</string>
+    <string name="catalog_action_volume_set_field_stream_hint" formatted="false">music, call, alarm</string>
+    <string name="catalog_action_volume_set_field_level_label" formatted="false">レベル（0-100）</string>
+    <string name="catalog_action_vpn_tunnel_name" formatted="false">VPNを接続または切断</string>
+    <string name="catalog_action_vpn_tunnel_description" formatted="false">WireGuardまたはTailscaleのトンネルをオンまたはオフにし、VPNが実際に切り替わったかを確認します。</string>
+    <string name="catalog_action_vpn_tunnel_field_client_label" formatted="false">VPNアプリ</string>
+    <string name="catalog_action_vpn_tunnel_field_client_hint" formatted="false">トンネルを管理するアプリ</string>
+    <string name="catalog_action_vpn_tunnel_field_state_label" formatted="false">接続</string>
+    <string name="catalog_action_vpn_tunnel_field_state_hint" formatted="false">「接続」でつなぎ、「切断」で切ります。</string>
+    <string name="catalog_action_vpn_tunnel_field_tunnel_label" formatted="false">トンネル名</string>
+    <string name="catalog_action_vpn_tunnel_field_tunnel_hint" formatted="false">WireGuardのみ。アプリに表示されているとおりに入力します。</string>
+    <string name="action_option_vpn_wireguard" formatted="false">WireGuard</string>
+    <string name="action_option_vpn_tailscale" formatted="false">Tailscale</string>
+    <string name="action_option_vpn_up" formatted="false">接続</string>
+    <string name="action_option_vpn_down" formatted="false">切断</string>
+    <string name="catalog_action_wifi_scan_name" formatted="false">Wi-Fiネットワークをスキャン</string>
+    <string name="catalog_action_wifi_scan_description" formatted="false">近くのアクセスポイントの一覧を変数に入れます。Androidは実際のスキャンの頻度を制限しているため、結果は前回のスキャンのキャッシュになることがあります。</string>
+    <string name="catalog_action_wifi_scan_field_var_label" formatted="false">変数の接頭辞</string>
+    <string name="catalog_action_wifi_scan_field_var_hint" formatted="false">wifi</string>
+    <string name="catalog_action_wifi_scan_field_limit_label" formatted="false">最大件数</string>
+    <string name="catalog_action_wifi_scan_field_limit_hint" formatted="false">1-64、既定は20</string>
+    <string name="catalog_action_aod_set_name" formatted="false">常時表示ディスプレイ</string>
+    <string name="catalog_action_aod_set_description" formatted="false">常時表示ディスプレイをオンまたはオフにします。</string>
+    <string name="catalog_action_aod_set_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_aod_set_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_airplane_toggle_name" formatted="false">機内モードを切り替え</string>
+    <string name="catalog_action_airplane_toggle_description" formatted="false">機内モードをオンまたはオフにします。</string>
+    <string name="catalog_action_airplane_toggle_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_airplane_toggle_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_hotspot_toggle_name" formatted="false">Wi-Fiテザリングを切り替え</string>
+    <string name="catalog_action_hotspot_toggle_description" formatted="false">Wi-Fiテザリングをオンまたはオフにします。</string>
+    <string name="catalog_action_hotspot_toggle_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_hotspot_toggle_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_mobile_toggle_name" formatted="false">モバイルデータ通信を切り替え</string>
+    <string name="catalog_action_mobile_toggle_description" formatted="false">モバイルデータ通信をオンまたはオフにします。</string>
+    <string name="catalog_action_mobile_toggle_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_mobile_toggle_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_screen_timeout_name" formatted="false">画面のタイムアウトを設定</string>
+    <string name="catalog_action_screen_timeout_description" formatted="false">画面が消灯するまでの時間を設定します。</string>
+    <string name="catalog_action_screen_timeout_field_millis_label" formatted="false">タイムアウト（ms）</string>
+    <string name="catalog_action_screen_timeout_field_millis_hint" formatted="false">1000、30000 など</string>
+    <string name="catalog_action_settings_write_name" formatted="false">設定を書き込む</string>
+    <string name="catalog_action_settings_write_description" formatted="false">Androidの設定を1つ、名前を指定して変更します。GlobalとSecureは、パソコンから一度だけ許可しておく必要があります。Systemは「システム設定の変更」の権限を使います。</string>
+    <string name="catalog_action_settings_write_field_table_label" formatted="false">テーブル</string>
+    <string name="catalog_action_settings_write_field_table_hint" formatted="false">設定が保存されている場所です。ほとんどはSecureかGlobalです。</string>
+    <string name="catalog_action_settings_write_table_global" formatted="false">Global（全ユーザー）</string>
+    <string name="catalog_action_settings_write_table_secure" formatted="false">Secure（このユーザー）</string>
+    <string name="catalog_action_settings_write_table_system" formatted="false">System（表示と音）</string>
+    <string name="catalog_action_settings_write_field_key_label" formatted="false">設定名</string>
+    <string name="catalog_action_settings_write_field_key_hint" formatted="false">location_mode、screen_off_timeout など</string>
+    <string name="catalog_action_settings_write_field_value_label" formatted="false">値</string>
+    <string name="catalog_action_settings_write_field_value_hint" formatted="false">書き込み後に読み戻すため、Androidが無視した値は失敗として報告されます。Taskerの =:=toggle=:= は、設定を0と1の間で切り替えます。</string>
+    <string name="catalog_action_settings_read_name" formatted="false">設定を読み取る</string>
+    <string name="catalog_action_settings_read_description" formatted="false">Androidの設定を1つ、名前を指定して変数に読み込みます。読み取りに権限は不要ですが、Androidが一部の名前をアプリから隠しています。</string>
+    <string name="catalog_action_settings_read_field_var_label" formatted="false">保存先</string>
+    <string name="catalog_action_settings_read_field_var_hint" formatted="false">存在しない設定は、Taskerと同じく空として保存されます。</string>
+    <string name="catalog_action_dnd_set_name" formatted="false">おやすみモードを設定</string>
+    <string name="catalog_action_dnd_set_description" formatted="false">おやすみモードの動作を設定します。</string>
+    <string name="catalog_action_dnd_set_field_mode_label" formatted="false">モード</string>
+    <string name="catalog_action_dnd_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
+    <string name="catalog_action_zen_rule_set_name" formatted="false">おやすみモードのルールを設定</string>
+    <string name="catalog_action_zen_rule_set_description" formatted="false">OpenTasker自身のおやすみモードのルールを追加または更新します。Android 15のデバイス効果も設定できます。</string>
+    <string name="catalog_action_zen_rule_set_field_id_label" formatted="false">ルールID</string>
+    <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">変わらないキー（例：focus_evening）</string>
+    <string name="catalog_action_zen_rule_set_field_name_label" formatted="false">ルール名</string>
+    <string name="catalog_action_zen_rule_set_field_name_hint" formatted="false">Androidのおやすみモードの設定に表示される名前</string>
+    <string name="catalog_action_zen_rule_set_field_mode_label" formatted="false">モード</string>
+    <string name="catalog_action_zen_rule_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
+    <string name="catalog_action_zen_rule_set_field_enabled_label" formatted="false">有効</string>
+    <string name="catalog_action_zen_rule_set_field_enabled_hint" formatted="false">Androidがこのルールをオンにしてよいかどうか</string>
+    <string name="catalog_action_zen_rule_set_field_grayscale_label" formatted="false">グレースケール表示</string>
+    <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">壁紙を暗くする</string>
+    <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">夜間モード</string>
+    <string name="catalog_action_zen_rule_clear_name" formatted="false">おやすみモードのルールを消去</string>
+    <string name="catalog_action_zen_rule_clear_description" formatted="false">OpenTasker自身のおやすみモードのルールを1つ削除します。</string>
+    <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">ルールID</string>
+    <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">「おやすみモードのルールを設定」で使ったキー</string>
+    <string name="catalog_action_ringer_set_name" formatted="false">着信音モードを設定</string>
+    <string name="catalog_action_ringer_set_description" formatted="false">デバイスの着信音モードを設定します。</string>
+    <string name="catalog_action_ringer_set_field_mode_label" formatted="false">モード</string>
+    <string name="catalog_action_ringer_set_field_mode_hint" formatted="false">normal/vibrate/silent</string>
+    <string name="catalog_action_torch_set_name" formatted="false">ライトを切り替え</string>
+    <string name="catalog_action_torch_set_description" formatted="false">ライトを点灯または消灯します。</string>
+    <string name="catalog_action_torch_set_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_torch_set_field_state_hint" formatted="false">on/off/toggle</string>
+    <string name="catalog_action_tile_set_name" formatted="false">タイルの状態を設定</string>
+    <string name="catalog_action_tile_set_description" formatted="false">クイック設定タイルの状態を更新します。</string>
+    <string name="catalog_action_tile_set_field_state_label" formatted="false">状態</string>
+    <string name="catalog_action_tile_set_field_state_hint" formatted="false">active/inactive</string>
+    <string name="catalog_action_tile_set_field_label_label" formatted="false">ラベル</string>
+    <string name="catalog_action_tile_set_field_label_hint" formatted="false">タイルのラベルの文字</string>
+    <string name="catalog_action_tile_set_field_slot_label" formatted="false">タイルの枠</string>
+    <string name="catalog_action_tile_set_field_slot_hint" formatted="false">設定済みのタイルの枠（1-4）</string>
+    <string name="catalog_action_tile_set_field_subtitle_label" formatted="false">サブタイトル</string>
+    <string name="catalog_action_tile_set_field_subtitle_hint" formatted="false">タイルのサブタイトル（任意）</string>
+    <string name="catalog_action_tile_set_field_icon_label" formatted="false">アイコン</string>
+    <string name="catalog_action_tile_set_field_icon_hint" formatted="false">内蔵のアイコン（任意）</string>
+    <string name="action_option_tile_icon_play" formatted="false">再生</string>
+    <string name="action_option_tile_icon_star" formatted="false">星</string>
+    <string name="action_option_tile_icon_settings" formatted="false">設定</string>
+    <string name="action_option_tile_icon_bolt" formatted="false">稲妻</string>
+    <string name="catalog_action_wallpaper_set_name" formatted="false">壁紙を設定</string>
+    <string name="catalog_action_wallpaper_set_description" formatted="false">ホーム画面またはロック画面の壁紙を画像に変更します。</string>
+    <string name="catalog_action_wallpaper_set_field_path_label" formatted="false">画像</string>
+    <string name="catalog_action_wallpaper_set_field_path_hint" formatted="false">「参照」をタップして選んでください。そうすると再起動後も読み取れます。</string>
+    <string name="catalog_action_wallpaper_set_field_target_label" formatted="false">画面</string>
+    <string name="catalog_action_wallpaper_set_field_target_hint" formatted="false">既定は両方</string>
+    <string name="action_option_wallpaper_both" formatted="false">ホーム画面とロック画面</string>
+    <string name="action_option_wallpaper_home" formatted="false">ホーム画面</string>
+    <string name="action_option_wallpaper_lock" formatted="false">ロック画面</string>
+    <string name="catalog_action_app_launch_name" formatted="false">アプリを起動</string>
+    <string name="catalog_action_app_launch_description" formatted="false">インストール済みのアプリを起動します。</string>
+    <string name="catalog_action_app_launch_field_package_label" formatted="false">パッケージ名</string>
+    <string name="catalog_action_app_launch_field_package_hint" formatted="false">com.example.app</string>
+    <string name="catalog_action_app_kill_name" formatted="false">アプリを強制停止</string>
+    <string name="catalog_action_app_kill_description" formatted="false">アプリを強制停止します。</string>
+    <string name="catalog_action_app_kill_field_package_label" formatted="false">パッケージ名</string>
+    <string name="catalog_action_app_archive_name" formatted="false">アプリをアーカイブ</string>
+    <string name="catalog_action_app_archive_description" formatted="false">インストール済みのアプリを、ユーザーデータを残したままアーカイブします。</string>
+    <string name="catalog_action_app_unarchive_name" formatted="false">アプリのアーカイブを解除</string>
+    <string name="catalog_action_app_unarchive_description" formatted="false">アーカイブしたアプリの復元を要求します。</string>
+    <string name="catalog_action_home_go_name" formatted="false">ホームに戻る</string>
+    <string name="catalog_action_home_go_description" formatted="false">ランチャーのホーム画面に戻ります。</string>
+    <string name="catalog_action_url_open_name" formatted="false">URLを開く</string>
+    <string name="catalog_action_url_open_description" formatted="false">URLをブラウザで開きます。</string>
+    <string name="catalog_action_url_open_field_url_label" formatted="false">URL</string>
+    <string name="catalog_action_url_open_field_url_hint" formatted="false">https://example.com</string>
+    <string name="catalog_action_sms_send_name" formatted="false">SMSを送信</string>
+    <string name="catalog_action_sms_send_description" formatted="false">テキストメッセージを送信します。</string>
+    <string name="catalog_action_sms_send_field_number_label" formatted="false">電話番号</string>
+    <string name="catalog_action_sms_send_field_message_label" formatted="false">メッセージ</string>
+    <string name="catalog_action_screenshot_take_name" formatted="false">スクリーンショットを撮影</string>
+    <string name="catalog_action_screenshot_take_description" formatted="false">デバイスのスクリーンショットを撮影します。</string>
+    <string name="catalog_action_screenshot_take_field_path_label" formatted="false">出力先のパス</string>
+    <string name="catalog_action_screenshot_take_field_path_hint" formatted="false">出力先のパス（任意）</string>
+    <string name="catalog_action_file_read_name" formatted="false">ファイルを読み込む</string>
+    <string name="catalog_action_file_read_description" formatted="false">ファイルの内容を変数に読み込みます。</string>
+    <string name="catalog_category_file" formatted="false">ファイル</string>
+    <string name="catalog_action_file_read_field_path_label" formatted="false">ファイルのパス</string>
+    <string name="catalog_action_file_read_field_var_label" formatted="false">保存先の変数</string>
+    <string name="catalog_action_file_read_field_var_hint" formatted="false">%var</string>
+    <string name="catalog_action_file_write_name" formatted="false">ファイルに書き込む</string>
+    <string name="catalog_action_file_write_description" formatted="false">内容をファイルに書き込みます（上書き）。</string>
+    <string name="catalog_action_file_write_field_path_label" formatted="false">ファイルのパス</string>
+    <string name="catalog_action_file_write_field_text_label" formatted="false">内容</string>
+    <string name="catalog_action_file_append_name" formatted="false">ファイルに追記</string>
+    <string name="catalog_action_file_append_description" formatted="false">内容をファイルの末尾に追記します。</string>
+    <string name="catalog_action_file_append_field_path_label" formatted="false">ファイルのパス</string>
+    <string name="catalog_action_file_append_field_text_label" formatted="false">内容</string>
+    <string name="catalog_action_file_delete_name" formatted="false">ファイルを削除</string>
+    <string name="catalog_action_file_delete_description" formatted="false">ファイルを削除します。</string>
+    <string name="catalog_action_file_delete_field_path_label" formatted="false">ファイルのパス</string>
+    <string name="catalog_action_file_list_name" formatted="false">ファイルを一覧</string>
+    <string name="catalog_action_file_list_description" formatted="false">ディレクトリの内容の一覧を変数に入れます。</string>
+    <string name="catalog_action_file_list_field_path_label" formatted="false">ディレクトリのパス</string>
+    <string name="catalog_action_file_list_field_var_label" formatted="false">保存先の変数</string>
+    <string name="catalog_action_file_list_field_var_hint" formatted="false">%var</string>
+    <string name="catalog_action_file_list_field_pattern_label" formatted="false">ファイル名のパターン</string>
+    <string name="catalog_action_file_list_field_pattern_hint" formatted="false">*.txt</string>
+    <string name="catalog_action_http_request_name" formatted="false">HTTPリクエスト</string>
+    <string name="catalog_action_http_request_description" formatted="false">ヘッダー、リダイレクト、出力先、タイムアウトを明示して、上限付きのHTTPリクエストを送信します。</string>
+    <string name="catalog_action_http_request_field_method_label" formatted="false">メソッド</string>
+    <string name="catalog_action_http_request_field_method_hint" formatted="false">GET、HEAD、POST、PUT、PATCH、DELETE、OPTIONS のいずれか</string>
+    <string name="catalog_action_http_request_field_url_label" formatted="false">URL</string>
+    <string name="catalog_action_http_request_field_query_label" formatted="false">クエリパラメータ</string>
+    <string name="catalog_action_http_request_field_query_hint" formatted="false">1行に1組の name=value</string>
+    <string name="catalog_action_http_request_field_headers_label" formatted="false">リクエストヘッダー</string>
+    <string name="catalog_action_http_request_field_headers_hint" formatted="false">1行に1つの Name: Value 形式のヘッダー。実行ログでは値が隠されます。</string>
+    <string name="catalog_action_http_request_field_authorization_label" formatted="false">Authorization</string>
+    <string name="catalog_action_http_request_field_authorization_hint" formatted="false">例：Bearer %SECRET_TOKEN。ログでは必ず伏せられます。</string>
+    <string name="catalog_action_http_request_field_body_label" formatted="false">リクエスト本文（直接入力）</string>
+    <string name="catalog_action_http_request_field_body_file_label" formatted="false">リクエスト本文のファイル</string>
+    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">「OpenTasker Files」内の相対パス。直接入力の本文とは併用できません。</string>
+    <string name="catalog_action_http_request_field_content_type_label" formatted="false">コンテンツタイプ</string>
+    <string name="catalog_action_http_request_field_content_type_hint" formatted="false">例：application/json</string>
+    <string name="catalog_action_http_request_field_response_var_label" formatted="false">レスポンス本文の保存先</string>
+    <string name="catalog_action_http_request_field_response_var_hint" formatted="false">既定は %result。出力ファイルとは併用できません。</string>
+    <string name="catalog_action_http_request_field_status_var_label" formatted="false">ステータスコードの保存先</string>
+    <string name="catalog_action_http_request_field_status_var_hint" formatted="false">%status などの変数（任意）</string>
+    <string name="catalog_action_http_request_field_headers_var_label" formatted="false">レスポンスヘッダーの保存先</string>
+    <string name="catalog_action_http_request_field_headers_var_hint" formatted="false">変数（任意）。1行に1つの Name: Value</string>
+    <string name="catalog_action_http_request_field_output_file_label" formatted="false">レスポンスの出力ファイル</string>
+    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">「OpenTasker Files」内の相対パス。書き込みが完了した時点で一度に置き換わります。</string>
+    <string name="catalog_action_http_request_field_max_response_bytes_label" formatted="false">レスポンスの最大サイズ（バイト）</string>
+    <string name="catalog_action_http_request_field_max_response_bytes_hint" formatted="false">変数なら1 MiBまで、ファイルなら50 MiBまで</string>
+    <string name="catalog_action_http_request_field_redirects_label" formatted="false">リダイレクトの扱い</string>
+    <string name="catalog_action_http_request_field_redirects_hint" formatted="false">none（既定）または same_origin。別オリジンへのリダイレクトには決して従いません。</string>
+    <string name="catalog_action_http_request_field_network_label" formatted="false">使用する接続</string>
+    <string name="catalog_action_http_request_field_network_hint" formatted="false">デバイスが選んだ種類の接続を使っていない場合は、リクエストを送信しません。</string>
+    <string name="catalog_action_http_request_field_allow_http_label" formatted="false">HTTPを許可</string>
+    <string name="catalog_action_http_request_field_allow_http_hint" formatted="false">名前解決されたアドレスがすべてプライベート/LANの場合に限り、暗号化なしのHTTPを許可します。</string>
+    <string name="catalog_action_http_request_field_timeout_label" formatted="false">既定のタイムアウト（秒）</string>
+    <string name="catalog_action_http_request_field_timeout_hint" formatted="false">1–120秒。個別のタイムアウト欄がこの値より優先されます。</string>
+    <string name="catalog_action_http_request_field_connect_timeout_label" formatted="false">接続のタイムアウト（秒）</string>
+    <string name="catalog_action_http_request_field_read_timeout_label" formatted="false">読み取りのタイムアウト（秒）</string>
+    <string name="catalog_action_http_request_field_write_timeout_label" formatted="false">書き込みのタイムアウト（秒）</string>
+    <string name="catalog_action_http_request_field_call_timeout_label" formatted="false">呼び出し全体のタイムアウト（秒）</string>
+    <string name="catalog_action_http_get_name" formatted="false">HTTP GET</string>
+    <string name="catalog_action_http_get_description" formatted="false">HTTP GETリクエストを実行します。</string>
+    <string name="catalog_category_network" formatted="false">ネットワーク</string>
+    <string name="catalog_action_http_get_field_url_label" formatted="false">URL</string>
+    <string name="catalog_action_http_get_field_var_label" formatted="false">レスポンスの保存先</string>
+    <string name="catalog_action_http_get_field_var_hint" formatted="false">%var</string>
+    <string name="catalog_action_http_get_field_allow_http_label" formatted="false">HTTPを許可</string>
+    <string name="catalog_action_http_get_field_allow_http_hint" formatted="false">LAN/プライベートネットワーク上のホストに限り、暗号化なしのHTTPを許可します。</string>
+    <string name="catalog_action_http_post_name" formatted="false">HTTP POST</string>
+    <string name="catalog_action_http_post_description" formatted="false">HTTP POSTリクエストを実行します。</string>
+    <string name="catalog_action_http_post_field_url_label" formatted="false">URL</string>
+    <string name="catalog_action_http_post_field_data_label" formatted="false">リクエスト本文</string>
+    <string name="catalog_action_http_post_field_var_label" formatted="false">レスポンスの保存先</string>
+    <string name="catalog_action_http_post_field_var_hint" formatted="false">%var</string>
+    <string name="catalog_action_http_post_field_allow_http_label" formatted="false">HTTPを許可</string>
+    <string name="catalog_action_http_post_field_allow_http_hint" formatted="false">LAN/プライベートネットワーク上のホストに限り、暗号化なしのHTTPを許可します。</string>
+    <string name="catalog_action_home_assistant_webhook_name" formatted="false">Home Assistant Webhook</string>
+    <string name="catalog_action_home_assistant_webhook_description" formatted="false">上限付きのJSONイベントをHome AssistantのWebhookに送信します。一時的な失敗は再試行します。</string>
+    <string name="catalog_action_home_assistant_webhook_field_url_label" formatted="false">WebhookのURL</string>
+    <string name="catalog_action_home_assistant_webhook_field_url_hint" formatted="false">HTTPSのWebhook URL。秘密のパス部分は表示では伏せられます。</string>
+    <string name="catalog_action_home_assistant_webhook_field_payload_label" formatted="false">JSONペイロード</string>
+    <string name="catalog_action_home_assistant_webhook_field_payload_hint" formatted="false">16 KBまでのJSONオブジェクト。このステップが表示される場所ではすべて隠されます。</string>
+    <string name="catalog_action_home_assistant_webhook_field_message_label" formatted="false">Home Assistantのメッセージ/コマンド</string>
+    <string name="catalog_action_home_assistant_webhook_field_message_hint" formatted="false">Companionの通知メッセージ（任意）。例：command_broadcast_intent。data と組み合わせて使います。</string>
+    <string name="catalog_action_home_assistant_webhook_field_data_label" formatted="false">Home Assistantのデータ</string>
+    <string name="catalog_action_home_assistant_webhook_field_data_hint" formatted="false">message と対になるJSONオブジェクト（任意）。秘密の値は表示では伏せられます。</string>
+    <string name="catalog_action_home_assistant_webhook_field_timeout_label" formatted="false">タイムアウト（秒）</string>
+    <string name="catalog_action_home_assistant_webhook_field_timeout_hint" formatted="false">既定：15（1-30）</string>
+    <string name="catalog_action_home_assistant_webhook_field_retries_label" formatted="false">再試行回数</string>
+    <string name="catalog_action_home_assistant_webhook_field_retries_hint" formatted="false">一時的な失敗のみ。既定：2（0-3）</string>
+    <string name="catalog_action_home_assistant_webhook_field_backoff_label" formatted="false">再試行までの待機（ms）</string>
+    <string name="catalog_action_home_assistant_webhook_field_backoff_hint" formatted="false">最初の遅延。指数的に延び、上限は10秒です（100-5000）。</string>
+    <string name="catalog_action_home_assistant_webhook_field_allow_http_label" formatted="false">HTTPを許可</string>
+    <string name="catalog_action_home_assistant_webhook_field_allow_http_hint" formatted="false">自分のネットワーク上のアドレスに限ります。ローカルネットワークへのアクセスとホストの一覧による制限は、そのまま適用されます。</string>
+    <string name="catalog_action_mqtt_publish_name" formatted="false">MQTTで発行</string>
+    <string name="catalog_action_mqtt_publish_description" formatted="false">プラットフォームのソケット/TLSスタックを使い、上限付きのメッセージをMQTT 3.1.1ブローカーに発行します。</string>
+    <string name="catalog_action_mqtt_publish_field_host_label" formatted="false">ブローカーのホスト</string>
+    <string name="catalog_action_mqtt_publish_field_host_hint" formatted="false">ホスト名またはIPアドレス</string>
+    <string name="catalog_action_mqtt_publish_field_port_label" formatted="false">ブローカーのポート</string>
+    <string name="catalog_action_mqtt_publish_field_port_hint" formatted="false">既定：TLSありは8883、TLSなしは1883</string>
+    <string name="catalog_action_mqtt_publish_field_tls_label" formatted="false">TLSを使う</string>
+    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">既定はオンです。オフの場合、OpenTaskerはプライベートまたはローカルのホストにだけ接続します。</string>
+    <string name="catalog_action_mqtt_publish_field_topic_label" formatted="false">トピック</string>
+    <string name="catalog_action_mqtt_publish_field_topic_hint" formatted="false">発行先のトピック。ワイルドカードの + と # は使えません。</string>
+    <string name="catalog_action_mqtt_publish_field_payload_label" formatted="false">ペイロード</string>
+    <string name="catalog_action_mqtt_publish_field_payload_hint" formatted="false">64 KBまでのUTF-8テキスト。このステップが表示される場所ではすべて隠されます。</string>
+    <string name="catalog_action_mqtt_publish_field_qos_label" formatted="false">QoS</string>
+    <string name="catalog_action_mqtt_publish_field_qos_hint" formatted="false">0 または 1。1 の場合、ブローカーがメッセージを受け取ったことを確認します。</string>
+    <string name="catalog_action_mqtt_publish_field_retain_label" formatted="false">保持（Retain）</string>
+    <string name="catalog_action_mqtt_publish_field_retain_hint" formatted="false">最後のメッセージを保持するようブローカーに求めます。</string>
+    <string name="catalog_action_mqtt_publish_field_username_label" formatted="false">ユーザー名</string>
+    <string name="catalog_action_mqtt_publish_field_username_hint" formatted="false">ブローカーのユーザー名（任意）</string>
+    <string name="catalog_action_mqtt_publish_field_password_label" formatted="false">パスワード</string>
+    <string name="catalog_action_mqtt_publish_field_password_hint" formatted="false">ブローカーのパスワード（任意）。必ず伏せられます。</string>
+    <string name="catalog_action_mqtt_publish_field_timeout_label" formatted="false">タイムアウト（秒）</string>
+    <string name="catalog_action_mqtt_publish_field_timeout_hint" formatted="false">接続、ハンドシェイク、受信確認のタイムアウト（1-30）</string>
+    <string name="catalog_action_ping_name" formatted="false">ホストにping</string>
+    <string name="catalog_action_ping_description" formatted="false">ネットワーク上のホストにpingを送ります。</string>
+    <string name="catalog_action_ping_field_host_label" formatted="false">ホストのアドレス</string>
+    <string name="catalog_action_ping_field_timeout_label" formatted="false">タイムアウト（秒）</string>
+    <string name="catalog_action_ping_field_timeout_hint" formatted="false">既定：5（1-30）</string>
+    <string name="catalog_action_ping_field_var_label" formatted="false">結果の変数</string>
+    <string name="catalog_action_ping_field_var_hint" formatted="false">true/false を保存します（既定：result）</string>
+    <string name="catalog_action_download_name" formatted="false">ファイルをダウンロード</string>
+    <string name="catalog_action_download_description" formatted="false">URLからファイルをダウンロードします。</string>
+    <string name="catalog_action_download_field_url_label" formatted="false">URL</string>
+    <string name="catalog_action_download_field_path_label" formatted="false">保存先のパス</string>
+    <string name="catalog_action_download_field_allow_http_label" formatted="false">HTTPを許可</string>
+    <string name="catalog_action_download_field_allow_http_hint" formatted="false">LAN/プライベートネットワーク上のホストに限り、暗号化なしのHTTPを許可します。</string>
+    <string name="catalog_action_download_field_timeout_label" formatted="false">タイムアウト（秒）</string>
+    <string name="catalog_action_download_field_timeout_hint" formatted="false">既定：30（1-300）</string>
+    <string name="catalog_action_download_field_max_bytes_label" formatted="false">サイズの上限（バイト）</string>
+    <string name="catalog_action_download_field_max_bytes_hint" formatted="false">既定かつ最大: 52428800（50 MB）</string>
+    <string name="catalog_action_wol_name" formatted="false">Wake-on-LAN</string>
+    <string name="catalog_action_wol_description" formatted="false">マジックパケットを送信して、ローカルネットワーク上のデバイスを起動します。</string>
+    <string name="catalog_action_wol_field_mac_label" formatted="false">MACアドレス</string>
+    <string name="catalog_action_wol_field_mac_hint" formatted="false">例：AA:BB:CC:DD:EE:FF</string>
+    <string name="catalog_action_wol_field_broadcast_label" formatted="false">ブロードキャストIP</string>
+    <string name="catalog_action_wol_field_broadcast_hint" formatted="false">既定：255.255.255.255</string>
+    <string name="catalog_action_wol_field_port_label" formatted="false">ポート</string>
+    <string name="catalog_action_wol_field_port_hint" formatted="false">既定：9</string>
+    <string name="catalog_action_sound_play_name" formatted="false">音を再生</string>
+    <string name="catalog_action_sound_play_description" formatted="false">音声ファイルを再生します。</string>
+    <string name="catalog_category_media" formatted="false">メディア</string>
+    <string name="catalog_action_sound_play_field_path_label" formatted="false">音声ファイルのパス</string>
+    <string name="catalog_action_sound_play_field_volume_label" formatted="false">音量（0-100）</string>
+    <string name="catalog_action_sound_play_field_volume_hint" formatted="false">任意。空の場合は現在の音量を使います。</string>
+    <string name="catalog_action_sound_play_field_stream_label" formatted="false">音声ストリーム</string>
+    <string name="catalog_action_sound_play_field_stream_hint" formatted="false">既定は「音楽」です。「着信音」と「通知」は着信音または通知の音量を使い、バイブまたはサイレントのときは鳴りません。おやすみモードで消音されることもあります。Android 17では、バックグラウンドで開始されたタスクの音は「アラーム」でしか聞こえません。これには正確なアラームの権限が必要で、音量はアラームの音量に従います。</string>
+    <string name="catalog_action_sound_beep_name" formatted="false">ビープ音</string>
+    <string name="catalog_action_sound_beep_description" formatted="false">指定した高さの音を鳴らします。</string>
+    <string name="catalog_action_sound_beep_field_frequency_label" formatted="false">周波数（Hz）</string>
+    <string name="catalog_action_sound_beep_field_frequency_hint" formatted="false">音の高さ（0～10000）。440は中央のドのすぐ上のラ（A）です。</string>
+    <string name="catalog_action_sound_beep_field_duration_label" formatted="false">長さ（ms）</string>
+    <string name="catalog_action_sound_beep_field_amplitude_label" formatted="false">振幅（0-100）</string>
+    <string name="catalog_action_sound_beep_field_amplitude_hint" formatted="false">空の場合は50</string>
+    <string name="catalog_action_sound_stop_name" formatted="false">音を停止</string>
+    <string name="catalog_action_sound_stop_description" formatted="false">再生を停止します。</string>
+    <string name="catalog_action_sound_pause_name" formatted="false">音を一時停止</string>
+    <string name="catalog_action_sound_pause_description" formatted="false">再生を一時停止します。</string>
+    <string name="catalog_action_track_next_name" formatted="false">次の曲</string>
+    <string name="catalog_action_track_next_description" formatted="false">次の曲を再生します。</string>
+    <string name="catalog_action_track_previous_name" formatted="false">前の曲</string>
+    <string name="catalog_action_track_previous_description" formatted="false">前の曲を再生します。</string>
+    <string name="catalog_action_sound_resume_name" formatted="false">音を再開</string>
+    <string name="catalog_action_sound_resume_description" formatted="false">再生を再開します。</string>
+    <string name="catalog_action_sound_toggle_name" formatted="false">再生/一時停止</string>
+    <string name="catalog_action_sound_toggle_description" formatted="false">再生と一時停止を切り替えます。</string>
+    <string name="catalog_action_track_rewind_name" formatted="false">巻き戻し</string>
+    <string name="catalog_action_track_rewind_description" formatted="false">現在の曲を巻き戻します。</string>
+    <string name="catalog_action_track_fastforward_name" formatted="false">早送り</string>
+    <string name="catalog_action_track_fastforward_description" formatted="false">現在の曲を早送りします。</string>
+    <string name="catalog_action_media_mute_name" formatted="false">消音</string>
+    <string name="catalog_action_media_mute_description" formatted="false">音声を消音します。</string>
+    <string name="catalog_action_media_mute_field_stream_label" formatted="false">ストリーム</string>
+    <string name="catalog_action_media_mute_field_stream_hint" formatted="false">music、ring、notification、alarm、system、call（既定：music）</string>
+    <string name="catalog_action_vibrate_name" formatted="false">バイブレーション</string>
+    <string name="catalog_action_vibrate_description" formatted="false">デバイスを振動させます。</string>
+    <string name="catalog_category_system" formatted="false">システム</string>
+    <string name="catalog_action_vibrate_field_millis_label" formatted="false">長さ（ms）</string>
+    <string name="catalog_action_reboot_name" formatted="false">デバイスを再起動</string>
+    <string name="catalog_action_reboot_description" formatted="false">デバイスを再起動します。</string>
+    <string name="catalog_action_lock_name" formatted="false">デバイスをロック</string>
+    <string name="catalog_action_lock_description" formatted="false">デバイスの画面をロックします。</string>
+    <string name="catalog_action_screen_off_name" formatted="false">画面を消灯</string>
+    <string name="catalog_action_screen_off_description" formatted="false">ディスプレイを消灯します。</string>
+    <string name="catalog_action_wake_name" formatted="false">デバイスを起こす</string>
+    <string name="catalog_action_wake_description" formatted="false">デバイスを起こします（画面を点灯）。</string>
+    <string name="catalog_action_log_name" formatted="false">ログにメッセージを記録</string>
+    <string name="catalog_action_log_description" formatted="false">メッセージをタスクのログに書き込みます。</string>
+    <string name="catalog_action_log_field_message_label" formatted="false">メッセージ</string>
+    <string name="catalog_action_notify_progress_name" formatted="false">進捗の通知</string>
+    <string name="catalog_action_notify_progress_description" formatted="false">順を追った進捗を通知で知らせます。Android 16より前では代わりの表示になります。</string>
+    <string name="catalog_action_notify_progress_field_title_label" formatted="false">タイトル</string>
+    <string name="catalog_action_notify_progress_field_title_hint" formatted="false">通知のタイトル</string>
+    <string name="catalog_action_notify_progress_field_text_label" formatted="false">本文</string>
+    <string name="catalog_action_notify_progress_field_text_hint" formatted="false">状況を伝える文（任意）</string>
+    <string name="catalog_action_notify_progress_field_progress_label" formatted="false">進捗</string>
+    <string name="catalog_action_notify_progress_field_progress_hint" formatted="false">0～100</string>
+    <string name="catalog_action_notify_progress_field_segments_label" formatted="false">区間</string>
+    <string name="catalog_action_notify_progress_field_segments_hint" formatted="false">正の長さをカンマ区切りで（任意）</string>
+    <string name="catalog_action_notify_progress_field_channel_label" formatted="false">チャンネル</string>
+    <string name="catalog_action_notify_progress_field_channel_hint" formatted="false">quiet、default、urgent のいずれか</string>
+    <string name="catalog_action_notify_progress_field_tag_label" formatted="false">タグ</string>
+    <string name="catalog_action_notify_progress_field_tag_hint" formatted="false">置き換え用のタグ（任意）</string>
+    <string name="catalog_action_notify_progress_field_id_label" formatted="false">ID</string>
+    <string name="catalog_action_notify_progress_field_id_hint" formatted="false">通知ID（任意）</string>
+    <string name="catalog_action_shortcut_publish_name" formatted="false">ショートカットを公開</string>
+    <string name="catalog_action_shortcut_publish_description" formatted="false">タスクの動的ショートカット、またはランチャーに固定するショートカットを作成します。</string>
+    <string name="catalog_action_shortcut_publish_field_id_label" formatted="false">ショートカットID</string>
+    <string name="catalog_action_shortcut_publish_field_id_hint" formatted="false">このショートカットの更新に使う、変わらないID</string>
+    <string name="catalog_action_shortcut_publish_field_task_id_label" formatted="false">タスク</string>
+    <string name="catalog_action_shortcut_publish_field_task_id_hint" formatted="false">ショートカットをタップしたときに実行するタスク</string>
+    <string name="catalog_action_shortcut_publish_field_label_label" formatted="false">ラベル</string>
+    <string name="catalog_action_shortcut_publish_field_label_hint" formatted="false">ランチャーに表示されるラベル</string>
+    <string name="catalog_action_shortcut_publish_field_mode_label" formatted="false">モード</string>
+    <string name="catalog_action_shortcut_publish_field_mode_hint" formatted="false">「動的」はすぐに更新されます。「固定」はランチャーに確認を求めます。</string>
+    <string name="action_option_shortcut_dynamic" formatted="false">動的</string>
+    <string name="action_option_shortcut_pinned" formatted="false">固定</string>
+</resources>

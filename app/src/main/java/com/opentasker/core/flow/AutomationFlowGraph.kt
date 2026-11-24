@@ -14,6 +14,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.enterTaskIdOrNull
+import com.opentasker.i18n.tr
 
 data class AutomationFlowGraph(
     val profileId: Long,
@@ -54,7 +55,11 @@ data class AutomationFlowGraph(
         val actionCount = nodes.count { it.kind == AutomationFlowNodeKind.ACTION }
         val enterTask = enterTaskNode?.title ?: if (hasEnterTask) strings.missingTaskTitle("enter") else strings.noEnterTask()
         val exitTask = exitTaskNode?.title ?: strings.noExitTask()
-        val warningText = if (warnings.isEmpty()) "no warnings" else "${warnings.size} warning${plural(warnings.size)}"
+        val warningText = when (warnings.size) {
+            0 -> tr("no warnings")
+            1 -> tr("1 warning")
+            else -> tr("%1\$s warnings", warnings.size)
+        }
         return strings.accessibilitySummary(title, contextNodes.size, actionCount, enterTask, exitTask, warningText)
     }
 }
@@ -230,7 +235,7 @@ object AutomationFlowGraphBuilder {
             nodes += AutomationFlowNode(
                 id = taskNodeId,
                 kind = AutomationFlowNodeKind.MISSING,
-                title = "Missing ${edgeLabel} task",
+                title = if (edgeLabel == "enter") tr("Missing enter task") else tr("Missing exit task"),
                 detail = strings.missingTaskDetail(taskId, profileName),
                 muted = true,
                 changed = "task:$taskId" in changedNodeKeys || "profile:$profileId" in changedNodeKeys,

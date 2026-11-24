@@ -15,6 +15,7 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.text.countOf
+import com.opentasker.i18n.tr
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -101,7 +102,7 @@ class TaskRunner(
         val missing = CapabilityState.missingForTask(task, ctx.app)
         if (missing.isNotEmpty()) {
             val preStart = System.currentTimeMillis()
-            val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: "Unfiled"
+            val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: tr("Unfiled")
             // Still blocked, still logged — but don't stack another modal on top of the settings page
             // the user was just sent to. A per-minute profile would otherwise re-raise it immediately.
             if (!CapabilityPrompt.allQuiet(missing.map { it.requirement })) {
@@ -991,23 +992,23 @@ class TaskRunner(
         missing: List<CapabilityState.MissingCapability>,
     ) {
         val lines = missing.joinToString("\n") { m ->
-            "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
+            tr("• %1\$s — needed by: %2\$s", CapabilityState.shortLabel(m.requirement), m.actionTypes.joinToString(", "))
         }
         // A permission whose ordinary "you have not granted it" story is wrong says so instead — see
         // CapabilityState.blockedDetail.
         val details = missing.distinctBy { it.requirement }
             .mapNotNull { CapabilityState.blockedDetail(it.requirement, ctx.app) }
         val advice = details.takeIf { it.isNotEmpty() }?.joinToString("\n\n")
-            ?: "Grant it below, then run again."
-        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n$advice"
+            ?: tr("Grant it below, then run again.")
+        val text = tr("Can't run “%1\$s” (project “%2\$s”).\n\nMissing permission(s):\n%3\$s\n\n%4\$s", taskName, project, lines, advice)
         // Only offer a deep-link pill for a permission that actually has a System settings page to open.
         val grantable = missing.distinctBy { it.requirement }
             .filter { CapabilityState.settingsIntent(it.requirement, ctx.app) != null }
         val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_TEXT)
-            putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
+            putExtra(DialogActivity.EXTRA_TITLE, tr("Permission required"))
             putExtra(DialogActivity.EXTRA_TEXT, text)
-            putExtra(DialogActivity.EXTRA_OK, "OK")
+            putExtra(DialogActivity.EXTRA_OK, tr("OK"))
             putExtra(DialogActivity.EXTRA_SETTINGS_REQS, grantable.map { it.requirement.name }.toTypedArray())
             putExtra(DialogActivity.EXTRA_SETTINGS_LABELS, grantable.map { CapabilityState.shortLabel(it.requirement) }.toTypedArray())
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)

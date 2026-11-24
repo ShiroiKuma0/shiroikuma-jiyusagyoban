@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.UiRole
 import com.opentasker.ui.theme.role
 
@@ -56,13 +57,13 @@ fun TabActionsFab(actions: List<TabAction>) {
             shape = CircleShape,
             modifier = Modifier.border(2.dp, role(UiRole.FAB_RING), CircleShape),
         ) {
-            Icon(Icons.Filled.Add, contentDescription = "Add / import / export")
+            Icon(Icons.Filled.Add, contentDescription = tr("Add / import / export"))
         }
         ThemedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             actions.forEach { action ->
                 if (action.dividerBefore) MenuDivider()
                 DropdownMenuItem(
-                    text = { Text(action.label) },
+                    text = { Text(tr(action.label)) },
                     icon = action.icon,
                     role = action.iconRole(),
                     opens = action.opens,

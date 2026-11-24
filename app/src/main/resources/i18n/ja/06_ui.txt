@@ -1,0 +1,461 @@
+# 06_ui — ui/screens from HelpDocumentationScreen to MonitorScreen
+
+# HelpDocumentationScreen.kt
+
+= Tools
+: ツール
+= Action reference
+: アクション一覧
+= Every built-in action, generated from the live registry. The `type` is the id you put in a bundle's `actions[]`; the fields are the keys that go in that action's `args` map.
+: 組み込みのアクションすべてを、実際の登録内容から生成した一覧です。`type` はバンドルの `actions[]` に書くIDで、各フィールドはそのアクションの `args` マップに入れるキーです。
+= %1$s actions in %2$s categories
+: %2$s個のカテゴリにアクション%1$s件
+= Collapse %1$s
+: %1$sを折りたたむ
+= Expand %1$s
+: %1$sを展開
+= %1$s, required
+: %1$s、必須
+
+# docSections — "Concepts"
+= Concepts
+: 基本の考え方
+= 白い熊 自由作業盤 automates your device. The pieces:
+: 白い熊 自由作業盤は端末を自動化します。構成要素は次のとおりです。
+= Project — an optional folder grouping profiles, tasks and scenes. Items with no project are "Unfiled".
+: プロジェクト — プロファイル、タスク、シーンをまとめる任意の入れ物です。プロジェクトのない項目は「未分類」になります。
+= Task — an ordered list of actions. Run on a trigger, a tile, a widget, or by hand.
+: タスク — アクションを順番に並べたものです。トリガー、タイル、ウィジェットから、または手動で実行します。
+= Action — one step in a task (show a notification, set a variable, send an intent, …).
+: アクション — タスクの中の1ステップです（通知を表示する、変数を設定する、インテントを送る、…）。
+= Profile — binds one or more contexts to an enter-task (and optional exit-task); active while all its contexts match.
+: プロファイル — 1つ以上のコンテキストを開始タスク（と任意の終了タスク）に結び付けます。すべてのコンテキストが一致している間、成立します。
+= Context — a condition: app in foreground, time window, day, location, device state, or a one-shot event.
+: コンテキスト — 条件です。前面のアプリ、時間帯、曜日、位置情報、端末の状態、または一度きりのイベント。
+= Scene — a floating overlay built from elements (text, button, slider, image …) that can run tasks on tap.
+: シーン — 要素（文字、ボタン、スライダー、画像 …）で組み立てる、画面に浮かぶオーバーレイです。タップでタスクを実行できます。
+= Widget template — a named home-screen widget layout, referenced by the Set Widget action and refreshed from variables.
+: ウィジェットのテンプレート — 名前を付けたホーム画面ウィジェットのレイアウトです。「ウィジェットを設定」アクションから参照され、変数の値で更新されます。
+= Variable — a named value (%name) read/written by actions; scope follows its case (see below).
+: 変数 — アクションが読み書きする、名前の付いた値（%name）です。有効範囲は大文字・小文字で決まります（下記参照）。
+
+# docSections — "Variables & scoping"
+= Variables & scoping
+: 変数と有効範囲
+= Variables are written %name and their scope is decided by the case of the first letters:
+: 変数は %name と書き、その有効範囲は先頭の文字の大文字・小文字で決まります。
+= %ALLCAPS — super-global: one value shared everywhere (projectId 0).
+: %ALLCAPS — スーパーグローバル：どこからでも共有される1つの値です（projectId 0）。
+= %MixedCase — project-global: one value per project (the task's project; Unfiled maps to super-global).
+: %MixedCase — プロジェクトグローバル：プロジェクトごとに1つの値です（タスクが属するプロジェクトのもの。未分類はスーパーグローバルになります）。
+= %lowercase — task-local: ephemeral, lives only for that task run.
+: %lowercase — タスクローカル：一時的なもので、そのタスクの実行中だけ存在します。
+= Persisted variables (super-global and project-global) survive restarts and are listed on the Vars tab. Indexing like %array(2) is not supported — the parenthetical is literal text.
+: 保存される変数（スーパーグローバルとプロジェクトグローバル）は再起動後も残り、「変数」タブに一覧表示されます。%array(2) のような添字指定には対応していません — かっこの部分はそのままの文字として扱われます。
+
+# docSections — "The bundle file"
+= The bundle file
+: バンドルファイル
+= Every Import/Export uses one JSON format, the OpenTaskerBundle. Any tab's + menu imports it; each tab exports its own slice. Top-level fields:
+: インポートとエクスポートはすべて、OpenTaskerBundleという1つのJSON形式を使います。どのタブの「+」メニューからでもインポートでき、各タブはそれぞれ自分の分だけをエクスポートします。最上位のフィールド：
+= Format version this build understands (currently 4). A newer file warns but older files always import — missing fields default.
+: このビルドが理解できる形式のバージョンです（現在は4）。それより新しいファイルは警告が出ますが、古いファイルは常にインポートできます — 欠けているフィールドには既定値が入ります。
+= App version that wrote the file (informational).
+: このファイルを書き出したアプリのバージョンです（参考情報）。
+= Export timestamp.
+: エクスポートした日時です。
+= name, description, capabilityRequirements[], warnings[].
+: name、description、capabilityRequirements[]、warnings[]。
+= Project folders referenced by items below.
+: 以下の項目から参照されるプロジェクトです。
+= Tasks with their actions.
+: タスクとそのアクションです。
+= Profiles with their contexts (imported disabled for review).
+: プロファイルとそのコンテキストです（確認のため、無効の状態でインポートされます）。
+= Persisted variables.
+: 保存される変数です。
+= Scenes with their elements.
+: シーンとその要素です。
+= Widget-layout templates.
+: ウィジェットのレイアウトのテンプレートです。
+= Per-tab Alphabetical/Manual choice (profiles, tasks, scenes).
+: タブごとの「名前順／手動」の選択です（プロファイル、タスク、シーン）。
+= On import, a project whose name already exists prompts: "Import into" (MERGE — file items under the existing project) or "New project" (RENAME — make a separate copy). Profiles always import disabled so you can review contexts and permissions first.
+: インポート時に、同じ名前のプロジェクトがすでにある場合は、「既存に追加」（MERGE — 項目を既存のプロジェクトに入れる）か「新規作成」（RENAME — 別のコピーを作る）かを選びます。プロファイルは、先にコンテキストと権限を確認できるよう、常に無効の状態でインポートされます。
+
+# docSections — "Tasks & actions"
+= Tasks & actions
+: タスクとアクション
+= A task is an ordered action[] list.
+: タスクは、順番に並んだ action[] のリストです。
+= Bundle-local id (referenced by profiles / scene elements).
+: バンドル内だけで通用するIDです（プロファイルやシーンの要素から参照されます）。
+= Display name; also how scene/profile lookups resolve by name.
+: 表示名です。シーンやプロファイルが名前でタスクを探すときにも使われます。
+= Higher runs first on contention.
+: 競合したときは、値の大きいほうが先に実行されます。
+= ABORT_NEW · ABORT_EXISTING · RUN_BOTH · WAIT — what happens if it's already running.
+: ABORT_NEW · ABORT_EXISTING · RUN_BOTH · WAIT — すでに実行中だった場合の動作です。
+= The steps (see below).
+: ステップです（下記参照）。
+= Owning project, or null = Unfiled.
+: 属するプロジェクトです。null = 未分類。
+= Manual sort order within the tab.
+: タブ内での手動の並び順です。
+= Each action (ActionSpec):
+: 各アクション（ActionSpec）：
+= Action id, e.g. notify.show — see the Action reference below.
+: アクションのIDです。例：notify.show — 下の「アクション一覧」を参照してください。
+= String key→value arguments for that action type.
+: そのアクションの種類に渡す、文字列のキー→値の引数です。
+= Optional custom label.
+: 任意の独自ラベルです。
+= If true, a failure doesn't stop the task.
+: trueの場合、失敗してもタスクは止まりません。
+= Optional %var condition guarding the step.
+: このステップを実行するかどうかを決める、任意の %var 条件です。
+
+# docSections — "Profiles & contexts"
+= Profiles & contexts
+: プロファイルとコンテキスト
+= A profile is active while ALL of its contexts match; entering runs enterTaskId, leaving runs exitTaskId.
+: プロファイルは、コンテキストがすべて一致している間、成立します。成立したときに enterTaskId が、成立しなくなったときに exitTaskId が実行されます。
+= Display name.
+: 表示名です。
+= Imported profiles arrive disabled.
+: インポートしたプロファイルは無効の状態で入ります。
+= Conditions (below).
+: 条件です（下記）。
+= Task run when the profile becomes active.
+: プロファイルが成立したときに実行するタスクです。
+= Task run when it deactivates (optional).
+: 成立しなくなったときに実行するタスクです（任意）。
+= Minimum seconds between activations.
+: 成立から次の成立までの最短の秒数です。
+= SINGLE · RESTART · QUEUED · PARALLEL.
+: SINGLE · RESTART · QUEUED · PARALLEL。
+= Each context (ContextSpec):
+: 各コンテキスト（ContextSpec）：
+= APPLICATION · TIME · DAY · LOCATION · STATE · EVENT.
+: APPLICATION · TIME · DAY · LOCATION · STATE · EVENT。
+= Type-specific settings (e.g. time window, app list).
+: 種類ごとの設定です（例：時間帯、アプリの一覧）。
+= Match when the condition is false.
+: 条件が成り立たないときに一致します。
+= Contexts sharing an orGroup match as OR instead of AND.
+: 同じ orGroup を持つコンテキストは、ANDではなくORとして判定されます。
+= The EVENT type covers one-shot triggers (boot, notification, NFC, calendar, and the internal event=minute tick used by clock widgets).
+: EVENT型は、一度きりのトリガーを扱います（起動完了、通知、NFC、カレンダー、および時計ウィジェットが使う内部の1分ごとの刻み event=minute）。
+
+# docSections — "Scenes"
+= Scenes
+: シーン
+= A scene is a floating overlay (widthDp × heightDp) of positioned elements.
+: シーンは、要素を配置した、画面に浮かぶオーバーレイ（widthDp × heightDp）です。
+= Panel size.
+: パネルのサイズです。
+= Positioned UI elements (below).
+: 配置された画面の要素です（下記）。
+= Each element (SceneElement):
+: 各要素（SceneElement）：
+= BUTTON · TEXT · EDIT_TEXT · CHECKBOX · TOGGLE · SLIDER · IMAGE · … 
+: BUTTON · TEXT · EDIT_TEXT · CHECKBOX · TOGGLE · SLIDER · IMAGE · … 
+= Position and size within the panel.
+: パネル内での位置とサイズです。
+= Element settings (label, text, min/max, …); %vars are expanded at show time.
+: 要素の設定です（label、text、min/max、…）。%var は表示するときに展開されます。
+= Task to run on tap / long-press.
+: タップ時／長押し時に実行するタスクです。
+
+# docSections — "Variables, templates & projects"
+= Variables, templates & projects
+: 変数、テンプレート、プロジェクト
+= Variable:
+: 変数：
+= Without the leading % (scope follows its case — see above).
+: 先頭の % を除いた名前です（有効範囲は大文字・小文字で決まります — 上記参照）。
+= Current value.
+: 現在の値です。
+= 0 = super-global, >0 = that project's project-global.
+: 0 = スーパーグローバル、>0 = そのプロジェクトのプロジェクトグローバル。
+= Widget template:
+: ウィジェットのテンプレート：
+= Referenced by a Set Widget action and the launcher.
+: 「ウィジェットを設定」アクションとランチャーから参照されます。
+= Widget-layout JSON with %vars left raw (expanded at render).
+: ウィジェットのレイアウトのJSONです。%var は展開せずにそのまま入ります（描画時に展開されます）。
+= Project:
+: プロジェクト：
+= Bundle-local id referenced by items' projectId.
+: バンドル内だけで通用するIDで、各項目の projectId から参照されます。
+= Folder name (matched case-insensitively on import).
+: プロジェクトの名前です（インポート時は大文字・小文字を区別せずに照合されます）。
+= Optional presentation.
+: 任意の表示設定です。
+
+# IconPackPickerDialog.kt
+
+= Icon pack
+: アイコンパック
+= Loading…
+: 読み込み中…
+= No icon packs installed.
+: アイコンパックがインストールされていません。
+= Search icons
+: アイコンを検索
+= No icons.
+: アイコンがありません。
+= Packs
+: パック一覧
+
+# ImportReviewDialogs.kt
+
+= Review Tasker import
+: Taskerからのインポートの確認
+= Review MacroDroid import
+: MacroDroidからのインポートの確認
+= Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use.
+: インポートしたプロファイルは、使う前にアクション、コンテキスト、権限を確認できるよう、無効の状態で作成されます。
+= Tasks
+: タスク
+= Profiles
+: プロファイル
+= Variables
+: 変数
+= Src tasks
+: 元のタスク
+= Src profiles
+: 元のプロファイル
+= %1$s mapped
+: 対応付け済み%1$s件
+= %1$s unsupported
+: 非対応%1$s件
+= Capability review
+: 機能の確認
+= Migration warnings
+: 移行の警告
+= Unsupported actions
+: 非対応のアクション
+= Mapped actions
+: 対応付けたアクション
+= Importing...
+: インポートしています...
+= Import for Review
+: 確認用にインポート
+
+# ImportReviewScreen.kt
+
+= Unfiled
+: 未分類
+= Widgets
+: ウィジェット
+= Projects
+: プロジェクト
+= Review import
+: インポートの確認
+= %1$s:
+: %1$s：
+= Warnings
+: 警告
+= Cannot import
+: インポートできません
+= Import is not compatible with this build.
+: このインポートは、このビルドと互換性がありません。
+= Items that already exist
+: すでに存在する項目
+= Overwrite in place
+: その場で上書き
+= Keep both (rename new)
+: 両方を残す（新しいほうの名前を変更）
+= Overwrite + backup (rename old)
+: 上書き＋バックアップ（古いほうの名前を変更）
+= Cancel
+: キャンセル
+= Importing…
+: インポートしています…
+= Import
+: インポート
+= existing project
+: 既存のプロジェクト
+= Into existing
+: 既存に追加
+= Create new
+: 新規作成
+= Create
+: 作成
+= %1$s (%2$s)
+: %1$s（%2$s）
+= %1$s already exist
+: %1$s件がすでに存在
+= new group · will be created
+: 新しいグループ · 作成されます
+= existing group
+: 既存のグループ
+= Already exists
+: すでに存在します
+= New
+: 新規
+= 1 exists
+: 1件が存在
+= %1$s exist
+: %1$s件が存在
+= Overwrite
+: 上書き
+= Keep both
+: 両方を残す
+= Backup
+: バックアップ
+
+# LibrarySort.kt
+
+= Manual
+: 手動
+= Name
+: 名前
+= Last edited
+: 最終編集
+= Sort order
+: 並び順
+= Sorted by name — a view only. Groups and your own order are untouched; “%1$s” shows them again.
+: 名前順に並べ替えて表示しています — 表示だけの並びです。グループとご自身で決めた順番はそのままで、「%1$s」を選ぶと元の並びに戻ります。
+= Sorted by last edited, newest first — a view only. Groups and your own order are untouched; “%1$s” shows them again.
+: 最終編集の新しい順に並べ替えて表示しています — 表示だけの並びです。グループとご自身で決めた順番はそのままで、「%1$s」を選ぶと元の並びに戻ります。
+
+# MonitorScreen.kt
+
+= Engine STOPPED
+: エンジン停止中
+= Engine STALLED
+: エンジン停滞中
+= Engine RUNNING
+: エンジン動作中
+= No tick for %1$s — auto-recovering within ~2.5 min.
+: %1$sのあいだ刻みがありません — 約2.5分以内に自動で復旧します。
+= Last tick
+: 最後の刻み
+= %1$s ago
+: %1$s前
+= Uptime
+: 稼働時間
+= Overlays on screen
+: 画面上のオーバーレイ
+= Enabled profiles
+: 有効なプロファイル
+= Live now (%1$s)
+: 現在動作中（%1$s）
+= In-flight tasks, scenes, bubbles and panels — everything the app is holding open right now, with the engine itself at the top. Tap ✕ to stop one. After a teardown this should be empty except the engine; anything else left here is a leak.
+: 実行中のタスク、シーン、バブル、パネル — アプリがいま開いたままにしているものすべてです。いちばん上がエンジン自体です。✕をタップすると、その1つを停止します。後片付けの後は、エンジン以外は何も残らないはずです。ほかに残っているものがあれば、それは片付け漏れです。
+= Nothing is running — not even the engine.
+: 何も動いていません — エンジンさえも動いていません。
+= Stop %1$s
+: %1$sを停止
+= Run on start
+: 開始時に実行
+= These run automatically on every fresh engine start (after an app update, reboot, or auto-recovery), so your overlays/state come back without running 起動 by hand — add your master 起動完了 ⇨ 起動.
+: ここに登録したタスクは、エンジンが新たに開始するたび（アプリの更新、端末の再起動、自動復旧の後）に自動で実行されます。そのため、起動を手で実行しなくてもオーバーレイや状態が元に戻ります — 大元の 起動完了 ⇨ 起動 を追加してください。
+= Nothing set to auto-run.
+: 自動実行するタスクは設定されていません。
+= Remove
+: 外す
+= Add task…
+: タスクを追加…
+= Run on exit
+: 終了時に実行
+= These run — in order, up to 30s each — when you pick “Exit app fully” from the top-bar ⋮ menu, before anything is forced down. Add your master teardown (e.g. 起動完了 ⇨ 終了). Whatever is still running afterwards is listed for you, and written to the run log.
+: ここに登録したタスクは、上部バーの⋮メニューで「アプリを完全に終了」を選んだときに、何かが強制的に止められる前に、順番に（それぞれ最長30秒）実行されます。大元の後片付けタスクを追加してください（例：起動完了 ⇨ 終了）。その後もまだ動いているものは一覧で示され、実行ログにも書き込まれます。
+= Nothing set to run on exit — the shutdown will just force everything down.
+: 終了時に実行するタスクは設定されていません — 終了処理はすべてを強制的に止めるだけになります。
+= Start engine on boot
+: 端末の起動時にエンジンを開始
+= On — a reboot starts the engine, and lifts a shutdown.
+: オン — 端末を再起動するとエンジンが開始し、終了した状態も解除されます。
+= Off — after a reboot nothing runs until you open the app.
+: オフ — 端末を再起動した後は、アプリを開くまで何も実行されません。
+= task #%1$s
+: タスク #%1$s
+= Task activity (1 task)
+: タスクの活動（タスク1件）
+= Task activity (%1$s tasks)
+: タスクの活動（タスク%1$s件）
+= Each task collapsed across the last %1$s runs: how many times it fired and when it last ran. Green = all OK; red = at least one run failed.
+: 直近%1$s回の実行をタスクごとにまとめたものです。何回実行されたかと、最後に実行された時刻を示します。緑 = すべて正常、赤 = 1回以上の実行が失敗。
+= No task runs recorded yet.
+: タスクの実行はまだ記録されていません。
+= %1$s× · last %2$s ago
+: %1$s回 · 最後は%2$s前
+= %1$s× · last %2$s ago · %3$s failed
+: %1$s回 · 最後は%2$s前 · 失敗%3$s件
+= Widget pulls — last tick (%1$s)
+: ウィジェットの取り込み — 最後の刻み（%1$s）
+= The per-minute tick runs Refresh Widgets, re-rendering every placed widget. A “pull” widget (template-bound, green) re-reads globals each tick; a “static” one (grey) keeps a fixed layout and never updates — that's why a clock/battery would stay frozen.
+: 1分ごとの刻みが「ウィジェットを更新」を実行し、配置されているすべてのウィジェットを描き直します。「取り込み」のウィジェット（テンプレートに結び付いたもの、緑）は刻みのたびにグローバル変数を読み直します。「固定」のウィジェット（灰色）はレイアウトが固定されていて、更新されることはありません — 時計や電池の表示が止まったままになるのはそのためです。
+= No Refresh Widgets has run this session yet. If the clock/battery stay stale, the per-minute tick isn't calling it — check the clock task fired under Recent task runs above.
+: 今回の起動では、「ウィジェットを更新」はまだ一度も実行されていません。時計や電池の表示が古いままなら、1分ごとの刻みがこれを呼び出していません — 上の「タスクの活動」で、時計のタスクが実行されたか確認してください。
+= Last pull
+: 最後の取り込み
+= %1$s ago · %2$s pull / %3$s static
+: %1$s前 · 取り込み%2$s件 / 固定%3$s件
+= pull
+: 取り込み
+= static — won't update
+: 固定 — 更新されません
+= On-screen overlays (%1$s)
+: 画面上のオーバーレイ（%1$s）
+= Nothing is drawn on screen. After an app restart the overlays are gone until re-shown — run 起動完了 ⇨ 起動 (or set it to auto-run below).
+: 画面には何も描かれていません。アプリを再起動すると、オーバーレイは表示し直すまで消えたままです — 起動完了 ⇨ 起動 を実行してください（または「開始時に実行」に登録してください）。
+= shown
+: 表示中
+= Enabled profiles (%1$s)
+: 有効なプロファイル（%1$s）
+= Armed triggers. “ran” means the trigger fired (e.g. data updated) — it does NOT mean its overlay is on screen; that's the “On-screen overlays” section above.
+: 待機中のトリガーです。「実行」はトリガーが発動したこと（例：データが更新された）を表すだけで、そのオーバーレイが画面に出ていることを意味するものではありません。それは上の「画面上のオーバーレイ」セクションで確認できます。
+= No enabled profiles — nothing is being watched.
+: 有効なプロファイルがありません — 何も見張られていません。
+= idle · not run yet
+: 待機中 · まだ実行されていません
+= ran %1$s ago
+: %1$s前に実行
+= History
+: 履歴
+= No restarts or recoveries recorded yet.
+: 再起動や復旧はまだ記録されていません。
+= Engine started
+: エンジンを開始
+= Re-armed — engine had died for %1$s
+: 再始動 — エンジンは%1$sのあいだ止まっていました
+= Resurrected — process had been killed
+: 復活 — プロセスが強制終了されていました
+= Recovered “%1$s” (matcher restarted)
+: 「%1$s」を復旧（監視を再起動）
+= Device state — globals (%1$s)
+: 端末の状態 — グローバル変数（%1$s）
+= No globals set yet.
+: グローバル変数はまだ設定されていません。
+= Run on exit — pick a task
+: 終了時に実行 — タスクを選択
+= Run on start — pick a task
+: 開始時に実行 — タスクを選択
+= Collapse all
+: すべて折りたたむ
+= Expand all
+: すべて展開
+= Close
+: 閉じる
+= %1$ss
+: %1$s秒
+= %1$sm %2$ss
+: %1$s分%2$s秒
+= %1$sh %2$sm
+: %1$s時間%2$s分
+
+# RuntimeInventory.Kind titles, shown in MonitorScreen.kt
+= Engine
+: エンジン
+= Running task
+: 実行中のタスク
+= Scene
+: シーン
+= Bubble
+: バブル
+= Panel
+: パネル

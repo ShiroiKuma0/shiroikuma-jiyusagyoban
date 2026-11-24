@@ -2367,3 +2367,11 @@ val downloadOcrModels = tasks.register("downloadOcrModels") {
 }
 
 tasks.named("preBuild") { dependsOn(downloadOcrModels) }
+
+// The fork's own text is translated by its English literal (i18n/Tr.kt), following the language of
+// the machine. The JVM tests assert the English, and the build machine runs in Japanese, so the
+// tests run as an English device.
+tasks.withType<Test>().configureEach {
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
+}

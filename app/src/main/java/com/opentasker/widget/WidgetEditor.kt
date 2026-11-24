@@ -1,5 +1,7 @@
 package com.opentasker.widget
 
+import com.opentasker.i18n.tr
+import com.opentasker.i18n.trc
 import com.opentasker.ui.theme.ThemedSwitch
 import com.opentasker.ui.components.Button
 import androidx.compose.foundation.Image
@@ -141,15 +143,15 @@ fun WidgetEditor(initialJson: String, onDone: (String) -> Unit, onCancel: () -> 
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = "Cancel") }
-                Text("Widget layout", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(start = 4.dp))
+                IconButton(onClick = onCancel) { Icon(Icons.Filled.Close, contentDescription = tr("Cancel")) }
+                Text(tr("Widget layout"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(start = 4.dp))
                 IconButton(onClick = { showImport = true }) {
-                    Icon(Icons.Filled.ContentPaste, contentDescription = "Import Tasker layout")
+                    Icon(Icons.Filled.ContentPaste, contentDescription = tr("Import Tasker layout"))
                 }
                 IconButton(onClick = { clipboard.setText(AnnotatedString(WidgetLayoutCodec.encode(root))) }) {
-                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy JSON")
+                    Icon(Icons.Filled.ContentCopy, contentDescription = tr("Copy JSON"))
                 }
-                OutlinedButton(onClick = { onDone(WidgetLayoutCodec.encode(root)) }) { Text("Save") }
+                OutlinedButton(onClick = { onDone(WidgetLayoutCodec.encode(root)) }) { Text(tr("Save")) }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             PreviewSizeControl(previewW, previewH, { previewW = it }, { previewH = it })
@@ -183,20 +185,18 @@ private fun TaskerImportDialog(onImport: (WidgetNode) -> Unit, onDismiss: () -> 
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Import Tasker layout") },
+        title = { Text(tr("Import Tasker layout")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Paste the layout JSON from a Tasker “Widget” (V2) action — the value of its " +
-                        "Layout field (arg13). Containers, text, images, padding, colours and fonts are mapped " +
-                        "to this editor’s schema.",
+                    tr("Paste the layout JSON from a Tasker “Widget” (V2) action — the value of its Layout field (arg13). Containers, text, images, padding, colours and fonts are mapped to this editor’s schema."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = pasted,
                     onValueChange = { pasted = it; error = null },
-                    label = { Text("Tasker layout JSON") },
+                    label = { Text(tr("Tasker layout JSON")) },
                     minLines = 6,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -206,10 +206,10 @@ private fun TaskerImportDialog(onImport: (WidgetNode) -> Unit, onDismiss: () -> 
         confirmButton = {
             Button(onClick = {
                 val node = TaskerWidgetImport.convert(pasted)
-                if (node != null) onImport(node) else error = "Couldn’t parse that as a Tasker layout."
-            }) { Text("Convert") }
+                if (node != null) onImport(node) else error = tr("Couldn’t parse that as a Tasker layout.")
+            }) { Text(tr("Convert")) }
         },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 
@@ -230,7 +230,7 @@ private fun WidgetPreview(root: WidgetNode, widthDp: Int, heightDp: Int) {
             runCatching { WidgetRenderer(density) { ThemeStore.typeface(it) }.render(root, wPx, hPx) }.getOrNull()
         }
         if (bitmap != null) {
-            Image(bitmap.asImageBitmap(), contentDescription = "Preview", modifier = Modifier.size(widthDp.dp, heightDp.dp))
+            Image(bitmap.asImageBitmap(), contentDescription = tr("Preview"), modifier = Modifier.size(widthDp.dp, heightDp.dp))
         }
     }
 }
@@ -243,7 +243,7 @@ private fun PreviewSizeControl(width: Int, height: Int, onWidth: (Int) -> Unit, 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Preview size", style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+        Text(tr("Preview size"), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
         PreviewDimField("W", width, 40..600, onWidth)
         Text("×", style = MaterialTheme.typography.labelMedium)
         PreviewDimField("H", height, 40..1200, onHeight)
@@ -274,13 +274,13 @@ private fun TreeRow(flat: Flat, selected: Boolean, onSelect: () -> Unit, onAddCh
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        IconButton(onClick = { onMove(-1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.ArrowUpward, "Up", modifier = Modifier.size(18.dp)) }
-        IconButton(onClick = { onMove(1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.ArrowDownward, "Down", modifier = Modifier.size(18.dp)) }
+        IconButton(onClick = { onMove(-1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.ArrowUpward, trc("move", "Up"), modifier = Modifier.size(18.dp)) }
+        IconButton(onClick = { onMove(1) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.ArrowDownward, trc("move", "Down"), modifier = Modifier.size(18.dp)) }
         if (flat.node.isContainer()) {
-            IconButton(onClick = onAddChild, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Add, "Add child", modifier = Modifier.size(18.dp)) }
+            IconButton(onClick = onAddChild, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Add, tr("Add child"), modifier = Modifier.size(18.dp)) }
         }
         if (flat.path.isNotEmpty()) {
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Delete, "Delete", modifier = Modifier.size(18.dp)) }
+            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Delete, tr("Delete"), modifier = Modifier.size(18.dp)) }
         }
     }
 }
@@ -352,21 +352,21 @@ private fun PropertyPanel(node: WidgetNode, isChild: Boolean, fonts: List<String
 
 @Composable
 private fun TextField2(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(value, onChange, label = { Text(tr(label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
 private fun NumberField(label: String, value: Int?, range: IntRange = 0..300, onChange: (Int?) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Text(tr(label), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             OutlinedTextField(
                 value = value?.toString().orEmpty(),
                 onValueChange = { s -> onChange(s.filter { it.isDigit() || it == '-' }.toIntOrNull()) },
                 singleLine = true, modifier = Modifier.width(92.dp),
             )
-            IconButton(onClick = { onChange((value ?: range.first) - 1) }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease $label") }
-            IconButton(onClick = { onChange((value ?: range.first) + 1) }) { Icon(Icons.Filled.Add, contentDescription = "Increase $label") }
+            IconButton(onClick = { onChange((value ?: range.first) - 1) }) { Icon(Icons.Filled.Remove, contentDescription = tr("Decrease %1\$s", tr(label))) }
+            IconButton(onClick = { onChange((value ?: range.first) + 1) }) { Icon(Icons.Filled.Add, contentDescription = tr("Increase %1\$s", tr(label))) }
         }
         Slider(
             value = (value ?: range.first).coerceIn(range).toFloat(),
@@ -379,7 +379,7 @@ private fun NumberField(label: String, value: Int?, range: IntRange = 0..300, on
 @Composable
 private fun BoolField(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Text(tr(label), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         ThemedSwitch(checked = value, onCheckedChange = onChange)
     }
 }
@@ -394,9 +394,9 @@ private fun ColorField(label: String, value: String?, onChange: (String?) -> Uni
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(tr(label), style = MaterialTheme.typography.bodyLarge)
             Text(
-                if (parsed == null) "Default" else value!!.uppercase(),
+                if (parsed == null) tr("Default") else value!!.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -424,7 +424,7 @@ private fun DropdownField(label: String, value: String, options: List<String>, o
     Box(Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = value, onValueChange = {}, readOnly = true,
-            label = { Text(label) },
+            label = { Text(tr(label)) },
             modifier = Modifier.fillMaxWidth(),
         )
         // Transparent overlay catches taps (a readOnly field won't open the menu on its own),

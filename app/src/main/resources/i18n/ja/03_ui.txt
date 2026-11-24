@@ -1,0 +1,124 @@
+# 03_ui — health-chart screens (ui/charts/huawei) and shared components (ui/components)
+
+# HuaweiSyncSession.kt
+= 健康 sync
+: 健康の同期
+
+# HuaweiWalksActivity.kt
+= this walk has no usable points
+: この運動には使える地点がありません
+= failed
+: 失敗
+
+# ColorPicker.kt
+= Color
+: 色
+= Apply
+: 適用
+= Default
+: 既定
+= Cancel
+: キャンセル
+
+# ItemNoteSection.kt
+= Add note
+: メモを追加
+= Note
+: メモ
+= Collapse note
+: メモを折りたたむ
+= Expand note
+: メモを展開
+= Tap to add a note.
+: タップしてメモを追加します。
+= What does this do?
+: これは何をするものですか？
+= Save
+: 保存
+
+# MultiSelect.kt
+= Clear selection
+: 選択を解除
+= %1$s selected
+: %1$s件を選択中
+=[count-noun] %1$s %2$s
+: %2$s%1$s件
+= Select all
+: すべて選択
+= Copy / cut / clone / paste
+: コピー / 切り取り / 複製 / 貼り付け
+= Clone
+: 複製
+= Copy
+: コピー
+= Cut
+: 切り取り
+= Paste
+: 貼り付け
+= Move selected to project
+: 選択した項目をプロジェクトへ移動
+= Delete selected
+: 選択した項目を削除
+= Delete %1$s %2$s?
+: %2$sを%1$s件削除しますか？
+= This permanently removes the selected %1$s.
+: 選択した%1$sを完全に削除します。
+= Delete
+: 削除
+= Selected
+: 選択中
+= Not selected
+: 未選択
+# The nouns callers pass to SelectionBar / ConfirmDeleteSelected (singular, and with the plural “s”)
+= task
+: タスク
+= tasks
+: タスク
+= profile
+: プロファイル
+= profiles
+: プロファイル
+= scene
+: シーン
+= scenes
+: シーン
+= group
+: グループ
+= groups
+: グループ
+
+# GroupedList.kt
+= Drag to reorder; tap for group options
+: ドラッグで並べ替え、タップでグループの操作
+= Move into group…
+: グループへ移動…
+= Move out of group
+: グループから出す
+= Collapse group
+: グループを折りたたむ
+= Expand group
+: グループを展開
+= Group actions
+: グループの操作
+= New subgroup
+: 新しいサブグループ
+= Rename group
+: グループの名前を変更
+= Delete group
+: グループを削除
+= New subgroup in “%1$s”
+: 「%1$s」に新しいサブグループ
+= Subgroup name
+: サブグループ名
+= Create
+: 作成
+= Drop here to remove from group
+: ここに放すとグループから外します
+= Ungrouped
+: グループなし
+= Move into group
+: グループへ移動
+= New group name
+: 新しいグループ名
+= New group
+: 新しいグループ

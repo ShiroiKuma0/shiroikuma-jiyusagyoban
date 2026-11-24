@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import com.opentasker.i18n.tr
 import java.util.Calendar
 import java.util.Locale
 
@@ -36,11 +37,11 @@ object DaySchedule {
     fun displayLabel(value: String): String {
         val days = parse(value)
         return when {
-            days.isEmpty() -> "No days selected"
-            days == orderedDays.toSet() -> "Every day"
-            days == weekdays -> "Weekdays"
-            days == weekends -> "Weekends"
-            else -> orderedDays.filter { it in days }.joinToString(", ")
+            days.isEmpty() -> tr("No days selected")
+            days == orderedDays.toSet() -> tr("Every day")
+            days == weekdays -> tr("Weekdays")
+            days == weekends -> tr("Weekends")
+            else -> orderedDays.filter { it in days }.joinToString(", ") { tr(it) }
         }
     }
 

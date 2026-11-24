@@ -1,0 +1,980 @@
+= quiet / default / urgent
+: quiet / default / urgent
+= Keep until cancelled
+: 取り消すまで残す
+= ID
+: ID
+= Task to run when the notification body is tapped (works collapsed)
+: 通知の本体をタップしたときに実行するタスク（折りたたんだ状態でも動作）
+= Task name to run on tap
+: タップ時に実行するタスクの名前
+= Dismiss App Notifications
+: アプリの通知を消去
+= Cancel another app's notifications by package, or one notification by its key (needs notification access)
+: パッケージを指定して別のアプリの通知を、またはキーを指定して通知を1件だけ取り消します（通知へのアクセスが必要）。
+= pick an app whose notifications to dismiss, or type a package / %var
+: 通知を消去するアプリを選ぶか、パッケージ名または %var を入力
+= Only this notification
+: この通知のみ
+= %NOTIF_KEY of a notification trigger — dismiss just that one; empty = all of the app's
+: 通知トリガーの %NOTIF_KEY を指定すると、その1件だけを消去します。空の場合は、そのアプリの通知をすべて消去します。
+= Open App Notification
+: アプリの通知を開く
+= Open another app's newest notification as a tap would (needs notification access)
+: 別のアプリの最新の通知を、タップしたときと同じように開きます（通知へのアクセスが必要）。
+= pick an app whose notification to open, or type a package / %var
+: 通知を開くアプリを選ぶか、パッケージ名または %var を入力
+= Containing
+: 含む文字列
+= only a notification whose title or body contains this; blank = the newest
+: タイトルまたは本文にこの文字列を含む通知のみ。空欄の場合は最新の通知
+= Wake screen
+: 画面を点灯
+= true turns the screen on first (needs Shizuku)
+: true にすると、先に画面を点灯します（Shizukuが必要）。
+= Parse JSON, CSV or XML text into variables (with an optional path selector)
+: JSON、CSV、XMLの文字列を解析して変数に入れます（パスセレクターも指定できます）。
+= The JSON/CSV/XML text (usually a %var)
+: JSON/CSV/XMLの文字列（通常は %var）
+= auto (default), json, csv or xml
+: auto（既定）、json、csv、または xml
+= Path selector
+: パスセレクター
+= e.g. items[0].name, a CSV column, or root/item/name
+: 例：items[0].name、CSVの列、または root/item/name
+= Also sets %var_count for arrays
+: 配列の場合は %var_count も設定
+= Format epoch milliseconds as text
+: エポックミリ秒を文字列に書式化します。
+= Time (epoch ms)
+: 時刻（エポックミリ秒）
+= Blank = now
+: 空欄の場合は現在時刻
+= e.g. yyyy-MM-dd HH:mm (blank = ISO-8601)
+: 例：yyyy-MM-dd HH:mm（空欄の場合は ISO-8601）
+= e.g. Asia/Tokyo (blank = device zone)
+: 例：Asia/Tokyo（空欄の場合は端末のタイムゾーン）
+= Default: %datetime_text
+: 既定：%datetime_text
+= Parse formatted text into epoch milliseconds
+: 書式化された文字列を解析してエポックミリ秒にします。
+= The date/time string to parse
+: 解析する日時の文字列
+= e.g. yyyy-MM-dd HH:mm
+: 例：yyyy-MM-dd HH:mm
+= Default: %datetime_ms
+: 既定：%datetime_ms
+= Calendar-aware date arithmetic on epoch milliseconds
+: エポックミリ秒に対して、暦に沿った日付の計算を行います。
+= May be negative
+: 負の値も指定できます。
+= seconds … years
+: seconds … years
+= Match Text
+: 文字列を照合
+= Match a regex against text; capture groups become an array
+: 文字列を正規表現と照合します。キャプチャグループは配列になります。
+= Linear-time RE2 syntax
+: 線形時間で動作するRE2構文
+= Matches land in %var / %var(#)
+: 一致した箇所は %var / %var(#) に入ります。
+= Replace Text
+: 文字列を置換
+= Replace regex matches in text ($1 group references supported)
+: 文字列の中で正規表現に一致した箇所を置換します（$1 形式のグループ参照に対応）。
+= $1, $2 … reference capture groups
+: $1、$2 … でキャプチャグループを参照
+= Split text into an array by a literal delimiter or a regex
+: 固定の区切り文字または正規表現で文字列を分割し、配列にします。
+= Delimiter (literal)
+: 区切り文字（固定）
+= Used when no regex pattern is given
+: 正規表現パターンの指定がない場合に使われます。
+= Overrides the literal delimiter
+: 固定の区切り文字より優先されます。
+= Result array variable
+: 結果の配列変数
+= Join an array's elements into one string
+: 配列の要素を1つの文字列に結合します。
+= Name of the array to join
+: 結合する配列の名前
+= Placed between elements (default: comma)
+: 要素の間に入れる文字列（既定：カンマ）
+= Extract part of a text by start/end index
+: 開始位置と終了位置を指定して、文字列の一部を取り出します。
+= 0-based; negative counts from the end
+: 0から数えます。負の値は末尾から数えます。
+= Blank = to the end
+: 空欄の場合は末尾まで
+= Set several variables in one step: a list of names and a list of values, matched in order
+: 複数の変数を1ステップで設定します。名前の一覧と値の一覧を、順番どおりに対応させます。
+= one per line (or split by the names splitter), e.g. %a
+: 1行に1つ（または名前の区切り文字で区切る）。例：%a
+= one per line (or split by the values splitter), in the names' order
+: 1行に1つ（または値の区切り文字で区切る）。名前と同じ順番で
+= blank = one name per line
+: 空欄の場合は1行に1つの名前
+= blank = one value per line
+: 空欄の場合は1行に1つの値
+= leave a variable that already has a value as it is
+: すでに値のある変数はそのままにします。
+= Count the characters of a text
+: 文字列の文字数を数えます。
+= gets the length
+: 長さが入ります。
+= Sunrise / Sunset Times
+: 日の出・日の入りの時刻
+= Work out sunrise, sunset and the twilights for a place and a day
+: 場所と日付から、日の出、日の入り、各薄明の時刻を求めます。
+= blank = the phone's position (needs location access)
+: 空欄の場合は端末の位置（位置情報へのアクセスが必要）
+= Day (epoch seconds)
+: 日付（エポック秒）
+= blank = today
+: 空欄の場合は今日
+= Sun elevations
+: 太陽高度
+= optional: one elevation in degrees per line, for custom twilights
+: 任意。独自の薄明に使う太陽高度を、度の単位で1行に1つずつ
+= Result prefix
+: 結果の接頭辞
+= the variables are written under this name
+: 変数はこの名前を先頭に付けて書き込まれます。
+= Switch one of this app's profiles on or off, or toggle it
+: このアプリのプロファイルを1つ、有効または無効にするか、切り替えます。
+= name or id
+: 名前またはID
+= Play a generated tone
+: 生成した音を鳴らします。
+= 0 – 10000
+: 0 – 10000
+= 1 – 10000
+: 1 – 10000
+= Amplitude (%)
+: 振幅（%）
+= 0 – 100. Default 50
+: 0 – 100。既定は50
+= blank = music
+: 空欄の場合は music
+= Resume Playback
+: 再生を再開
+= Send the media key Play to the player in front
+: 前面のプレーヤーにメディアキー「再生」を送ります。
+= Play / Pause
+: 再生 / 一時停止
+= Send the media key Play/Pause
+: メディアキー「再生/一時停止」を送ります。
+= Send the media key Rewind
+: メディアキー「巻き戻し」を送ります。
+= Send the media key Fast Forward
+: メディアキー「早送り」を送ります。
+= Does nothing: a step that only carries a label
+: 何もしません。ラベルを持たせるためだけのステップです。
+= Go To
+: Go To
+= Jump to a labelled step or a step number, or to the top of the loop (continue), out of the loop (break) or to the end of the If this step sits in
+: ラベルの付いたステップまたはステップ番号へ飛びます。このステップを囲むループの先頭（continue）、ループの外（break）、Ifの終わりへ飛ぶこともできます。
+= the label of the step to jump to; wins over the step number
+: 飛び先のステップのラベル。ステップ番号より優先されます。
+= counted from 1; may come from a variable
+: 1から数えます。変数でも指定できます。
+= Or: in this block
+: または：このブロック内で
+= loop_top = next item, loop_end = leave the loop, if_end = leave the If
+: loop_top = 次の項目へ、loop_end = ループを抜ける、if_end = Ifを抜ける
+= Stop every running copy of a task by name. Naming this task itself ends this run
+: 指定した名前のタスクの、実行中のものをすべて停止します。このタスク自身の名前を指定すると、この実行が終了します。
+= Full HTTP request (any method) with headers, body, timeouts and response capture
+: ヘッダー、本文、タイムアウト、レスポンスの取得を指定できる、完全なHTTPリクエスト（メソッドは任意）を送信します。
+= Default GET
+: 既定は GET
+= URL
+: URL
+= name=value, one per line
+: name=value の形式で1行に1つ
+= Headers
+: ヘッダー
+= Name: value, one per line
+: Name: value の形式で1行に1つ
+= Authorization
+: Authorization
+= Value for the Authorization header
+: Authorization ヘッダーの値
+= Body
+: 本文
+= Body from file
+: ファイルから本文
+= Path to a file to send as the body
+: 本文として送るファイルのパス
+= e.g. application/json
+: 例：application/json
+= Response variable
+: レスポンスの変数
+= Stores the response body
+: レスポンス本文を保存します。
+= Status variable
+: ステータスの変数
+= Stores the HTTP status code
+: HTTPステータスコードを保存します。
+= Headers variable
+: ヘッダーの変数
+= Stores the response headers
+: レスポンスヘッダーを保存します。
+= Response to file
+: レスポンスをファイルへ
+= Write the response body to this path
+: レスポンス本文をこのパスに書き込みます。
+= Max response bytes
+: レスポンスの最大バイト数
+= Follow redirects
+: リダイレクトに従う
+= true/false
+: true/false
+= Which transport may carry it (default any)
+: 使用できる通信経路（既定は any）
+= Allow cleartext HTTP (LAN)
+: 暗号化なしのHTTPを許可（LAN）
+= Only loopback/private hosts are ever allowed
+: 許可されるのは、ループバックまたはプライベートなホストだけです。
+= Timeout (s)
+: タイムアウト（秒）
+= Connect timeout (s)
+: 接続タイムアウト（秒）
+= Read timeout (s)
+: 読み取りタイムアウト（秒）
+= Write timeout (s)
+: 書き込みタイムアウト（秒）
+= Call timeout (s)
+: 呼び出し全体のタイムアウト（秒）
+= Set Action Field
+: アクションの項目を設定
+= Write a value into another task's action argument (e.g. bake a picker's result into a config task's var.set value so it survives startup)
+: 別のタスクのアクションの引数に値を書き込みます（例：選択画面の結果を設定用タスクの var.set の値に書き込んでおき、起動後も残るようにする）。
+= Target task name
+: 対象のタスク名
+= the task to edit
+: 編集するタスク
+= Match action type
+: 照合するアクションの種類
+= e.g. var.set (first match wins)
+: 例：var.set（最初に一致したものを使用）
+= Match name arg
+: 照合する name 引数
+= the variable a var.set writes, e.g. SC_Blacklist
+: var.set が書き込む変数。例：SC_Blacklist
+= Or action index
+: または、アクションの番号
+= 0-based; used instead of the matchers
+: 0から数えます。照合条件の代わりに使われます。
+= Field to set
+: 設定する項目
+= arg key; default 'value'
+: 引数のキー。既定は「value」
+= New value
+: 新しい値
+= %-expanded before writing
+: 書き込む前に % の変数を展開します。
+= Add Action
+: アクションを追加
+= Insert an action into another task if it isn't there yet (identity = type + name arg), optionally placed alphabetically — lets a picker grow a config task's roster without ever duplicating a line
+: 別のタスクに、まだ存在しない場合にかぎりアクションを挿入します（種類と name 引数が同じものを同一とみなします）。アルファベット順の位置に入れることもできます。選択画面から設定用タスクの一覧を、行を重複させることなく増やしていけます。
+= the task to grow
+: アクションを追加するタスク
+= Action type
+: アクションの種類
+= e.g. var.set
+: 例：var.set
+= Name arg
+: name 引数
+= the variable a var.set writes — also the identity key
+: var.set が書き込む変数。同一かどうかの判定にも使われます。
+= Value arg
+: value 引数
+= written verbatim (already expanded once)
+: そのまま書き込まれます（すでに一度展開済み）。
+= label for the inserted action, written verbatim
+: 挿入するアクションのラベル。そのまま書き込まれます。
+= Placement
+: 挿入位置
+= end (default) / start / sorted / 0-based index
+: end（既定） / start / sorted / 0から数えた番号
+= Sort pattern
+: 並べ替えのパターン
+= at=sorted: regex over the name arg; capture group 1 = the sort key
+: at=sorted のとき、name 引数に適用する正規表現。キャプチャグループ1が並べ替えのキーになります。
+= On error
+: エラー時
+= continue = the inserted action keeps going on failure
+: continue = 挿入したアクションは失敗しても続行します
+= gets 'added' or 'exists'
+: 「added」または「exists」が入ります。
+= Alert
+: アラート
+= Pick Directory
+: ディレクトリを選択
+= Open the system directory picker and store the chosen directory's path. Cancel stores an empty value
+: システムのディレクトリ選択画面を開き、選んだディレクトリのパスを保存します。キャンセルした場合は空の値を保存します。
+= gets the path; %<name>_ok gets true/false. Default 'dir'
+: パスが入ります。%<name>_ok には true/false が入ります。既定は「dir」です。
+= blank = wait until answered
+: 空欄の場合は応答があるまで待機
+= Export Project (clean)
+: プロジェクトをエクスポート（変数なし）
+= Write one project — tasks, profiles and scenes with their notes and groups, no variables — as an importable bundle into a directory. The clean setup another phone imports
+: プロジェクト1つを、インポート可能なバンドルとしてディレクトリに書き出します。タスク、プロファイル、シーンをメモとグループ付きで含み、変数は含みません。別の端末に取り込むための、まっさらな構成です。
+= Project name
+: プロジェクト名
+= Directory to write into
+: 書き込み先のディレクトリ
+= e.g. the variable a Pick Directory action filled
+: 例：「ディレクトリを選択」アクションが値を入れた変数
+= File name stem
+: ファイル名の基本部分
+= the file is <stem>_<yyyy-MM-dd_HH-mm-ss>.json. Default: the project name
+: ファイル名は <stem>_<yyyy-MM-dd_HH-mm-ss>.json になります。既定：プロジェクト名
+= gets the file's path; %<name>_tasks / _profiles / _scenes get the counts. Default 'export_path'
+: ファイルのパスが入ります。%<name>_tasks / _profiles / _scenes には件数が入ります。既定は「export_path」です。
+= Badge Picture (PNG)
+: バッジ画像（PNG）
+= Draw a badge — short text on a fill, with a border — as a square PNG for a round avatar: the badge sits inside the circle, the rest is black, so no corner is cut off
+: 丸いアバター用の正方形のPNGとして、バッジ（塗り色の上の短い文字と枠線）を描きます。バッジは円の内側に収まり、残りは黒になるため、角が切り取られることはありません。
+= Badge text
+: バッジの文字
+= e.g. J3
+: 例：J3
+= Fill colour
+: 塗りの色
+= #RRGGBB
+: #RRGGBB
+= Text colour
+: 文字の色
+= #RRGGBB. Default black
+: #RRGGBB。既定は黒
+= Border colour
+: 枠線の色
+= #RRGGBB. Default: the fill
+: #RRGGBB。既定：塗りの色
+= File name (no extension)
+: ファイル名（拡張子なし）
+= the file is <name>.png and replaces an existing one. Default: the badge text
+: ファイル名は <name>.png になり、既存のファイルは置き換えられます。既定：バッジの文字
+= Side in pixels
+: 一辺の長さ（ピクセル）
+= Default 512
+: 既定は512
+= Background colour
+: 背景の色
+= gets the file's path. Default 'badge_path'
+: ファイルのパスが入ります。既定は「badge_path」です。
+= Task Exists
+: タスクの有無を確認
+= Store true/false for whether a task of this name exists — so a task can generate a missing sub-task instead of failing on it
+: この名前のタスクが存在するかどうかを true/false で保存します。タスクが、足りないサブタスクで失敗する代わりに、それを生成できるようになります。
+= optional — limits the search to one project
+: 任意。検索を1つのプロジェクトに限定します。
+= gets 'true' or 'false'; default 'exists'
+: 「true」または「false」が入ります。既定は「exists」です。
+= Sort Group Tasks
+: グループのタスクを並べ替え
+= Put one task group back in alphabetical order, below the project's ungrouped tasks — for groups that grow a generated task per app
+: タスクのグループ1つを、プロジェクトのグループなしのタスクの下でアルファベット順に並べ直します。アプリごとに生成されたタスクが増えていくグループ向けです。
+= Group name
+: グループ名
+= a group on the Tasks tab
+: 「タスク」タブにあるグループ
+= Copy a variable's current value into the global scope so it survives across task runs
+: 変数の現在の値をグローバル変数にコピーし、タスクの実行をまたいで保持します。
+= local variable name
+: ローカル変数の名前
+= Unset a variable (and any array of the same name)
+: 変数（および同じ名前の配列）を未設定にします。
+= bare name, no %
+: % を付けない名前
+= Split a variable's value into an array of the same name
+: 変数の値を分割し、同じ名前の配列にします。
+= delimiter; \\n \\t allowed; empty = per character
+: 区切り文字。\\n と \\t も使えます。空の場合は1文字ずつに分割します。
+= Delete base
+: 元の変数を削除
+= Unset the scalar after splitting
+: 分割後に、元の変数（配列でない値）を未設定にします。
+= Join the array of this name back into a single value
+: この名前の配列を、1つの値に結合し直します。
+= Array name
+: 配列名
+= delimiter; \\n \\t allowed
+: 区切り文字。\\n と \\t も使えます。
+= Variable Search Replace
+: 変数を検索・置換
+= Regex search/replace within a variable; optionally store matches
+: 変数の中を正規表現で検索・置換します。一致した箇所を格納することもできます。
+= Search
+: 検索
+= regular expression
+: 正規表現
+= Replace with
+: 置換後の文字列
+= replacement (empty = remove matches)
+: 置換後の文字列（空の場合は一致した箇所を削除）
+= Ignore case
+: 大文字と小文字を区別しない
+= Multi-line
+: 複数行
+= ^ and $ match per line
+: ^ と $ が行ごとに一致します。
+= Store matches in
+: 一致の格納先
+= array variable for matches (optional)
+: 一致した箇所を入れる配列変数（任意）
+= Transform a variable's value (case, encoding, hash, …)
+: 変数の値を変換します（大文字・小文字、エンコード、ハッシュなど）。
+= Function
+: 関数
+= upper / lower / trim / length / reverse / capitalize / urlencode / urldecode / base64encode / base64decode / md5 / sha1 / sha256
+: upper / lower / trim / length / reverse / capitalize / urlencode / urldecode / base64encode / base64decode / md5 / sha1 / sha256
+= Variable Add
+: 変数に加算
+= Add a number to a numeric variable, with optional wrap and round
+: 数値の変数に数を加えます。循環と丸めも指定できます。
+= number to add (may be negative)
+: 加える数（負の値も可）
+= Wrap around
+: 循環
+= wrap result modulo this value (optional)
+: 結果をこの値で割った余りに循環させます（任意）。
+= Round
+: 丸め
+= round result to a whole number
+: 結果を整数に丸めます。
+= Parse/Format DateTime
+: 日時を解析/書式化
+= Produce a formatted date/time string into a variable
+: 書式化した日時の文字列を変数に入れます。
+= bare variable name
+: % を付けない変数名
+= Source
+: 入力元
+= now / seconds / millis / formatted
+: now / seconds / millis / formatted
+= Input
+: 入力
+= epoch value, or a date string when source = formatted
+: エポックの値。source = formatted の場合は日付の文字列
+= Input format
+: 入力の形式
+= pattern when source = formatted (e.g. yyyy-MM-dd)
+: source = formatted の場合のパターン（例：yyyy-MM-dd）
+= Output format
+: 出力の形式
+= default yyyy-MM-dd HH:mm:ss
+: 既定は yyyy-MM-dd HH:mm:ss
+= Array Set
+: 配列を設定
+= Populate an array from a delimited string
+: 区切り文字で区切られた文字列から配列を作ります。
+= delimited string
+: 区切り文字で区切られた文字列
+= delimiter; default , ; \\n \\t allowed
+: 区切り文字。既定は , です。\\n と \\t も使えます。
+= Insert a value into an array
+: 配列に値を挿入します。
+= value to insert
+: 挿入する値
+= 1-based; empty = end
+: 1から数えます。空の場合は末尾
+= Remove an element from an array into a variable
+: 配列から要素を1つ取り除き、変数に入れます。
+= 1-based; empty = last
+: 1から数えます。空の場合は最後の要素
+= Store removed in
+: 取り除いた値の格納先
+= variable for the popped value (optional)
+: 取り出した値を入れる変数（任意）
+= Empty an array
+: 配列を空にします。
+= Sort, reverse, shuffle, dedupe or squash an array
+: 配列に対して、並べ替え、逆順、シャッフル、重複の除去、空きの詰めを行います。
+= sort / sort-desc / numeric / reverse / shuffle / unique / squash
+: sort / sort-desc / numeric / reverse / shuffle / unique / squash
+= Arrays Merge
+: 配列を連結
+= Concatenate several arrays into one
+: 複数の配列を1つに連結します。
+= Source arrays
+: 元の配列
+= comma-separated array names
+: カンマ区切りの配列名
+= Result array
+: 結果の配列
+= bare name for the merged array
+: 連結した配列に付ける、% なしの名前
+= Move File
+: ファイルを移動
+= Move or rename a file — inside the app's files, inside /sdcard, or from one to the other
+: ファイルを移動または名前変更します。アプリのファイル内、/sdcard 内、またはその一方から他方へ移せます。
+= source path
+: 移動元のパス
+= destination path
+: 移動先のパス
+= Both in shared storage
+: 両方とも共有ストレージ
+= true = resolve BOTH paths under /sdcard instead of the app's private files
+: true にすると、両方のパスを、アプリ専用のファイルではなく /sdcard 以下として解決します。
+= Source in shared storage
+: 移動元が共有ストレージ
+= true = the source is under /sdcard — this is how a file put in /sdcard/tmp gets into the app's own files
+: true にすると、移動元は /sdcard 以下になります。/sdcard/tmp に置いたファイルをアプリ自身のファイルに取り込むには、これを使います。
+= Destination in shared storage
+: 移動先が共有ストレージ
+= true = the destination is under /sdcard
+: true にすると、移動先は /sdcard 以下になります。
+= Create Directory
+: ディレクトリを作成
+= Create a directory (and parents) within the app's files
+: アプリのファイル内にディレクトリ（と親ディレクトリ）を作成します。
+= Path
+: パス
+= directory path
+: ディレクトリのパス
+= In shared storage
+: 共有ストレージ内
+= true = resolve under /sdcard (your own tree, visible to a file manager) instead of the app's private files
+: true にすると、アプリ専用のファイルではなく /sdcard 以下（ファイルマネージャーから見える、自分のディレクトリツリー）として解決します。
+= Flash
+: フラッシュ
+= Show a styled overlay message. Colours/size default to the UI Flash settings.
+: 装飾付きのオーバーレイメッセージを表示します。色とサイズの既定値は、UI設定の「フラッシュ」に従います。
+= message; supports %expansion
+: メッセージ。%expansion（変数の展開）に対応
+= Use HTML
+: HTMLを使う
+= interpret HTML tags (<b>, <h1>, <font color>, …)
+: HTMLタグ（<b>、<h1>、<font color> など）を解釈します。
+= Text color
+: 文字の色
+= blank uses the UI default
+: 空欄の場合はUIの既定値を使います。
+= Background color
+: 背景の色
+= Border color
+: 枠線の色
+= top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right
+: top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right
+= X offset (dp)
+: 横方向のずれ（dp）
+= horizontal offset from the anchor
+: アンカーからの横方向のずれ
+= Y offset (dp)
+: 縦方向のずれ（dp）
+= vertical offset from the anchor
+: アンカーからの縦方向のずれ
+= Long
+: 長く表示
+= longer display time
+: 表示時間を長くします。
+= Comment
+: コメント
+= A no-op note for documenting a task
+: タスクの説明用のメモです。何も実行しません。
+= note text
+: メモの内容
+= Put text on the system clipboard
+: 文字列をシステムのクリップボードに入れます。
+= text to copy
+: コピーする文字列
+= Read clipboard text into a variable
+: クリップボードの文字列を変数に読み込みます。
+= variable name
+: 変数名
+= Compose Email
+: メールを作成
+= Open the email composer prefilled
+: 内容を入力済みの状態で、メール作成画面を開きます。
+= comma-separated addresses
+: カンマ区切りのアドレス
+= Cc
+: Cc
+= Subject
+: 件名
+= Set the wallpaper from an image — home screen, lock screen, or both. The lock screen needs "where" set: the API leaves it alone otherwise
+: 画像を壁紙に設定します（ホーム画面、ロック画面、またはその両方）。ロック画面に設定するには「where」の指定が必要です。指定しないと、APIはロック画面を変更しません。
+= Image path
+: 画像のパス
+= a .png/.jpg — in app files, or anywhere under /sdcard with "In shared storage" on
+: .png/.jpg のファイル。アプリのファイル内、または「共有ストレージ内」をオンにすれば /sdcard 以下のどこでも指定できます。
+= Which screen
+: 対象の画面
+= home (default), lock, or both
+: home（既定）、lock、または both
+= true = resolve the path under /sdcard instead of the app's own files
+: true にすると、パスをアプリ自身のファイルではなく /sdcard 以下として解決します。
+= Set Live Wallpaper
+: ライブ壁紙を設定
+= Switch the live wallpaper to a component. Silent with Shizuku, which can set it outright; without Shizuku the system preview opens and you confirm with a tap
+: ライブ壁紙を指定のコンポーネントに切り替えます。Shizukuがあれば直接設定できるため、確認なしで切り替わります。Shizukuがない場合はシステムのプレビューが開くので、タップして確定します。
+= Package
+: パッケージ
+= e.g. com.screensavers_store.matrixtvlivewallpaper
+: 例：com.screensavers_store.matrixtvlivewallpaper
+= Service class
+: サービスのクラス
+= the WallpaperService, e.g. .MatrixWallpaper (a leading dot is expanded)
+: WallpaperService のクラス。例：.MatrixWallpaper（先頭のドットは展開されます）
+= WiFi Settings
+: Wi-Fiの設定
+= Open the system Wi-Fi settings screen
+: システムのWi-Fi設定画面を開きます。
+= List Apps
+: アプリを一覧
+= List installed apps into array variable(s)
+: インストール済みのアプリの一覧を配列変数に入れます。
+= Packages array
+: パッケージの配列
+= array name for package names
+: パッケージ名を入れる配列の名前
+= Labels array
+: ラベルの配列
+= array name for app labels (optional)
+: アプリのラベルを入れる配列の名前（任意）
+= Include system apps
+: システムアプリを含める
+= Keyboard Picker
+: キーボードの選択画面
+= Show the input-method (keyboard) picker
+: 入力方法（キーボード）の選択画面を表示します。
+= Interface
+: インターフェース
+= Back
+: 戻る
+= Press Back (needs the accessibility service enabled)
+: 「戻る」を押します（ユーザー補助サービスを有効にする必要があります）。
+= Recents
+: 最近使ったアプリ
+= Open the recent-apps overview (needs the accessibility service)
+: 最近使ったアプリの一覧を開きます（ユーザー補助サービスが必要）。
+= Take a system screenshot (saved to the gallery; needs the accessibility service, API 30+)
+: システムのスクリーンショットを撮影します（ギャラリーに保存。ユーザー補助サービスとAPI 30以降が必要）。
+= Notifications Panel
+: 通知パネル
+= Open the notification shade (needs the accessibility service)
+: 通知パネルを開きます（ユーザー補助サービスが必要）。
+= Quick Settings
+: クイック設定
+= Open the quick-settings panel (needs the accessibility service)
+: クイック設定パネルを開きます（ユーザー補助サービスが必要）。
+= Power Dialog
+: 電源ダイアログ
+= Show the power / long-press menu (needs the accessibility service)
+: 電源メニュー（電源ボタン長押しのメニュー）を表示します（ユーザー補助サービスが必要）。
+= Lock Screen
+: 画面をロック
+= Lock the screen — Android 9+ (needs the accessibility service)
+: 画面をロックします。Android 9以降（ユーザー補助サービスが必要）。
+= Lockdown
+: ロックダウン
+= Lock and require PIN/password (biometrics disabled) — Android 9+ (needs the accessibility service)
+: ロックして、PINまたはパスワードを必須にします（生体認証は無効）。Android 9以降（ユーザー補助サービスが必要）。
+= Call
+: 電話をかける
+= Place a phone call (or open the dialer without CALL_PHONE)
+: 電話を発信します（CALL_PHONE の権限がない場合は、ダイヤル画面を開きます）。
+= Number
+: 番号
+= phone number
+: 電話番号
+= Auto Brightness
+: 明るさの自動調整
+= Turn automatic screen brightness on/off (Write Settings access)
+: 画面の明るさの自動調整をオンまたはオフにします（「システム設定の変更」の許可が必要）。
+= on / off / toggle (or a %variable)
+: on / off / toggle（または %variable）
+= Open File
+: ファイルを開く
+= Open a file in the app's files with another app
+: アプリのファイル内にあるファイルを、別のアプリで開きます。
+= file path
+: ファイルのパス
+= optional; guessed from extension if blank
+: 任意。空欄の場合は拡張子から推測します。
+= Enable, disable, or toggle a profile by name
+: 名前を指定して、プロファイルを有効または無効にするか、切り替えます。
+= exact profile name
+: プロファイルの正確な名前
+= Get Setting
+: 設定を取得
+= Read a System/Secure/Global setting into a variable
+: System/Secure/Global の設定を変数に読み込みます。
+= Namespace
+: 名前空間
+= system / secure / global
+: system / secure / global
+= e.g. screen_off_timeout
+: 例：screen_off_timeout
+= Set Setting
+: 設定を変更
+= Write a System setting (Write Settings access; System namespace only)
+: Systemの設定を書き込みます（「システム設定の変更」の許可が必要。System名前空間のみ）。
+= system (secure/global need Shizuku)
+: system（secure/global にはShizukuが必要）
+= value to write
+: 書き込む値
+= Input Dialog
+: 入力ダイアログ
+= Prompt for text and store the result in a variable. Also writes <store>_ok — true when confirmed, false when cancelled — so an answer deliberately left EMPTY can be told apart from backing out
+: 文字の入力を求め、結果を変数に保存します。<store>_ok にも書き込みます（確定したときは true、キャンセルしたときは false）。これにより、あえて空のまま確定した回答と、取りやめた場合とを区別できます。
+= Prompt
+: 案内文
+= Default value
+: 既定値
+= Input type
+: 入力の種類
+= text / number / password / email
+: text / number / password / email
+= variable name (default: input)
+: 変数名（既定：input）
+= Close after (s)
+: 自動で閉じるまでの時間（秒）
+= 0 = wait indefinitely
+: 0 の場合は無期限に待機
+= List Dialog
+: 一覧ダイアログ
+= Show a list to pick from; store the chosen item and index
+: 選択用の一覧を表示し、選んだ項目とその番号を保存します。
+= Items
+: 項目
+= separated list (default separator: ,)
+: 区切り文字で区切った一覧（既定の区切り文字：,）
+= Separator
+: 区切り文字
+= default ,
+: 既定は ,
+= Store selection in
+: 選択の格納先
+= variable name (default: selected)
+: 変数名（既定：selected）
+= Store index in
+: 番号の格納先
+= variable for the picked index (optional)
+: 選んだ項目の番号を入れる変数（任意）
+= Text Dialog
+: テキストダイアログ
+= Show text with OK/Cancel; store which button was pressed
+: OK/キャンセル付きでテキストを表示し、押されたボタンを保存します。
+= OK label
+: OKのラベル
+= default: OK
+: 既定：OK
+= Cancel label
+: キャンセルのラベル
+= default: Cancel
+: 既定：キャンセル
+= Size
+: サイズ
+= normal (default) / large / full — full nearly fills the screen and the body scrolls
+: normal（既定） / large / full — full は画面のほぼ全体を占め、本文がスクロールします。
+= Formatted text
+: 書式付きテキスト
+= read the body as markup: # title, ## section (underlined), ### / #### sub, - bullet, --- rule, ::: title … ::: box, **bold**, __underline__, *italic*
+: 本文をマークアップとして読み取ります：# タイトル、## セクション（下線付き）、### / #### 小見出し、- 箇条書き、--- 罫線、::: タイトル … ::: 囲み、**太字**、__下線__、*斜体*
+= Font scale
+: フォントの倍率
+= 1 = the theme's own size (default), 1.5 = half again as big. Clamped 0.5–3
+: 1 = テーマ本来のサイズ（既定）、1.5 = その1.5倍。0.5–3 の範囲に収められます。
+= Store OK in
+: OKの格納先
+= variable set to true/false (optional)
+: true/false が入る変数（任意）
+= List Scene Gestures
+: シーンのジェスチャーを一覧
+= Write a formatted listing of which gesture on which scene runs which task. Scenes with no gesture bound are left out. Pair it with a Text Dialog set to formatted text for a reference sheet that cannot go stale
+: どのシーンのどのジェスチャーがどのタスクを実行するかを、書式付きの一覧として書き出します。ジェスチャーが割り当てられていないシーンは含まれません。書式付きテキストに設定した「テキストダイアログ」と組み合わせると、内容が古くなることのない早見表になります。
+= comma-separated scene names, in the order to list them. One line per section to group them: "右辺|Right edge: 右上, 右中, 右下". Blank = every scene in this project
+: カンマ区切りのシーン名。一覧に載せる順に並べます。グループ分けするには、1行に1セクションずつ書きます：「右辺|Right edge: 右上, 右中, 右下」。空欄の場合は、このプロジェクトのすべてのシーン
+= Language
+: 言語
+= blank = follow the device; ja / en force one. Only the words this action supplies are translated — your scene and task names stay as written
+: 空欄の場合は端末の設定に従います。ja / en を指定すると、その言語に固定します。翻訳されるのは、このアクションが補う言葉だけです。シーン名とタスク名は書かれたとおりに表示されます。
+= Sheet name
+: 早見表の名前
+= optional, "日本語|English" — resolved into <store>_title for the dialog to use as its title
+: 任意。「日本語|English」の形式。<store>_title に解決され、ダイアログのタイトルとして使えます。
+= Footer
+: フッター
+= optional, "日本語|English" — closes the sheet with a rule and an italic line. {count} = how many were listed
+: 任意。「日本語|English」の形式。罫線と斜体の1行で早見表を締めくくります。{count} = 一覧に載せた件数
+= variable name (default: gestures). Also writes <name>_count and <name>_title
+: 変数名（既定：gestures）。<name>_count と <name>_title にも書き込みます。
+= When nothing is bound
+: 割り当てが1つもない場合
+= text stored if no scene has a gesture ("日本語|English")
+: どのシーンにもジェスチャーがない場合に保存される文字列（「日本語|English」）
+= List Key Bindings
+: キーの割り当てを一覧
+= Write a formatted listing of which physical-key gesture runs which task, read from the profiles themselves — including the conditions that pick between two bindings on the same press, and whether a profile is switched off
+: どの物理キーの操作がどのタスクを実行するかを、プロファイルそのものから読み取り、書式付きの一覧として書き出します。同じ押し方に対する2つの割り当てを切り分ける条件や、プロファイルが無効になっているかどうかも含みます。
+= Scope
+: 範囲
+= blank = this task's project (default); "all" = every project on the device
+: 空欄の場合はこのタスクのプロジェクト（既定）。「all」の場合は端末上のすべてのプロジェクト
+= blank = follow the device; ja / en force one. Only the words this action supplies are translated — your profile and task names stay as written
+: 空欄の場合は端末の設定に従います。ja / en を指定すると、その言語に固定します。翻訳されるのは、このアクションが補う言葉だけです。プロファイル名とタスク名は書かれたとおりに表示されます。
+= variable name (default: bindings). Also writes <name>_count and <name>_title
+: 変数名（既定：bindings）。<name>_count と <name>_title にも書き込みます。
+= text stored if no profile triggers on a hardware key ("日本語|English")
+: 物理キーをトリガーとするプロファイルが1つもない場合に保存される文字列（「日本語|English」）
+= Run Shell
+: シェルコマンドを実行
+= Run a shell command with Shizuku (ADB/root) privileges
+: Shizuku（ADB/root）の権限でシェルコマンドを実行します。
+= Command
+: コマンド
+= runs via sh -c
+: sh -c で実行されます。
+= Store stdout in
+: 標準出力の格納先
+= variable (default: stdout)
+: 変数（既定：stdout）
+= Store stderr in
+: 標準エラー出力の格納先
+= variable (default: stderr)
+: 変数（既定：stderr）
+= Store exit code in
+: 終了コードの格納先
+= variable (default: exit)
+: 変数（既定：exit）
+= Ignore exit code
+: 終了コードを無視
+= succeed even if exit code is non-zero
+: 終了コードが0以外でも成功とします。
+= Health
+: 健康
+= Sync Band
+: バンドを同期
+= Pull the Hume Band's stored history — heart rate, HRV, SpO2, temperature, sleep, steps — into the workspace. Connects, drains every stream and disconnects; the link is never held open
+: Hume Bandに保存されている履歴（心拍数、HRV（心拍変動）、SpO2、体温、睡眠、歩数）をワークスペースに取り込みます。接続し、すべてのストリームを読み出して切断します。接続を開いたままにすることはありません。
+= Read from
+: 読み取りの開始時点
+= auto (default) = last successful sync minus the overlap, or 3 days back if there has never been one. A number = that many days. Or an exact yyyy-MM-dd HH:mm:ss
+: auto（既定）= 最後に成功した同期の時点から重複分だけさかのぼった時点。一度も同期していない場合は3日前。数値を指定すると、その日数だけさかのぼります。yyyy-MM-dd HH:mm:ss の形式で正確な日時も指定できます。
+= Streams
+: ストリーム
+= blank = all. Comma list of: hr, hrv, spo2, temp, sleep, daily, detail
+: 空欄の場合はすべて。次のうちからカンマ区切りで指定：hr, hrv, spo2, temp, sleep, daily, detail
+= Band address
+: バンドのアドレス
+= blank = the configured one. A MAC, e.g. D5:A7:06:DC:A1:3A
+: 空欄の場合は設定済みのアドレス。MACアドレスで指定します。例：D5:A7:06:DC:A1:3A
+= default BAND_ — writes <prefix>Phase, Pct, Records, Inserted, Stream, Summary while it runs
+: 既定は BAND_ です。実行中、<prefix>Phase、Pct、Records、Inserted、Stream、Summary に書き込みます。
+= Whole-session timeout (s)
+: セッション全体のタイムアウト（秒）
+= default 180, coerced 15..600. A stream that times out is recorded and the sync moves on
+: 既定は180で、15..600 の範囲に収められます。タイムアウトしたストリームは記録され、同期は次へ進みます。
+= Write the JSONL archive
+: JSONLアーカイブを書き込む
+= default on — one line per NEW record, appended, never rewritten
+: 既定はオン — 新しいレコード1件につき1行を追記し、書き換えることはありません。
+= Store summary in
+: 概要の格納先
+= variable to receive the one-line result
+: 1行の結果を受け取る変数
+= Find Band
+: バンドを探す
+= Listen for nearby Bluetooth devices and work out which one is a Hume band, with the evidence for saying so. Use it after a new or factory-reset band changes its address; hands the address back in a variable and changes no setting by itself
+: 付近のBluetoothデバイスを受信して、どれがHumeのバンドかを、その根拠とともに割り出します。新しいバンドや初期化したバンドのアドレスが変わったときに使います。アドレスは変数で返され、このアクション自体が設定を変更することはありません。
+= Listen for (s)
+: 受信する時間（秒）
+= default 8, coerced 1..60. A band advertises every second or two, so a short window is usually enough
+: 既定は8で、1..60 の範囲に収められます。バンドは1～2秒ごとにアドバタイズするため、通常は短い時間で足ります。
+= Confirm by connecting
+: 接続して確認
+= default on — connects to the best candidates and checks for fff0/fff6/fff7, the same gate a sync passes. The only conclusive test
+: 既定はオン — 有力な候補に接続し、同期のときと同じ関門である fff0/fff6/fff7 の有無を調べます。決定的な確認方法はこれだけです。
+= Confirm at most
+: 確認する最大台数
+= default 3, coerced 0..5. Stops at the first device that answers
+: 既定は3で、0..5 の範囲に収められます。最初に応答したデバイスで止まります。
+= List every device
+: すべてのデバイスを一覧に載せる
+= default on — also lists the devices that look nothing like a band, so nothing is hidden
+: 既定はオン — バンドとは思えないデバイスも一覧に載せ、何も隠しません。
+= Known address
+: 既知のアドレス
+= blank = the configured one. Marked in the report as the address currently in use
+: 空欄の場合は設定済みのアドレス。レポートでは、現在使用中のアドレスとして印が付きます。
+= blank = the 健康 setting. en-US or ja-JP
+: 空欄の場合は「健康」の設定。en-US または ja-JP
+= default BANDSCAN_ — writes <prefix>Spin, Phase, Pct, Note and List about four times a second, so a Scene bound to them turns and fills up live. When it finishes, List becomes the full report and Note the verdict, so the same window shows the answer
+: 既定は BANDSCAN_ です。<prefix>Spin、Phase、Pct、Note、List に毎秒4回ほど書き込むため、これらに結び付けたシーンがその場で回転し、埋まっていきます。完了すると、List は完全なレポートに、Note は判定になるので、同じウィンドウに答えが表示されます。
+= Cancel variable
+: 中止用の変数
+= a scene button sets this to 1 to stop the scan within a quarter of a second; blank = only a progress panel's 中止 can stop it
+: シーンのボタンがこの変数を1にすると、0.25秒以内にスキャンが止まります。空欄の場合は、進捗パネルの「中止」でしか止められません。
+= Store report in
+: レポートの格納先
+= default Band_ScanReport — the full descriptive text, ready for a dialog
+: 既定は Band_ScanReport — ダイアログにそのまま使える、説明付きの全文
+= Store address in
+: アドレスの格納先
+= default Band_ScanAddress — the best MAC found, or blank if nothing was conclusive
+: 既定は Band_ScanAddress — 見つかった最有力のMACアドレス。決定的なものがなければ空
+= Store device count in
+: デバイス数の格納先
+= default Band_ScanCount
+: 既定は Band_ScanCount
+= Store verdict in
+: 判定の格納先
+= default Band_ScanVerdict — confirmed / likely / possible / none
+: 既定は Band_ScanVerdict — confirmed / likely / possible / none
+= Mark Training Session
+: トレーニングセッションを記録
+= Bookend a workout the band cannot see — strength work leaves almost no trace in a wrist sensor. Bind it to a shortcut or widget and tap at the start and end; 回復 then counts the session's real heart-rate load instead of missing it
+: バンドが検知できないワークアウトの開始と終了を記録します。筋力トレーニングは、手首のセンサーにほとんど痕跡を残しません。ショートカットやウィジェットに割り当てて、開始時と終了時にタップしてください。そうすると「回復」は、そのセッションを見落とさず、実際の心拍負荷を計算に入れます。
+= toggle (default) starts or ends whichever applies — the one to put on a button. pick opens the chart to draw a past session on. Or start / end / log
+: toggle（既定）は、状況に応じて開始または終了します。ボタンに割り当てるならこれです。pick はグラフを開き、過去のセッションをその上に描き込めます。ほかに start / end / log
+= Minutes (log only)
+: 分数（log のみ）
+= for mode=log: a session of this many minutes that ended just now, 5..240
+: mode=log 用：たった今終わった、この分数のセッション。5..240
+= optional, e.g. lifting — shown beside the session
+: 任意。例：lifting — セッションの横に表示されます。
+= Set OCR Models
+: OCRモデルを設定
+= Point 文字認識 at the directory holding its ONNX weight files. They are not in the APK — about 100 MB that never changes — so this is where that location is declared. Blank re-runs discovery over the usual directories
+: 「文字認識」に、ONNXの重みファイルがあるディレクトリを指定します。重みファイルはAPKには含まれていません（約100 MBあり、内容は変わりません）。そのため、その場所をここで指定します。空欄にすると、通常のディレクトリを対象に探索をやり直します。
+= Model directory
+: モデルのディレクトリ
+= blank = look in the usual places. e.g. /sdcard/〇/[227] 日本語/[227][66] 辞書/[227][66][362] 文字認識モデル
+: 空欄の場合は通常の場所を探します。例：/sdcard/〇/[227] 日本語/[227][66] 辞書/[227][66][362] 文字認識モデル
+= Recognise Text (OCR)
+: 文字を認識（OCR）
+= Read the text in an image entirely on-device (PP-OCRv5) into a variable. The same engine as the 文字認識 share tile — share a screenshot cut-out to that, or point this at a saved image
+: 画像内の文字を、すべて端末上で（PP-OCRv5）読み取り、変数に入れます。共有タイルの「文字認識」と同じエンジンです。スクリーンショットの切り抜きをそこへ共有するか、このアクションで保存済みの画像を指定します。
+= a file path, or a content:// / file:// URI. Leave blank with "Open the review window" on to open 文字認識 and pick an image there
+: ファイルのパス、または content:// / file:// のURI。「確認ウィンドウを開く」をオンにして空欄のままにすると、「文字認識」が開き、そこで画像を選べます。
+= blank = jpn (Japanese + English). Also: latin (German/Czech/Polish), eslav (Russian)
+: 空欄の場合は jpn（日本語＋英語）。ほかに latin（ドイツ語/チェコ語/ポーランド語）、eslav（ロシア語）
+= blank = %OCR. Also sets %<var>_lines and %<var>_script
+: 空欄の場合は %OCR。%<var>_lines と %<var>_script も設定します。
+= Model
+: モデル
+= blank = whatever the UI setting says. server = the accurate 81 MB model, mobile = the fast 16 MB one (Japanese/English only)
+: 空欄の場合はUI設定に従います。server = 高精度の81 MBモデル、mobile = 高速な16 MBモデル（日本語/英語のみ）
+= Open the review window
+: 確認ウィンドウを開く
+= true = show the image and text for checking instead of returning the text silently
+: true にすると、文字列を黙って返す代わりに、確認用に画像と文字を表示します。
+= Article to HTML (OCR)
+: 記事をHTMLに（OCR）
+= Read a scrolling screenshot into a formatted HTML file — headings, paragraphs, bold and italic, the photographs cropped out and inlined, every block sized against the body text. Handles pages far too tall for Recognise Text, and joins several screenshots of one article into a single file
+: スクロールして撮ったスクリーンショットを、書式付きのHTMLファイルに読み取ります。見出し、段落、太字と斜体を再現し、写真は切り出して埋め込み、各ブロックの大きさは本文の文字を基準に決めます。「文字を認識」では扱えないほど縦に長いページも処理でき、1つの記事の複数のスクリーンショットを1つのファイルにまとめます。
+= one path per line (or separated by |), in reading order. A repeated passage where two screenshots overlap is dropped automatically
+: 1行に1つのパス（または | で区切る）を、読む順に並べます。2枚のスクリーンショットが重なる部分の繰り返しは、自動的に取り除かれます。
+= Output directory
+: 出力先のディレクトリ
+= blank = /sdcard/tmp. The file is named <yyyy-MM-dd_HH-mm-ss>-<headline>.html
+: 空欄の場合は /sdcard/tmp。ファイル名は <yyyy-MM-dd_HH-mm-ss>-<headline>.html になります。
+= blank = the biggest type on the page. Also the filename
+: 空欄の場合は、ページ内で最も大きい文字。ファイル名にも使われます。
+= blank = mobile, the fast 16 MB model — an article is dozens of recognition passes, and the text is corrected by hand afterwards. server = the accurate 81 MB one. settings = follow the app-wide toggle
+: 空欄の場合は mobile（高速な16 MBモデル）。1つの記事で認識を何十回も行ううえ、文字はあとで手作業で直すためです。server = 高精度の81 MBモデル。settings = アプリ全体の切り替えに従います。

@@ -11,6 +11,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.ProfileLifecycleStrings
+import com.opentasker.i18n.tr
 import java.util.Locale
 
 typealias ContextObservationTransformer = (
@@ -141,13 +142,13 @@ fun inspectProfile(
     val lifecycleSuppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs, lifecycleStrings)
     val matching = profile.enabled && contextsMatch && lifecycleSuppression == null
     val summary = when {
-        !profile.enabled -> "Profile is disabled."
+        !profile.enabled -> tr("Profile is disabled.")
         lifecycleSuppression != null -> lifecycleSuppression
-        checks.isEmpty() -> "No contexts are configured."
-        contextsMatch && checks.all { it.effectiveMatched } -> "All contexts currently match."
+        checks.isEmpty() -> tr("No contexts are configured.")
+        contextsMatch && checks.all { it.effectiveMatched } -> tr("All contexts currently match.")
         // An "any of" rule or an OR group holds while some of its contexts don't.
-        contextsMatch -> "Enough contexts match for the profile's rule."
-        else -> blockingReason(checks, profile.contextExpression) ?: "The profile's context rule doesn't hold."
+        contextsMatch -> tr("Enough contexts match for the profile's rule.")
+        else -> blockingReason(checks, profile.contextExpression) ?: tr("The profile's context rule doesn't hold.")
     }
 
     return ProfileInspection(
@@ -235,7 +236,7 @@ internal fun blockingReason(checks: List<ContextCheck>, expression: ContextExpre
     val (check, needsMatch) = culprit(expression, true) ?: return null
     return when {
         needsMatch || check.valueUnknown -> check.reason
-        else -> "Context ${check.index + 1} matches, and the rule needs it not to."
+        else -> tr("Context %1\$s matches, and the rule needs it not to.", check.index + 1)
     }
 }
 
@@ -250,23 +251,22 @@ internal fun explainContextExpression(
         return when {
             node.isLeaf() -> {
                 val check = node.contextIndex?.let(checks::getOrNull)
-                val state = when {
-                    check?.effectiveMatched == true -> "matches"
-                    check?.valueUnknown == true -> "is unknown"
-                    else -> "doesn't match"
+                val number = (node.contextIndex ?: -1) + 1
+                val leaf = when {
+                    check?.effectiveMatched == true -> tr("Context %1\$s matches", number)
+                    check?.valueUnknown == true -> tr("Context %1\$s is unknown", number)
+                    else -> tr("Context %1\$s doesn't match", number)
                 }
-                val leaf = "Context ${(node.contextIndex ?: -1) + 1} $state"
-                if (node.invert) "not ($leaf)" else leaf
+                if (node.invert) tr("not (%1\$s)", leaf) else leaf
             }
             nodeOperator != null && node.children.isNotEmpty() -> {
-                val operator = when (nodeOperator) {
-                    ContextBooleanOperator.AND -> "all of"
-                    ContextBooleanOperator.OR -> "any of"
-                }
                 val body = node.children.joinToString(", ", transform = ::explain)
-                if (node.invert) "not $operator ($body)" else "$operator ($body)"
+                when (nodeOperator) {
+                    ContextBooleanOperator.AND -> if (node.invert) tr("not all of (%1\$s)", body) else tr("all of (%1\$s)", body)
+                    ContextBooleanOperator.OR -> if (node.invert) tr("not any of (%1\$s)", body) else tr("any of (%1\$s)", body)
+                }
             }
-            else -> "Invalid context group"
+            else -> tr("Invalid context group")
         }
     }
     // "All of (Context 1 matches, Context 2 doesn't match)", in words rather than ALL(Context 1=match).
@@ -302,7 +302,7 @@ private fun inspectContextForProfile(
         index = index,
         spec = spec,
         sourceKey = sourceKey,
-        sourceLabel = snapshot?.label ?: sourceKey?.toContextSourceLabel() ?: "Unknown source",
+        sourceLabel = snapshot?.label ?: sourceKey?.toContextSourceLabel() ?: tr("Unknown source"),
         sourceStatus = sourceStatus,
         rawMatched = rawMatched,
         effectiveMatched = effectiveMatched,
@@ -316,13 +316,13 @@ private fun inspectContextForProfile(
 fun contextConfigSummary(spec: ContextSpec): String {
     val summary = when (spec.type) {
         ContextType.PLUGIN -> {
-            val pkg = spec.config["package"].orEmpty().ifBlank { "none" }
+            val pkg = spec.config["package"].orEmpty().ifBlank { tr("none") }
             val blurb = spec.config["blurb"]?.takeIf { it.isNotBlank() }
             if (blurb != null) "$pkg ($blurb)" else pkg
         }
         else -> readableContextSummary(spec) ?: configEntriesSummary(spec.config)
     }
-    return if (spec.invert) "$summary; inverted" else summary
+    return if (spec.invert) tr("%1\$s; inverted", summary) else summary
 }
 
 /**
@@ -350,17 +350,23 @@ private fun sunEventSummary(spec: ContextSpec, entries: (Map<String, String>) ->
     val degrees = SunEventCalculator.elevationDegrees(raw) ?: return null
     val rising = event == "sunrise"
     val moment = when {
-        raw.isEmpty() -> if (rising) "Sunrise" else "Sunset"
+        raw.isEmpty() -> if (rising) tr("Sunrise") else tr("Sunset")
         raw.lowercase() in SunEventCalculator.NAMED_ELEVATIONS -> {
             val name = raw.lowercase().replaceFirstChar { it.uppercase() }
-            "$name ${if (rising) "dawn" else "dusk"} (sun ${degreesText(-degrees)} degrees below the horizon)"
+            if (rising) {
+                tr("%1\$s dawn (sun %2\$s degrees below the horizon)", tr(name), degreesText(-degrees))
+            } else {
+                tr("%1\$s dusk (sun %2\$s degrees below the horizon)", tr(name), degreesText(-degrees))
+            }
         }
         else -> {
-            val motion = if (rising) "rising" else "setting"
             when {
-                degrees > 0 -> "Sun $motion past ${degreesText(degrees)} degrees above the horizon"
-                degrees < 0 -> "Sun $motion past ${degreesText(-degrees)} degrees below the horizon"
-                else -> "Sun $motion past the horizon"
+                degrees > 0 && rising -> tr("Sun rising past %1\$s degrees above the horizon", degreesText(degrees))
+                degrees > 0 -> tr("Sun setting past %1\$s degrees above the horizon", degreesText(degrees))
+                degrees < 0 && rising -> tr("Sun rising past %1\$s degrees below the horizon", degreesText(-degrees))
+                degrees < 0 -> tr("Sun setting past %1\$s degrees below the horizon", degreesText(-degrees))
+                rising -> tr("Sun rising past the horizon")
+                else -> tr("Sun setting past the horizon")
             }
         }
     }
@@ -396,7 +402,7 @@ private fun configEntriesSummary(config: Map<String, String>): String =
     config.entries
         .sortedBy { it.key }
         .joinToString { "${readableFieldName(it.key)}: ${it.value}" }
-        .ifBlank { "No configuration" }
+        .ifBlank { tr("No configuration") }
 
 /** Reads as the check it makes, "Bluetooth device nearby = Car" rather than "key=bt_near, operator==, value=Car". */
 private fun stateConditionSummary(
@@ -409,7 +415,7 @@ private fun stateConditionSummary(
     if (!predicate.isNullOrBlank() && parseStatePredicate(predicate) == null) return null
     val (key, operator, expected) = stateCondition(spec)
     val normalized = normalizeStateKey(key).ifEmpty { return null }
-    val label = if (normalized == BT_NEAR_STATE_KEY) "Bluetooth device nearby" else quote(normalized.replace('_', ' '))
+    val label = if (normalized == BT_NEAR_STATE_KEY) tr("Bluetooth device nearby") else quote(normalized.replace('_', ' '))
     val condition = "$label ${quote(operator.trim().ifEmpty { "=" })} ${quote(expected)}".trim()
     if (spec.config.keys.all { it in STATE_CONDITION_KEYS }) return condition
     return "$condition, ${entries(spec.config.filterKeys { it !in STATE_CONDITION_KEYS })}"
@@ -418,12 +424,12 @@ private fun stateConditionSummary(
 private val STATE_CONDITION_KEYS = setOf("predicate", "key", "operator", "value")
 
 fun String.toContextSourceLabel(): String = when (this) {
-    "app" -> "Application"
-    "time" -> "Time and day"
-    "state" -> "Device state"
-    "event" -> "System event"
-    "location" -> "Location"
-    "plugin" -> "Plugin condition"
+    "app" -> tr("Application")
+    "time" -> tr("Time and day")
+    "state" -> tr("Device state")
+    "event" -> tr("System event")
+    "location" -> tr("Location")
+    "plugin" -> tr("Plugin condition")
     else -> replaceFirstChar { it.titlecase(Locale.US) }
 }
 
@@ -435,42 +441,42 @@ private fun contextReason(
     rawMatched: Boolean,
     effectiveMatched: Boolean,
 ): String {
-    if (sourceKey == null) return "This context type is not mapped to a runtime source."
-    if (snapshot == null || !snapshot.registered) return "No registered runtime source for ${sourceKey.toContextSourceLabel()}."
-    val lastValueNote = if (observation != null) " Its last value still counts until it reports again." else ""
-    snapshot.error?.let { return "The ${snapshot.label} source stopped with an error: $it$lastValueNote" }
+    if (sourceKey == null) return tr("This context type is not mapped to a runtime source.")
+    if (snapshot == null || !snapshot.registered) return tr("No registered runtime source for %1\$s.", sourceKey.toContextSourceLabel())
+    val lastValueNote = if (observation != null) tr(" Its last value still counts until it reports again.") else ""
+    snapshot.error?.let { return tr("The %1\$s source stopped with an error: %2\$s", tr(snapshot.label), it) + lastValueNote }
     if (!snapshot.setupReady) {
-        return (snapshot.setupDetail ?: "${snapshot.label} needs setup before it can report values.") + lastValueNote
+        return (snapshot.setupDetail?.let { tr(it) } ?: tr("%1\$s needs setup before it can report values.", tr(snapshot.label))) + lastValueNote
     }
     if (spec.type == ContextType.EVENT) {
-        spec.config["event"]?.lowercase(Locale.ROOT)?.let(snapshot.eventSetupGaps::get)?.let { return it }
+        spec.config["event"]?.lowercase(Locale.ROOT)?.let(snapshot.eventSetupGaps::get)?.let { return tr(it) }
     }
     if (observation == null && spec.type == ContextType.PLUGIN && snapshot.lastObservation != null) {
-        return "Waiting for this plugin's first result. The latest one was for another plugin or setting."
+        return tr("Waiting for this plugin's first result. The latest one was for another plugin or setting.")
     }
-    if (observation == null) return "Waiting for the first ${snapshot.label} event."
-    if (observation.event.type != sourceKey) return "Latest event came from ${observation.event.type}, not $sourceKey."
+    if (observation == null) return tr("Waiting for the first %1\$s event.", tr(snapshot.label))
+    if (observation.event.type != sourceKey) return tr("Latest event came from %1\$s, not %2\$s.", observation.event.type, sourceKey)
     if (spec.type == ContextType.STATE) {
         stateSetupMarkerKey(spec)
             ?.let { observation.event.metadata[it] }
             ?.takeIf(String::isNotBlank)
-            ?.let { return it }
+            ?.let { return tr(it) }
     }
     timeBoundsGap(spec, observation.event.metadata)?.let { return it }
     if (spec.type == ContextType.EVENT) {
         return when {
-            spec.invert && effectiveMatched -> "Latest event does not satisfy the configuration, so the inverted event context can trigger on this pulse."
-            spec.invert && rawMatched -> "Latest event satisfies the configuration, so the inverted event context blocks this pulse."
-            effectiveMatched -> "Latest event satisfies the configuration; event contexts are one-shot pulses and can trigger again on each matching event."
-            else -> "Latest event does not satisfy the configuration; event contexts wait for the next matching pulse."
+            spec.invert && effectiveMatched -> tr("Latest event does not satisfy the configuration, so the inverted event context can trigger on this pulse.")
+            spec.invert && rawMatched -> tr("Latest event satisfies the configuration, so the inverted event context blocks this pulse.")
+            effectiveMatched -> tr("Latest event satisfies the configuration; event contexts are one-shot pulses and can trigger again on each matching event.")
+            else -> tr("Latest event does not satisfy the configuration; event contexts wait for the next matching pulse.")
         }
     }
 
     val verdict = when {
-        spec.invert && effectiveMatched -> "Latest value does not satisfy the configuration, so the inverted context matches."
-        spec.invert && rawMatched -> "Latest value satisfies the configuration, so the inverted context blocks the profile."
-        effectiveMatched -> "Latest value satisfies the configuration."
-        else -> "Latest value does not satisfy the configuration."
+        spec.invert && effectiveMatched -> tr("Latest value does not satisfy the configuration, so the inverted context matches.")
+        spec.invert && rawMatched -> tr("Latest value satisfies the configuration, so the inverted context blocks the profile.")
+        effectiveMatched -> tr("Latest value satisfies the configuration.")
+        else -> tr("Latest value does not satisfy the configuration.")
     }
     return verdict + timeBoundsRead(spec, observation.event.metadata)
 }
@@ -480,18 +486,21 @@ private fun timeBoundsGap(spec: ContextSpec, metadata: Map<String, String>): Str
     val unresolved = TimeContextBounds.unresolvedBounds(spec, metadata).ifEmpty { return null }
     unresolved.firstOrNull { TimeContextBounds.variableName(it) == null }?.let { unreadable ->
         if (!TimeContextBounds.isLocalVariable(unreadable)) {
-            return "$unreadable isn't a variable name, so this context stays off. A name starts with a letter and has only letters, digits, _ and -, like %Sunrise."
+            return tr("%1\$s isn't a variable name, so this context stays off. A name starts with a letter and has only letters, digits, _ and -, like %%Sunrise.", unreadable)
         }
-        return "$unreadable is a local variable, which a context can't read, so this context stays off. A global has a capital letter in its name."
+        return tr("%1\$s is a local variable, which a context can't read, so this context stays off. A global has a capital letter in its name.", unreadable)
     }
-    val holds = if (unresolved.size == 1) "doesn't hold" else "don't hold"
-    return "${unresolved.joinToString(" and ")} $holds a time yet, so this context stays off, inverted or not."
+    return if (unresolved.size == 1) {
+        tr("%1\$s doesn't hold a time yet, so this context stays off, inverted or not.", unresolved.first())
+    } else {
+        tr("%1\$s don't hold a time yet, so this context stays off, inverted or not.", unresolved.joinToString(tr(" and ")))
+    }
 }
 
 /** " Read %Sunrise as 06:42 and %Sunset as 16:51." for a Time context bounded by variables, else empty. */
 private fun timeBoundsRead(spec: ContextSpec, metadata: Map<String, String>): String {
     val read = TimeContextBounds.boundTimes(spec, metadata).ifEmpty { return "" }
-    return read.joinToString(" and ", prefix = " Read ", postfix = ".") { (name, time) -> "$name as $time" }
+    return tr(" Read %1\$s.", read.joinToString(tr(" and ")) { (name, time) -> tr("%1\$s as %2\$s", name, time) })
 }
 
 fun ContextSourceSnapshot.observationStatus(

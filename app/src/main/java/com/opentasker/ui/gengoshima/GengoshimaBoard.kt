@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.opentasker.i18n.tr
+import com.opentasker.i18n.trc
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -178,14 +180,14 @@ fun GengoshimaBoardScreen(
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "言語島 — Language islands",
+                        tr("言語島 — Language islands"),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline,
                     )
                     Text(
-                        "長押しで並べ替え / long-press and drag to reorder",
+                        tr("長押しで並べ替え / long-press and drag to reorder"),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -262,7 +264,7 @@ private fun GsCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                 // The picture opens the page exactly as the pill under it does (白い熊, 2026-11-17).
-                .clickable(enabled = enabled, onClickLabel = tile.en, onClick = onOpen),
+                .clickable(enabled = enabled, onClickLabel = trc("island_tile", tile.en), onClick = onOpen),
             contentAlignment = Alignment.TopEnd,
         ) {
             GsBoardArt(tile.key, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)))
@@ -297,7 +299,7 @@ private fun GsCard(
                         fontSize = when { tile.wide -> 22.sp; tile.ja.length > 6 -> 13.sp; tile.ja.length > 4 -> 15.sp; else -> 17.sp },
                         fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, softWrap = false,
                     )
-                    Text(tile.en, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+                    Text(trc("island_tile", tile.en), fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
                 }
             }
         }

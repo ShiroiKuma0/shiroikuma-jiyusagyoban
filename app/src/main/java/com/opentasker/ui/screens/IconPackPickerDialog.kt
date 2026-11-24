@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.res.ResourcesCompat
 import com.opentasker.app.R
 import com.opentasker.core.icons.TaskIconStore
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
@@ -128,12 +129,12 @@ internal fun IconPackPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Uni
         AlertDialog(
             modifier = dialogBorder(),
             onDismissRequest = onDismiss,
-            title = { Text("Icon pack") },
+            title = { Text(tr("Icon pack")) },
             text = {
                 val list = packs
                 when {
-                    list == null -> Text("Loading…", style = MaterialTheme.typography.bodyMedium)
-                    list.isEmpty() -> Text("No icon packs installed.", style = MaterialTheme.typography.bodyMedium)
+                    list == null -> Text(tr("Loading…"), style = MaterialTheme.typography.bodyMedium)
+                    list.isEmpty() -> Text(tr("No icon packs installed."), style = MaterialTheme.typography.bodyMedium)
                     else -> Column(
                         Modifier.fillMaxWidth().heightIn(max = 420.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -184,13 +185,13 @@ private fun IconPackGrid(pack: IconPack, onBack: () -> Unit, onDismiss: () -> Un
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = query, onValueChange = { query = it },
-                    label = { Text("Search icons") }, singleLine = true,
+                    label = { Text(tr("Search icons")) }, singleLine = true,
                     keyboardOptions = KeyboardOptions.Default,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 when {
-                    names == null -> Text("Loading…", style = MaterialTheme.typography.bodyMedium)
-                    filtered.isEmpty() -> Text("No icons.", style = MaterialTheme.typography.bodyMedium)
+                    names == null -> Text(tr("Loading…"), style = MaterialTheme.typography.bodyMedium)
+                    filtered.isEmpty() -> Text(tr("No icons."), style = MaterialTheme.typography.bodyMedium)
                     else -> LazyVerticalGrid(
                         columns = GridCells.Adaptive(56.dp),
                         modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
@@ -222,7 +223,7 @@ private fun IconPackGrid(pack: IconPack, onBack: () -> Unit, onDismiss: () -> Un
                 }
             }
         },
-        confirmButton = { Button(onClick = onBack) { Text("Packs") } },
+        confirmButton = { Button(onClick = onBack) { Text(tr("Packs")) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

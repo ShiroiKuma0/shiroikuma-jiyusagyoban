@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -102,6 +103,8 @@ internal fun filterActionPickerItems(
     return items.filter { item ->
         item.name.contains(normalizedQuery, ignoreCase = true) ||
             item.description.contains(normalizedQuery, ignoreCase = true) ||
+            tr(item.name).contains(normalizedQuery, ignoreCase = true) ||
+            tr(item.description).contains(normalizedQuery, ignoreCase = true) ||
             item.id.contains(normalizedQuery, ignoreCase = true)
     }
 }
@@ -157,7 +160,7 @@ internal fun ActionPickerDialog(
                         actionGroups.forEach { (category, actions) ->
                             item(key = "category-$category") {
                                 Text(
-                                    category,
+                                    tr(category),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(top = 4.dp),
@@ -200,7 +203,7 @@ internal fun ActionPickerDialog(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                                             ) {
-                                                Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                                Text(tr(metadata.name), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                                                 if (capability.level != CapabilityLevel.Supported) {
                                                     StatusPill(
                                                         if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
@@ -208,9 +211,9 @@ internal fun ActionPickerDialog(
                                                     )
                                                 }
                                             }
-                                            Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(tr(metadata.description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             if (capability.level != CapabilityLevel.Supported) {
-                                                Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                                Text(tr(capability.reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                                             }
                                         }
                                     }
@@ -317,14 +320,14 @@ internal fun ActionConfigDialog(
         // These forms carry many fields, and discarding them has no undo because nothing was
         // saved yet.
         properties = DialogProperties(dismissOnClickOutside = false),
-        title = { Text(state.metadata.name) },
+        title = { Text(tr(state.metadata.name)) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 620.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
-                    Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr(state.metadata.description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (capability.level != CapabilityLevel.Supported) {
                         Spacer(Modifier.height(8.dp))
                         Surface(
@@ -336,7 +339,7 @@ internal fun ActionConfigDialog(
                             shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         ) {
                             Text(
-                                capability.reason,
+                                tr(capability.reason),
                                 modifier = Modifier.padding(12.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -415,12 +418,12 @@ private fun RunTaskParametersSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
         Text(
-            "Parameters",
+            tr("Parameters"),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            "Named values passed to the task; it reads each as {{ param.name }} (or %@name).",
+            tr("Named values passed to the task; it reads each as {{ param.name }} (or %@name)."),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -434,7 +437,7 @@ private fun RunTaskParametersSection(
                     onValueChange = { newName ->
                         onChange(params.toMutableList().also { it[index] = newName to it[index].second })
                     },
-                    label = { Text("Name") },
+                    label = { Text(tr("Name")) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -443,25 +446,25 @@ private fun RunTaskParametersSection(
                     onValueChange = { newValue ->
                         onChange(params.toMutableList().also { it[index] = it[index].first to newValue })
                     },
-                    label = { Text("Value") },
+                    label = { Text(tr("Value")) },
                     modifier = Modifier.weight(1.4f),
                 )
                 IconButton(onClick = { onChange(params.toMutableList().also { it.removeAt(index) }) }) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Remove parameter")
+                    Icon(Icons.Filled.Delete, contentDescription = tr("Remove parameter"))
                 }
             }
         }
         OutlinedButton(onClick = { onChange(params + ("" to "")) }) {
             Icon(Icons.Filled.Add, contentDescription = null)
             Spacer(Modifier.width(6.dp))
-            Text("Add parameter")
+            Text(tr("Add parameter"))
         }
     }
 }
 
 @Composable
 internal fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
-    val label = field.label + if (field.required) " *" else ""
+    val label = tr(field.label) + if (field.required) " *" else ""
     when (field.fieldType) {
         FieldType.CHECKBOX -> {
             val checked = value.toBoolean()
@@ -488,7 +491,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                 Column(Modifier.weight(1f)) {
                     Text(label, style = MaterialTheme.typography.labelLarge)
                     field.hint?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 ThemedSwitch(checked = checked, onCheckedChange = null)
@@ -500,7 +503,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
-            placeholder = field.hint?.let { { Text(it) } },
+            placeholder = field.hint?.let { { Text(tr(it)) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             minLines = 3,
             modifier = Modifier.fillMaxWidth(),
@@ -510,7 +513,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             value = value,
             onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }) },
             label = { Text(label) },
-            placeholder = field.hint?.let { { Text(it) } },
+            placeholder = field.hint?.let { { Text(tr(it)) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
@@ -531,7 +534,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                 Column(Modifier.weight(1f)) {
                     Text(label, style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (parsed == null) "Default" else value.uppercase(),
+                        if (parsed == null) tr("Default") else value.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -560,13 +563,13 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(label, style = MaterialTheme.typography.labelLarge)
                 OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (value.isBlank()) "Design layout (visual editor)" else "Edit layout visually")
+                    Text(if (value.isBlank()) tr("Design layout (visual editor)") else tr("Edit layout visually"))
                 }
                 OutlinedTextField(
                     value = value,
                     onValueChange = onChange,
-                    label = { Text("Layout JSON (advanced)") },
-                    placeholder = field.hint?.let { { Text(it) } },
+                    label = { Text(tr("Layout JSON (advanced)")) },
+                    placeholder = field.hint?.let { { Text(tr(it)) } },
                     supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
@@ -597,13 +600,13 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                     value = value,
                     onValueChange = onChange,
                     label = { Text(label) },
-                    placeholder = field.hint?.let { { Text(it) } },
+                    placeholder = field.hint?.let { { Text(tr(it)) } },
                     supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
                     singleLine = true,
                     trailingIcon = if (field.options.isEmpty()) null else {
                         {
                             IconButton(onClick = { expanded = true }) {
-                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose a value")
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = tr("Choose a value"))
                             }
                         }
                     },
@@ -625,12 +628,12 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                 value = value,
                 onValueChange = onChange,
                 label = { Text(label) },
-                placeholder = field.hint?.let { { Text(it) } },
+                placeholder = field.hint?.let { { Text(tr(it)) } },
                 supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
                 singleLine = true,
                 trailingIcon = {
                     IconButton(onClick = { showPicker = true }) {
-                        Icon(Icons.Filled.Apps, contentDescription = "Pick an app")
+                        Icon(Icons.Filled.Apps, contentDescription = tr("Pick an app"))
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -647,7 +650,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
-            placeholder = field.hint?.let { { Text(it) } },
+            placeholder = field.hint?.let { { Text(tr(it)) } },
             supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             // Not single-line: short values stay compact but long ones (a font name, a path, a message)
             // wrap and grow so they stay fully editable rather than scrolling inside one hidden line.
@@ -678,18 +681,18 @@ private fun PathPickerTrailingIcon(onPath: (String) -> Unit) {
         documentUriToFsPath(uri, isTree = false)?.let(onPath)
     }
     IconButton(onClick = { menu = true }) {
-        Icon(Icons.Filled.Folder, contentDescription = "Pick a directory or file")
+        Icon(Icons.Filled.Folder, contentDescription = tr("Pick a directory or file"))
     }
     ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
         DropdownMenuItem(
-            text = { Text("Pick directory…") },
+            text = { Text(tr("Pick directory…")) },
             onClick = { menu = false; treeLauncher.launch(null) },
             icon = Icons.Filled.Folder,
             role = IconRole.VIEW,
             opens = true,
         )
         DropdownMenuItem(
-            text = { Text("Pick file…") },
+            text = { Text(tr("Pick file…")) },
             onClick = { menu = false; fileLauncher.launch(arrayOf("*/*")) },
             icon = Icons.Filled.InsertDriveFile,
             role = IconRole.VIEW,

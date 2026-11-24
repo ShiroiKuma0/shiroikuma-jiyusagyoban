@@ -1,5 +1,7 @@
 package com.opentasker.core.location
 
+import com.opentasker.i18n.tr
+
 object LocationPolicyDisclosures {
     const val foregroundSetupBody: String =
         "Needed for live Location contexts and WiFi SSID visibility on modern Android. " +
@@ -12,12 +14,14 @@ object LocationPolicyDisclosures {
 
     fun backgroundSetupBody(apiLevel: Int): String {
         val settingsPath = if (apiLevel >= 30) {
-            "Android 11+ grants background location from app settings instead of the foreground permission dialog."
+            tr("Android 11+ grants background location from app settings instead of the foreground permission dialog.")
         } else {
-            "Android 10 can route users from the permission flow to the app's location settings."
+            tr("Android 10 can route users from the permission flow to the app's location settings.")
         }
-        return "Needed only when geofence automations must keep evaluating after 白い熊 自由作業盤 is no longer visible. " +
-            "$settingsPath Users can decline and keep using foreground-only automations. Public reliability still needs device verification."
+        return tr(
+            "Needed only when geofence automations must keep evaluating after 白い熊 自由作業盤 is no longer visible. %1\$s Users can decline and keep using foreground-only automations. Public reliability still needs device verification.",
+            settingsPath,
+        )
     }
 
     /**
@@ -36,20 +40,21 @@ object LocationPolicyDisclosures {
     ): String =
         when {
             foreground && !providerEnabled ->
-                "Location permission is granted, but GPS and network location providers are disabled."
+                tr("Location permission is granted, but GPS and network location providers are disabled.")
             foreground && background && precise ->
-                "Live FOSS location source is registered with precise foreground and background location permission." +
+                tr("Live FOSS location source is registered with precise foreground and background location permission.") +
                     android14ForegroundServiceNote(apiLevel)
             foreground && background ->
-                "Live FOSS location source is registered with approximate foreground and background location permission. " +
-                    "Background precision follows the user's foreground precision choice." +
+                tr(
+                    "Live FOSS location source is registered with approximate foreground and background location permission. Background precision follows the user's foreground precision choice.",
+                ) +
                     android14ForegroundServiceNote(apiLevel)
             foreground && precise ->
-                "Live FOSS location source can emit while 白い熊 自由作業盤 is running; background location from app settings is still needed for long-running geofence reliability."
+                tr("Live FOSS location source can emit while 白い熊 自由作業盤 is running; background location from app settings is still needed for long-running geofence reliability.")
             foreground ->
-                "Live FOSS location source can emit approximate fixes while 白い熊 自由作業盤 is running; background location from app settings and precise access are still missing."
+                tr("Live FOSS location source can emit approximate fixes while 白い熊 自由作業盤 is running; background location from app settings and precise access are still missing.")
             else ->
-                "Foreground location permission is missing; live location contexts remain blocked until setup is complete."
+                tr("Foreground location permission is missing; live location contexts remain blocked until setup is complete.")
         }
 
     /** Why Get Location stopped before asking Android for anything, naming the Setup row that fixes it. */
@@ -62,7 +67,7 @@ object LocationPolicyDisclosures {
 
     private fun android14ForegroundServiceNote(apiLevel: Int): String =
         if (apiLevel >= 34) {
-            " Android 14+ location foreground-service use remains gated to these granted location prerequisites."
+            tr(" Android 14+ location foreground-service use remains gated to these granted location prerequisites.")
         } else {
             ""
         }

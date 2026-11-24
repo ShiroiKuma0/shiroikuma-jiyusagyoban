@@ -5,6 +5,7 @@ import com.opentasker.core.bubbles.FlashBubbleOverlayManager
 import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
 import com.opentasker.core.progress.ProgressPanel
 import com.opentasker.core.scenes.SceneOverlayService
+import com.opentasker.i18n.tr
 import com.opentasker.progress.ProgressPanelManager
 import com.opentasker.scenes.SceneActivity
 import com.opentasker.scenes.SceneOverlayManager
@@ -51,8 +52,8 @@ object RuntimeInventory {
                 LiveItem(
                     key = "engine",
                     kind = Kind.ENGINE,
-                    label = "Automation engine",
-                    detail = "foreground service",
+                    label = tr("Automation engine"),
+                    detail = tr("foreground service"),
                     expected = true,
                     stop = { ctx -> AutomationService.stop(ctx) },
                 ),
@@ -65,7 +66,7 @@ object RuntimeInventory {
                     key = "task-${run.runId}",
                     kind = Kind.TASK,
                     label = run.name,
-                    detail = "${run.source.lowercase()} · running ${(now - run.startedAt) / 1000}s",
+                    detail = tr("%1\$s · running %2\$ss", run.source.lowercase(), (now - run.startedAt) / 1000),
                     stop = { RunningTasks.cancel(run.runId) },
                 ),
             )
@@ -77,7 +78,7 @@ object RuntimeInventory {
                     key = "scene-$id",
                     kind = Kind.SCENE,
                     label = name,
-                    detail = "overlay window",
+                    detail = tr("overlay window"),
                     stop = { SceneOverlayManager.hide(id) },
                 ),
             )
@@ -89,8 +90,8 @@ object RuntimeInventory {
                 LiveItem(
                     key = "scene-activities",
                     kind = Kind.SCENE,
-                    label = "Scene activities",
-                    detail = "$sceneActivities open",
+                    label = tr("Scene activities"),
+                    detail = tr("%1\$s open", sceneActivities),
                     stop = { SceneActivity.dismissAll() },
                 ),
             )
@@ -101,8 +102,8 @@ object RuntimeInventory {
                 LiveItem(
                     key = "scene-service",
                     kind = Kind.SCENE,
-                    label = "Scene overlay service",
-                    detail = "foreground service",
+                    label = tr("Scene overlay service"),
+                    detail = tr("foreground service"),
                     stop = { ctx -> SceneOverlayService.dismiss(ctx) },
                 ),
             )
@@ -114,7 +115,7 @@ object RuntimeInventory {
                     key = "freeze-$pkg",
                     kind = Kind.BUBBLE,
                     label = pkg,
-                    detail = "freeze bubble",
+                    detail = tr("freeze bubble"),
                     stop = { FreezeBubbleOverlayManager.stop() },
                 ),
             )
@@ -126,7 +127,7 @@ object RuntimeInventory {
                     key = "flash-$key",
                     kind = Kind.BUBBLE,
                     label = key,
-                    detail = "flash bubble",
+                    detail = tr("flash bubble"),
                     stop = { FlashBubbleOverlayManager.stop() },
                 ),
             )
@@ -137,8 +138,8 @@ object RuntimeInventory {
                 LiveItem(
                     key = "progress-panel",
                     kind = Kind.PANEL,
-                    label = "Progress panel",
-                    detail = if (ProgressPanelManager.isShowing()) "on screen" else "state left behind",
+                    label = tr("Progress panel"),
+                    detail = if (ProgressPanelManager.isShowing()) tr("on screen") else tr("state left behind"),
                     stop = {
                         ProgressPanelManager.hide()
                         ProgressPanel.hide()

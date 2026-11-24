@@ -1,5 +1,6 @@
 package com.opentasker.ui.components
 
+import com.opentasker.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -322,7 +323,7 @@ fun <T> LazyListScope.groupedItems(
                         Box {
                             Icon(
                                 Icons.Filled.DragIndicator,
-                                contentDescription = "Drag to reorder; tap for group options",
+                                contentDescription = tr("Drag to reorder; tap for group options"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(32.dp)
@@ -346,9 +347,9 @@ fun <T> LazyListScope.groupedItems(
                                     },
                             )
                             ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                DropdownMenuItem(text = { Text("Move into group…") }, icon = Icons.AutoMirrored.Filled.DriveFileMove, role = IconRole.SHARE, opens = true, onClick = { menu = false; onMoveItem(key) })
+                                DropdownMenuItem(text = { Text(tr("Move into group…")) }, icon = Icons.AutoMirrored.Filled.DriveFileMove, role = IconRole.SHARE, opens = true, onClick = { menu = false; onMoveItem(key) })
                                 if (ops.groupIdOf(key) != null) {
-                                    DropdownMenuItem(text = { Text("Move out of group") }, icon = Icons.AutoMirrored.Filled.Logout, role = IconRole.SHARE, onClick = { menu = false; ops.setItemGroup(key, null) })
+                                    DropdownMenuItem(text = { Text(tr("Move out of group")) }, icon = Icons.AutoMirrored.Filled.Logout, role = IconRole.SHARE, onClick = { menu = false; ops.setItemGroup(key, null) })
                                 }
                             }
                         }
@@ -465,7 +466,7 @@ fun GroupHeaderRow(
     ) {
         Icon(
             if (group.expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-            contentDescription = if (group.expanded) "Collapse group" else "Expand group",
+            contentDescription = if (group.expanded) tr("Collapse group") else tr("Expand group"),
             tint = MaterialTheme.colorScheme.primary,
         )
         Text(
@@ -482,26 +483,26 @@ fun GroupHeaderRow(
         // Compact (32dp) so the ⋮ doesn't force the header taller than its padding setting (白い熊).
         IconButton(
             onClick = { menuOpen = true },
-            modifier = Modifier.size(32.dp).semantics { contentDescription = "Group actions" },
+            modifier = Modifier.size(32.dp).semantics { contentDescription = tr("Group actions") },
         ) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "Group actions")
+            Icon(Icons.Filled.MoreVert, contentDescription = tr("Group actions"))
             ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
-                    text = { Text("New subgroup") },
+                    text = { Text(tr("New subgroup")) },
                     icon = Icons.Filled.Add,
                     role = IconRole.WRITE,
                     opens = true,
                     onClick = { menuOpen = false; addingSub = true },
                 )
                 DropdownMenuItem(
-                    text = { Text("Rename group") },
+                    text = { Text(tr("Rename group")) },
                     icon = Icons.Filled.Edit,
                     role = IconRole.WRITE,
                     opens = true,
                     onClick = { menuOpen = false; renaming = true },
                 )
                 DropdownMenuItem(
-                    text = { Text("Move into group…") },
+                    text = { Text(tr("Move into group…")) },
                     icon = Icons.AutoMirrored.Filled.DriveFileMove,
                     role = IconRole.SHARE,
                     opens = true,
@@ -509,14 +510,14 @@ fun GroupHeaderRow(
                 )
                 if (group.parentGroupId != null) {
                     DropdownMenuItem(
-                        text = { Text("Move out of group") },
+                        text = { Text(tr("Move out of group")) },
                         icon = Icons.AutoMirrored.Filled.Logout,
                         role = IconRole.SHARE,
                         onClick = { menuOpen = false; onMoveOut() },
                     )
                 }
                 DropdownMenuItem(
-                    text = { Text("Delete group") },
+                    text = { Text(tr("Delete group")) },
                     icon = Icons.Filled.Delete,
                     destructive = true,
                     onClick = { menuOpen = false; onDelete() },
@@ -528,31 +529,31 @@ fun GroupHeaderRow(
         var text by remember { mutableStateOf(group.name) }
         AlertDialog(
             onDismissRequest = { renaming = false },
-            title = { Text("Rename group") },
+            title = { Text(tr("Rename group")) },
             text = { OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth()) },
             confirmButton = {
-                Button(onClick = { if (text.isNotBlank()) onRename(text.trim()); renaming = false }) { Text("Save") }
+                Button(onClick = { if (text.isNotBlank()) onRename(text.trim()); renaming = false }) { Text(tr("Save")) }
             },
-            dismissButton = { OutlinedButton(onClick = { renaming = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { renaming = false }) { Text(tr("Cancel")) } },
         )
     }
     if (addingSub) {
         var text by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { addingSub = false },
-            title = { Text("New subgroup in “${group.name}”") },
+            title = { Text(tr("New subgroup in “%1\$s”", group.name)) },
             text = {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    placeholder = { Text("Subgroup name") },
+                    placeholder = { Text(tr("Subgroup name")) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
             confirmButton = {
-                Button(onClick = { if (text.isNotBlank()) onAddSubgroup(text.trim()); addingSub = false }) { Text("Create") }
+                Button(onClick = { if (text.isNotBlank()) onAddSubgroup(text.trim()); addingSub = false }) { Text(tr("Create")) }
             },
-            dismissButton = { OutlinedButton(onClick = { addingSub = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { addingSub = false }) { Text(tr("Cancel")) } },
         )
     }
 }
@@ -755,7 +756,7 @@ fun UngroupedDropZone(memberCount: Int, highlighted: Boolean, modifier: Modifier
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            if (highlighted) "Drop here to remove from group" else "Ungrouped",
+            if (highlighted) tr("Drop here to remove from group") else tr("Ungrouped"),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
@@ -782,7 +783,7 @@ fun GroupPickerDialog(
     var newName by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Move into group") },
+        title = { Text(tr("Move into group")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 groups.forEach { g ->
@@ -806,7 +807,7 @@ fun GroupPickerDialog(
                         OutlinedTextField(
                             value = newName,
                             onValueChange = { newName = it },
-                            placeholder = { Text("New group name") },
+                            placeholder = { Text(tr("New group name")) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
@@ -820,7 +821,7 @@ fun GroupPickerDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             RoleIcon(Icons.Filled.Add, IconRole.WRITE, Modifier.size(18.dp))
-                            Text("New group", color = role(UiRole.LIST_LABEL))
+                            Text(tr("New group"), color = role(UiRole.LIST_LABEL))
                         }
                     }
                 }
@@ -828,9 +829,9 @@ fun GroupPickerDialog(
         },
         confirmButton = {
             if (creating && onCreate != null) {
-                Button(onClick = { if (newName.isNotBlank()) onCreate(newName.trim()) }) { Text("Create") }
+                Button(onClick = { if (newName.isNotBlank()) onCreate(newName.trim()) }) { Text(tr("Create")) }
             }
         },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }

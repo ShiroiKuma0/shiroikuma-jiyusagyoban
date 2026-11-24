@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.HorizontalDivider
@@ -163,7 +164,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text("言語島 — 文を入れる", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    status ?: "書き終えたら下の「訳して音声を作る」/ when done, press Translate & voice below",
+                    status ?: tr("書き終えたら下の「訳して音声を作る」/ when done, press Translate & voice below"),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,7 +177,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
         if (inboxCount > 0) {
             val context = androidx.compose.ui.platform.LocalContext.current
             OutlinedButton(onClick = { context.startActivity(GengoshimaInboxActivity.intent(context)) }, modifier = Modifier.fillMaxWidth()) {
-                Text("未分類 ($inboxCount) — 島に入れる / file captured sentences")
+                Text(tr("未分類 (%1\$s) — 島に入れる / file captured sentences", inboxCount))
             }
         }
 
@@ -188,13 +189,13 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
             item {
                 // Vocabulary and sentences another chat handed over as text, pasted in one go.
                 val context = androidx.compose.ui.platform.LocalContext.current
-                OutlinedButton(onClick = { context.startActivity(GengoshimaImportActivity.intent(context)) }) { Text("取り込む / Import") }
+                OutlinedButton(onClick = { context.startActivity(GengoshimaImportActivity.intent(context)) }) { Text(tr("取り込む / Import")) }
             }
         }
 
         if (island == null) {
             Text(
-                "まず島を作ってください — 話題ひとつにつき島ひとつ。\nMake an island first: one topic, one island.",
+                tr("まず島を作ってください — 話題ひとつにつき島ひとつ。\nMake an island first: one topic, one island."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
@@ -205,15 +206,15 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                 textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp),
                 label = {
                     Text(
-                        if (language == GengoshimaLanguage.CS) "チェコ語の文 — Enter で追加 / Czech sentence, Enter adds it"
-                        else "英文 — Enter で追加 / English sentence, Enter adds it",
+                        if (language == GengoshimaLanguage.CS) tr("チェコ語の文 — Enter で追加 / Czech sentence, Enter adds it")
+                        else tr("英文 — Enter で追加 / English sentence, Enter adds it"),
                     )
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { add() }),
             )
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Button(onClick = { add() }, enabled = query.isNotEmpty()) { Text("追加 / Add") }
+                Button(onClick = { add() }, enabled = query.isNotEmpty()) { Text(tr("追加 / Add")) }
                 Spacer(Modifier.width(12.dp))
                 // What the next sentence is written in; tap to switch EN ⇄ CS.
                 LanguageChip(language, onClick = { language = GengoshimaLanguage.toggle(language) })
@@ -225,7 +226,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
         LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (matches.isNotEmpty()) {
                 item {
-                    Text("似た文がもうあります / already written:", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(tr("似た文がもうあります / already written:"), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
                 items(matches, key = { "m${it.id}" }) { m ->
                     val where = islands.firstOrNull { it.id == m.islandId }
@@ -247,7 +248,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
             onClick = onGenerate,
             enabled = waiting,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        ) { Text("訳して音声を作る / Translate & voice", fontSize = 18.sp) }
+        ) { Text(tr("訳して音声を作る / Translate & voice"), fontSize = 18.sp) }
     }
 
     if (newIsland) {
@@ -294,7 +295,7 @@ private fun SentenceRow(s: GengoshimaSentenceEntity) {
         when {
             s.ja.isNotBlank() -> Text(mark + s.ja, fontSize = 17.sp, color = color)
             s.error.isNotBlank() -> Text("✕ " + s.error, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
-            else -> Text("訳待ち / to translate", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Text(tr("訳待ち / to translate"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -305,21 +306,21 @@ internal fun NewIslandDialog(onDismiss: () -> Unit, onCreate: (String, String) -
     var register by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新しい島 / New island") },
+        title = { Text(tr("新しい島 / New island")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(en, { en = it }, label = { Text("話題（英語） / Topic") }, singleLine = true)
+                OutlinedTextField(en, { en = it }, label = { Text(tr("話題（英語） / Topic")) }, singleLine = true)
                 OutlinedTextField(
                     register, { register = it },
-                    label = { Text("話し方 / Register") },
-                    placeholder = { Text("例: 同僚に、丁寧に / to a colleague, polite") },
+                    label = { Text(tr("話し方 / Register")) },
+                    placeholder = { Text(tr("例: 同僚に、丁寧に / to a colleague, polite")) },
                 )
                 // Said up front, not only as a placeholder: a hint that appears once the field is
                 // tapped explains nothing to someone deciding whether to tap it (白い熊, 2026-09-30).
                 Text(
-                    "誰に・どんな場面で話すか。島の全文の丁寧さがこれで決まる。空なら丁寧（です／ます）。\n" +
-                        "Who you're talking to, and how formally: it sets the politeness of every sentence " +
-                        "in the island. Blank means polite (です／ます).",
+                    tr(
+                        "誰に・どんな場面で話すか。島の全文の丁寧さがこれで決まる。空なら丁寧（です／ます）。\nWho you're talking to, and how formally: it sets the politeness of every sentence in the island. Blank means polite (です／ます).",
+                    ),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -331,7 +332,7 @@ internal fun NewIslandDialog(onDismiss: () -> Unit, onCreate: (String, String) -
                         SelectionChip(label = label, selected = register == value, onSelect = { register = value })
                     }
                 }
-                Text("日本語の島名は訳と一緒に付きます。\nThe Japanese name comes with the translation.", fontSize = 13.sp)
+                Text(tr("日本語の島名は訳と一緒に付きます。\nThe Japanese name comes with the translation."), fontSize = 13.sp)
             }
         },
         confirmButton = { Button(onClick = { onCreate(en.trim(), register.trim()) }, enabled = en.isNotBlank()) { Text("作る") } },

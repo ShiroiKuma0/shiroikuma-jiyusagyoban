@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -91,9 +92,9 @@ fun ProjectSwitcher(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val label = when (filter) {
-        ProjectFilter.All -> "All"
-        ProjectFilter.Unfiled -> "Unfiled"
-        is ProjectFilter.Of -> projects.firstOrNull { it.id == filter.projectId }?.name ?: "Project"
+        ProjectFilter.All -> tr("All")
+        ProjectFilter.Unfiled -> tr("Unfiled")
+        is ProjectFilter.Of -> projects.firstOrNull { it.id == filter.projectId }?.name ?: tr("Project")
     }
     Box {
         TextButton(onClick = { expanded = true }) {
@@ -104,11 +105,11 @@ fun ProjectSwitcher(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose project")
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = tr("Choose project"))
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            FilterItem("All", filter == ProjectFilter.All) { onSelect(ProjectFilter.All); expanded = false }
-            FilterItem("Unfiled", filter == ProjectFilter.Unfiled) { onSelect(ProjectFilter.Unfiled); expanded = false }
+            FilterItem(tr("All"), filter == ProjectFilter.All) { onSelect(ProjectFilter.All); expanded = false }
+            FilterItem(tr("Unfiled"), filter == ProjectFilter.Unfiled) { onSelect(ProjectFilter.Unfiled); expanded = false }
             projects.forEach { project ->
                 DropdownMenuItem(
                     text = {
@@ -120,7 +121,7 @@ fun ProjectSwitcher(
                     // Always present, also when empty, so every row keeps the ✓ column.
                     leadingIcon = {
                         if (filter is ProjectFilter.Of && filter.projectId == project.id) {
-                            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = role(UiRole.LIST_SELECTED))
+                            Icon(Icons.Filled.Check, contentDescription = tr("Selected"), tint = role(UiRole.LIST_SELECTED))
                         }
                     },
                     choice = true,
@@ -129,14 +130,14 @@ fun ProjectSwitcher(
             }
             MenuDivider()
             DropdownMenuItem(
-                text = { Text("Export everything…") },
+                text = { Text(tr("Export everything…")) },
                 icon = Icons.Filled.Upload,
                 role = IconRole.SHARE,
                 opens = true,
                 onClick = { onExportEverything(); expanded = false },
             )
             DropdownMenuItem(
-                text = { Text("Manage projects…") },
+                text = { Text(tr("Manage projects…")) },
                 icon = Icons.Filled.Settings,
                 role = IconRole.VIEW,
                 opens = true,
@@ -150,7 +151,7 @@ fun ProjectSwitcher(
 private fun FilterItem(label: String, selected: Boolean, onClick: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label) },
-        leadingIcon = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected", tint = role(UiRole.LIST_SELECTED)) },
+        leadingIcon = { if (selected) Icon(Icons.Filled.Check, contentDescription = tr("Selected"), tint = role(UiRole.LIST_SELECTED)) },
         choice = true,
         onClick = onClick,
     )
@@ -193,13 +194,13 @@ fun ProjectsManagementScreen(
         ) {
             TextButton(onClick = onToggleSort) {
                 Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
-                Text(if (manual) "Manual" else "A–Z", modifier = Modifier.padding(start = 4.dp))
+                Text(if (manual) tr("Manual") else tr("A–Z"), modifier = Modifier.padding(start = 4.dp))
             }
         }
         if (projects.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "No projects yet. Create one to group profiles, tasks, and scenes.",
+                    tr("No projects yet. Create one to group profiles, tasks, and scenes."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -236,7 +237,7 @@ fun ProjectsManagementScreen(
                         dragHandle = {
                             Icon(
                                 Icons.Filled.DragIndicator,
-                                contentDescription = "Drag to reorder",
+                                contentDescription = tr("Drag to reorder"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.pointerInput(project.id) {
                                     detectDragGestures(
@@ -351,7 +352,7 @@ private fun ProjectManagementRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "$members item${if (members == 1) "" else "s"}",
+                if (members == 1) tr("1 item") else tr("%1\$s items", members),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -359,10 +360,10 @@ private fun ProjectManagementRow(
         if (reorderable) {
             dragHandle()
         }
-        IconButton(onClick = onExport) { Icon(Icons.Filled.Upload, contentDescription = "Export project") }
-        IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
+        IconButton(onClick = onExport) { Icon(Icons.Filled.Upload, contentDescription = tr("Export project")) }
+        IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = tr("Edit")) }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+            Icon(Icons.Filled.Delete, contentDescription = tr("Delete"), tint = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -380,21 +381,21 @@ private fun ProjectEditDialog(
     val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "New project" else "Edit project") },
+        title = { Text(if (initial == null) tr("New project") else tr("Edit project")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Name") },
+                    label = { Text(tr("Name")) },
                     isError = nameClash,
                     supportingText = if (nameClash) {
-                        { Text("A project with that name already exists.") }
+                        { Text(tr("A project with that name already exists.")) }
                     } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Color", style = MaterialTheme.typography.labelMedium)
+                Text(tr("Color"), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     SelectableDot(color = null, selected = color == null) { color = null }
                     PROJECT_COLOR_PRESETS.forEach { preset ->
@@ -405,10 +406,10 @@ private fun ProjectEditDialog(
         },
         confirmButton = {
             Button(onClick = { onConfirm(name.trim(), color) }, enabled = name.isNotBlank() && !nameClash) {
-                Text(if (initial == null) "Create" else "Save")
+                Text(if (initial == null) tr("Create") else tr("Save"))
             }
         },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 
@@ -422,13 +423,14 @@ private fun DeleteProjectDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete \"${project.name}\"?") },
+        title = { Text(tr("Delete \"%1\$s\"?", project.name)) },
         text = {
             Text(
                 if (members == 0) {
-                    "This project has no items."
+                    tr("This project has no items.")
                 } else {
-                    "This project has $members item${if (members == 1) "" else "s"}. Move them to Unfiled, or delete them too."
+                    if (members == 1) tr("This project has 1 item. Move it to Unfiled, or delete it too.")
+                    else tr("This project has %1\$s items. Move them to Unfiled, or delete them too.", members)
                 },
             )
         },
@@ -441,18 +443,18 @@ private fun DeleteProjectDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                com.opentasker.ui.components.OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+                com.opentasker.ui.components.OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) }
                 if (members == 0) {
                     com.opentasker.ui.components.Button(
                         onClick = onReassign,
                         colors = destructiveButtonColors(),
-                    ) { Text("Delete") }
+                    ) { Text(tr("Delete")) }
                 } else {
-                    com.opentasker.ui.components.Button(onClick = onReassign) { Text("Move items to Unfiled") }
+                    com.opentasker.ui.components.Button(onClick = onReassign) { Text(tr("Move items to Unfiled")) }
                     com.opentasker.ui.components.Button(
                         onClick = onDeleteItems,
                         colors = destructiveButtonColors(),
-                    ) { Text("Delete items too") }
+                    ) { Text(tr("Delete items too")) }
                 }
             }
         },
@@ -473,7 +475,7 @@ fun ProjectPickerDialog(
         title = { Text(title) },
         text = {
             Column(Modifier.fillMaxWidth()) {
-                PickerRow("Unfiled", null, currentProjectId == null) { onPick(null) }
+                PickerRow(tr("Unfiled"), null, currentProjectId == null) { onPick(null) }
                 // "No project" and the projects are two groups of rows.
                 if (projects.isNotEmpty()) HorizontalDivider(color = role(UiRole.LIST_DIVIDER))
                 projects.forEach { project ->
@@ -481,7 +483,7 @@ fun ProjectPickerDialog(
                 }
             }
         },
-        confirmButton = { Button(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 
@@ -498,7 +500,7 @@ private fun PickerRow(label: String, color: Int?, selected: Boolean, onClick: ()
         RoleIcon(Icons.Filled.Folder, IconRole.PERSON, Modifier.size(20.dp))
         ColorDot(color)
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = role(UiRole.LIST_LABEL), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = role(UiRole.LIST_SELECTED))
+        if (selected) Icon(Icons.Filled.Check, contentDescription = tr("Current"), tint = role(UiRole.LIST_SELECTED))
     }
 }
 

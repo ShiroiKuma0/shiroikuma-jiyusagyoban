@@ -1,0 +1,575 @@
+# 08_ui — ui/screens/UiCustomizationScreen.kt (the app's own "UI" settings page)
+
+# UiCustomizationScreen.kt — PAGE_SECTIONS: section titles and chip texts (drawn through tr(section.title) / tr(section.chip))
+= Export / Import
+: エクスポート / インポート
+= Export
+: エクスポート
+= Colors
+: 色
+= Borders
+: 枠線
+= Typography
+: 書体
+= Fonts
+: フォント
+= Flash / toast
+: フラッシュ / トースト
+= Flash
+: フラッシュ
+= Editor
+: エディター
+= Task list
+: タスク一覧
+= Tasks
+: タスク
+= Variables
+: 変数
+= Monitor
+: モニター
+= Panel bars
+: パネルのバー
+= Panels
+: パネル
+= Flash bubbles (通知明滅)
+: 明滅バブル（通知明滅）
+= Freeze bubbles
+: 凍結バブル
+= Freeze
+: 凍結
+= Shortcut picker
+: ショートカットの選択画面
+= Picker
+: 選択画面
+= 「文字認識」 OCR
+: 「文字認識」OCR
+= Import review
+: インポートの確認
+= Import
+: インポート
+= 「健康」 charts
+: 「健康」のグラフ
+= Maintenance
+: メンテナンス
+= Reset
+: リセット
+
+# UiCustomizationScreen.kt — roleSection(): the chips of the role-table sections
+= Text
+: 文字
+= Buttons
+: ボタン
+= Dialogs
+: ダイアログ
+= Switches
+: スイッチ
+= Marks
+: チェック
+= Menus
+: メニュー
+= Lists
+: 一覧
+= This page
+: このページ
+= Bars
+: バー
+= Scenes
+: シーン
+= Widgets
+: ウィジェット
+= Progress
+: 進捗
+= 健康 chrome
+: 健康の画面
+= Screens
+: 画面
+
+# UiCustomizationScreen.kt — 「文字認識」 OCR section
+= High-accuracy model
+: 高精度モデル
+= On: PP-OCRv5 server (81 MB). Off: mobile (16 MB), about 2.5x faster — roughly 2 s instead of 5 s on a full-width screenshot. Measured on clean screenshot text the two are equivalent; the server model's headroom is for photographed and handwritten text. Japanese and English only — there is no server-sized Latin or Cyrillic recogniser, so those chips are unaffected.
+: オン：PP-OCRv5 server（81 MB）。オフ：mobile（16 MB）で、約2.5倍速くなります。全幅のスクリーンショットで5秒かかるところが2秒ほどです。きれいなスクリーンショットの文字では、測定したかぎり両者の精度は同じです。serverモデルの余力が生きるのは、撮影した文字や手書きの文字です。日本語と英語だけが対象です。ラテン文字とキリル文字にはserver規模の認識モデルがないため、それらのチップには影響しません。
+= Models
+: モデル
+= The recognition weights are about 100 MB and never change, so they are NOT in the APK — every kept build would have carried another copy. Fetch them once, point each row at the file, and they stay. The character dictionaries do ship, because each one has to match its model exactly.
+: 認識用の重みファイルは約100 MBあり、内容が変わることもないため、APKには入れていません。入れると、保存しておくビルドごとに同じものがもう一つ増えてしまうからです。一度だけ取得して、各行でそのファイルを指定すれば、そのまま使い続けられます。文字辞書はAPKに同梱しています。それぞれがモデルと正確に一致していなければならないためです。
+= Detection
+: 検出
+= Detection long side
+: 検出時の長辺
+= The size the detector actually sees. 1600 px is measured, not inherited — against PP-OCR's own 960 default it halved the character error on a full-width screenshot, and the errors it removed were exactly the small text. Higher costs time with the area.
+: 検出器が実際に見る大きさです。1600 pxは引き継いだ値ではなく、測定して決めた値です。PP-OCR本来の既定値960と比べると、全幅のスクリーンショットで文字の誤りが半分になり、減ったのはまさに小さな文字の誤りでした。大きくすると、面積に比例して時間がかかります。
+= Binarisation threshold
+: 二値化のしきい値
+= Where the probability map becomes text. Lower finds fainter text and starts joining neighbouring lines into one box; higher splits words off the ends of lines.
+: 確率マップのどこからを文字とみなすかを決めます。下げると薄い文字も見つかりますが、隣り合う行が一つの枠にまとまり始めます。上げると、行の端の単語が切り離されます。
+= Box score threshold
+: 枠のスコアのしきい値
+= The confidence a detected region needs to survive. Raising it drops marginal boxes — useful on a noisy photograph, and a good way to lose real faint lines on a clean screenshot.
+: 検出した領域を残すために必要な確信度です。上げると、きわどい枠が捨てられます。ノイズの多い写真では役に立ちますが、きれいなスクリーンショットでは、本物の薄い行まで失いやすくなります。
+= Unclip ratio
+: 枠の拡張率
+= How far each detected box is grown before the crop is taken — the one to leave alone without a test image in front of you. Detection predicts a SHRUNK region, and this is what puts the ascenders and diacritics back inside it: too low silently decapitates every line and 'ä' starts reading as 'a'. Too high swallows the line above. 1.5 is PaddleOCR's own value and measured correct here.
+: 切り抜く前に、検出した枠をどれだけ広げるかを決めます。確認用の画像が手元にないときは、触らないほうがよい設定です。検出が予測するのは縮めた領域で、文字の上に突き出た部分や発音区別符号を枠の中に戻すのがこの値です。低すぎると、何の知らせもなくすべての行の上端が切れ、「ä」が「a」と読まれるようになります。高すぎると、上の行まで取り込んでしまいます。1.5はPaddleOCR本来の値で、ここでも測定して正しいと確かめてあります。
+
+# UiCustomizationScreen.kt — ModelSlot labels and notes (core/ocr/ModelSlot.kt), drawn on this page
+= Detector
+: 検出器
+= PP-OCRv5 mobile detector, ~4.7 MB. Shared by every script — without it nothing is found at all.
+: PP-OCRv5 mobileの検出器、約4.7 MB。すべての文字種で共用します。これがないと、何も検出されません。
+= Japanese + English (accurate)
+: 日本語 + 英語（高精度）
+= PP-OCRv5 server recogniser, ~81 MB. Reads Japanese, English and Chinese in one model. Used when the high-accuracy switch is on.
+: PP-OCRv5 serverの認識モデル、約81 MB。日本語、英語、中国語を一つのモデルで読み取ります。「高精度モデル」のスイッチがオンのときに使われます。
+= Japanese + English (fast)
+: 日本語 + 英語（高速）
+= PP-OCRv5 mobile recogniser, ~16 MB. Measured equal to the server model on clean screenshot text and about 2.5x faster. Used when the high-accuracy switch is off.
+: PP-OCRv5 mobileの認識モデル、約16 MB。きれいなスクリーンショットの文字では、測定したかぎりserverモデルと同じ精度で、約2.5倍速く動きます。「高精度モデル」のスイッチがオフのときに使われます。
+= Latin
+: ラテン文字
+= latin_PP-OCRv5_mobile_rec, ~7.5 MB. German, Czech, Polish and 41 other Latin-script languages.
+: latin_PP-OCRv5_mobile_rec、約7.5 MB。ドイツ語、チェコ語、ポーランド語のほか、ラテン文字を使う41の言語。
+= Cyrillic
+: キリル文字
+= eslav_PP-OCRv5_mobile_rec, ~7.5 MB. Russian, Ukrainian, Belarusian, Bulgarian.
+: eslav_PP-OCRv5_mobile_rec、約7.5 MB。ロシア語、ウクライナ語、ベラルーシ語、ブルガリア語。
+
+# UiCustomizationScreen.kt — fonts
+= That file is not a usable .ttf or .otf font
+: このファイルは、使用できる.ttfまたは.otfフォントではありません。
+= Font
+: フォント
+= Weight
+: 太さ
+= Text size
+: 文字サイズ
+= Live sample
+: 表示見本
+= Delete font
+: フォントを削除
+= Add font…
+: フォントを追加…
+= Selected
+: 選択中
+
+# UiCustomizationScreen.kt — WEIGHT_OPTIONS (drawn through trc("weight", …))
+=[weight] Default
+: 既定
+=[weight] Thin
+: 極細
+=[weight] Light
+: 細字
+=[weight] Regular
+: 標準
+=[weight] Medium
+: 中字
+=[weight] Semibold
+: やや太字
+=[weight] Bold
+: 太字
+=[weight] Black
+: 極太
+
+# UiCustomizationScreen.kt — Export / Import section
+= Export directory
+: エクスポート先のディレクトリ
+= Not set — choose a directory
+: 未設定 — ディレクトリを選んでください
+= No directory set yet — pick one to enable one-tap export.
+: ディレクトリがまだ設定されていません。選ぶと、ワンタップでエクスポートできるようになります。
+= No export in this directory yet.
+: このディレクトリには、まだエクスポートがありません。
+= Last export: %1$s
+: 前回のエクスポート：%1$s
+= Export / Import…
+: エクスポート / インポート…
+= Back up or restore everything settable — the whole workspace and all app settings — as one ZIP.
+: 設定できるものすべて、つまりワークスペース全体とアプリの設定全部を、一つのZIPとしてバックアップまたは復元します。
+= Automation export
+: 自動化によるエクスポート
+= Let sister apps trigger this export, and back this app's data up and restore it. On by default — 白い熊 応用管理 needs it to reach a freshly installed copy on a clean phone.
+: 姉妹アプリがこのエクスポートを起動したり、このアプリのデータをバックアップ・復元したりできるようにします。既定でオンです。まっさらな端末にインストールしたばかりのこのアプリへ白い熊 応用管理が届くために必要です。
+= Use authorization token?
+: 認証トークンを使いますか？
+= Off: any sister app may drive the automation. On: a caller must also present the token below. The data door checks the caller's identity and signature either way, so this is extra, not the gate.
+: オフ：どの姉妹アプリでも自動化を操作できます。オン：呼び出し側は、下のトークンも示す必要があります。どちらの場合も、データの受け渡し口は呼び出し側の身元と署名を確認します。したがって、これは追加の備えであり、関門そのものではありません。
+= Copy automation token
+: 自動化トークンをコピー
+= Automation token copied
+: 自動化トークンをコピーしました。
+= Regenerate token
+: トークンを再生成
+= Makes a new token. Every copy pasted elsewhere has to be updated.
+: 新しいトークンを作ります。ほかの場所に貼り付けたものは、すべて更新する必要があります。
+= Automation token regenerated — update pasted copies
+: 自動化トークンを再生成しました。貼り付け済みのものを更新してください。
+
+# UiCustomizationScreen.kt — Colors, Borders, Flash / toast
+= The foundation colours. Every other colour follows these until it is set apart in its own section.
+: 基本の色です。ほかの色はすべて、それぞれのセクションで個別に設定するまで、これらの色に従います。
+= Background
+: 背景
+= Secondary text
+: 補助の文字
+= Accent
+: アクセント色
+= Surface (cards & bars)
+: 面（カードとバー）
+= Border color
+: 枠線の色
+= Border width
+: 枠線の幅
+= Corner radius
+: 角の丸み
+= %1$s succeeded (%2$s ms)
+: %1$s: 成功（%2$s ms）
+
+# UiCustomizationScreen.kt — ColorTarget labels (the colour picker's title)
+= Surface
+: 面
+= Border
+: 枠線
+= Flash background
+: フラッシュの背景
+= Flash text
+: フラッシュの文字
+= Flash border
+: フラッシュの枠線
+= Oval bar border
+: 楕円バーの枠線
+= Group header border
+: グループ見出しの枠線
+= Action label frame
+: アクションのラベルの枠
+= Action border
+: アクションの枠線
+= Selection highlight
+: 選択の強調表示
+
+# UiCustomizationScreen.kt — Editor, Task list, Tasks, Variables, Monitor, Panel bars
+= Advanced action picker
+: 高度なアクション選択画面
+= When adding an action, browse a full-screen list folded by category, each action expandable to its description and fields.
+: アクションを追加するときに、カテゴリごとに折りたたまれた全画面の一覧から選びます。各アクションは、展開すると説明と項目を確認できます。
+= New profiles start on
+: 新しいプロファイルをオンで開始
+= A profile you make in the editor is switched on when you save it. Imports, templates and copies still start off.
+: エディターで作成したプロファイルは、保存したときにオンになります。インポートしたもの、テンプレートから作ったもの、複製したものは、これまでどおりオフで始まります。
+= Task icon size
+: タスクのアイコンのサイズ
+= Padding between cards
+: カードの間隔
+= Padding inside card
+: カード内の余白
+= Padding inside action rows
+: アクションの行内の余白
+= Action label text size
+: アクションのラベルの文字サイズ
+= Action name/value text size
+: アクションの名前と値の文字サイズ
+= Action name colour
+: アクションの名前の色
+= Action value colour
+: アクションの値の色
+= Action label frame colour
+: アクションのラベルの枠の色
+= Action label frame width
+: アクションのラベルの枠の幅
+= Action border colour
+: アクションの枠線の色
+= Action border width
+: アクションの枠線の幅
+= Selection highlight colour
+: 選択の強調表示の色
+= Padding inside group headers
+: グループ見出し内の余白
+= Group header colour
+: グループ見出しの色
+= Group header border colour
+: グループ見出しの枠線の色
+= Group header border width
+: グループ見出しの枠線の幅
+= Padding inside variable rows
+: 変数の行内の余白
+= Variable name text size
+: 変数名の文字サイズ
+= Variable value text size
+: 変数の値の文字サイズ
+= Variable name colour
+: 変数名の色
+= Variable value colour
+: 変数の値の色
+= Task row spacing
+: タスクの行の間隔
+= Oval bar border width
+: 楕円バーの枠線の幅
+= Oval bar border colour
+: 楕円バーの枠線の色
+
+# UiCustomizationScreen.kt — Freeze bubbles, Flash bubbles, Shortcut picker
+= Icon size
+: アイコンのサイズ
+= Icon roundness
+: アイコンの角の丸み
+= Label size
+: ラベルのサイズ
+= App
+: アプリ
+= Tap
+: タップ
+= Long-tap
+: 長押し
+= Kill-flash task (gets %APP_PACKAGE)
+: 明滅停止タスク（%APP_PACKAGE を受け取ります）
+= Kill-all task (kill icon / notification tap)
+: 全停止タスク（停止アイコン / 通知のタップ）
+= Open app + kill flash
+: アプリを開いて明滅を止める
+= Kill flash only
+: 明滅を止めるだけ
+= Open app only
+: アプリを開くだけ
+= Dismiss icon only
+: アイコンを消すだけ
+= Font size
+: フォントサイズ
+= Row spacing
+: 行の間隔
+= follow the font
+: フォントに合わせる
+= Indent per level
+: 階層ごとの字下げ
+= Group box roundness
+: グループ枠の角の丸み
+= Group box border
+: グループ枠の枠線
+
+# UiCustomizationScreen.kt — Import review
+= Header & stats size
+: 見出しと集計のサイズ
+= Section title size
+: セクション名のサイズ
+= Item row size
+: 項目の行のサイズ
+= Warnings size
+: 警告のサイズ
+= Conflict colour
+: 競合の色
+= Review import
+: インポートの確認
+= 2 tasks · 1 profile — 1 already exist
+: タスク2件 · プロファイル1件 — 1件はすでに存在
+= ⚠ Warnings appear here.
+: ⚠ 警告はここに表示されます。
+= Tasks (%1$s)
+: タスク（%1$s）
+= New task
+: 新しいタスク
+= New
+: 新規
+= Existing task
+: 既存のタスク
+= Overwrite
+: 上書き
+
+# UiCustomizationScreen.kt — 「健康」 charts
+= Live preview
+: 表示プレビュー
+= Colour check
+: 色の点検
+= Sizes
+: サイズ
+= Preview height
+: プレビューの高さ
+= Full-screen height
+: 全画面表示の高さ
+= Space between cards
+: カードの間隔
+= Axis label size
+: 軸ラベルのサイズ
+= Headline number size
+: 見出しの数値のサイズ
+=[chart] Marks
+: 線・点・棒
+= Line width
+: 線の太さ
+= Sample dot size
+: 測定点のサイズ
+= Hourly capsule width
+: 1時間ごとのカプセルの幅
+= Step bar width
+: 歩数の棒の幅
+= Blood-pressure cap width
+: 血圧の両端の幅
+= Sleep block height
+: 睡眠ブロックの高さ
+= %1$s %% of its row
+: 行の%1$s %%
+= Rounded data-end radius
+: データ端の角の丸み
+= Ink
+: 色と濃さ
+= Grid opacity
+: 目盛線の不透明度
+= Area fill under a line
+: 線の下の塗り
+= Glow behind a line
+: 線の後ろの光彩
+= No-measurement tint
+: 測定なしの区間の色付け
+= What gets drawn
+: 描くもの
+= Grid
+: 目盛線
+= The recessive lines behind the data.
+: データの後ろに引く、控えめな線です。
+= Sample dots
+: 測定点
+= The real readings, drawn over the smoothed line. Turning these off hides where the curve is interpolating.
+: 実際の測定値を、なめらかにした線の上に描きます。オフにすると、曲線が補間している箇所が分からなくなります。
+= Flagged-sample ✕ marks
+: 除外した測定値の✕印
+= Readings the outlier filter dropped, shown at their real value.
+: 外れ値フィルターが除外した測定値を、実際の値の位置に表示します。
+= Tint stretches with no measurement
+: 測定のない区間に色を付ける
+= Off, a gap looks the same as a flat reading — the chart stops showing that the band was not measuring.
+: オフにすると、測定の空白が変化のない測定値と同じに見え、バンドが測定していなかったことがグラフから分からなくなります。
+= Opening time span
+: 開いたときの表示時間幅
+= Line shape
+: 線の形
+= Smooth curve (no overshoot)
+: なめらかな曲線（行き過ぎなし）
+= Straight lines
+: 直線
+= Held until the next reading
+: 次の測定値まで保持
+= Series colours
+: 系列の色
+= Restore the validated chart palette
+: 検証済みのグラフ配色に戻す
+= Puts every chart knob above back to what shipped — the colours that pass the checks in the preview.
+: 上にあるグラフの設定をすべて出荷時の状態に戻します。プレビューの点検に合格する配色です。
+
+# UiCustomizationScreen.kt — ChartColorTarget labels (the Japanese part stays, the English gloss is dropped)
+= Grid lines
+: 目盛線
+= Axis + caption ink
+: 軸と説明文の色
+= 心拍 — heart rate
+: 心拍
+= バンド状態指数 — band state index
+: バンド状態指数
+= 血中酸素 — blood oxygen
+: 血中酸素
+= 体温 — temperature
+: 体温
+= 歩数 — steps
+: 歩数
+= 安静時心拍 — resting heart rate (Huawei)
+: 安静時心拍（Huawei）
+= 収縮期 — systolic
+: 収縮期
+= 拡張期 — diastolic
+: 拡張期
+= 睡眠 深い — deep
+: 睡眠 深い
+= 睡眠 浅い — light
+: 睡眠 浅い
+= 睡眠 覚醒 — awake
+: 睡眠 覚醒
+
+# UiCustomizationScreen.kt — Maintenance
+= Reset section order
+: セクションの順番をリセット
+= Puts the sections of this page, and the chips at its top, back in their built-in order. What is unfolded stays unfolded.
+: このページのセクションと上部のチップを、組み込みの順番に戻します。開いているセクションは開いたままです。
+= Reset all colours
+: すべての色をリセット
+= Every colour back to black and yellow: the foundation colours, and every item that was set apart in its own section. Fonts, sizes, widths and the chart palette stay.
+: すべての色を黒と黄色に戻します。基本の色も、それぞれのセクションで個別に設定した項目も対象です。フォント、サイズ、幅、グラフの配色はそのままです。
+= Reset to black & yellow
+: 黒と黄色にリセット
+= Restore the default appearance — black background, yellow text and borders.
+: 既定の外観（黒い背景、黄色い文字と枠線）に戻します。
+= Reset all colours?
+: すべての色をリセットしますか？
+= The foundation colours and every colour set apart in a section of its own go back to black and yellow. Fonts, sizes, widths and the chart palette are not touched.
+: 基本の色と、それぞれのセクションで個別に設定した色が、すべて黒と黄色に戻ります。フォント、サイズ、幅、グラフの配色は変わりません。
+
+# UiCustomizationScreen.kt — rows, colour picker, common buttons
+= Back
+: 戻る
+= Cancel
+: キャンセル
+= Close
+: 閉じる
+= Apply
+: 適用
+= Default
+: 既定
+= Default - %1$s
+: 既定 - %1$s
+= Reset %1$s
+: %1$sをリセット
+= Hex
+: 16進数
+
+# UiCustomizationScreen.kt — the Export / Import panel and its outcome dialogs
+= Export / Import — 白い熊 自由作業盤
+: エクスポート / インポート — 白い熊 自由作業盤
+= Everything settable in the app, category by category, as one ZIP of plain JSON files.
+: アプリで設定できるものすべてを、カテゴリごとに、プレーンなJSONファイルをまとめた一つのZIPにします。
+= Select all
+: すべて選択
+= Unable to open the export destination
+: エクスポート先を開けません
+= Unable to create a file in the export directory
+: エクスポート先のディレクトリにファイルを作成できません
+= Exported %1$s.\n\n%2$s
+: %1$sをエクスポートしました。\n\n%2$s
+= Export failed: %1$s
+: エクスポートに失敗しました：%1$s
+= Import failed: %1$s
+: インポートに失敗しました：%1$s
+= unknown error
+: 不明なエラー
+= No categories selected.
+: カテゴリが選択されていません。
+= ✓ Export finished
+: ✓ エクスポートが完了しました
+= ✓ Import finished
+: ✓ インポートが完了しました
+= Restored:\n\n%1$s\n\nRestart to apply everything.
+: 復元したもの：\n\n%1$s\n\nすべてを適用するには再起動してください。
+= OK
+: OK
+= Later
+: あとで
+= Restart now
+: 今すぐ再起動
+
+# UiCustomizationScreen.kt — SettingsBackup.Cat labels (core/transfer/SettingsBackup.kt), drawn as the panel's check rows
+= Workspace programming — projects · tasks · profiles · scenes · variables
+: ワークスペースの内容 — プロジェクト · タスク · プロファイル · シーン · 変数
+= UI theme (colours · fonts)
+: UIテーマ（色 · フォント）
+= Widgets (templates · bindings)
+: ウィジェット（テンプレート · 割り当て）
+= Bubbles (freeze · flash)
+: バブル（凍結 · 明滅）
+= App settings (sort · projects · logs · picker)
+: アプリの設定（並べ替え · プロジェクト · ログ · 選択画面）
+= Share tiles (共有アプリ工房)
+: 共有タイル（共有アプリ工房）
+= Task icons
+: タスクのアイコン
+= 健康 — ratings · notes · 機能訓練 · marked sessions
+: 健康 — 評価 · メモ · 機能訓練 · 印を付けたセッション
+= 健康 measurements — every sample, sleep, sync and workout row
+: 健康の測定データ — すべての測定値、睡眠、同期、ワークアウトの記録
+= 健康 base maps — the cutouts 地図 drew, one per area
+: 健康の基本地図 — 地図が描いた切り抜き、地域ごとに1枚
+= 言語島 — islands · sentences · translations · history · audio
+: 言語島 — 島 · 文 · 翻訳 · 履歴 · 音声

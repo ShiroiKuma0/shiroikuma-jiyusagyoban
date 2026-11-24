@@ -135,6 +135,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.bubbles.FlashBubbleOverlayManager
 import com.opentasker.core.bubbles.FlashBubbleStore
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.i18n.tr
 import com.opentasker.core.engine.resolveTaskByName
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.engine.variables.expandAgainstGlobals
@@ -720,7 +721,7 @@ internal fun SceneElementView(
                     } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
-                val label = v("label", "Button")
+                val label = v("label", tr("Button"))
                 // Same per-character outline as TEXT: the stroked copy first, the fill on top. Lets the
                 // 音楽端灯 良/削 buttons carry the 相撲字時計 date's black glyph border (%Ongaku_Btnstrokecolor
                 // /%Ongaku_Btnstrokew) so they read over album art of any colour.
@@ -785,7 +786,7 @@ internal fun SceneElementView(
             // Reset the gesture tracker on release; a non-swipeOnly slider also commits its final value.
             val onFinished: () -> Unit = { moved = false; if (!swipeOnly) onSettled() }
             val sliderColors = tint?.let { SliderDefaults.colors(thumbColor = it, activeTrackColor = it, inactiveTrackColor = it) }
-            val label = v("label", "Slider")
+            val label = v("label", tr("Slider"))
             // Fill style (style:"fill"): a fat rounded-capsule bar that fills from the bottom (no thumb),
             // with a channel icon seated at the base. trackColor / fillColor / icon / iconColor / iconSize
             // are configurable; drag (or tap) anywhere on the bar sets the level. Inherently vertical.
@@ -881,7 +882,7 @@ internal fun SceneElementView(
                     // task) sees the current text without waiting for Done/focus-loss.
                     if (!varName.isNullOrBlank()) onSetVar(varName, it)
                 },
-                label = { Text(v("label", "Text")) },
+                label = { Text(v("label", tr("Text"))) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 // Run the element's tap task when the user presses Done or the field loses focus.
@@ -919,9 +920,9 @@ internal fun SceneElementView(
                             checkmarkColor = role(UiRole.CHECK_MARK),
                         ),
                     )
-                    Text(v("label", "Checkbox"), color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
+                    Text(v("label", tr("Checkbox")), color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                 } else {
-                    Text(v("label", "Toggle"), color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
+                    Text(v("label", tr("Toggle")), color = styleLabelColor ?: role(UiRole.SCENE_TEXT), fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                     ThemedSwitch(checked = checked, onCheckedChange = onChanged)
                 }
             }
@@ -939,7 +940,7 @@ internal fun SceneElementView(
             Box(Modifier.fillMaxSize()) {
                 OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxSize()) {
                     Text(
-                        selected.ifBlank { v("label", "Select") },
+                        selected.ifBlank { v("label", tr("Select")) },
                         color = styleLabelColor ?: role(UiRole.SCENE_TEXT),
                         fontSize = styleSize,
                         fontWeight = styleWeightOrNull,
@@ -1043,7 +1044,7 @@ internal fun SceneElementView(
                 Image(bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(source.ifBlank { "Image" }, style = MaterialTheme.typography.labelSmall, color = role(UiRole.SCENE_NOTE))
+                    Text(source.ifBlank { tr("Image") }, style = MaterialTheme.typography.labelSmall, color = role(UiRole.SCENE_NOTE))
                 }
             }
         }

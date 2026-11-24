@@ -13,6 +13,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.ProfileLifecycleStrings
+import com.opentasker.i18n.tr
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
@@ -86,8 +87,8 @@ object SyntheticTriggerSimulator {
         profile: Profile,
         nowMs: Long = System.currentTimeMillis(),
         pinnedEvents: Map<Int, ContextEvent> = emptyMap(),
-        cooldown: SyntheticGateResult = SyntheticGateResult.pass("No cooldown is currently blocking this profile."),
-        admission: SyntheticGateResult = SyntheticGateResult.pass("Admission budget is available (preview only)."),
+        cooldown: SyntheticGateResult = SyntheticGateResult.pass(tr("No cooldown is currently blocking this profile.")),
+        admission: SyntheticGateResult = SyntheticGateResult.pass(tr("Admission budget is available (preview only).")),
         lifecycleStrings: ProfileLifecycleStrings = ProfileLifecycleStrings.English,
     ): SyntheticTriggerSimulation {
         val results = profile.contexts.mapIndexed { index, spec ->
@@ -95,7 +96,7 @@ object SyntheticTriggerSimulator {
                 SyntheticContextTemplate(
                     event = event,
                     displayMetadata = redactMetadata(event.metadata),
-                    description = "Pinned event override",
+                    description = tr("Pinned event override"),
                 )
             } ?: template(spec, nowMs)
             val rawMatched = template.issue == null && ContextMatchEvaluator.matches(spec, template.event)
@@ -103,15 +104,15 @@ object SyntheticTriggerSimulator {
             // does a NOT group over it.
             val unknown = !rawMatched && ContextMatchEvaluator.valueUnknown(spec, template.event.metadata)
             val effectiveMatched = if (spec.invert) !rawMatched && !unknown else rawMatched
-            val event = if (index in pinnedEvents) "The pinned event" else "The synthetic event"
+            val event = if (index in pinnedEvents) tr("The pinned event") else tr("The synthetic event")
             val explanation = when {
                 template.issue != null -> template.issue
-                spec.invert && unknown -> "$event has no value for this context, so the inverted context stays off."
-                unknown -> "$event has no value for this context, so it counts as unknown and can't turn the profile on, even under a NOT."
-                spec.invert && effectiveMatched -> "$event fails the raw predicate, so inversion passes it."
-                spec.invert && rawMatched -> "$event satisfies the raw predicate, so inversion blocks it."
-                effectiveMatched -> "$event satisfies this predicate."
-                else -> "$event does not satisfy this predicate."
+                spec.invert && unknown -> tr("%1\$s has no value for this context, so the inverted context stays off.", event)
+                unknown -> tr("%1\$s has no value for this context, so it counts as unknown and can't turn the profile on, even under a NOT.", event)
+                spec.invert && effectiveMatched -> tr("%1\$s fails the raw predicate, so inversion passes it.", event)
+                spec.invert && rawMatched -> tr("%1\$s satisfies the raw predicate, so inversion blocks it.", event)
+                effectiveMatched -> tr("%1\$s satisfies this predicate.", event)
+                else -> tr("%1\$s does not satisfy this predicate.", event)
             }
             SyntheticContextResult(
                 index = index,
@@ -146,14 +147,14 @@ object SyntheticTriggerSimulator {
         val graceSuppression = profile.gracePeriodSec > 0 && aggregateMatch
         val profileMatched = profile.enabled && lifecycleSuppression == null && aggregateMatch && !graceSuppression
         val profileReason = when {
-            !profile.enabled -> "Profile is disabled."
+            !profile.enabled -> tr("Profile is disabled.")
             lifecycleSuppression != null -> lifecycleSuppression
-            profile.contexts.isEmpty() -> "No contexts are configured."
+            profile.contexts.isEmpty() -> tr("No contexts are configured.")
             !aggregateMatch -> results.firstOrNull { !it.effectiveMatched }?.let {
-                "Context ${it.index + 1} blocks the profile: ${it.explanation}"
-            } ?: "The configured context expression is invalid or did not match."
-            profile.gracePeriodSec > 0 -> "All context predicates pass; the ${profile.gracePeriodSec}s activation/deactivation grace period still applies."
-            else -> "All context predicates pass the configured context logic."
+                tr("Context %1\$s blocks the profile: %2\$s", it.index + 1, it.explanation)
+            } ?: tr("The configured context expression is invalid or did not match.")
+            profile.gracePeriodSec > 0 -> tr("All context predicates pass; the %1\$ss activation/deactivation grace period still applies.", profile.gracePeriodSec)
+            else -> tr("All context predicates pass the configured context logic.")
         }
         return SyntheticTriggerSimulation(
             profileId = profile.id,
@@ -194,9 +195,9 @@ object SyntheticTriggerSimulator {
                     "component" to component,
                 ),
             ),
-            description = "Foreground package and component",
+            description = tr("Foreground package and component"),
             issue = configuredPackage.takeIf(String::isBlank)?.let {
-                "Application context has no configured package."
+                tr("Application context has no configured package.")
             },
         )
     }
@@ -215,19 +216,19 @@ object SyntheticTriggerSimulator {
             if (endGlobal != null) put(TimeContextBounds.END_VALUE, formatClock(ASSUMED_GLOBAL_END))
         }
         val assumptions = listOfNotNull(
-            startGlobal?.let { "%$it as ${formatClock(ASSUMED_GLOBAL_START)}" },
-            endGlobal?.let { "%$it as ${formatClock(ASSUMED_GLOBAL_END)}" },
+            startGlobal?.let { tr("%1\$s as %2\$s", "%$it", formatClock(ASSUMED_GLOBAL_START)) },
+            endGlobal?.let { tr("%1\$s as %2\$s", "%$it", formatClock(ASSUMED_GLOBAL_END)) },
         )
         return template(
             event = ContextEvent("time", true, mapOf("time" to formatClock(minute), "epochMs" to nowMs.toString()) + assumed),
             description = if (assumptions.isEmpty()) {
-                "Midpoint of the configured time window"
+                tr("Midpoint of the configured time window")
             } else {
-                "Midpoint of the time window, taking ${assumptions.joinToString(" and ")}"
+                tr("Midpoint of the time window, taking %1\$s", assumptions.joinToString(tr(" and ")))
             },
             issue = when {
-                startRaw.isBlank() || endRaw.isBlank() -> "Time context needs both a start and end time."
-                start == null || end == null -> "Time context contains an invalid clock value."
+                startRaw.isBlank() || endRaw.isBlank() -> tr("Time context needs both a start and end time.")
+                start == null || end == null -> tr("Time context contains an invalid clock value.")
                 else -> null
             },
         )
@@ -239,8 +240,8 @@ object SyntheticTriggerSimulator {
         val day = DaySchedule.orderedDays.firstOrNull { it in selected } ?: "MON"
         return template(
             event = ContextEvent("time", true, mapOf("day" to day)),
-            description = "First configured day token",
-            issue = if (selected.isEmpty()) "Day context has no valid configured day." else null,
+            description = tr("First configured day token"),
+            issue = if (selected.isEmpty()) tr("Day context has no valid configured day.") else null,
         )
     }
 
@@ -265,18 +266,18 @@ object SyntheticTriggerSimulator {
         )
         val invalid = when {
             latitudeRaw.isBlank() || longitudeRaw.isBlank() || radiusRaw.isBlank() ->
-                "Location context needs latitude, longitude, and radius."
+                tr("Location context needs latitude, longitude, and radius.")
             latitude !in -90.0..90.0 || longitude !in -180.0..180.0 ->
-                "Location context contains an out-of-range coordinate."
-            radius < 0.0 -> "Location radius cannot be negative."
+                tr("Location context contains an out-of-range coordinate.")
+            radius < 0.0 -> tr("Location radius cannot be negative.")
             maxAccuracyRaw.isNotBlank() && (maxAccuracyRaw.toDoubleOrNull()?.let { it < 0.0 } != false) ->
-                "Location accuracy must be a non-negative number."
-            dwell < 0L -> "Location dwell cannot be negative."
+                tr("Location accuracy must be a non-negative number.")
+            dwell < 0L -> tr("Location dwell cannot be negative.")
             else -> null
         }
         return template(
             event = ContextEvent("location", true, metadata),
-            description = if (outside) "Point outside the configured geofence" else "Point at the geofence center",
+            description = if (outside) tr("Point outside the configured geofence") else tr("Point at the geofence center"),
             issue = invalid,
         )
     }
@@ -306,18 +307,18 @@ object SyntheticTriggerSimulator {
             }
         }
         val issue = when {
-            parsed == null -> "State context needs a key, operator, and value predicate."
+            parsed == null -> tr("State context needs a key, operator, and value predicate.")
             namePattern && patternExample == null ->
-                "No made-up network name matches this Wi-Fi name pattern, so it needs a real network to try."
+                tr("No made-up network name matches this Wi-Fi name pattern, so it needs a real network to try.")
             namePattern -> null
-            parsed.second !in setOf("=", ">=", "<=", ">", "<") -> "State context uses an unsupported comparison operator."
+            parsed.second !in setOf("=", ">=", "<=", ">", "<") -> tr("State context uses an unsupported comparison operator.")
             parsed.second != "=" && expected.toIntOrNull() == null ->
-                "Numeric state comparisons need a numeric threshold."
+                tr("Numeric state comparisons need a numeric threshold.")
             else -> null
         }
         return template(
             event = ContextEvent("state", true, metadata),
-            description = "State value satisfying the configured predicate",
+            description = tr("State value satisfying the configured predicate"),
             issue = issue,
         )
     }
@@ -368,17 +369,17 @@ object SyntheticTriggerSimulator {
         if (filter.isNotBlank()) metadata["filter"] = filter
         val issue = when {
             expectedEvent.isBlank() && filter.isBlank() ->
-                "Event context needs an event name or a filter."
+                tr("Event context needs an event name or a filter.")
             first(spec.config, "beforeMinutes", "withinMinutes").isNotBlank() &&
                 first(spec.config, "beforeMinutes", "withinMinutes").toIntOrNull() == null ->
-                "Event before-window must be a number of minutes."
+                tr("Event before-window must be a number of minutes.")
             null in patternExamples.values ->
-                "No made-up text matches this notification's title or text pattern, so it needs a real notification to try."
+                tr("No made-up text matches this notification's title or text pattern, so it needs a real notification to try.")
             else -> null
         }
         return template(
             event = ContextEvent("event", true, metadata),
-            description = "Event payload populated from the configured filters",
+            description = tr("Event payload populated from the configured filters"),
             issue = issue,
         )
     }
@@ -410,17 +411,17 @@ object SyntheticTriggerSimulator {
             "zone" to zone.id,
         )
         val issue = when {
-            latitude == null || longitude == null -> "Sun event needs valid latitude and longitude."
-            latitude !in -90.0..90.0 || longitude !in -180.0..180.0 -> "Sun event coordinates are out of range."
-            elevation == null -> "Sun elevation must be civil, nautical, astronomical, or degrees from -90 to 90, not '$elevationRaw'."
-            crossing == null -> "The configured sun event is unavailable at these coordinates."
-            offsetRaw.isNotBlank() && offsetRaw.toIntOrNull() == null -> "Sun event offset must be numeric."
-            windowRaw.isNotBlank() && windowRaw.toIntOrNull() == null -> "Sun event window must be numeric."
+            latitude == null || longitude == null -> tr("Sun event needs valid latitude and longitude.")
+            latitude !in -90.0..90.0 || longitude !in -180.0..180.0 -> tr("Sun event coordinates are out of range.")
+            elevation == null -> tr("Sun elevation must be civil, nautical, astronomical, or degrees from -90 to 90, not '%1\$s'.", elevationRaw)
+            crossing == null -> tr("The configured sun event is unavailable at these coordinates.")
+            offsetRaw.isNotBlank() && offsetRaw.toIntOrNull() == null -> tr("Sun event offset must be numeric.")
+            windowRaw.isNotBlank() && windowRaw.toIntOrNull() == null -> tr("Sun event window must be numeric.")
             else -> null
         }
         return template(
             event = ContextEvent("event", true, metadata),
-            description = "Sun tick at the configured ${expectedEvent.lowercase(Locale.US)} window",
+            description = tr("Sun tick at the configured %1\$s window", expectedEvent.lowercase(Locale.US)),
             issue = issue,
         )
     }
@@ -437,8 +438,8 @@ object SyntheticTriggerSimulator {
                 mapOf("package" to packageName, "bundleJson" to bundle, "state" to "satisfied") +
                     listOfNotNull(blurb.takeIf(String::isNotEmpty)?.let { "blurb" to it }),
             ),
-            description = "Satisfied plugin condition result",
-            issue = if (configuredPackage.isBlank()) "Plugin context has no configured package." else null,
+            description = tr("Satisfied plugin condition result"),
+            issue = if (configuredPackage.isBlank()) tr("Plugin context has no configured package.") else null,
         )
     }
 

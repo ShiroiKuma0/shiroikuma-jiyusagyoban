@@ -9,6 +9,7 @@ import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.share.ShareRelayEntry
 import com.opentasker.core.share.ShareRelayStore
 import com.opentasker.core.shizuku.ShizukuShell
+import com.opentasker.i18n.tr
 import java.io.ByteArrayOutputStream
 import java.io.File
 
@@ -47,7 +48,7 @@ object RelayGenerator {
                     ShareRelayStore.markGenerated(entry.targetPackage, RelayKeystore.certFingerprint(context))
                     Outcome.Installed
                 }
-                is RelayInstaller.Result.SignatureMismatch -> Outcome.Failed("signature mismatch")
+                is RelayInstaller.Result.SignatureMismatch -> Outcome.Failed(tr("signature mismatch"))
                 is RelayInstaller.Result.Failure -> Outcome.Failed(result.message)
             }
         } catch (e: Exception) {

@@ -1,5 +1,7 @@
 package com.opentasker.ui.components
 
+import com.opentasker.i18n.trc
+import com.opentasker.i18n.tr
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -65,25 +67,25 @@ fun SelectionBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            IconButton(onClick = onClear) { Icon(Icons.Filled.Close, contentDescription = "Clear selection") }
-            Text("$count $noun", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onSelectAll, enabled = count < total) { Text("Select all") }
+            IconButton(onClick = onClear) { Icon(Icons.Filled.Close, contentDescription = tr("Clear selection")) }
+            Text(if (noun == "selected") tr("%1\$s selected", count) else trc("count-noun", "%1\$s %2\$s", count, tr(noun)), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = onSelectAll, enabled = count < total) { Text(tr("Select all")) }
             if (onCopy != null) {
                 var menu by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy / cut / clone / paste") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Filled.ContentCopy, contentDescription = tr("Copy / cut / clone / paste")) }
                     ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        onClone?.let { act -> DropdownMenuItem(text = { Text("Clone") }, icon = Icons.Filled.CopyAll, role = IconRole.SHARE, onClick = { menu = false; act() }) }
-                        DropdownMenuItem(text = { Text("Copy") }, icon = Icons.Filled.ContentCopy, role = IconRole.SHARE, onClick = { menu = false; onCopy() })
-                        onCut?.let { act -> DropdownMenuItem(text = { Text("Cut") }, icon = Icons.Filled.ContentCut, role = IconRole.SHARE, onClick = { menu = false; act() }) }
-                        onPaste?.let { act -> DropdownMenuItem(text = { Text("Paste") }, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE, onClick = { menu = false; act() }) }
+                        onClone?.let { act -> DropdownMenuItem(text = { Text(tr("Clone")) }, icon = Icons.Filled.CopyAll, role = IconRole.SHARE, onClick = { menu = false; act() }) }
+                        DropdownMenuItem(text = { Text(tr("Copy")) }, icon = Icons.Filled.ContentCopy, role = IconRole.SHARE, onClick = { menu = false; onCopy() })
+                        onCut?.let { act -> DropdownMenuItem(text = { Text(tr("Cut")) }, icon = Icons.Filled.ContentCut, role = IconRole.SHARE, onClick = { menu = false; act() }) }
+                        onPaste?.let { act -> DropdownMenuItem(text = { Text(tr("Paste")) }, icon = Icons.Filled.ContentPaste, role = IconRole.SHARE, onClick = { menu = false; act() }) }
                     }
                 }
             }
             if (onMoveToProject != null) {
-                IconButton(onClick = onMoveToProject) { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = "Move selected to project") }
+                IconButton(onClick = onMoveToProject) { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = tr("Move selected to project")) }
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete selected") }
+            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = tr("Delete selected")) }
         }
     }
 }
@@ -93,10 +95,10 @@ fun SelectionBar(
 fun ConfirmDeleteSelected(count: Int, noun: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete $count $noun${if (count == 1) "" else "s"}?") },
-        text = { Text("This permanently removes the selected ${noun}s.") },
-        confirmButton = { Button(onClick = onConfirm) { Text("Delete") } },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text(tr("Delete %1\$s %2\$s?", count, tr(if (count == 1) noun else noun + "s"))) },
+        text = { Text(tr("This permanently removes the selected %1\$s.", tr(noun + "s"))) },
+        confirmButton = { Button(onClick = onConfirm) { Text(tr("Delete")) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 
@@ -109,7 +111,7 @@ fun ConfirmDeleteSelected(count: Int, noun: String, onConfirm: () -> Unit, onDis
 fun SelectionCheck(selected: Boolean) {
     Icon(
         if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-        contentDescription = if (selected) "Selected" else "Not selected",
+        contentDescription = if (selected) tr("Selected") else tr("Not selected"),
         tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(24.dp),
     )

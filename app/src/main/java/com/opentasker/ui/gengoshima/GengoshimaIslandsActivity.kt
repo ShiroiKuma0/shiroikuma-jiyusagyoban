@@ -1,5 +1,6 @@
 package com.opentasker.ui.gengoshima
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.OutlinedButton
 import android.content.Context
 import android.content.Intent
@@ -170,7 +171,7 @@ private fun EditorRoot(onClose: () -> Unit, onGenerate: () -> Unit) {
             onClick = onGenerate,
             enabled = pending || status != null,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-        ) { Text("訳して音声を作る / Translate & voice", fontSize = 18.sp) }
+        ) { Text(tr("訳して音声を作る / Translate & voice"), fontSize = 18.sp) }
     }
 }
 
@@ -197,10 +198,10 @@ private fun IslandList(dao: GengoshimaDao, islands: List<GengoshimaIslandEntity>
                     )
                 }
                 IconButton(onClick = { scope.launch { swapIslands(dao, islands, i, -1) } }, enabled = i != islands.first()) {
-                    Icon(Icons.Filled.ArrowUpward, "上へ / up")
+                    Icon(Icons.Filled.ArrowUpward, tr("上へ / up"))
                 }
                 IconButton(onClick = { scope.launch { swapIslands(dao, islands, i, +1) } }, enabled = i != islands.last()) {
-                    Icon(Icons.Filled.ArrowDownward, "下へ / down")
+                    Icon(Icons.Filled.ArrowDownward, tr("下へ / down"))
                 }
             }
         }
@@ -244,7 +245,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
     studyMessage?.let { msg ->
         AlertDialog(
             onDismissRequest = { studyMessage = null },
-            title = { Text("辞書で学ぶ / Study in 辞書") },
+            title = { Text(tr("辞書で学ぶ / Study in 辞書")) },
             text = { Text(msg) },
             confirmButton = { Button(onClick = { studyMessage = null }) { Text("閉じる") } },
         )
@@ -264,7 +265,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
             GenerationRunner.start(context, settings, only = ids, splitOnly = splitOnly)
         }
         if (!started) {
-            android.widget.Toast.makeText(context, "別の作業が走っています / another run is going", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, tr("別の作業が走っています / another run is going"), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -301,18 +302,18 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
         item {
             Column(Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)).padding(10.dp)) {
                 Text(island.nameEn, fontSize = 16.sp)
-                Text("話し方 / Register: ${island.register.ifBlank { "（丁寧・既定 / polite, default）" }}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("話し方 / Register: %1\$s", island.register.ifBlank { tr("（丁寧・既定 / polite, default）") }), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 // The app's action pills (健康's language): glyph + what pressing does, all yellow.
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(top = 8.dp),
                 ) {
-                    ActionPill("島を直す / edit island", Icons.Filled.Edit, onClick = { editIsland = true })
-                    ActionPill("辞書で学ぶ / study in 辞書", Icons.Filled.MenuBook, onClick = { studyMessage = studyInJisho(context, island) })
+                    ActionPill(tr("島を直す / edit island"), Icons.Filled.Edit, onClick = { editIsland = true })
+                    ActionPill(tr("辞書で学ぶ / study in 辞書"), Icons.Filled.MenuBook, onClick = { studyMessage = studyInJisho(context, island) })
                     val waiting = sentences.filter { it.state != GengoshimaSentenceEntity.STATE_READY || ankiWaiting(it) }
                     ActionPill(
-                        "島を仕上げる / finish island" + if (waiting.isNotEmpty()) " (${waiting.size})" else "",
+                        tr("島を仕上げる / finish island") + if (waiting.isNotEmpty()) " (${waiting.size})" else "",
                         Icons.Filled.DoneAll,
                         onClick = {
                             if (waiting.any { it.state != GengoshimaSentenceEntity.STATE_READY }) launch(waiting.map { it.id }.toSet())
@@ -321,7 +322,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
                         enabled = waiting.isNotEmpty() && !running,
                     )
                     ActionPill(
-                        "島を暗記で更新 / update island in 暗記", Icons.Filled.Sync,
+                        tr("島を暗記で更新 / update island in 暗記"), Icons.Filled.Sync,
                         onClick = {
                             scope.launch {
                                 val now = System.currentTimeMillis()
@@ -332,13 +333,13 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
                         },
                         enabled = settings.ankiSync && !running,
                     )
-                    ActionPill("島を消す / delete island", Icons.Filled.Delete, onClick = { deletingIsland = true })
+                    ActionPill(tr("島を消す / delete island"), Icons.Filled.Delete, onClick = { deletingIsland = true })
                 }
                 // The run going now, one line; tap it for the whole progress window.
                 progress?.takeIf { it.running }?.let { p ->
                     val now = p.steps.firstOrNull { it.state == GenerationRunner.StepState.RUN }
                     Text(
-                        "作業中 / working — " + (now?.let { "${it.title}: ${it.detail.lineSequence().firstOrNull().orEmpty()}" } ?: "…"),
+                        tr("作業中 / working — %1\$s", now?.let { "${it.title}: ${it.detail.lineSequence().firstOrNull().orEmpty()}" } ?: "…"),
                         fontSize = 13.sp, color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 6.dp).clickable { context.startActivity(GengoshimaProgressActivity.intent(context)) },
                     )
@@ -428,18 +429,19 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
     discarding?.let { (s, a) ->
         AlertDialog(
             onDismissRequest = { discarding = null },
-            title = { Text(if (a == SentenceAction.RESPLIT) "分け直しますか？ / Re-split?" else "訳し直しますか？ / Translate again?") },
+            title = { Text(if (a == SentenceAction.RESPLIT) tr("分け直しますか？ / Re-split?") else tr("訳し直しますか？ / Translate again?")) },
             text = {
                 Text(
                     if (a == SentenceAction.RESPLIT) {
-                        "手で分けた語は自動の分け方に戻ります。同じ語に付けた読みは残ります。\n" +
-                            "Your split goes back to the automatic one. Readings you set stay on the same words."
+                        tr(
+                            "手で分けた語は自動の分け方に戻ります。同じ語に付けた読みは残ります。\nYour split goes back to the automatic one. Readings you set stay on the same words.",
+                        )
                     } else {
-                        "手で書いた日本語と分け方は新しい訳に置き換わります。\nYour own Japanese and split are replaced by a new translation."
+                        tr("手で書いた日本語と分け方は新しい訳に置き換わります。\nYour own Japanese and split are replaced by a new translation.")
                     },
                 )
             },
-            confirmButton = { Button(onClick = { discarding = null; act(s, a) }) { Text("進める / go ahead") } },
+            confirmButton = { Button(onClick = { discarding = null; act(s, a) }) { Text(tr("進める / go ahead")) } },
             dismissButton = { OutlinedButton(onClick = { discarding = null }) { Text("やめる") } },
         )
     }
@@ -453,7 +455,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
         }
     }
     deleting?.let { s ->
-        ConfirmDialog("この文を消しますか？ / Delete this sentence?", "${s.en}\n${s.ja}", onDismiss = { deleting = null }) {
+        ConfirmDialog(tr("この文を消しますか？ / Delete this sentence?"), "${s.en}\n${s.ja}", onDismiss = { deleting = null }) {
             deleting = null
             scope.launch {
                 dao.deleteSentence(s.id)
@@ -467,8 +469,8 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
     }
     if (deletingIsland) {
         ConfirmDialog(
-            "島ごと消しますか？ / Delete the whole island?",
-            "${island.nameJa.ifBlank { island.nameEn }} — ${sentences.size} 文と音声がすべて消えます。\nIts ${sentences.size} sentences and their audio go with it.",
+            tr("島ごと消しますか？ / Delete the whole island?"),
+            tr("%1\$s — %2\$s 文と音声がすべて消えます。\nIts %2\$s sentences and their audio go with it.", island.nameJa.ifBlank { island.nameEn }, sentences.size),
             onDismiss = { deletingIsland = false },
         ) {
             deletingIsland = false
@@ -534,17 +536,17 @@ private fun IslandEditDialog(island: GengoshimaIslandEntity, onDismiss: () -> Un
     var register by remember { mutableStateOf(island.register) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("島を直す / Edit island") },
+        title = { Text(tr("島を直す / Edit island")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(en, { en = it }, label = { Text("話題（英語） / Topic") }, singleLine = true)
-                OutlinedTextField(ja, { ja = it }, label = { Text("日本語の島名 / Japanese name") }, singleLine = true)
-                OutlinedTextField(register, { register = it }, label = { Text("話し方 / Register") })
+                OutlinedTextField(en, { en = it }, label = { Text(tr("話題（英語） / Topic")) }, singleLine = true)
+                OutlinedTextField(ja, { ja = it }, label = { Text(tr("日本語の島名 / Japanese name")) }, singleLine = true)
+                OutlinedTextField(register, { register = it }, label = { Text(tr("話し方 / Register")) })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     REGISTERS.forEach { (label, value) -> SelectionChip(label = label, selected = register == value, onSelect = { register = value }) }
                 }
                 Text(
-                    "話し方を変えると、手で直した行を除き島全体を訳し直します。\nChanging the register re-translates the island, except lines you wrote in Japanese.",
+                    tr("話し方を変えると、手で直した行を除き島全体を訳し直します。\nChanging the register re-translates the island, except lines you wrote in Japanese."),
                     fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -565,7 +567,7 @@ private val REGISTERS = listOf(
 private fun MoveDialog(targets: List<GengoshimaIslandEntity>, onDismiss: () -> Unit, onPick: (GengoshimaIslandEntity) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("どの島へ / Move to which island") },
+        title = { Text(tr("どの島へ / Move to which island")) },
         text = {
             LazyColumn {
                 items(targets, key = { it.id }) { i ->
@@ -597,7 +599,7 @@ private fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, on
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(body) },
-        confirmButton = { Button(onClick = onConfirm, colors = destructiveButtonColors()) { Text("消す / delete") } },
+        confirmButton = { Button(onClick = onConfirm, colors = destructiveButtonColors()) { Text(tr("消す / delete")) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
@@ -611,8 +613,10 @@ internal fun studyInJisho(context: Context, island: GengoshimaIslandEntity): Str
     val s = GengoshimaSettings.last(context)
     val ogg = com.opentasker.core.gengoshima.IslandExport.oggFile(island, s)
     if (!ogg.isFile) {
-        return "この島の「${s.islandFileName}」はまだありません — 「訳して音声を作る」を一度走らせてください。\n" +
-            "This island's whole-island file does not exist yet — run 「訳して音声を作る」 once."
+        return tr(
+            "この島の「%1\$s」はまだありません — 「訳して音声を作る」を一度走らせてください。\nThis island's whole-island file does not exist yet — run 「訳して音声を作る」 once.",
+            s.islandFileName,
+        )
     }
     val intent = Intent(STUDY_AUDIO)
         .setPackage("shiroikuma.jisho")
@@ -620,10 +624,12 @@ internal fun studyInJisho(context: Context, island: GengoshimaIslandEntity): Str
         .putExtra("title", island.nameJa.ifBlank { island.nameEn })
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     if (context.packageManager.queryIntentActivities(intent, 0).isEmpty()) {
-        return "白い熊の辞書 はまだこの受け口（STUDY_AUDIO）を持っていません。辞書側の更新を待ってください。\n" +
-            "白い熊の辞書 does not accept STUDY_AUDIO yet; it needs an update on its side.\n\n${ogg.absolutePath}"
+        return tr(
+            "白い熊の辞書 はまだこの受け口（STUDY_AUDIO）を持っていません。辞書側の更新を待ってください。\n白い熊の辞書 does not accept STUDY_AUDIO yet; it needs an update on its side.\n\n%1\$s",
+            ogg.absolutePath,
+        )
     }
-    return runCatching { context.startActivity(intent); null }.getOrElse { "開けませんでした / could not open: ${it.message}" }
+    return runCatching { context.startActivity(intent); null }.getOrElse { tr("開けませんでした / could not open: %1\$s", it.message) }
 }
 
 /** The intent 白い熊の辞書 answers with its study player (hand-off: hand-off-study-audio.md in its repo). */

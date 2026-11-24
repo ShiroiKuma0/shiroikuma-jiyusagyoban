@@ -5,6 +5,7 @@ import android.os.Build
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.scheduling.ExactAlarmSupport
+import com.opentasker.i18n.tr
 
 enum class AudioForegroundServiceEligibility {
     NONE,
@@ -160,14 +161,20 @@ internal object AndroidAudioHardening {
     }
 
     fun outputCapabilityReason(reason: String): String =
-        "Android 17+ allows this only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground service, " +
-            "or for alarm-usage audio with exact-alarm access. $reason"
+        tr(
+            "Android 17+ allows this only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground service, or for alarm-usage audio with exact-alarm access. %1\$s",
+            tr(reason),
+        )
 
     fun mediaKeyCapabilityReason(reason: String): String =
-        "Android 17+ allows media-key dispatch only while 白い熊 自由作業盤 is visible or from a while-in-use eligible " +
-            "foreground service. $reason"
+        tr(
+            "Android 17+ allows media-key dispatch only while 白い熊 自由作業盤 is visible or from a while-in-use eligible foreground service. %1\$s",
+            tr(reason),
+        )
 
     fun volumeCapabilityReason(reason: String): String =
-        "Android 17+ allows volume changes only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground " +
-            "service, or on the alarm stream with exact-alarm access. $reason"
+        tr(
+            "Android 17+ allows volume changes only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground service, or on the alarm stream with exact-alarm access. %1\$s",
+            tr(reason),
+        )
 }

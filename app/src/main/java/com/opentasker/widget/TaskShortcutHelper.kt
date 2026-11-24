@@ -9,6 +9,7 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Task
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
@@ -101,7 +102,7 @@ object TaskShortcutHelper {
     fun buildShortcut(context: Context, task: Task): ShortcutInfoCompat =
         ShortcutInfoCompat.Builder(context, "task_${task.id}")
             .setShortLabel(task.name)
-            .setLongLabel("Run: ${task.name}")
+            .setLongLabel(tr("Run: %1\$s", task.name))
             .setIcon(TaskIconStore.iconCompatFor(context, task))
             .setIntent(runIntent(context, task))
             .build()
@@ -359,7 +360,7 @@ object TaskShortcutHelper {
         }
         return ShortcutInfoCompat.Builder(context, shortcutId)
             .setShortLabel(label)
-            .setLongLabel("Run: $label")
+            .setLongLabel(tr("Run: %1\$s", label))
             .apply { if (existing == null) setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher)) }
             .setIntent(runIntent)
             .build()

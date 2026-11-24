@@ -1,5 +1,7 @@
 package com.opentasker.core.permissions
 
+import com.opentasker.i18n.tr
+
 /**
  * Pure, testable OEM battery-killer guidance.
  *
@@ -88,12 +90,12 @@ object OemBatteryGuidance {
     private fun samsung() = Guidance(
         oemName = "Samsung One UI",
         riskLevel = RiskLevel.MEDIUM,
-        summary = "One UI may put 白い熊 自由作業盤 to sleep. Exclude it from sleeping apps for reliable automation.",
+        summary = tr("One UI may put 白い熊 自由作業盤 to sleep. Exclude it from sleeping apps for reliable automation."),
         steps = listOf(
-            "Settings > Battery and device care > Battery > Background usage limits.",
-            "Turn off \"Put unused apps to sleep\" or add 白い熊 自由作業盤 to \"Never sleeping apps\".",
-            "Remove 白い熊 自由作業盤 from \"Sleeping apps\" and \"Deep sleeping apps\" if listed.",
-            "Settings > Apps > 白い熊 自由作業盤 > Battery: set to \"Unrestricted\".",
+            tr("Settings > Battery and device care > Battery > Background usage limits."),
+            tr("Turn off \"Put unused apps to sleep\" or add 白い熊 自由作業盤 to \"Never sleeping apps\"."),
+            tr("Remove 白い熊 自由作業盤 from \"Sleeping apps\" and \"Deep sleeping apps\" if listed."),
+            tr("Settings > Apps > 白い熊 自由作業盤 > Battery: set to \"Unrestricted\"."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/samsung",
         settingsTargets = listOf(
@@ -105,12 +107,12 @@ object OemBatteryGuidance {
     private fun xiaomi() = Guidance(
         oemName = "Xiaomi (MIUI/HyperOS)",
         riskLevel = RiskLevel.HIGH,
-        summary = "MIUI/HyperOS blocks background autostart by default. Grant Autostart or automations will not fire.",
+        summary = tr("MIUI/HyperOS blocks background autostart by default. Grant Autostart or automations will not fire."),
         steps = listOf(
-            "Security > Permissions > Autostart: enable 白い熊 自由作業盤.",
-            "Settings > Apps > 白い熊 自由作業盤 > Battery saver: set to \"No restrictions\".",
-            "Recent apps: lock 白い熊 自由作業盤 (pull down on the card) so it is not killed.",
-            "Disable \"MIUI optimization\" only if automations still fail after the above.",
+            tr("Security > Permissions > Autostart: enable 白い熊 自由作業盤."),
+            tr("Settings > Apps > 白い熊 自由作業盤 > Battery saver: set to \"No restrictions\"."),
+            tr("Recent apps: lock 白い熊 自由作業盤 (pull down on the card) so it is not killed."),
+            tr("Disable \"MIUI optimization\" only if automations still fail after the above."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/xiaomi",
         settingsTargets = listOf(
@@ -121,12 +123,12 @@ object OemBatteryGuidance {
     private fun onePlus() = Guidance(
         oemName = "OnePlus (OxygenOS)",
         riskLevel = RiskLevel.HIGH,
-        summary = "OxygenOS aggressively manages background apps. Disable optimization and enable auto-launch.",
+        summary = tr("OxygenOS aggressively manages background apps. Disable optimization and enable auto-launch."),
         steps = listOf(
-            "Settings > Battery > Battery optimization > 白い熊 自由作業盤: \"Don't optimize\".",
-            "Settings > Apps > Auto-launch / Startup manager: enable 白い熊 自由作業盤 where present.",
-            "Recent apps: lock 白い熊 自由作業盤 so deep optimization does not kill it.",
-            "Disable \"Advanced optimization\" / \"Sleep standby optimization\" if available.",
+            tr("Settings > Battery > Battery optimization > 白い熊 自由作業盤: \"Don't optimize\"."),
+            tr("Settings > Apps > Auto-launch / Startup manager: enable 白い熊 自由作業盤 where present."),
+            tr("Recent apps: lock 白い熊 自由作業盤 so deep optimization does not kill it."),
+            tr("Disable \"Advanced optimization\" / \"Sleep standby optimization\" if available."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/oneplus",
         settingsTargets = listOf(
@@ -137,12 +139,12 @@ object OemBatteryGuidance {
     private fun oppo() = Guidance(
         oemName = "Oppo (ColorOS)",
         riskLevel = RiskLevel.SEVERE,
-        summary = "ColorOS startup management blocks background apps. Enable auto-startup and allow background.",
+        summary = tr("ColorOS startup management blocks background apps. Enable auto-startup and allow background."),
         steps = listOf(
-            "Settings > App management > 白い熊 自由作業盤 > Allow auto startup.",
-            "Settings > Battery > 白い熊 自由作業盤 > Allow background activity / High background power.",
-            "Phone Manager > Privacy permissions > Startup manager: enable 白い熊 自由作業盤.",
-            "Recent apps: lock 白い熊 自由作業盤 so it is not cleared.",
+            tr("Settings > App management > 白い熊 自由作業盤 > Allow auto startup."),
+            tr("Settings > Battery > 白い熊 自由作業盤 > Allow background activity / High background power."),
+            tr("Phone Manager > Privacy permissions > Startup manager: enable 白い熊 自由作業盤."),
+            tr("Recent apps: lock 白い熊 自由作業盤 so it is not cleared."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/oppo",
         settingsTargets = listOf(
@@ -155,12 +157,12 @@ object OemBatteryGuidance {
     private fun realme() = Guidance(
         oemName = "Realme (Realme UI)",
         riskLevel = RiskLevel.SEVERE,
-        summary = "Realme UI (ColorOS-based) blocks background autostart. Enable startup and background activity.",
+        summary = tr("Realme UI (ColorOS-based) blocks background autostart. Enable startup and background activity."),
         steps = listOf(
-            "Settings > App management > 白い熊 自由作業盤 > Allow auto startup.",
-            "Settings > Battery > 白い熊 自由作業盤 > Allow background activity.",
-            "Phone Manager > Startup manager: enable 白い熊 自由作業盤.",
-            "Recent apps: lock 白い熊 自由作業盤 so it survives memory cleanup.",
+            tr("Settings > App management > 白い熊 自由作業盤 > Allow auto startup."),
+            tr("Settings > Battery > 白い熊 自由作業盤 > Allow background activity."),
+            tr("Phone Manager > Startup manager: enable 白い熊 自由作業盤."),
+            tr("Recent apps: lock 白い熊 自由作業盤 so it survives memory cleanup."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/realme",
         settingsTargets = listOf(
@@ -172,12 +174,12 @@ object OemBatteryGuidance {
     private fun vivo() = Guidance(
         oemName = "Vivo (Funtouch/OriginOS)",
         riskLevel = RiskLevel.SEVERE,
-        summary = "Vivo blocks background startup by default. Allow auto-start and high background power.",
+        summary = tr("Vivo blocks background startup by default. Allow auto-start and high background power."),
         steps = listOf(
-            "Settings > Battery > Background power consumption management: allow 白い熊 自由作業盤.",
-            "i Manager > App manager > Autostart manager: enable 白い熊 自由作業盤.",
-            "Settings > Apps > 白い熊 自由作業盤 > Battery: allow background activity.",
-            "Recent apps: lock 白い熊 自由作業盤 so it is not cleared.",
+            tr("Settings > Battery > Background power consumption management: allow 白い熊 自由作業盤."),
+            tr("i Manager > App manager > Autostart manager: enable 白い熊 自由作業盤."),
+            tr("Settings > Apps > 白い熊 自由作業盤 > Battery: allow background activity."),
+            tr("Recent apps: lock 白い熊 自由作業盤 so it is not cleared."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/vivo",
         settingsTargets = listOf(
@@ -189,12 +191,12 @@ object OemBatteryGuidance {
     private fun huawei() = Guidance(
         oemName = "Huawei/Honor (EMUI/MagicOS)",
         riskLevel = RiskLevel.SEVERE,
-        summary = "EMUI/MagicOS uses Protected apps and manual app launch. Set 白い熊 自由作業盤 to manage manually.",
+        summary = tr("EMUI/MagicOS uses Protected apps and manual app launch. Set 白い熊 自由作業盤 to manage manually."),
         steps = listOf(
-            "Settings > Apps > 白い熊 自由作業盤 > Battery > App launch: turn off \"Manage automatically\".",
-            "Enable Auto-launch, Secondary launch, and Run in background manually.",
-            "Phone Manager > Protected apps: enable 白い熊 自由作業盤 (older EMUI).",
-            "Settings > Battery: disable aggressive power-saving modes.",
+            tr("Settings > Apps > 白い熊 自由作業盤 > Battery > App launch: turn off \"Manage automatically\"."),
+            tr("Enable Auto-launch, Secondary launch, and Run in background manually."),
+            tr("Phone Manager > Protected apps: enable 白い熊 自由作業盤 (older EMUI)."),
+            tr("Settings > Battery: disable aggressive power-saving modes."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/huawei",
         settingsTargets = listOf(
@@ -206,11 +208,11 @@ object OemBatteryGuidance {
     private fun meizu() = Guidance(
         oemName = "Meizu (Flyme)",
         riskLevel = RiskLevel.HIGH,
-        summary = "Flyme restricts background apps. Allow background running and standby for 白い熊 自由作業盤.",
+        summary = tr("Flyme restricts background apps. Allow background running and standby for 白い熊 自由作業盤."),
         steps = listOf(
-            "Settings > Apps > 白い熊 自由作業盤 > permissions: allow run in background.",
-            "Phone Manager > Permissions > Background management: allow 白い熊 自由作業盤.",
-            "Battery: disable standby intelligent power saving for 白い熊 自由作業盤.",
+            tr("Settings > Apps > 白い熊 自由作業盤 > permissions: allow run in background."),
+            tr("Phone Manager > Permissions > Background management: allow 白い熊 自由作業盤."),
+            tr("Battery: disable standby intelligent power saving for 白い熊 自由作業盤."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/meizu",
         settingsTargets = listOf(
@@ -221,11 +223,11 @@ object OemBatteryGuidance {
     private fun asus() = Guidance(
         oemName = "Asus (ZenUI)",
         riskLevel = RiskLevel.MEDIUM,
-        summary = "ZenUI Auto-start Manager can block 白い熊 自由作業盤. Allow auto-start and disable cleanup.",
+        summary = tr("ZenUI Auto-start Manager can block 白い熊 自由作業盤. Allow auto-start and disable cleanup."),
         steps = listOf(
-            "Auto-start Manager / Mobile Manager: allow 白い熊 自由作業盤.",
-            "Settings > Battery: disable aggressive cleanup for 白い熊 自由作業盤.",
-            "Settings > Apps > 白い熊 自由作業盤 > Battery: do not optimize.",
+            tr("Auto-start Manager / Mobile Manager: allow 白い熊 自由作業盤."),
+            tr("Settings > Battery: disable aggressive cleanup for 白い熊 自由作業盤."),
+            tr("Settings > Apps > 白い熊 自由作業盤 > Battery: do not optimize."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/asus",
         settingsTargets = listOf(
@@ -234,25 +236,25 @@ object OemBatteryGuidance {
     )
 
     private fun stock(manufacturer: String?) = Guidance(
-        oemName = manufacturer?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: "Stock Android",
+        oemName = manufacturer?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: tr("Stock Android"),
         riskLevel = RiskLevel.LOW,
-        summary = "This device follows stock Android battery behavior. The battery-optimization exemption is usually enough.",
+        summary = tr("This device follows stock Android battery behavior. The battery-optimization exemption is usually enough."),
         steps = listOf(
-            "Settings > Apps > 白い熊 自由作業盤 > Battery: set to \"Unrestricted\".",
-            "Keep the battery-optimization exemption granted above.",
+            tr("Settings > Apps > 白い熊 自由作業盤 > Battery: set to \"Unrestricted\"."),
+            tr("Keep the battery-optimization exemption granted above."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/general",
         settingsTargets = emptyList(),
     )
 
     private fun generic(manufacturer: String?) = Guidance(
-        oemName = manufacturer?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: "Your device",
+        oemName = manufacturer?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: tr("Your device"),
         riskLevel = RiskLevel.MEDIUM,
-        summary = "This OEM is not specifically recognized. Disable battery optimization and look for an autostart toggle.",
+        summary = tr("This OEM is not specifically recognized. Disable battery optimization and look for an autostart toggle."),
         steps = listOf(
-            "Keep the battery-optimization exemption granted above.",
-            "Look for an \"Autostart\", \"Auto-launch\", or \"Background activity\" toggle in app or battery settings.",
-            "Lock 白い熊 自由作業盤 in recent apps so the system does not clear it.",
+            tr("Keep the battery-optimization exemption granted above."),
+            tr("Look for an \"Autostart\", \"Auto-launch\", or \"Background activity\" toggle in app or battery settings."),
+            tr("Lock 白い熊 自由作業盤 in recent apps so the system does not clear it."),
         ),
         dontKillMyAppUrl = "$DKMA_BASE/general",
         settingsTargets = emptyList(),

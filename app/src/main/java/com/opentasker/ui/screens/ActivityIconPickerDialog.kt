@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.OutlinedButton
 import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
@@ -72,12 +73,12 @@ internal fun ActivityIconPickerDialog(targetPackage: String, onDismiss: () -> Un
     AlertDialog(
         modifier = dialogBorder(),
         onDismissRequest = onDismiss,
-        title = { Text("App icons") },
+        title = { Text(tr("App icons")) },
         text = {
             val list = icons
             when {
-                list == null -> Text("Loading…", style = MaterialTheme.typography.bodyMedium)
-                list.isEmpty() -> Text("No activity icons found.", style = MaterialTheme.typography.bodyMedium)
+                list == null -> Text(tr("Loading…"), style = MaterialTheme.typography.bodyMedium)
+                list.isEmpty() -> Text(tr("No activity icons found."), style = MaterialTheme.typography.bodyMedium)
                 else -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(56.dp),
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),

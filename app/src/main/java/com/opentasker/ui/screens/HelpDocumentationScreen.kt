@@ -34,6 +34,7 @@ import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
+import com.opentasker.i18n.tr
 
 /**
  * The "Help & Tools" tab: a "Tools" section (the relocated beginner/utility cards — templates, task
@@ -66,7 +67,7 @@ fun HelpDocumentationScreen(
         // "Tools" section at the top: the beginner/utility cards relocated out of the main tabs.
         item(key = "tools-header") {
             Text(
-                "Tools",
+                tr("Tools"),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -81,9 +82,9 @@ fun HelpDocumentationScreen(
         }
         item(key = "Action reference") {
             DocCard("Action reference", expandedSections) {
-                Para("Every built-in action, generated from the live registry. The `type` is the id you put in a bundle's `actions[]`; the fields are the keys that go in that action's `args` map.")
+                Para(tr("Every built-in action, generated from the live registry. The `type` is the id you put in a bundle's `actions[]`; the fields are the keys that go in that action's `args` map."))
                 Text(
-                    "${actionsByCategory.values.sumOf { it.size }} actions in ${actionsByCategory.size} categories",
+                    tr("%1\$s actions in %2\$s categories", actionsByCategory.values.sumOf { it.size }, actionsByCategory.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -122,10 +123,10 @@ private fun DocCard(
                 modifier = Modifier.fillMaxWidth().clickable { expandedSections[key] = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                Text(tr(title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse $title" else "Expand $title",
+                    contentDescription = if (expanded) tr("Collapse %1\$s", tr(title)) else tr("Expand %1\$s", tr(title)),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -138,18 +139,16 @@ private fun DocCard(
 private fun ActionDoc(action: ActionMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(action.name, style = MaterialTheme.typography.titleSmall)
+            Text(tr(action.name), style = MaterialTheme.typography.titleSmall)
             CodeChip(action.id)
         }
         if (action.description.isNotBlank()) {
-            Text(action.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr(action.description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         action.fields.forEach { field ->
-            val meta = buildString {
-                append(field.fieldType.name.lowercase())
-                if (field.required) append(", required")
-            }
-            FieldLine(field.key, meta, field.hint ?: "")
+            val fieldType = field.fieldType.name.lowercase()
+            val meta = if (field.required) tr("%1\$s, required", fieldType) else fieldType
+            FieldLine(field.key, meta, tr(field.hint ?: ""))
         }
     }
 }
@@ -157,15 +156,15 @@ private fun ActionDoc(action: ActionMetadata) {
 @Composable
 private fun RenderBlock(block: DocBlock) {
     when (block) {
-        is DocBlock.Para -> Para(block.text)
+        is DocBlock.Para -> Para(tr(block.text))
         is DocBlock.Code -> CodeBlock(block.text)
         is DocBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             block.items.forEach { item ->
-                Text("•  $item", style = MaterialTheme.typography.bodySmall)
+                Text("•  ${tr(item)}", style = MaterialTheme.typography.bodySmall)
             }
         }
         is DocBlock.Fields -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            block.rows.forEach { FieldLine(it.name, it.type, it.note) }
+            block.rows.forEach { FieldLine(it.name, it.type, tr(it.note)) }
         }
     }
 }

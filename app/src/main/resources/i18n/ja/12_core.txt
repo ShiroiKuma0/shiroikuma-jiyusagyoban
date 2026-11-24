@@ -1,0 +1,551 @@
+# 12_core — engine code: core/capabilities … core/engine
+
+# CapabilityState.kt
+= Needs the accessibility service enabled in System Settings.
+: システム設定でユーザー補助サービスを有効にする必要があります。
+= Needs Shizuku installed and running.
+: Shizukuがインストールされ、動作している必要があります。
+= Needs the Modify system settings permission.
+: 「システム設定の変更」の権限が必要です。
+= Needs the display-over-other-apps permission.
+: 「他のアプリの上に重ねて表示」の権限が必要です。
+= Needs notification permission.
+: 通知の権限が必要です。
+= Needs notification access.
+: 通知へのアクセスが必要です。
+= Needs Do Not Disturb access.
+: おやすみモードへのアクセスが必要です。
+= Needs All files access to read files outside the app (e.g. tones in shared storage).
+: アプリの外にあるファイル（共有ストレージの着信音など）を読み取るには、すべてのファイルへのアクセスが必要です。
+= Needs Device admin enabled.
+: デバイス管理者を有効にする必要があります。
+= Needs the Microphone permission.
+: マイクの権限が必要です。
+= Needs the Location permission.
+: 位置情報の権限が必要です。
+= Needs the Nearby devices (Bluetooth) permission.
+: 「付近のデバイス」（Bluetooth）の権限が必要です。
+= Accessibility enabled
+: ユーザー補助：有効
+= Accessibility off
+: ユーザー補助：無効
+= Shizuku detected
+: Shizukuを検出
+= Shizuku not installed
+: Shizukuは未インストール
+= Modify settings allowed
+: 設定の変更：許可済み
+= Modify settings off
+: 設定の変更：未許可
+= Display over apps allowed
+: 重ねて表示：許可済み
+= Display over apps off
+: 重ねて表示：未許可
+= Notifications allowed
+: 通知：許可済み
+= Notifications off
+: 通知：未許可
+= Notification access on
+: 通知へのアクセス：オン
+= Notification access off
+: 通知へのアクセス：オフ
+= Do Not Disturb access on
+: おやすみモードへのアクセス：オン
+= Do Not Disturb access off
+: おやすみモードへのアクセス：オフ
+= All files access on
+: すべてのファイルへのアクセス：オン
+= All files access off
+: すべてのファイルへのアクセス：オフ
+= Device admin on
+: デバイス管理者：オン
+= Device admin off
+: デバイス管理者：オフ
+= Microphone allowed
+: マイク：許可済み
+= Microphone off
+: マイク：未許可
+= Location allowed
+: 位置情報：許可済み
+= Location off
+: 位置情報：未許可
+= Bluetooth allowed
+: Bluetooth：許可済み
+= Bluetooth off
+: Bluetooth：未許可
+= Open settings
+: 設定を開く
+= Enable accessibility
+: ユーザー補助を有効にする
+= Set up Shizuku
+: Shizukuをセットアップ
+= Allow modify settings
+: 設定の変更を許可
+= Allow display over apps
+: 重ねて表示を許可
+= Enable notification access
+: 通知へのアクセスを有効にする
+= Grant Do Not Disturb access
+: おやすみモードへのアクセスを許可
+= Grant notification access
+: 通知を許可
+= Grant All files access
+: すべてのファイルへのアクセスを許可
+= Enable device admin
+: デバイス管理者を有効にする
+= Grant microphone
+: マイクを許可
+= Grant location
+: 位置情報を許可
+= Grant Bluetooth
+: Bluetoothを許可
+= Accessibility
+: ユーザー補助
+= Shizuku
+: Shizuku
+= Modify system settings
+: システム設定の変更
+= Display over other apps
+: 他のアプリの上に重ねて表示
+= Notifications
+: 通知
+= Notification access
+: 通知へのアクセス
+= Do Not Disturb access
+: おやすみモードへのアクセス
+= All files access
+: すべてのファイルへのアクセス
+= Device admin
+: デバイス管理者
+= Microphone
+: マイク
+= Location
+: 位置情報
+= Bluetooth
+: Bluetooth
+= It IS switched on in System Settings — but Android is not running it. That happens when the service is killed and the system marks it crashed; it will not start again on its own.\n\nFix: open Accessibility settings below, turn 白い熊 自由作業盤 OFF and then ON again.
+: システム設定では確かにオンになっていますが、Androidがこのサービスを動かしていません。サービスが強制終了され、システムが「クラッシュした」と記録した場合に起こり、自動では再開されません。\n\n対処：下のボタンからユーザー補助の設定を開き、白い熊 自由作業盤をいったんオフにしてから、もう一度オンにしてください。
+
+# DialogActivity.kt
+= That place has no path on the phone's storage
+: その場所には端末のストレージ上のパスがありません。
+= OK
+: OK
+= Cancel
+: キャンセル
+= No settings page for %1$s
+: %1$sの設定画面がありません。
+= Couldn't open %1$s settings
+: %1$sの設定を開けませんでした。
+= Open %1$s settings
+: %1$sの設定を開く
+
+# TaskRunner.kt — the permission-block dialog
+= Unfiled
+: 未分類
+= • %1$s — needed by: %2$s
+: • %1$s — 必要とするアクション：%2$s
+= Grant it below, then run again.
+: 下のボタンから許可して、もう一度実行してください。
+= Can't run “%1$s” (project “%2$s”).\n\nMissing permission(s):\n%3$s\n\n%4$s
+: 「%1$s」（プロジェクト「%2$s」）を実行できません。\n\n不足している権限：\n%3$s\n\n%4$s
+= Permission required
+: 権限が必要です
+
+# AutomationService.kt — the engine notification
+= 白い熊 自由作業盤 engine
+: 白い熊 自由作業盤のエンジン
+= 白い熊 自由作業盤 is running
+: 白い熊 自由作業盤は実行中です
+= Tap to open automation status
+: タップして自動化の状況を開く
+
+# RuntimeInventory.kt
+= Engine
+: エンジン
+= Running task
+: 実行中のタスク
+= Scene
+: シーン
+= Bubble
+: バブル
+= Panel
+: パネル
+= Automation engine
+: 自動化エンジン
+= foreground service
+: フォアグラウンドサービス
+= %1$s · running %2$ss
+: %1$s · 実行中 %2$s秒
+= overlay window
+: オーバーレイウィンドウ
+= Scene activities
+: シーンのアクティビティ
+= %1$s open
+: %1$s件を表示中
+= Scene overlay service
+: シーンのオーバーレイサービス
+= freeze bubble
+: 凍結バブル
+= flash bubble
+: 明滅バブル
+= Progress panel
+: 進行状況パネル
+= on screen
+: 画面に表示中
+= state left behind
+: 状態だけが残っています
+
+# DaySchedule.kt
+= No days selected
+: 曜日が選択されていません
+= Every day
+: 毎日
+= Weekdays
+: 平日
+= Weekends
+: 週末
+= MON
+: 月
+= TUE
+: 火
+= WED
+: 水
+= THU
+: 木
+= FRI
+: 金
+= SAT
+: 土
+= SUN
+: 日
+
+# SemanticDiffStrings.kt — path segments without a string resource
+= Global
+: グローバル
+= Secret
+: 秘密
+= On
+: オン
+
+# RunLogDiagnostics.kt — RunLogOutcome labels (shown by the run log screen)
+= Succeeded
+: 成功
+= Failed
+: 失敗
+= Skipped
+: スキップ
+= Held
+: 保留
+= Cancelled
+: キャンセルしました
+= Interrupted
+: 中断
+
+# NfcTagIntentGate.kt — State labels
+= not applicable
+: 対象外
+= allowed
+: 許可済み
+= blocked by Android's "Allow apps to read NFC tags" setting
+: Androidの「アプリにNFCタグの読み取りを許可」の設定でブロックされています
+
+# ContextInspector.kt — ContextSourceStatus / ContextObservationStatus labels
+= Active
+: 有効
+= Waiting
+: 待機中
+= Needs setup
+: セットアップが必要
+= Missing
+: 見つかりません
+= Error
+: エラー
+= Loading
+: 読み込み中
+= Ready
+: 準備完了
+= Stale
+: 古い
+
+# ContextInspector.kt
+= Profile is disabled.
+: プロファイルは無効です。
+= No contexts are configured.
+: コンテキストが設定されていません。
+= All contexts currently match.
+: 現在、すべてのコンテキストが成立しています。
+= Enough contexts match for the profile's rule.
+: プロファイルの規則を満たすだけのコンテキストが成立しています。
+= The profile's context rule doesn't hold.
+: プロファイルのコンテキストの規則が成り立っていません。
+= Context %1$s matches, and the rule needs it not to.
+: コンテキスト%1$sが成立していますが、規則では成立しないことが必要です。
+= Context %1$s matches
+: コンテキスト%1$sは成立
+= Context %1$s is unknown
+: コンテキスト%1$sは不明
+= Context %1$s doesn't match
+: コンテキスト%1$sは不成立
+= not (%1$s)
+: 否定（%1$s）
+= all of (%1$s)
+: すべて（%1$s）
+= any of (%1$s)
+: いずれか（%1$s）
+= not all of (%1$s)
+: 「すべて」の否定（%1$s）
+= not any of (%1$s)
+: 「いずれか」の否定（%1$s）
+= Invalid context group
+: 無効なコンテキストグループ
+= Unknown source
+: 不明なソース
+= none
+: なし
+= %1$s; inverted
+: %1$s（反転）
+= Sunrise
+: 日の出
+= Sunset
+: 日の入り
+= Civil
+: 市民
+= Nautical
+: 航海
+= Astronomical
+: 天文
+= %1$s dawn (sun %2$s degrees below the horizon)
+: %1$s薄明の始まり（太陽が地平線の下%2$s度）
+= %1$s dusk (sun %2$s degrees below the horizon)
+: %1$s薄明の終わり（太陽が地平線の下%2$s度）
+= Sun rising past %1$s degrees above the horizon
+: 昇る太陽が地平線の上%1$s度を通過
+= Sun setting past %1$s degrees above the horizon
+: 沈む太陽が地平線の上%1$s度を通過
+= Sun rising past %1$s degrees below the horizon
+: 昇る太陽が地平線の下%1$s度を通過
+= Sun setting past %1$s degrees below the horizon
+: 沈む太陽が地平線の下%1$s度を通過
+= Sun rising past the horizon
+: 昇る太陽が地平線を通過
+= Sun setting past the horizon
+: 沈む太陽が地平線を通過
+= No configuration
+: 設定なし
+= Bluetooth device nearby
+: Bluetoothデバイスが近くにある
+= Application
+: アプリ
+= Time and day
+: 時刻と曜日
+= Device state
+: デバイスの状態
+= System event
+: システムイベント
+= Plugin condition
+: プラグインの条件
+= This context type is not mapped to a runtime source.
+: この種類のコンテキストには、対応する実行時のソースがありません。
+= No registered runtime source for %1$s.
+: 「%1$s」の実行時のソースが登録されていません。
+=  Its last value still counts until it reports again.
+:  次に報告があるまで、最後の値が引き続き使われます。
+= The %1$s source stopped with an error: %2$s
+: 「%1$s」のソースがエラーで停止しました：%2$s
+= %1$s needs setup before it can report values.
+: 「%1$s」は、値を報告できるようになる前にセットアップが必要です。
+= Waiting for this plugin's first result. The latest one was for another plugin or setting.
+: このプラグインの最初の結果を待っています。最新の結果は別のプラグインまたは設定のものでした。
+= Waiting for the first %1$s event.
+: 「%1$s」の最初のイベントを待っています。
+= Latest event came from %1$s, not %2$s.
+: 最新のイベントは%2$sではなく、%1$sから届きました。
+= Latest event does not satisfy the configuration, so the inverted event context can trigger on this pulse.
+: 最新のイベントは設定を満たしていないため、反転したイベントコンテキストはこのパルスでトリガーできます。
+= Latest event satisfies the configuration, so the inverted event context blocks this pulse.
+: 最新のイベントが設定を満たしているため、反転したイベントコンテキストはこのパルスを止めます。
+= Latest event satisfies the configuration; event contexts are one-shot pulses and can trigger again on each matching event.
+: 最新のイベントは設定を満たしています。イベントコンテキストは一回限りのパルスで、一致するイベントのたびに再びトリガーできます。
+= Latest event does not satisfy the configuration; event contexts wait for the next matching pulse.
+: 最新のイベントは設定を満たしていません。イベントコンテキストは次に一致するパルスを待ちます。
+= Latest value does not satisfy the configuration, so the inverted context matches.
+: 最新の値は設定を満たしていないため、反転したコンテキストは成立します。
+= Latest value satisfies the configuration, so the inverted context blocks the profile.
+: 最新の値が設定を満たしているため、反転したコンテキストがプロファイルを止めています。
+= Latest value satisfies the configuration.
+: 最新の値は設定を満たしています。
+= Latest value does not satisfy the configuration.
+: 最新の値は設定を満たしていません。
+= %1$s isn't a variable name, so this context stays off. A name starts with a letter and has only letters, digits, _ and -, like %%Sunrise.
+: %1$s は変数名ではないため、このコンテキストは成立しません。変数名は文字で始まり、%%Sunrise のように文字、数字、_、- だけでできています。
+= %1$s is a local variable, which a context can't read, so this context stays off. A global has a capital letter in its name.
+: %1$s はローカル変数で、コンテキストからは読み取れないため、このコンテキストは成立しません。グローバル変数の名前には大文字が含まれます。
+= %1$s doesn't hold a time yet, so this context stays off, inverted or not.
+: %1$s にはまだ時刻が入っていないため、このコンテキストは反転の有無にかかわらず成立しません。
+= %1$s don't hold a time yet, so this context stays off, inverted or not.
+: %1$s にはまだ時刻が入っていないため、このコンテキストは反転の有無にかかわらず成立しません。
+=  and 
+: 、
+=  Read %1$s.
+:  %1$s読み取りました。
+= %1$s as %2$s
+: %1$s を%2$sとして
+
+# BluetoothNear.kt — setup gaps (shown by the context inspector)
+= This device has no Bluetooth, so Bluetooth Near has nothing to scan with.
+: この端末にはBluetoothがないため、「Bluetooth Near」でスキャンする手段がありません。
+= Open Setup and grant Nearby Bluetooth scan before using Bluetooth Near.
+: 「Bluetooth Near」を使う前に、「セットアップ」を開いて付近のBluetoothスキャンを許可してください。
+= Turn Bluetooth on to use Bluetooth Near.
+: 「Bluetooth Near」を使うには、Bluetoothをオンにしてください。
+= Turn location on. Android 11 and older need it to scan for Bluetooth devices.
+: 位置情報をオンにしてください。Android 11以前では、Bluetooth機器のスキャンに位置情報が必要です。
+
+# StateSensorEvents.kt — setup markers (shown by the context inspector)
+= Open Setup to review orientation sensor support; Android did not expose a sensor service on this device.
+: 「セットアップ」を開いて、画面の向きセンサーの対応状況を確認してください。この端末ではAndroidがセンサーサービスを提供していません。
+= Open Setup to review orientation sensor support; this device has no gravity or accelerometer sensor.
+: 「セットアップ」を開いて、画面の向きセンサーの対応状況を確認してください。この端末には重力センサーも加速度センサーもありません。
+= Open Setup to review orientation sensor support; Android could not register the available sensor.
+: 「セットアップ」を開いて、画面の向きセンサーの対応状況を確認してください。Androidが利用可能なセンサーを登録できませんでした。
+= Open Setup to review proximity sensor support; Android did not expose a sensor service on this device.
+: 「セットアップ」を開いて、近接センサーの対応状況を確認してください。この端末ではAndroidがセンサーサービスを提供していません。
+= Open Setup to review proximity sensor support; this device has no proximity sensor.
+: 「セットアップ」を開いて、近接センサーの対応状況を確認してください。この端末には近接センサーがありません。
+= Open Setup to review proximity sensor support; Android could not register the available sensor.
+: 「セットアップ」を開いて、近接センサーの対応状況を確認してください。Androidが利用可能なセンサーを登録できませんでした。
+= Open Setup and grant Physical activity permission before using Activity context values.
+: 行動のコンテキストの値を使う前に、「セットアップ」を開いて身体活動の権限を許可してください。
+= Open Setup to review activity sensor support; Android did not expose a sensor service on this device.
+: 「セットアップ」を開いて、行動センサーの対応状況を確認してください。この端末ではAndroidがセンサーサービスを提供していません。
+= Open Setup to review activity sensor support; this device has no step detector or accelerometer.
+: 「セットアップ」を開いて、行動センサーの対応状況を確認してください。この端末には歩行検出センサーも加速度センサーもありません。
+= Open Setup to review activity sensor support; Android could not register the available sensor.
+: 「セットアップ」を開いて、行動センサーの対応状況を確認してください。Androidが利用可能なセンサーを登録できませんでした。
+= Open Setup and grant Foreground location permission before using Speed context values.
+: 速度のコンテキストの値を使う前に、「セットアップ」を開いてフォアグラウンドの位置情報の権限を許可してください。
+= Open Setup to review speed context support; Android did not expose a location service on this device.
+: 「セットアップ」を開いて、速度のコンテキストの対応状況を確認してください。この端末ではAndroidが位置情報サービスを提供していません。
+= Open Setup and enable a GPS or network location provider before using Speed context values.
+: 速度のコンテキストの値を使う前に、「セットアップ」を開いてGPSまたはネットワークの位置情報プロバイダーを有効にしてください。
+= Open Setup to review speed context support; Android could not register a location provider.
+: 「セットアップ」を開いて、速度のコンテキストの対応状況を確認してください。Androidが位置情報プロバイダーを登録できませんでした。
+= Open Setup to grant Phone permission; this device did not expose network roaming state.
+: 「セットアップ」を開いて電話の権限を許可してください。この端末はネットワークのローミング状態を提供していません。
+= Open Setup and grant Phone permission before using Roaming context values.
+: ローミングのコンテキストの値を使う前に、「セットアップ」を開いて電話の権限を許可してください。
+= Open Setup to review phone-state support; this device has no telephony service.
+: 「セットアップ」を開いて、電話の状態の対応状況を確認してください。この端末には電話サービスがありません。
+= Open Setup to grant Phone permission; this device did not expose call state.
+: 「セットアップ」を開いて電話の権限を許可してください。この端末は通話の状態を提供していません。
+= Open Setup and grant Phone permission before using Phone call state values.
+: 通話の状態の値を使う前に、「セットアップ」を開いて電話の権限を許可してください。
+= Open Setup to review tethering support; Android could not register its tethering state callback.
+: 「セットアップ」を開いて、テザリングの対応状況を確認してください。Androidがテザリング状態のコールバックを登録できませんでした。
+= Open Setup to review tethering support; Android did not expose a tethering service.
+: 「セットアップ」を開いて、テザリングの対応状況を確認してください。Androidがテザリングサービスを提供していません。
+
+# SyntheticTriggerSimulation.kt
+= No cooldown is currently blocking this profile.
+: 現在、このプロファイルを止めているクールダウンはありません。
+= Admission budget is available (preview only).
+: 実行の受け入れ枠に空きがあります（プレビューのみ）。
+= Pinned event override
+: 固定したイベントで上書き
+= The pinned event
+: 固定したイベント
+= The synthetic event
+: 模擬イベント
+= %1$s has no value for this context, so the inverted context stays off.
+: %1$sにはこのコンテキストの値がないため、反転したコンテキストは成立しません。
+= %1$s has no value for this context, so it counts as unknown and can't turn the profile on, even under a NOT.
+: %1$sにはこのコンテキストの値がないため不明として扱われ、NOTの下でもプロファイルを有効にできません。
+= %1$s fails the raw predicate, so inversion passes it.
+: %1$sは元の条件を満たさないため、反転によって通過します。
+= %1$s satisfies the raw predicate, so inversion blocks it.
+: %1$sは元の条件を満たすため、反転によって止められます。
+= %1$s satisfies this predicate.
+: %1$sはこの条件を満たしています。
+= %1$s does not satisfy this predicate.
+: %1$sはこの条件を満たしていません。
+= Context %1$s blocks the profile: %2$s
+: コンテキスト%1$sがプロファイルを止めています：%2$s
+= The configured context expression is invalid or did not match.
+: 設定されたコンテキストの式が無効か、成立しませんでした。
+= All context predicates pass; the %1$ss activation/deactivation grace period still applies.
+: すべてのコンテキストの条件を通過しました。ただし、有効化・無効化の猶予時間（%1$s秒）は引き続き適用されます。
+= All context predicates pass the configured context logic.
+: すべてのコンテキストの条件が、設定されたコンテキストの論理を通過しました。
+= Foreground package and component
+: フォアグラウンドのパッケージとコンポーネント
+= Application context has no configured package.
+: アプリのコンテキストにパッケージが設定されていません。
+= Midpoint of the configured time window
+: 設定された時間帯の中間点
+= Midpoint of the time window, taking %1$s
+: 時間帯の中間点（%1$s計算）
+= Time context needs both a start and end time.
+: 時刻のコンテキストには、開始時刻と終了時刻の両方が必要です。
+= Time context contains an invalid clock value.
+: 時刻のコンテキストに無効な時刻の値が含まれています。
+= First configured day token
+: 設定された最初の曜日
+= Day context has no valid configured day.
+: 曜日のコンテキストに有効な曜日が設定されていません。
+= Location context needs latitude, longitude, and radius.
+: 位置情報のコンテキストには、緯度、経度、半径が必要です。
+= Location context contains an out-of-range coordinate.
+: 位置情報のコンテキストに範囲外の座標が含まれています。
+= Location radius cannot be negative.
+: 位置情報の半径を負の値にすることはできません。
+= Location accuracy must be a non-negative number.
+: 位置情報の精度は0以上の数値でなければなりません。
+= Location dwell cannot be negative.
+: 位置情報の滞在時間を負の値にすることはできません。
+= Point outside the configured geofence
+: 設定されたジオフェンスの外の地点
+= Point at the geofence center
+: ジオフェンスの中心の地点
+= State context needs a key, operator, and value predicate.
+: 状態のコンテキストには、キー、演算子、値からなる条件が必要です。
+= No made-up network name matches this Wi-Fi name pattern, so it needs a real network to try.
+: このWi-Fi名のパターンに一致する架空のネットワーク名を作れないため、試すには実際のネットワークが必要です。
+= State context uses an unsupported comparison operator.
+: 状態のコンテキストが、非対応の比較演算子を使っています。
+= Numeric state comparisons need a numeric threshold.
+: 数値の状態を比較するには、数値のしきい値が必要です。
+= State value satisfying the configured predicate
+: 設定された条件を満たす状態の値
+= Event context needs an event name or a filter.
+: イベントのコンテキストには、イベント名か絞り込みが必要です。
+= Event before-window must be a number of minutes.
+: イベントの事前の時間幅は、分単位の数値でなければなりません。
+= No made-up text matches this notification's title or text pattern, so it needs a real notification to try.
+: この通知のタイトルまたは本文のパターンに一致する架空の文字列を作れないため、試すには実際の通知が必要です。
+= Event payload populated from the configured filters
+: 設定された絞り込みから作ったイベントの内容
+= Sun event needs valid latitude and longitude.
+: 太陽のイベントには、有効な緯度と経度が必要です。
+= Sun event coordinates are out of range.
+: 太陽のイベントの座標が範囲外です。
+= Sun elevation must be civil, nautical, astronomical, or degrees from -90 to 90, not '%1$s'.
+: 太陽の高度は civil、nautical、astronomical、または-90〜90の度数で指定してください。「%1$s」は使えません。
+= The configured sun event is unavailable at these coordinates.
+: 設定された太陽のイベントは、この座標では起こりません。
+= Sun event offset must be numeric.
+: 太陽のイベントのオフセットは数値でなければなりません。
+= Sun event window must be numeric.
+: 太陽のイベントの時間幅は数値でなければなりません。
+= Sun tick at the configured %1$s window
+: 設定された%1$sの時間幅での太陽の時刻通知
+= Satisfied plugin condition result
+: 成立したプラグイン条件の結果
+= Plugin context has no configured package.
+: プラグインのコンテキストにパッケージが設定されていません。
+
+# WorkspaceHealth.kt
+= %1$s: unsupported
+: %1$s：非対応
+= %1$s: needs %2$s
+: %1$s：%2$sが必要

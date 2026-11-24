@@ -1,0 +1,698 @@
+# 04_ui — ui/components (Reorder, TabActionsFab, ThemedSnackbar), ui/gengoshima (言語島),
+#         ui/screens (action picker, action editor, ActiveAutomation lists and shell), widget
+
+# Reorder.kt
+= Drag to reorder
+: ドラッグして並べ替え
+
+# TabActionsFab.kt
+= Add / import / export
+: 追加 / インポート / エクスポート
+
+# TabActionsFab.kt — the labels of the per-tab "+" menu (defined in ActiveAutomationUi.kt)
+= Import JSON…
+: JSONをインポート…
+= New profile (needs a task)
+: 新しいプロファイル（タスクが必要）
+= New profile
+: 新しいプロファイル
+= From template…
+: テンプレートから…
+= Export profiles…
+: プロファイルをエクスポート…
+= Export everything…
+: すべてエクスポート…
+= New task
+: 新しいタスク
+= Export tasks…
+: タスクをエクスポート…
+= New widget template
+: 新しいウィジェットのテンプレート
+= Export templates…
+: テンプレートをエクスポート…
+= Export variables…
+: 変数をエクスポート…
+= New scene
+: 新しいシーン
+= Export scenes…
+: シーンをエクスポート…
+= New project
+: 新しいプロジェクト
+
+# ThemedSnackbar.kt
+= Dismiss
+: 閉じる
+
+# GengoshimaBoard.kt
+= 言語島 — Language islands
+: 言語島
+= 長押しで並べ替え / long-press and drag to reorder
+: 長押ししてドラッグで並べ替え
+
+# GengoshimaBoard.kt — the line under each tile's Japanese title (GS_TILES)
+=[island_tile] Review recordings
+: 録音した文を確かめる
+=[island_tile] File sentences
+: 文を島に振り分ける
+=[island_tile] Write sentences
+: 文を書き入れる
+=[island_tile] Translate & voice
+: 訳と音声を作る
+=[island_tile] Listen
+: 島を通して聴く
+=[island_tile] Shadow
+: 後について言う
+=[island_tile] Recall
+: 日本語を思い出す
+=[island_tile] Import
+: 文をまとめて取り込む
+=[island_tile] Vocabulary
+: 語彙を見る
+=[island_tile] Edit islands
+: 島と文を直す
+=[island_tile] Statistics
+: 学習の記録
+=[island_tile] Sync with 暗記
+: 暗記と揃える
+=[island_tile] Settings
+: 言語島の設定
+=[island_tile] Take from 暗記
+: 暗記の文を島にする
+
+# GengoshimaEntryActivity.kt
+= 書き終えたら下の「訳して音声を作る」/ when done, press Translate & voice below
+: 書き終えたら下の「訳して音声を作る」を押してください
+= 未分類 (%1$s) — 島に入れる / file captured sentences
+: 未分類 (%1$s) — 島に入れる
+= 取り込む / Import
+: 取り込む
+= まず島を作ってください — 話題ひとつにつき島ひとつ。\nMake an island first: one topic, one island.
+: まず島を作ってください — 話題ひとつにつき島ひとつ。
+= チェコ語の文 — Enter で追加 / Czech sentence, Enter adds it
+: チェコ語の文 — Enterで追加
+= 英文 — Enter で追加 / English sentence, Enter adds it
+: 英文 — Enterで追加
+= 追加 / Add
+: 追加
+= 似た文がもうあります / already written:
+: 似た文がもうあります：
+= 訳して音声を作る / Translate & voice
+: 訳して音声を作る
+= 訳待ち / to translate
+: 訳待ち
+= 新しい島 / New island
+: 新しい島
+= 話題（英語） / Topic
+: 話題（英語）
+= 話し方 / Register
+: 話し方
+= 例: 同僚に、丁寧に / to a colleague, polite
+: 例：同僚に、丁寧に
+= 誰に・どんな場面で話すか。島の全文の丁寧さがこれで決まる。空なら丁寧（です／ます）。\nWho you're talking to, and how formally: it sets the politeness of every sentence in the island. Blank means polite (です／ます).
+: 誰に・どんな場面で話すかを書きます。島の全文の丁寧さがこれで決まります。空なら丁寧（です／ます）になります。
+= 日本語の島名は訳と一緒に付きます。\nThe Japanese name comes with the translation.
+: 日本語の島名は訳と一緒に付きます。
+
+# GengoshimaInboxActivity.kt
+= 島の提案ができませんでした / no proposal: %1$s
+: 島の提案ができませんでした：%1$s
+= Claude が島を考えています… / Claude is choosing islands…
+: Claudeが島を考えています…
+= %1$s 文を選択中 / selected
+: %1$s文を選択中
+= 島を押すと変更、長押しで複数選択 / tap an island to change it, long-press to select
+: 島を押すと変更、長押しで複数選択
+= 島を変える / Move
+: 島を変える
+= %1$s 文を島に入れました / filed.
+: %1$s文を島に入れました。
+= 未分類の文はありません。kxkb で確認した文がここに届きます。\nNothing waiting — sentences reviewed in kxkb arrive here.
+: 未分類の文はありません。kxkbで確認した文がここに届きます。
+= 確定できませんでした / could not file: %1$s
+: 確定できませんでした：%1$s
+= 島のない文が %1$s あります / %1$s without an island
+: 島のない文が%1$s件あります（%1$s件に島を選んでください）
+= すべて確定 / File all
+: すべて確定
+= 島を選ぶ / Choose an island
+: 島を選ぶ
+
+# GengoshimaIslandsActivity.kt
+= 上へ / up
+: 上へ
+= 下へ / down
+: 下へ
+= 辞書で学ぶ / Study in 辞書
+: 辞書で学ぶ
+= 別の作業が走っています / another run is going
+: 別の作業が実行中です
+= 話し方 / Register: %1$s
+: 話し方：%1$s
+= （丁寧・既定 / polite, default）
+: （丁寧・既定）
+= 島を直す / edit island
+: 島を直す
+= 辞書で学ぶ / study in 辞書
+: 辞書で学ぶ
+= 島を仕上げる / finish island
+: 島を仕上げる
+= 島を暗記で更新 / update island in 暗記
+: 島を暗記で更新
+= 島を消す / delete island
+: 島を消す
+= 作業中 / working — %1$s
+: 作業中 — %1$s
+= 分け直しますか？ / Re-split?
+: 分け直しますか？
+= 訳し直しますか？ / Translate again?
+: 訳し直しますか？
+= 手で分けた語は自動の分け方に戻ります。同じ語に付けた読みは残ります。\nYour split goes back to the automatic one. Readings you set stay on the same words.
+: 手で分けた語は自動の分け方に戻ります。同じ語に付けた読みは残ります。
+= 手で書いた日本語と分け方は新しい訳に置き換わります。\nYour own Japanese and split are replaced by a new translation.
+: 手で書いた日本語と分け方は新しい訳に置き換わります。
+= 進める / go ahead
+: 進める
+= この文を消しますか？ / Delete this sentence?
+: この文を消しますか？
+= 島ごと消しますか？ / Delete the whole island?
+: 島ごと消しますか？
+= %1$s — %2$s 文と音声がすべて消えます。\nIts %2$s sentences and their audio go with it.
+: %1$s — %2$s文と、その%2$s文の音声がすべて消えます。
+= 島を直す / Edit island
+: 島を直す
+= 日本語の島名 / Japanese name
+: 日本語の島名
+= 話し方を変えると、手で直した行を除き島全体を訳し直します。\nChanging the register re-translates the island, except lines you wrote in Japanese.
+: 話し方を変えると、手で直した行を除き島全体を訳し直します。
+= どの島へ / Move to which island
+: どの島へ移しますか
+= 消す / delete
+: 消す
+= この島の「%1$s」はまだありません — 「訳して音声を作る」を一度走らせてください。\nThis island's whole-island file does not exist yet — run 「訳して音声を作る」 once.
+: この島の「%1$s」はまだありません — 「訳して音声を作る」を一度実行してください。
+= 白い熊の辞書 はまだこの受け口（STUDY_AUDIO）を持っていません。辞書側の更新を待ってください。\n白い熊の辞書 does not accept STUDY_AUDIO yet; it needs an update on its side.\n\n%1$s
+: 白い熊の辞書はまだこの受け口（STUDY_AUDIO）を持っていません。辞書側の更新を待ってください。\n\n%1$s
+= 開けませんでした / could not open: %1$s
+: 開けませんでした：%1$s
+
+# SentenceCard.kt — the state pills (CardState)
+= 訳し直し待ち / to translate
+: 訳し直し待ち
+= 分け直し待ち / to re-split
+: 分け直し待ち
+= 音声待ち / to voice
+: 音声待ち
+= 失敗 / failed
+: 失敗
+
+# SentenceCard.kt
+= 作業中… / working…
+: 作業中…
+= 暗記待ち / to 暗記
+: 暗記待ち
+= 手書きの日本語 / hand-written
+: 手書きの日本語
+= 手で分けた / split by hand
+: 手で分けた
+= 声にする / voice it
+: 声にする
+= 仕上げる / finish
+: 仕上げる
+= 暗記へ / to 暗記
+: 暗記へ
+= 別の島へ / move
+: 別の島へ
+= その他 / more
+: その他
+= 分けるだけ / split only — check before voicing
+: 分けるだけ — 声にする前に確かめる
+= 訳し直す / translate again
+: 訳し直す
+= 分け直す / re-split
+: 分け直す
+= 声を作り直す / re-voice both
+: 声を両方作り直す
+= 暗記を更新 / update in 暗記
+: 暗記を更新
+= 直す / edit
+: 直す
+= 原文を直す / Edit the source
+: 原文を直す
+= 原文の言語 / source language
+: 原文の言語
+= 原文（%1$s） / Source
+: 原文（%1$s）
+= 直すと訳し直し待ちになります。「仕上げる」で訳して声にします。\nSaved, it waits to be translated again; 「仕上げる」 translates and voices it.
+: 直すと訳し直し待ちになります。「仕上げる」で訳して声にします。
+= 日本語を直す / Edit the Japanese
+: 日本語を直す
+= 日本語 / Japanese
+: 日本語
+= その通りに残します。単語分けと振り仮名は作り直し、手で直した読みは同じ語に残ります。\nKept exactly. The words and furigana are made again; a reading you set stays on the same word.
+: その通りに残します。単語分けと振り仮名は作り直し、手で直した読みは同じ語に残ります。
+= 語を直す / Edit the word — %1$s
+: 語を直す — %1$s
+= 振り仮名 / furigana
+: 振り仮名
+= 声もこの読みで作ります（例: 生 → なま）。\nThe voice reads it this way too (e.g. 生 → なま).
+: 声もこの読みで作ります（例：生 → なま）。
+= ここで切る / cut after:
+: ここで切る：
+= 切る / cut
+: 切る
+= 戻る / back
+: 戻る
+= 次とつなぐ / join next
+: 次とつなぐ
+
+# VocabEdit.kt
+= 語 / term
+: 語
+= 読み（ひらがな）/ reading
+: 読み（ひらがな）
+= 訳 — 複数は ; で / translation, senses split by ;
+: 訳 — 複数は ; で区切る
+= 注 / note
+: 注
+= 島 / island
+: 島
+= 訳が要ります / a translation is required
+: 訳が必要です
+= English
+: 英語
+= 島の最後に普通の文として入り、音声が付きます。\nIt joins the island as an ordinary sentence and is voiced.
+: 島の最後に普通の文として入り、音声が付きます。
+
+# ActionEditorDialogs.kt
+= Parameters
+: パラメーター
+= Named values passed to the task; it reads each as {{ param.name }} (or %@name).
+: タスクに渡す名前付きの値です。タスク側では {{ param.name }}（または %@name）として読み取ります。
+= Name
+: 名前
+= Value
+: 値
+= Remove parameter
+: パラメーターを削除
+= Add parameter
+: パラメーターを追加
+= Default
+: 既定
+= Design layout (visual editor)
+: レイアウトを作成（ビジュアルエディター）
+= Edit layout visually
+: レイアウトを画面上で編集
+= Layout JSON (advanced)
+: レイアウトのJSON（上級者向け）
+= Choose a value
+: 値を選択
+= Pick an app
+: アプリを選択
+= Pick a directory or file
+: ディレクトリまたはファイルを選択
+= Pick directory…
+: ディレクトリを選択…
+= Pick file…
+: ファイルを選択…
+
+# ActionPickerScreen.kt
+= Add action
+: アクションを追加
+= Back
+: 戻る
+= Search actions
+: アクションを検索
+= Unsupported
+: 非対応
+= Setup
+: セットアップ
+= Fields
+: 項目
+= required
+: 必須
+= Add to task
+: タスクに追加
+
+# ActiveAutomationLists.kt
+= Contains blocked tasks
+: 実行できないタスクがあります
+= Unfiled
+: 未分類
+= Move 1 profile
+: プロファイル1件を移動
+= Move %1$s profiles
+: プロファイル%1$s件を移動
+= Move 1 task
+: タスク1件を移動
+= Move %1$s tasks
+: タスク%1$s件を移動
+= Collapse profile
+: プロファイルを折りたたむ
+= Expand profile
+: プロファイルを展開
+= Add task icon
+: タスクのアイコンを追加
+= OFF
+: 無効
+= Task menu
+: タスクのメニュー
+= Rename
+: 名前を変更
+= Edit
+: 編集
+= Enabled
+: 有効
+= Collapse task
+: タスクを折りたたむ
+= Expand task
+: タスクを展開
+= Rename task
+: タスクの名前を変更
+= Save
+: 保存
+= Cancel
+: キャンセル
+= Clone
+: 複製
+= Copy
+: コピー
+= Cut
+: 切り取り
+= Delete
+: 削除
+= Paste before
+: 前に貼り付け
+= Paste after
+: 後ろに貼り付け
+= Save changes?
+: 変更を保存しますか？
+= “%1$s” was edited but not saved.
+: 「%1$s」は編集されましたが、まだ保存されていません。
+= Discard
+: 破棄
+
+# ActiveAutomationLists.kt — nouns passed to the selection bar and the delete confirmation
+= profile
+: プロファイル
+= profiles
+: プロファイル
+= task
+: タスク
+= tasks
+: タスク
+= group
+: グループ
+= groups
+: グループ
+
+# ActiveAutomationLists.kt — stored-record types (StorageRecordType.label)
+= Profile
+: プロファイル
+= Task
+: タスク
+= Scene
+: シーン
+
+# ActiveAutomationLists.kt — context types (ContextType, shown capitalised)
+= Application
+: アプリ
+= Time
+: 時刻
+= Day
+: 曜日
+= Location
+: 位置情報
+= State
+: 状態
+= Event
+: イベント
+= Plugin
+: プラグイン
+
+# ActiveAutomationUi.kt — the destinations of the bottom bar (OpenTaskerScreen.label)
+= Monitor
+: モニター
+= Projects
+: プロジェクト
+= Profiles
+: プロファイル
+= Tasks
+: タスク
+= Variables
+: 変数
+= Flow
+: フロー
+= Scenes
+: シーン
+= Widgets
+: ウィジェット
+= Inspector
+: インスペクター
+= Run Log
+: 実行ログ
+= Help & Tools
+: ヘルプとツール
+
+# ActiveAutomationUi.kt
+= Flow target no longer exists
+: フローの対象はもう存在しません
+= Undo
+: 元に戻す
+= %1$s enabled - %2$s total
+: 有効%1$s件 - 全%2$s件
+= %1$s actions - %2$s tasks
+: アクション%1$s件 - タスク%2$s件
+= %1$s variables
+: 変数%1$s件
+= %1$s profiles - %2$s tasks
+: プロファイル%1$s件 - タスク%2$s件
+= %1$s elements - %2$s scenes
+: 要素%1$s件 - シーン%2$s件
+= %1$s widget templates
+: ウィジェットのテンプレート%1$s件
+= Live context health
+: コンテキストの現在の状態
+= Permission and reliability checks
+: 権限と信頼性の確認
+= %1$s recent entries
+: 最近の記録%1$s件
+= Engine and live state
+: エンジンと現在の状態
+= %1$s projects
+: プロジェクト%1$s件
+= Schema and action reference
+: スキーマとアクションの一覧
+= Shutting down
+: 終了しています
+= Running the run-on-exit tasks…
+: 終了時に実行するタスクを実行中…
+= Ready to exit
+: 終了の準備ができました
+= Still running
+: まだ実行中のものがあります
+= No run-on-exit tasks are configured (set them under Monitor ⇨ Run on exit).
+: 終了時に実行するタスクは設定されていません（「モニター」⇨「終了時に実行」で設定できます）。
+= Ran on exit: %1$s.
+: 終了時に実行しました：%1$s。
+= Gave up waiting after 30s (still going): %1$s.
+: 30秒待っても終わらなかったため、待機を打ち切りました（まだ実行中）：%1$s。
+= Configured but no longer exist — stale “Run on exit” entries: %1$s.
+: 設定されていますが、もう存在しません — 「終了時に実行」の古い項目：%1$s。
+= Nothing is left running. Only the engine service remains, and it is stopped next.
+: 実行中のものは残っていません。残っているのはエンジンのサービスだけで、これは次に停止します。
+= 1 thing should already have stopped and did not — they are forced down on OK:
+: すでに止まっているはずなのに止まっていないものが1件あります — OKを押すと強制的に停止します：
+= %1$s things should already have stopped and did not — they are forced down on OK:
+: すでに止まっているはずなのに止まっていないものが%1$s件あります — OKを押すと強制的に停止します：
+= This report is also written to the run log. Nothing will restart the app by itself afterwards — not the per-minute alarm, a widget, the tile or a sister app; open 白い熊 自由作業盤 to start it again.
+: この報告は実行ログにも書き込まれます。終了後は、毎分のアラーム、ウィジェット、タイル、姉妹アプリのどれからも、アプリがひとりでに再起動することはありません。もう一度始めるには、白い熊 自由作業盤を開いてください。
+= Stop everything & exit
+: すべて停止して終了
+= Collapse all
+: すべて折りたたむ
+= Expand all
+: すべて展開
+= More options (long-press: 白い熊 自由作業盤 UI)
+: その他のオプション（長押し：白い熊 自由作業盤 UI）
+= 白い熊 自由作業盤 UI
+: 白い熊 自由作業盤 UI
+= Restart engine
+: エンジンを再起動
+= Engine restarted — run-on-start tasks will re-run.
+: エンジンを再起動しました — 起動時に実行するタスクがもう一度実行されます。
+= Exit app fully
+: アプリを完全に終了
+= Profile enabled
+: プロファイルを有効にしました
+= Profile disabled
+: プロファイルを無効にしました
+= Freeze bubble on
+: 凍結バブルをオンにしました
+= Freeze bubble off
+: 凍結バブルをオフにしました
+= Task enabled
+: タスクを有効にしました
+= Task disabled
+: タスクを無効にしました
+= Actions updated
+: アクションを更新しました
+= Action removed
+: アクションを削除しました
+= Context removed
+: コンテキストを削除しました
+= Action added
+: アクションを追加しました
+= Action updated
+: アクションを更新しました
+= Context added
+: コンテキストを追加しました
+= Context updated
+: コンテキストを更新しました
+
+# ActiveAutomationUi.kt — the kinds of the shutdown report (RuntimeInventory.Kind.title)
+= Engine
+: エンジン
+= Running task
+: 実行中のタスク
+= Bubble
+: バブル
+= Panel
+: パネル
+
+# CreateTaskShortcutActivity.kt
+= Pick a task
+: タスクを選択
+= No tasks yet. Create one in 白い熊 自由作業盤 first.
+: タスクがまだありません。先に白い熊 自由作業盤で作成してください。
+= Collapse
+: 折りたたむ
+= Expand
+: 展開
+
+# StyledWidgetConfigActivity.kt
+= Configure widget
+: ウィジェットを設定
+= Widget name
+: ウィジェット名
+= Tasks target this with the Set Widget action.
+: タスクは「ウィジェットを設定」アクションで、この名前を指定します。
+= Tap task: none
+: タップ時のタスク：なし
+= Tap task: %1$s
+: タップ時のタスク：%1$s
+= None
+: なし
+= Content: Custom layout
+: 内容：独自のレイアウト
+= Content: template "%1$s"
+: 内容：テンプレート「%1$s」
+= Custom layout (edit below)
+: 独自のレイアウト（下で編集）
+= Layout (JSON, advanced)
+: レイアウト（JSON、上級者向け）
+= This widget renders the "%1$s" template, re-expanded by the Refresh Widgets action (e.g. the per-minute clock tick).
+: このウィジェットはテンプレート「%1$s」を表示します。「ウィジェットを更新」アクション（例：毎分の時計の更新）のたびに展開し直されます。
+= Add widget
+: ウィジェットを追加
+
+# TaskRunActivity.kt
+= Invalid task
+: タスクの指定が正しくありません
+= 白い熊 自由作業盤 は停止中 — open the app to start it
+: 白い熊 自由作業盤は停止中です — 開始するにはアプリを開いてください
+= Task not found
+: タスクが見つかりません
+= %1$s is corrupt; restore a database backup
+: 「%1$s」は壊れています。データベースのバックアップを復元してください
+= Task run failed
+: タスクの実行に失敗しました
+
+# TaskShortcutHelper.kt
+= Run: %1$s
+: 実行：%1$s
+
+# WidgetEditor.kt
+= Widget layout
+: ウィジェットのレイアウト
+= Import Tasker layout
+: Taskerのレイアウトをインポート
+= Copy JSON
+: JSONをコピー
+= Paste the layout JSON from a Tasker “Widget” (V2) action — the value of its Layout field (arg13). Containers, text, images, padding, colours and fonts are mapped to this editor’s schema.
+: Taskerの「Widget」（V2）アクションのレイアウトJSON（Layout欄、arg13の値）を貼り付けてください。コンテナ、文字、画像、余白、色、フォントが、このエディターの形式に変換されます。
+= Tasker layout JSON
+: TaskerのレイアウトJSON
+= Couldn’t parse that as a Tasker layout.
+: Taskerのレイアウトとして読み取れませんでした。
+= Convert
+: 変換
+= Preview
+: プレビュー
+= Preview size
+: プレビューのサイズ
+=[move] Up
+: 上へ
+=[move] Down
+: 下へ
+= Add child
+: 子要素を追加
+= Decrease %1$s
+: %1$sを減らす
+= Increase %1$s
+: %1$sを増やす
+
+# WidgetEditor.kt — the field labels of the node editor
+= Type
+: 種類
+= Text
+: 文字
+= Font
+: フォント
+= Size (dp)
+: サイズ (dp)
+= Color
+: 色
+= Bold
+: 太字
+= Text align
+: 文字の揃え
+= Source path
+: 画像のパス
+= Scale
+: 拡大縮小
+= Tint
+: 着色
+= Shape
+: 図形
+= Fill
+: 塗り
+= Stroke
+: 線
+= Stroke width (dp)
+: 線の太さ (dp)
+= Corner (dp)
+: 角の丸み (dp)
+= Arrange (main)
+: 配置（主軸）
+= Align (cross)
+: 揃え（交差軸）
+= Gap (dp)
+: 間隔 (dp)
+= Anchor (in box)
+: アンカー（ボックス内）
+= Offset X (dp)
+: ずらす量 X (dp)
+= Offset Y (dp)
+: ずらす量 Y (dp)
+= Free X (dp)
+: 自由配置 X (dp)
+= Free Y (dp)
+: 自由配置 Y (dp)
+= Width
+: 幅
+= Height
+: 高さ
+= Background
+: 背景
+= Background corner (dp)
+: 背景の角の丸み (dp)

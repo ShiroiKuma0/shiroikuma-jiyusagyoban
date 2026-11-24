@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -41,7 +42,7 @@ internal fun TaskerImportReviewDialog(
     val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(state.title) },
+        title = { Text(tr(state.title)) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -50,35 +51,35 @@ internal fun TaskerImportReviewDialog(
                 if (busy) item { TransferProgressRow(progress) }
                 item {
                     Text(
-                        "Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use.",
+                        tr("Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${preview.importTaskCount}", "Tasks", Modifier.weight(1f))
-                        SummaryMetric("${preview.importProfileCount}", "Profiles", Modifier.weight(1f))
-                        SummaryMetric("${preview.importVariableCount}", "Variables", Modifier.weight(1f))
+                        SummaryMetric("${preview.importTaskCount}", tr("Tasks"), Modifier.weight(1f))
+                        SummaryMetric("${preview.importProfileCount}", tr("Profiles"), Modifier.weight(1f))
+                        SummaryMetric("${preview.importVariableCount}", tr("Variables"), Modifier.weight(1f))
                     }
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        SummaryMetric("${preview.sourceTaskCount}", "Src tasks", Modifier.weight(1f))
-                        SummaryMetric("${preview.sourceProfileCount}", "Src profiles", Modifier.weight(1f))
-                        SummaryMetric("${preview.sourceSceneCount}", "Scenes", Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceTaskCount}", tr("Src tasks"), Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceProfileCount}", tr("Src profiles"), Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceSceneCount}", tr("Scenes"), Modifier.weight(1f))
                     }
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusPill("${preview.mappedActionCount} mapped", MaterialTheme.colorScheme.tertiary)
-                        StatusPill("${preview.unsupportedActionCount} unsupported", MaterialTheme.colorScheme.error)
+                        StatusPill(tr("%1\$s mapped", preview.mappedActionCount), MaterialTheme.colorScheme.tertiary)
+                        StatusPill(tr("%1\$s unsupported", preview.unsupportedActionCount), MaterialTheme.colorScheme.error)
                     }
                 }
                 if (preview.capabilityWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Capability review",
+                            title = tr("Capability review"),
                             values = preview.capabilityWarnings,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -87,8 +88,8 @@ internal fun TaskerImportReviewDialog(
                 if (migrationWarnings.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Migration warnings",
-                            values = migrationWarnings,
+                            title = tr("Migration warnings"),
+                            values = migrationWarnings.map { tr(it) },
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -96,7 +97,7 @@ internal fun TaskerImportReviewDialog(
                 if (state.unsupportedActionRows.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Unsupported actions",
+                            title = tr("Unsupported actions"),
                             values = state.unsupportedActionRows,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -105,7 +106,7 @@ internal fun TaskerImportReviewDialog(
                 if (state.mappedActionRows.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Mapped actions",
+                            title = tr("Mapped actions"),
                             values = state.mappedActionRows,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
@@ -118,7 +119,7 @@ internal fun TaskerImportReviewDialog(
                 enabled = preview.canImport && !busy,
                 onClick = onConfirm,
             ) {
-                Text(if (busy) "Importing..." else "Import for Review")
+                Text(if (busy) tr("Importing...") else tr("Import for Review"))
             }
         },
         // Stays enabled while busy. Disabling it left the only way out of a long import as force

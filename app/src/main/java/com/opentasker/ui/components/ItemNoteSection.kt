@@ -1,5 +1,6 @@
 package com.opentasker.ui.components
 
+import com.opentasker.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -68,14 +69,14 @@ fun ItemNoteSection(tab: String, itemKey: String, modifier: Modifier = Modifier)
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (note.isBlank()) "Add note" else "Note",
+                if (note.isBlank()) tr("Add note") else tr("Note"),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
             Icon(
                 if (noteExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (noteExpanded) "Collapse note" else "Expand note",
+                contentDescription = if (noteExpanded) tr("Collapse note") else tr("Expand note"),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
@@ -91,7 +92,7 @@ fun ItemNoteSection(tab: String, itemKey: String, modifier: Modifier = Modifier)
                     .padding(10.dp),
             ) {
                 Text(
-                    note.ifBlank { "Tap to add a note." },
+                    note.ifBlank { tr("Tap to add a note.") },
                     style = MaterialTheme.typography.bodyMedium,
                     fontStyle = if (note.isBlank()) FontStyle.Italic else FontStyle.Normal,
                     color = if (note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
@@ -105,22 +106,22 @@ fun ItemNoteSection(tab: String, itemKey: String, modifier: Modifier = Modifier)
         var text by remember { mutableStateOf(note) }
         AlertDialog(
             onDismissRequest = { editing = false },
-            title = { Text("Note") },
+            title = { Text(tr("Note")) },
             text = {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("What does this do?") },
+                    placeholder = { Text(tr("What does this do?")) },
                     minLines = 3,
                 )
             },
             confirmButton = {
                 Button(onClick = { persist(newNote = text.trim(), newExpanded = true); editing = false }) {
-                    Text("Save")
+                    Text(tr("Save"))
                 }
             },
-            dismissButton = { OutlinedButton(onClick = { editing = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { editing = false }) { Text(tr("Cancel")) } },
         )
     }
 }

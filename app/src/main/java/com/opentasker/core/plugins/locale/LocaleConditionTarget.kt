@@ -1,6 +1,7 @@
 package com.opentasker.core.plugins.locale
 
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.i18n.tr
 
 /**
  * The fork's equivalent of upstream's SUPER_GLOBAL_PROJECT_ID: project 0 is the super-global scope that
@@ -145,10 +146,10 @@ object LocaleConditionTarget {
     }
 
     fun buildBlurb(spec: LocaleConditionSpec): String = when (spec.kind) {
-        LocaleConditionKind.PROFILE_ACTIVE -> "Profile active: ${spec.profileId}"
-        LocaleConditionKind.CONTEXT_SATISFIED -> "Context satisfied: profile ${spec.profileId}, context ${(spec.contextIndex ?: 0) + 1}"
+        LocaleConditionKind.PROFILE_ACTIVE -> tr("Profile active: %1\$s", spec.profileId)
+        LocaleConditionKind.CONTEXT_SATISFIED -> tr("Context satisfied: profile %1\$s, context %2\$s", spec.profileId, (spec.contextIndex ?: 0) + 1)
         LocaleConditionKind.VARIABLE_COMPARE ->
-            "${spec.variableName.orEmpty()} ${spec.operator?.wireName.orEmpty()} configured value"
+            tr("%1\$s %2\$s configured value", spec.variableName.orEmpty(), spec.operator?.wireName.orEmpty())
     }
 
     private fun requirePositiveId(value: Long): Long = value.also {

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -145,7 +146,7 @@ internal fun TemplatePickerDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                                 ) {
-                                    Text(template.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                    Text(tr(template.title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                                     StatusPill(
                                         status,
                                         when (template.availability) {
@@ -155,9 +156,9 @@ internal fun TemplatePickerDialog(
                                         },
                                     )
                                 }
-                                Text(template.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                                Text(template.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(template.safetyNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tr(template.category), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                Text(tr(template.summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tr(template.safetyNote), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -180,14 +181,14 @@ internal fun TemplateSlotDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(template.title) },
+        title = { Text(tr(template.title)) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
-                    Text(template.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr(template.summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
@@ -204,8 +205,8 @@ internal fun TemplateSlotDialog(
                     OutlinedTextField(
                         value = values[slot.key].orEmpty(),
                         onValueChange = { values = values + (slot.key to it) },
-                        label = { Text(slot.label + if (slot.required) " *" else "") },
-                        placeholder = slot.hint?.let { { Text(it) } },
+                        label = { Text(tr(slot.label) + if (slot.required) " *" else "") },
+                        placeholder = slot.hint?.let { { Text(tr(it)) } },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -281,7 +282,7 @@ internal fun TaskEditorDialog(
                     isError = nameClash,
                     supportingText = {
                         Text(
-                            if (nameClash) "A task with this name already exists in this project."
+                            if (nameClash) tr("A task with this name already exists in this project.")
                             else stringResource(R.string.task_name_helper)
                         )
                     },
@@ -349,17 +350,17 @@ internal fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit, ta
         if (uri != null) scope.launch {
             val saved = withContext(Dispatchers.IO) { TaskIconStore.saveFromAudio(context, uri) }
             if (saved != null) onStage(saved)
-            else android.widget.Toast.makeText(context, "No album art in that file", android.widget.Toast.LENGTH_SHORT).show()
+            else android.widget.Toast.makeText(context, tr("No album art in that file"), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Shortcut icon", style = MaterialTheme.typography.labelLarge)
+        Text(tr("Shortcut icon"), style = MaterialTheme.typography.labelLarge)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
                 if (preview != null) {
                     Image(
                         bitmap = preview.asImageBitmap(),
-                        contentDescription = "Selected icon",
+                        contentDescription = tr("Selected icon"),
                         modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
                     )
                 } else {
@@ -368,20 +369,20 @@ internal fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit, ta
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { showAppPicker = true }) { Text("App") }
+                    OutlinedButton(onClick = { showAppPicker = true }) { Text(tr("App")) }
                     OutlinedButton(onClick = {
                         photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }) { Text("Picture") }
+                    }) { Text(tr("Picture")) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { showEmojiPicker = true }) { Text("Emoji") }
-                    OutlinedButton(onClick = { audioPicker.launch("audio/*") }) { Text("Audio") }
-                    if (iconPath != null) TextButton(onClick = { onStage(null) }) { Text("Clear") }
+                    OutlinedButton(onClick = { showEmojiPicker = true }) { Text(tr("Emoji")) }
+                    OutlinedButton(onClick = { audioPicker.launch("audio/*") }) { Text(tr("Audio")) }
+                    if (iconPath != null) TextButton(onClick = { onStage(null) }) { Text(tr("Clear")) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (targetPackage != null) OutlinedButton(onClick = { showActivityIcons = true }) { Text("App icons") }
-                    OutlinedButton(onClick = { showIconPack = true }) { Text("Icon pack") }
-                    OutlinedButton(onClick = { showFramework = true }) { Text("System") }
+                    if (targetPackage != null) OutlinedButton(onClick = { showActivityIcons = true }) { Text(tr("App icons")) }
+                    OutlinedButton(onClick = { showIconPack = true }) { Text(tr("Icon pack")) }
+                    OutlinedButton(onClick = { showFramework = true }) { Text(tr("System")) }
                 }
             }
         }
@@ -568,7 +569,7 @@ internal fun ProfileEditorDialog(
                     isError = nameClash,
                     supportingText = {
                         Text(
-                            if (nameClash) "A profile with this name already exists in this project."
+                            if (nameClash) tr("A profile with this name already exists in this project.")
                             else stringResource(R.string.profile_name_helper)
                         )
                     },
@@ -652,10 +653,11 @@ internal fun ProfileEditorDialog(
                 }
 
                 HorizontalDivider()
-                Text("Arbitration", style = MaterialTheme.typography.titleSmall)
+                Text(tr("Arbitration"), style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "How this profile behaves when it competes with others. Everything here is off by " +
-                        "default — a profile left alone runs exactly as before.",
+                    tr(
+                        "How this profile behaves when it competes with others. Everything here is off by default — a profile left alone runs exactly as before."
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -663,16 +665,15 @@ internal fun ProfileEditorDialog(
                 OutlinedTextField(
                     value = priorityText,
                     onValueChange = { priorityText = it.filter { c -> c.isDigit() || c == '-' }.take(4) },
-                    label = { Text("Priority") },
+                    label = { Text(tr("Priority")) },
                     supportingText = {
                         Text(
                             if (!priorityValid) {
-                                "Whole number between ${ProfileLifecyclePolicy.MIN_PRIORITY} and ${ProfileLifecyclePolicy.MAX_PRIORITY}."
+                                tr("Whole number between %1\$s and %2\$s.", ProfileLifecyclePolicy.MIN_PRIORITY, ProfileLifecyclePolicy.MAX_PRIORITY)
                             } else {
-                                "While this profile matches, it suppresses any matching profile with a STRICTLY lower " +
-                                    "priority — their tasks are skipped and logged, and they run again the moment this " +
-                                    "one stops matching. Equal priorities never suppress each other, so leaving every " +
-                                    "profile at 0 keeps them all independent."
+                                tr(
+                                    "While this profile matches, it suppresses any matching profile with a STRICTLY lower priority — their tasks are skipped and logged, and they run again the moment this one stops matching. Equal priorities never suppress each other, so leaving every profile at 0 keeps them all independent."
+                                )
                             }
                         )
                     },
@@ -685,14 +686,15 @@ internal fun ProfileEditorDialog(
                 OutlinedTextField(
                     value = graceText,
                     onValueChange = { graceText = it.filter(Char::isDigit).take(4) },
-                    label = { Text("Grace period (seconds)") },
+                    label = { Text(tr("Grace period (seconds)")) },
                     supportingText = {
                         Text(
                             if (!graceValid) {
-                                "Whole number of seconds, 0 to ${ProfileLifecyclePolicy.MAX_GRACE_PERIOD_SEC}."
+                                tr("Whole number of seconds, 0 to %1\$s.", ProfileLifecyclePolicy.MAX_GRACE_PERIOD_SEC)
                             } else {
-                                "The conditions must hold this long before an activation OR a deactivation is " +
-                                    "accepted — it debounces a flapping trigger. 0 reacts immediately."
+                                tr(
+                                    "The conditions must hold this long before an activation OR a deactivation is accepted — it debounces a flapping trigger. 0 reacts immediately."
+                                )
                             }
                         )
                     },
@@ -702,22 +704,22 @@ internal fun ProfileEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Text("Lifetime", style = MaterialTheme.typography.labelLarge)
+                Text(tr("Lifetime"), style = MaterialTheme.typography.labelLarge)
                 SelectableOption(
-                    title = "Always",
-                    body = "Runs for as long as it stays enabled.",
+                    title = tr("Always"),
+                    body = tr("Runs for as long as it stays enabled."),
                     selected = lifetime == ProfileLifetime.NEVER,
                     onClick = { lifetime = ProfileLifetime.NEVER },
                 )
                 SelectableOption(
-                    title = "Until a date",
-                    body = "Stops matching at the start of the day you name, and disables itself.",
+                    title = tr("Until a date"),
+                    body = tr("Stops matching at the start of the day you name, and disables itself."),
                     selected = lifetime == ProfileLifetime.UNTIL_DATE,
                     onClick = { lifetime = ProfileLifetime.UNTIL_DATE },
                 )
                 SelectableOption(
-                    title = "Once",
-                    body = "Runs a single time, then disables itself. Re-enabling it here arms it again.",
+                    title = tr("Once"),
+                    body = tr("Runs a single time, then disables itself. Re-enabling it here arms it again."),
                     selected = lifetime == ProfileLifetime.ONCE,
                     onClick = { lifetime = ProfileLifetime.ONCE },
                 )
@@ -725,11 +727,11 @@ internal fun ProfileEditorDialog(
                     OutlinedTextField(
                         value = expiryText,
                         onValueChange = { expiryText = it.take(10) },
-                        label = { Text("Expires on (YYYY-MM-DD)") },
+                        label = { Text(tr("Expires on (YYYY-MM-DD)")) },
                         supportingText = {
                             Text(
-                                if (!expiryValid) "Enter a real date as YYYY-MM-DD, e.g. 2026-12-31."
-                                else "The profile stops matching at 00:00 local time on this day."
+                                if (!expiryValid) tr("Enter a real date as YYYY-MM-DD, e.g. 2026-12-31.")
+                                else tr("The profile stops matching at 00:00 local time on this day.")
                             )
                         },
                         isError = !expiryValid,
@@ -741,13 +743,13 @@ internal fun ProfileEditorDialog(
                 OutlinedTextField(
                     value = maxActiveText,
                     onValueChange = { maxActiveText = it.filter(Char::isDigit).take(1) },
-                    label = { Text("Max concurrent runs (optional)") },
+                    label = { Text(tr("Max concurrent runs (optional)")) },
                     supportingText = {
                         Text(
                             if (!maxActiveValid) {
-                                "${ProfileConcurrencyPolicy.MIN_MAX_ACTIVE}–${ProfileConcurrencyPolicy.MAX_MAX_ACTIVE}, or blank for the engine default."
+                                tr("%1\$s–%2\$s, or blank for the engine default.", ProfileConcurrencyPolicy.MIN_MAX_ACTIVE, ProfileConcurrencyPolicy.MAX_MAX_ACTIVE)
                             } else {
-                                "Caps how many of this profile's runs may be in flight at once."
+                                tr("Caps how many of this profile's runs may be in flight at once.")
                             }
                         )
                     },
@@ -760,13 +762,13 @@ internal fun ProfileEditorDialog(
                 OutlinedTextField(
                     value = burstText,
                     onValueChange = { burstText = it.filter(Char::isDigit).take(2) },
-                    label = { Text("Burst limit (optional)") },
+                    label = { Text(tr("Burst limit (optional)")) },
                     supportingText = {
                         Text(
                             if (!burstValid) {
-                                "${ProfileConcurrencyPolicy.MIN_BURST_LIMIT}–${ProfileConcurrencyPolicy.MAX_BURST_LIMIT}, or blank for the engine default."
+                                tr("%1\$s–%2\$s, or blank for the engine default.", ProfileConcurrencyPolicy.MIN_BURST_LIMIT, ProfileConcurrencyPolicy.MAX_BURST_LIMIT)
                             } else {
-                                "Caps how many runs this profile may START inside the engine's burst window."
+                                tr("Caps how many runs this profile may START inside the engine's burst window.")
                             }
                         )
                     },
@@ -776,31 +778,31 @@ internal fun ProfileEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Text("When a run is refused", style = MaterialTheme.typography.labelLarge)
+                Text(tr("When a run is refused"), style = MaterialTheme.typography.labelLarge)
                 SelectableOption(
-                    title = "Log it",
-                    body = "A refused run leaves a skipped entry in the Run Log, saying which limit refused it.",
+                    title = tr("Log it"),
+                    body = tr("A refused run leaves a skipped entry in the Run Log, saying which limit refused it."),
                     selected = overflowPolicy == ProfileOverflowPolicy.LOG,
                     onClick = { overflowPolicy = ProfileOverflowPolicy.LOG },
                 )
                 SelectableOption(
-                    title = "Drop it quietly",
-                    body = "No Run Log entry. For a fast trigger whose refusals are noise rather than news.",
+                    title = tr("Drop it quietly"),
+                    body = tr("No Run Log entry. For a fast trigger whose refusals are noise rather than news."),
                     selected = overflowPolicy == ProfileOverflowPolicy.SILENT,
                     onClick = { overflowPolicy = ProfileOverflowPolicy.SILENT },
                 )
 
-                Text("Recovery task", style = MaterialTheme.typography.labelLarge)
+                Text(tr("Recovery task"), style = MaterialTheme.typography.labelLarge)
                 Text(
-                    "Run when this profile's task fails and nothing in it caught the error. It receives " +
-                        "the failure as variables — which task, which action, which message — so it can " +
-                        "report or repair. It runs once and never triggers its own recovery.",
+                    tr(
+                        "Run when this profile's task fails and nothing in it caught the error. It receives the failure as variables — which task, which action, which message — so it can report or repair. It runs once and never triggers its own recovery."
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 SelectableOption(
-                    title = "None",
-                    body = "A failure is logged and left alone.",
+                    title = tr("None"),
+                    body = tr("A failure is logged and left alone."),
                     selected = fallbackTaskId <= 0L,
                     onClick = { fallbackTaskId = 0L },
                 )
@@ -1070,7 +1072,7 @@ internal fun DeleteConfirmationDialog(
         is DeleteTarget.TaskTarget -> stringResource(R.string.delete_task_body, target.task.name, target.task.actions.size)
         is DeleteTarget.SceneTarget -> stringResource(R.string.delete_scene_body, target.scene.name, target.scene.elements.size)
         is DeleteTarget.ActionTarget -> stringResource(R.string.delete_action_body, target.index + 1, target.task.name)
-        is DeleteTarget.ContextTarget -> stringResource(R.string.delete_context_body, target.context.type.name.lowercase(), target.profile.name)
+        is DeleteTarget.ContextTarget -> stringResource(R.string.delete_context_body, tr(target.context.type.name.lowercase()), target.profile.name)
     }
     val confirmLabel = when (target) {
         is DeleteTarget.ProfileTarget -> stringResource(R.string.profile_delete)
@@ -1128,7 +1130,7 @@ internal fun TaskIconPickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (String?) -> Unit,
     targetPackage: String? = null,
-    title: String = "Task icon",
+    title: String = tr("Task icon"),
 ) {
     val original = remember { initialIconPath }
     var staged by remember { mutableStateOf(initialIconPath) }
@@ -1146,7 +1148,7 @@ internal fun TaskIconPickerDialog(
         onDismissRequest = cancel,
         title = { Text(title) },
         text = { TaskIconEditorRow(iconPath = staged, onStage = { stage(it) }, targetPackage = targetPackage) },
-        confirmButton = { OutlinedButton(onClick = { onConfirm(staged) }) { Text("Done") } },
+        confirmButton = { OutlinedButton(onClick = { onConfirm(staged) }) { Text(tr("Done")) } },
         dismissButton = { OutlinedButton(onClick = cancel) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

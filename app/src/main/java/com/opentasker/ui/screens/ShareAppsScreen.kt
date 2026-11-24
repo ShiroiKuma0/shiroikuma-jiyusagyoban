@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemedSwitch
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -78,9 +79,9 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Share apps") },
+                title = { Text(tr("Share apps")) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
                 },
             )
         },
@@ -92,8 +93,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
         ) {
             item {
                 Text(
-                    "Each app here gets its own tile in the system share sheet. Sharing to it unfreezes " +
-                        "the app (Shizuku), forwards the content, and drops a re-freeze bubble.",
+                    tr("Each app here gets its own tile in the system share sheet. Sharing to it unfreezes the app (Shizuku), forwards the content, and drops a re-freeze bubble."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -112,11 +112,11 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Text(
-                                "Shizuku is needed to install and remove relays.",
+                                tr("Shizuku is needed to install and remove relays."),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
                             )
-                            OutlinedButton(onClick = { ShizukuShell.requestPermission() }) { Text("Grant") }
+                            OutlinedButton(onClick = { ShizukuShell.requestPermission() }) { Text(tr("Grant")) }
                         }
                     }
                 }
@@ -135,8 +135,8 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                             busy.remove(entry.targetPackage)
                             toast(
                                 when (outcome) {
-                                    is RelayGenerator.Outcome.Installed -> "${entry.label}: installed"
-                                    is RelayGenerator.Outcome.ShizukuUnavailable -> "Shizuku unavailable"
+                                    is RelayGenerator.Outcome.Installed -> tr("%1\$s: installed", entry.label)
+                                    is RelayGenerator.Outcome.ShizukuUnavailable -> tr("Shizuku unavailable")
                                     is RelayGenerator.Outcome.Failed -> "${entry.label}: ${outcome.message}"
                                 },
                             )
@@ -148,7 +148,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                             val outcome = RelayGenerator.remove(context, entry)
                             busy.remove(entry.targetPackage)
                             if (outcome is RelayGenerator.Outcome.Failed) toast("${entry.label}: ${outcome.message}")
-                            else if (outcome is RelayGenerator.Outcome.ShizukuUnavailable) toast("Shizuku unavailable")
+                            else if (outcome is RelayGenerator.Outcome.ShizukuUnavailable) toast(tr("Shizuku unavailable"))
                         }
                     },
                 )
@@ -161,16 +161,16 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Text(if (relays.size < ShareRelayStore.MAX_TARGETS) "Add apps" else "Maximum ${ShareRelayStore.MAX_TARGETS} reached")
+                    Text(if (relays.size < ShareRelayStore.MAX_TARGETS) tr("Add apps") else tr("Maximum %1\$s reached", ShareRelayStore.MAX_TARGETS))
                 }
             }
 
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text("Copy files when forwarding", style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("Copy files when forwarding"), style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "Route shared files through this app's storage — for receivers that reject a passed-on grant.",
+                            tr("Route shared files through this app's storage — for receivers that reject a passed-on grant."),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -183,7 +183,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
 
     if (showPicker) {
         AppMultiSelectDialog(
-            title = "Add share targets",
+            title = tr("Add share targets"),
             preselected = relays.map { it.targetPackage }.toSet(),
             onConfirm = { picked, _ ->
                 showPicker = false
@@ -205,7 +205,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
         TaskIconPickerDialog(
             initialIconPath = entry.iconPath,
             targetPackage = entry.targetPackage,
-            title = "Icon — ${entry.label}",
+            title = tr("Icon — %1\$s", entry.label),
             onDismiss = { iconEditFor = null },
             onConfirm = { path ->
                 ShareRelayStore.setIcon(entry.targetPackage, path)
@@ -237,13 +237,13 @@ private fun RelayRow(
                         .background(MaterialTheme.colorScheme.surface).clickable { onEditIcon() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (bmp != null) Image(bmp.asImageBitmap(), "Edit icon", Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
+                    if (bmp != null) Image(bmp.asImageBitmap(), tr("Edit icon"), Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
                     else Text("?", style = MaterialTheme.typography.titleLarge)
                 }
                 OutlinedTextField(
                     value = entry.label,
                     onValueChange = onLabelChange,
-                    label = { Text("Tile name") },
+                    label = { Text(tr("Tile name")) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -267,9 +267,9 @@ private fun RelayRow(
                     shape = RoundedCornerShape(10.dp),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text(if (entry.state == RelayState.GENERATED) "Reinstall" else if (entry.state == RelayState.STALE) "Regenerate" else "Generate")
+                    else Text(if (entry.state == RelayState.GENERATED) tr("Reinstall") else if (entry.state == RelayState.STALE) tr("Regenerate") else tr("Generate"))
                 }
-                OutlinedButton(onClick = onRemove, enabled = !busy, shape = RoundedCornerShape(10.dp)) { Text("Remove") }
+                OutlinedButton(onClick = onRemove, enabled = !busy, shape = RoundedCornerShape(10.dp)) { Text(tr("Remove")) }
             }
         }
     }
@@ -278,9 +278,9 @@ private fun RelayRow(
 @Composable
 private fun StateBadge(state: RelayState) {
     val (text, color) = when (state) {
-        RelayState.DRAFT -> "not generated" to MaterialTheme.colorScheme.onSurfaceVariant
-        RelayState.GENERATED -> "✓ installed" to MaterialTheme.colorScheme.tertiary
-        RelayState.STALE -> "needs regenerate" to MaterialTheme.colorScheme.error
+        RelayState.DRAFT -> tr("not generated") to MaterialTheme.colorScheme.onSurfaceVariant
+        RelayState.GENERATED -> tr("✓ installed") to MaterialTheme.colorScheme.tertiary
+        RelayState.STALE -> tr("needs regenerate") to MaterialTheme.colorScheme.error
     }
     Text(text, style = MaterialTheme.typography.labelMedium, color = color)
 }

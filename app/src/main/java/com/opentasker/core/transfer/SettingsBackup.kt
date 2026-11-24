@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.i18n.tr
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.opentasker.core.logging.AppLogger
@@ -501,10 +502,10 @@ object SettingsBackup {
                     }
                 }
                 count++
-                onProgress?.invoke(count, total, cat.label)
+                onProgress?.invoke(count, total, tr(cat.label))
             }
         }
-        return "$count categor${if (count == 1) "y" else "ies"}"
+        return if (count == 1) tr("1 category") else tr("%1\$s categories", count)
     }
 
     private fun writeEntry(zip: ZipOutputStream, name: String, bytes: ByteArray) {
@@ -958,20 +959,22 @@ object SettingsBackup {
                     val raw = entries[WORKSPACE_ENTRY] ?: continue
                     val bundle = OpenTaskerBundleCodec.decode(raw.toString(Charsets.UTF_8))
                     val report = OpenTaskerBundleRepository(db).importBundle(bundle)
-                    lines += "${cat.label}: ${report.insertedTasks} tasks · ${report.insertedProfiles} profiles · " +
-                        "${report.insertedScenes} scenes · ${report.insertedVariables} variables"
+                    lines += tr(
+                        "%1\$s: %2\$s tasks · %3\$s profiles · %4\$s scenes · %5\$s variables",
+                        tr(cat.label), report.insertedTasks, report.insertedProfiles, report.insertedScenes, report.insertedVariables,
+                    )
                 }
                 Cat.TASK_ICONS -> {
                     val n = importDirFiles(entries, ICONS_DIR, File(context.filesDir, "task_icons"))
-                    if (n >= 0) { lines += "${cat.label}: $n"; }
+                    if (n >= 0) { lines += tr("%1\$s: %2\$s", tr(cat.label), n); }
                 }
                 Cat.HEALTH_DATA -> {
                     val n = importTables(entries, db)
-                    if (n > 0) lines += "${cat.label}: $n rows"
+                    if (n > 0) lines += tr("%1\$s: %2\$s rows", tr(cat.label), n)
                 }
                 Cat.MAPS -> {
                     val n = importCutouts(entries, db)
-                    if (n > 0) lines += "${cat.label}: $n"
+                    if (n > 0) lines += tr("%1\$s: %2\$s", tr(cat.label), n)
                 }
                 Cat.GENGOSHIMA -> {
                     val rows = importTables(entries, db, GENGOSHIMA_TABLES, GENGOSHIMA_DIR)
@@ -982,8 +985,8 @@ object SettingsBackup {
                     // Absent from archives written before the board existed — that is not a miss.
                     val keys = entries[GENGOSHIMA_PREFS_ENTRY]?.let { importPrefs(context, it, db) } ?: 0
                     if (rows > 0 || files > 0 || keys > 0) {
-                        lines += "${cat.label}: $rows rows" + (if (files > 0) " · $files files" else "") +
-                            if (keys > 0) " · $keys keys" else ""
+                        lines += tr("%1\$s: %2\$s rows", tr(cat.label), rows) + (if (files > 0) tr(" · %1\$s files", files) else "") +
+                            if (keys > 0) tr(" · %1\$s keys", keys) else ""
                     }
                 }
                 else -> {
@@ -1006,7 +1009,7 @@ object SettingsBackup {
                     val raw = entries["${cat.id}.json"]
                     if (raw == null && files <= 0) continue
                     val n = if (raw == null) 0 else importPrefs(context, raw, db)
-                    lines += "${cat.label}: $n keys" + if (files > 0) " · $files files" else ""
+                    lines += tr("%1\$s: %2\$s keys", tr(cat.label), n) + if (files > 0) tr(" · %1\$s files", files) else ""
                     restartNeeded = true
                 }
             }

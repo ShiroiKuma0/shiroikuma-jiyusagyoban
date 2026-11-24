@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import com.opentasker.i18n.tr
 import com.opentasker.ui.charts.render.PlotFrame
 import com.opentasker.ui.charts.render.drawBars
 import com.opentasker.ui.charts.render.drawCapsules
@@ -139,7 +140,7 @@ fun ChartPaletteVerdict(prefs: ThemePrefs, modifier: Modifier = Modifier) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(mark, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.Bold)
                 Column {
-                    Text(name, style = MaterialTheme.typography.bodyMedium)
+                    Text(tr(name), style = MaterialTheme.typography.bodyMedium)
                     val detail = report.failures.takeIf { it.isNotEmpty() }
                         ?: report.findings.filter { it.check == "色覚" || it.check == "識別" }
                     detail.forEach {

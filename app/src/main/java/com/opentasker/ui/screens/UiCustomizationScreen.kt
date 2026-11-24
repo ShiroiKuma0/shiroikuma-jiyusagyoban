@@ -89,6 +89,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.i18n.tr
+import com.opentasker.i18n.trc
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import com.opentasker.core.transfer.AutomationAuth
@@ -262,7 +264,7 @@ private fun ModelRow(slot: ModelSlot) {
 
     IconRow(1, Icons.Filled.Memory, IconRole.VIEW, ruled = true) {
         Column(Modifier.weight(1f)) {
-            RowLabel(slot.label)
+            RowLabel(tr(slot.label))
             if (current.isBlank()) RowNote("未設定 — ${slot.fileName}", warn = true) else RowValue("設定済み")
             // The pill opens the file picker, so it carries the ›; its explanation sits beneath it.
             HuggingPill(
@@ -271,7 +273,7 @@ private fun ModelRow(slot: ModelSlot) {
                 modifier = Modifier.padding(vertical = 3.dp),
                 onClick = { picker.launch(arrayOf("*/*")) },
             )
-            RowNote(slot.about)
+            RowNote(tr(slot.about))
         }
     }
 }
@@ -282,33 +284,26 @@ const val FOCUS_OCR = "ocr"
 private fun SectionRows.ocrSectionRows(prefs: ThemePrefs) {
     item {
                 SwitchRow(
-                    level = 1, label = "High-accuracy model",
-                    description = "On: PP-OCRv5 server (81 MB). Off: mobile (16 MB), about 2.5x faster — " +
-                        "roughly 2 s instead of 5 s on a full-width screenshot. Measured on clean screenshot " +
-                        "text the two are equivalent; the server model's headroom is for photographed and " +
-                        "handwritten text. Japanese and English only — there is no server-sized Latin or " +
-                        "Cyrillic recogniser, so those chips are unaffected.",
+                    level = 1, label = tr("High-accuracy model"),
+                    description = tr("On: PP-OCRv5 server (81 MB). Off: mobile (16 MB), about 2.5x faster — roughly 2 s instead of 5 s on a full-width screenshot. Measured on clean screenshot text the two are equivalent; the server model's headroom is for photographed and handwritten text. Japanese and English only — there is no server-sized Latin or Cyrillic recogniser, so those chips are unaffected."),
                     checked = prefs.ocrHighAccuracy,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(ocrHighAccuracy = v) } },
                 )
             }
 
-    item { SubHeader(1, "Models") }
+    item { SubHeader(1, tr("Models")) }
     item {
         SettingNote(
-            "The recognition weights are about 100 MB and never change, so they are NOT in the APK — " +
-                "every kept build would have carried another copy. Fetch them once, point each row at " +
-                "the file, and they stay. The character dictionaries do ship, because each one has to " +
-                "match its model exactly."
+            tr("The recognition weights are about 100 MB and never change, so they are NOT in the APK — every kept build would have carried another copy. Fetch them once, point each row at the file, and they stay. The character dictionaries do ship, because each one has to match its model exactly.")
         )
     }
     item { ModelDownloadRow() }
     items(ModelSlot.entries.toList(), key = { "ocr-model-${it.id}" }) { slot -> ModelRow(slot) }
 
-    item { SubHeader(1, "Detection") }
+    item { SubHeader(1, tr("Detection")) }
     item {
                 SliderRow(
-                    level = 1, label = "Detection long side",
+                    level = 1, label = tr("Detection long side"),
                     value = prefs.ocrDetectionLongSide, valueText = "${prefs.ocrDetectionLongSide} px",
                     range = OcrTuning.LONG_SIDE_MIN.toFloat()..OcrTuning.LONG_SIDE_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(ocrDetectionLongSide = v) } },
@@ -316,14 +311,12 @@ private fun SectionRows.ocrSectionRows(prefs: ThemePrefs) {
             }
     item {
                 SettingNote(
-                    "The size the detector actually sees. 1600 px is measured, not inherited — against " +
-                        "PP-OCR's own 960 default it halved the character error on a full-width screenshot, " +
-                        "and the errors it removed were exactly the small text. Higher costs time with the area."
+                    tr("The size the detector actually sees. 1600 px is measured, not inherited — against PP-OCR's own 960 default it halved the character error on a full-width screenshot, and the errors it removed were exactly the small text. Higher costs time with the area.")
                 )
             }
     item {
                 SliderRow(
-                    level = 1, label = "Binarisation threshold",
+                    level = 1, label = tr("Binarisation threshold"),
                     value = prefs.ocrBinarisePercent, valueText = "0.${prefs.ocrBinarisePercent}",
                     range = OcrTuning.BINARY_PERCENT_MIN.toFloat()..OcrTuning.BINARY_PERCENT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(ocrBinarisePercent = v) } },
@@ -331,13 +324,12 @@ private fun SectionRows.ocrSectionRows(prefs: ThemePrefs) {
             }
     item {
                 SettingNote(
-                    "Where the probability map becomes text. Lower finds fainter text and starts joining " +
-                        "neighbouring lines into one box; higher splits words off the ends of lines."
+                    tr("Where the probability map becomes text. Lower finds fainter text and starts joining neighbouring lines into one box; higher splits words off the ends of lines.")
                 )
             }
     item {
                 SliderRow(
-                    level = 1, label = "Box score threshold",
+                    level = 1, label = tr("Box score threshold"),
                     value = prefs.ocrBoxScorePercent, valueText = "0.${prefs.ocrBoxScorePercent}",
                     range = OcrTuning.BOX_SCORE_PERCENT_MIN.toFloat()..OcrTuning.BOX_SCORE_PERCENT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(ocrBoxScorePercent = v) } },
@@ -345,13 +337,12 @@ private fun SectionRows.ocrSectionRows(prefs: ThemePrefs) {
             }
     item {
                 SettingNote(
-                    "The confidence a detected region needs to survive. Raising it drops marginal boxes — " +
-                        "useful on a noisy photograph, and a good way to lose real faint lines on a clean screenshot."
+                    tr("The confidence a detected region needs to survive. Raising it drops marginal boxes — useful on a noisy photograph, and a good way to lose real faint lines on a clean screenshot.")
                 )
             }
     item {
                 SliderRow(
-                    level = 1, label = "Unclip ratio",
+                    level = 1, label = tr("Unclip ratio"),
                     value = prefs.ocrUnclipTenths, valueText = "%.1f".format(prefs.ocrUnclipTenths / 10f),
                     range = OcrTuning.UNCLIP_TENTHS_MIN.toFloat()..OcrTuning.UNCLIP_TENTHS_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(ocrUnclipTenths = v) } },
@@ -359,11 +350,7 @@ private fun SectionRows.ocrSectionRows(prefs: ThemePrefs) {
             }
     item {
                 SettingNote(
-                    "How far each detected box is grown before the crop is taken — the one to leave alone " +
-                        "without a test image in front of you. Detection predicts a SHRUNK region, and this is " +
-                        "what puts the ascenders and diacritics back inside it: too low silently decapitates " +
-                        "every line and 'ä' starts reading as 'a'. Too high swallows the line above. 1.5 is " +
-                        "PaddleOCR's own value and measured correct here."
+                    tr("How far each detected box is grown before the crop is taken — the one to leave alone without a test image in front of you. Detection predicts a SHRUNK region, and this is what puts the ascenders and diacritics back inside it: too low silently decapitates every line and 'ä' starts reading as 'a'. Too high swallows the line above. 1.5 is PaddleOCR's own value and measured correct here.")
                 )
             }
 
@@ -431,7 +418,7 @@ fun UiCustomizationScreen(
                 ThemeStore.update { it.copy(fontFileName = name) }
                 fontsRefresh++
             } else {
-                scope.launch { snackbarHostState.showSnackbar("That file is not a usable .ttf or .otf font") }
+                scope.launch { snackbarHostState.showSnackbar(tr("That file is not a usable .ttf or .otf font")) }
             }
         }
     }
@@ -459,8 +446,8 @@ fun UiCustomizationScreen(
                 val dirName = eximStatus.first
                 PillRow(
                     level = 1,
-                    label = "Export directory",
-                    description = dirName ?: "Not set — choose a directory",
+                    label = tr("Export directory"),
+                    description = dirName ?: tr("Not set — choose a directory"),
                     opens = true,
                     warn = dirName == null,
                     icon = Icons.Filled.Storage,
@@ -471,17 +458,17 @@ fun UiCustomizationScreen(
             item {
                 val (dirName, latest) = eximStatus
                 val (message, warn) = when {
-                    dirName == null -> "No directory set yet — pick one to enable one-tap export." to true
-                    latest == null -> "No export in this directory yet." to false
-                    else -> "Last export: ${latest.timestampText}" to false
+                    dirName == null -> tr("No directory set yet — pick one to enable one-tap export.") to true
+                    latest == null -> tr("No export in this directory yet.") to false
+                    else -> tr("Last export: %1\$s", latest.timestampText) to false
                 }
                 SettingNote(message, warn = warn)
             }
             item {
                 PillRow(
                     level = 1,
-                    label = "Export / Import…",
-                    description = "Back up or restore everything settable — the whole workspace and all app settings — as one ZIP.",
+                    label = tr("Export / Import…"),
+                    description = tr("Back up or restore everything settable — the whole workspace and all app settings — as one ZIP."),
                     main = true,
                     opens = true,
                     icon = Icons.Filled.ImportExport,
@@ -492,10 +479,8 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1,
-                    label = "Automation export",
-                    description = "Let sister apps trigger this export, and back this app's data up " +
-                        "and restore it. On by default — 白い熊 応用管理 needs it to reach a freshly " +
-                        "installed copy on a clean phone.",
+                    label = tr("Automation export"),
+                    description = tr("Let sister apps trigger this export, and back this app's data up and restore it. On by default — 白い熊 応用管理 needs it to reach a freshly installed copy on a clean phone."),
                     checked = automationEnabled,
                     icon = Icons.Filled.ImportExport,
                     iconRole = IconRole.SHARE,
@@ -508,10 +493,8 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1,
-                    label = "Use authorization token?",
-                    description = "Off: any sister app may drive the automation. On: a caller must " +
-                        "also present the token below. The data door checks the caller's identity " +
-                        "and signature either way, so this is extra, not the gate.",
+                    label = tr("Use authorization token?"),
+                    description = tr("Off: any sister app may drive the automation. On: a caller must also present the token below. The data door checks the caller's identity and signature either way, so this is extra, not the gate."),
                     checked = automationRequireToken,
                     icon = Icons.Filled.Lock,
                     iconRole = IconRole.BLOCK,
@@ -527,13 +510,13 @@ fun UiCustomizationScreen(
                 val clipboard = LocalClipboardManager.current
                 PillRow(
                     level = 1,
-                    label = "Copy automation token",
+                    label = tr("Copy automation token"),
                     description = "${automationToken.take(8)}…${automationToken.takeLast(8)}",
                     icon = Icons.Filled.ContentCopy,
                     iconRole = IconRole.SHARE,
                     onClick = {
                         clipboard.setText(AnnotatedString(automationToken))
-                        scope.launch { snackbarHostState.showSnackbar("Automation token copied") }
+                        scope.launch { snackbarHostState.showSnackbar(tr("Automation token copied")) }
                     },
                 )
             }
@@ -541,14 +524,14 @@ fun UiCustomizationScreen(
             if (automationRequireToken) item {
                 PillRow(
                     level = 1,
-                    label = "Regenerate token",
-                    description = "Makes a new token. Every copy pasted elsewhere has to be updated.",
+                    label = tr("Regenerate token"),
+                    description = tr("Makes a new token. Every copy pasted elsewhere has to be updated."),
                     destructive = true,
                     icon = Icons.Filled.Refresh,
                     iconRole = IconRole.DELETE,
                     onClick = {
                         automationToken = AutomationAuth.regenerateToken(context)
-                        scope.launch { snackbarHostState.showSnackbar("Automation token regenerated — update pasted copies") }
+                        scope.launch { snackbarHostState.showSnackbar(tr("Automation token regenerated — update pasted copies")) }
                     },
                 )
             }
@@ -557,22 +540,22 @@ fun UiCustomizationScreen(
             "colors" -> {
             item {
                 SettingNote(
-                    "The foundation colours. Every other colour follows these until it is set apart in its own section."
+                    tr("The foundation colours. Every other colour follows these until it is set apart in its own section.")
                 )
             }
-            item { ColorRow(1, "Background", prefs.background, ColorTarget.Background) { colorTarget = it } }
-            item { ColorRow(1, "Text", prefs.text, ColorTarget.Text) { colorTarget = it } }
-            item { ColorRow(1, "Secondary text", prefs.textSecondary, ColorTarget.TextSecondary) { colorTarget = it } }
-            item { ColorRow(1, "Accent", prefs.accent, ColorTarget.Accent) { colorTarget = it } }
-            item { ColorRow(1, "Surface (cards & bars)", prefs.surface, ColorTarget.Surface) { colorTarget = it } }
+            item { ColorRow(1, tr("Background"), prefs.background, ColorTarget.Background) { colorTarget = it } }
+            item { ColorRow(1, tr("Text"), prefs.text, ColorTarget.Text) { colorTarget = it } }
+            item { ColorRow(1, tr("Secondary text"), prefs.textSecondary, ColorTarget.TextSecondary) { colorTarget = it } }
+            item { ColorRow(1, tr("Accent"), prefs.accent, ColorTarget.Accent) { colorTarget = it } }
+            item { ColorRow(1, tr("Surface (cards & bars)"), prefs.surface, ColorTarget.Surface) { colorTarget = it } }
 
             }
             "borders" -> {
-            item { ColorRow(1, "Border color", prefs.border, ColorTarget.Border) { colorTarget = it } }
+            item { ColorRow(1, tr("Border color"), prefs.border, ColorTarget.Border) { colorTarget = it } }
             item {
                 SliderRow(
                     level = 1,
-                    label = "Border width",
+                    label = tr("Border width"),
                     value = prefs.borderWidthDp,
                     valueText = "${prefs.borderWidthDp} dp",
                     range = 0f..ThemePrefs.BORDER_WIDTH_MAX.toFloat(),
@@ -599,7 +582,7 @@ fun UiCustomizationScreen(
             item {
                 SliderRow(
                     level = 1,
-                    label = "Text size",
+                    label = tr("Text size"),
                     value = prefs.fontScalePct,
                     valueText = "${prefs.fontScalePct}%",
                     range = ThemePrefs.SCALE_MIN.toFloat()..ThemePrefs.SCALE_MAX.toFloat(),
@@ -611,13 +594,13 @@ fun UiCustomizationScreen(
             }
             "flash" -> {
             item { FlashPreview(level = 1, prefs = prefs) }
-            item { ColorRow(1, "Background", prefs.flashBackground, ColorTarget.FlashBackground) { colorTarget = it } }
-            item { ColorRow(1, "Text", prefs.flashText, ColorTarget.FlashText) { colorTarget = it } }
-            item { ColorRow(1, "Border color", prefs.flashBorder, ColorTarget.FlashBorder) { colorTarget = it } }
+            item { ColorRow(1, tr("Background"), prefs.flashBackground, ColorTarget.FlashBackground) { colorTarget = it } }
+            item { ColorRow(1, tr("Text"), prefs.flashText, ColorTarget.FlashText) { colorTarget = it } }
+            item { ColorRow(1, tr("Border color"), prefs.flashBorder, ColorTarget.FlashBorder) { colorTarget = it } }
             item {
                 SliderRow(
                     level = 1,
-                    label = "Border width",
+                    label = tr("Border width"),
                     value = prefs.flashBorderWidthDp,
                     valueText = "${prefs.flashBorderWidthDp} dp",
                     range = 0f..ThemePrefs.FLASH_BORDER_WIDTH_MAX.toFloat(),
@@ -627,7 +610,7 @@ fun UiCustomizationScreen(
             item {
                 SliderRow(
                     level = 1,
-                    label = "Corner radius",
+                    label = tr("Corner radius"),
                     value = prefs.flashCornerRadiusDp,
                     valueText = "${prefs.flashCornerRadiusDp} dp",
                     range = 0f..ThemePrefs.FLASH_CORNER_MAX.toFloat(),
@@ -637,7 +620,7 @@ fun UiCustomizationScreen(
             item {
                 SliderRow(
                     level = 1,
-                    label = "Text size",
+                    label = tr("Text size"),
                     value = prefs.flashTextSizeSp,
                     valueText = "${prefs.flashTextSizeSp} sp",
                     range = ThemePrefs.FLASH_TEXT_MIN.toFloat()..ThemePrefs.FLASH_TEXT_MAX.toFloat(),
@@ -658,9 +641,9 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1,
-                    label = "Advanced action picker",
+                    label = tr("Advanced action picker"),
                     icon = Icons.Filled.Checklist,
-                    description = "When adding an action, browse a full-screen list folded by category, each action expandable to its description and fields.",
+                    description = tr("When adding an action, browse a full-screen list folded by category, each action expandable to its description and fields."),
                     checked = prefs.advancedActionPicker,
                     onCheckedChange = { ThemeStore.update { p -> p.copy(advancedActionPicker = it) } },
                 )
@@ -668,9 +651,9 @@ fun UiCustomizationScreen(
             item {
                 SwitchRow(
                     level = 1,
-                    label = "New profiles start on",
+                    label = tr("New profiles start on"),
                     icon = Icons.Filled.ToggleOn,
-                    description = "A profile you make in the editor is switched on when you save it. Imports, templates and copies still start off.",
+                    description = tr("A profile you make in the editor is switched on when you save it. Imports, templates and copies still start off."),
                     checked = prefs.newProfilesEnabled,
                     onCheckedChange = { ThemeStore.update { p -> p.copy(newProfilesEnabled = it) } },
                 )
@@ -684,7 +667,7 @@ fun UiCustomizationScreen(
             "tasks" -> {
             item {
                 SliderRow(
-                    level = 1, label = "Padding between cards",
+                    level = 1, label = tr("Padding between cards"),
                     value = prefs.taskCardGapDp, valueText = "${prefs.taskCardGapDp} dp",
                     range = 0f..ThemePrefs.TASK_CARD_GAP_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(taskCardGapDp = v) } },
@@ -692,7 +675,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Padding inside card",
+                    level = 1, label = tr("Padding inside card"),
                     value = prefs.taskCardVPadDp, valueText = "${prefs.taskCardVPadDp} dp",
                     range = 0f..ThemePrefs.TASK_CARD_VPAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(taskCardVPadDp = v) } },
@@ -700,7 +683,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Padding inside action rows",
+                    level = 1, label = tr("Padding inside action rows"),
                     value = prefs.actionRowPadDp, valueText = "${prefs.actionRowPadDp} dp",
                     range = 0f..ThemePrefs.ACTION_ROW_PAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(actionRowPadDp = v) } },
@@ -708,7 +691,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Action label text size",
+                    level = 1, label = tr("Action label text size"),
                     value = prefs.actionLabelSizeSp, valueText = "${prefs.actionLabelSizeSp} sp",
                     range = ThemePrefs.ACTION_LABEL_MIN.toFloat()..ThemePrefs.ACTION_LABEL_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(actionLabelSizeSp = v) } },
@@ -716,46 +699,46 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Action name/value text size",
+                    level = 1, label = tr("Action name/value text size"),
                     value = prefs.actionValueSizeSp, valueText = "${prefs.actionValueSizeSp} sp",
                     range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(actionValueSizeSp = v) } },
                 )
             }
-            item { ColorRow(1, "Action name colour", prefs.actionNameColor, ColorTarget.ActionName) { colorTarget = it } }
-            item { ColorRow(1, "Action value colour", prefs.actionValueColor, ColorTarget.ActionValue) { colorTarget = it } }
-            item { ColorRow(1, "Action label frame colour", prefs.actionLabelFrameColor, ColorTarget.ActionLabelFrame) { colorTarget = it } }
+            item { ColorRow(1, tr("Action name colour"), prefs.actionNameColor, ColorTarget.ActionName) { colorTarget = it } }
+            item { ColorRow(1, tr("Action value colour"), prefs.actionValueColor, ColorTarget.ActionValue) { colorTarget = it } }
+            item { ColorRow(1, tr("Action label frame colour"), prefs.actionLabelFrameColor, ColorTarget.ActionLabelFrame) { colorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Action label frame width",
+                    level = 1, label = tr("Action label frame width"),
                     value = prefs.actionLabelFrameWidthDp, valueText = "${prefs.actionLabelFrameWidthDp} dp",
                     range = 0f..ThemePrefs.BORDER_WIDTH_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(actionLabelFrameWidthDp = v) } },
                 )
             }
-            item { ColorRow(1, "Action border colour", prefs.actionBorderColor, ColorTarget.ActionBorder) { colorTarget = it } }
+            item { ColorRow(1, tr("Action border colour"), prefs.actionBorderColor, ColorTarget.ActionBorder) { colorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Action border width",
+                    level = 1, label = tr("Action border width"),
                     value = prefs.actionBorderWidthDp, valueText = "${prefs.actionBorderWidthDp} dp",
                     range = 0f..ThemePrefs.BORDER_WIDTH_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(actionBorderWidthDp = v) } },
                 )
             }
-            item { ColorRow(1, "Selection highlight colour", prefs.selectionColor, ColorTarget.Selection) { colorTarget = it } }
+            item { ColorRow(1, tr("Selection highlight colour"), prefs.selectionColor, ColorTarget.Selection) { colorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Padding inside group headers",
+                    level = 1, label = tr("Padding inside group headers"),
                     value = prefs.groupHeaderVPadDp, valueText = "${prefs.groupHeaderVPadDp} dp",
                     range = 0f..ThemePrefs.GROUP_HEADER_VPAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(groupHeaderVPadDp = v) } },
                 )
             }
-            item { ColorRow(1, "Group header colour", prefs.groupHeaderColor, ColorTarget.GroupHeader) { colorTarget = it } }
-            item { ColorRow(1, "Group header border colour", prefs.groupHeaderBorderColor, ColorTarget.GroupHeaderBorder) { colorTarget = it } }
+            item { ColorRow(1, tr("Group header colour"), prefs.groupHeaderColor, ColorTarget.GroupHeader) { colorTarget = it } }
+            item { ColorRow(1, tr("Group header border colour"), prefs.groupHeaderBorderColor, ColorTarget.GroupHeaderBorder) { colorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Group header border width",
+                    level = 1, label = tr("Group header border width"),
                     value = prefs.groupHeaderBorderWidthDp, valueText = "${prefs.groupHeaderBorderWidthDp} dp",
                     range = 0f..ThemePrefs.GROUP_HEADER_BORDER_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(groupHeaderBorderWidthDp = v) } },
@@ -768,7 +751,7 @@ fun UiCustomizationScreen(
             "variables" -> {
             item {
                 SliderRow(
-                    level = 1, label = "Padding inside variable rows",
+                    level = 1, label = tr("Padding inside variable rows"),
                     value = prefs.varRowPadDp, valueText = "${prefs.varRowPadDp} dp",
                     range = 0f..ThemePrefs.ACTION_ROW_PAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(varRowPadDp = v) } },
@@ -776,7 +759,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Variable name text size",
+                    level = 1, label = tr("Variable name text size"),
                     value = prefs.varNameSizeSp, valueText = "${prefs.varNameSizeSp} sp",
                     range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(varNameSizeSp = v) } },
@@ -784,20 +767,20 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Variable value text size",
+                    level = 1, label = tr("Variable value text size"),
                     value = prefs.varValueSizeSp, valueText = "${prefs.varValueSizeSp} sp",
                     range = ThemePrefs.ACTION_VALUE_MIN.toFloat()..ThemePrefs.ACTION_VALUE_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(varValueSizeSp = v) } },
                 )
             }
-            item { ColorRow(1, "Variable name colour", prefs.varNameColor, ColorTarget.VarName) { colorTarget = it } }
-            item { ColorRow(1, "Variable value colour", prefs.varValueColor, ColorTarget.VarValue) { colorTarget = it } }
+            item { ColorRow(1, tr("Variable name colour"), prefs.varNameColor, ColorTarget.VarName) { colorTarget = it } }
+            item { ColorRow(1, tr("Variable value colour"), prefs.varValueColor, ColorTarget.VarValue) { colorTarget = it } }
 
             }
             "monitor" -> {
             item {
                 SliderRow(
-                    level = 1, label = "Task row spacing",
+                    level = 1, label = tr("Task row spacing"),
                     value = prefs.monitorRowPadDp, valueText = "${prefs.monitorRowPadDp} dp",
                     range = 0f..ThemePrefs.MONITOR_PAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(monitorRowPadDp = v) } },
@@ -808,13 +791,13 @@ fun UiCustomizationScreen(
             "panelbars" -> {
             item {
                 SliderRow(
-                    level = 1, label = "Oval bar border width",
+                    level = 1, label = tr("Oval bar border width"),
                     value = prefs.ovalBarBorderWidthDp, valueText = "${prefs.ovalBarBorderWidthDp} dp",
                     range = 0f..ThemePrefs.OVAL_BAR_BORDER_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(ovalBarBorderWidthDp = v) } },
                 )
             }
-            item { ColorRow(1, "Oval bar border colour", prefs.ovalBarBorderColor, ColorTarget.OvalBarBorder) { colorTarget = it } }
+            item { ColorRow(1, tr("Oval bar border colour"), prefs.ovalBarBorderColor, ColorTarget.OvalBarBorder) { colorTarget = it } }
 
             }
             "bubbles" -> {
@@ -822,7 +805,7 @@ fun UiCustomizationScreen(
             item {
                 SliderRow(
                     level = 1,
-                    label = "Icon size",
+                    label = tr("Icon size"),
                     value = prefs.bubbleIconSizeDp,
                     valueText = "${prefs.bubbleIconSizeDp} dp",
                     range = ThemePrefs.BUBBLE_ICON_MIN.toFloat()..ThemePrefs.BUBBLE_ICON_MAX.toFloat(),
@@ -832,7 +815,7 @@ fun UiCustomizationScreen(
             item {
                 SliderRow(
                     level = 1,
-                    label = "Icon roundness",
+                    label = tr("Icon roundness"),
                     value = prefs.bubbleIconCornerDp,
                     valueText = "${prefs.bubbleIconCornerDp} dp",
                     range = 0f..ThemePrefs.BUBBLE_ICON_CORNER_MAX.toFloat(),
@@ -842,7 +825,7 @@ fun UiCustomizationScreen(
             item {
                 SliderRow(
                     level = 1,
-                    label = "Label size",
+                    label = tr("Label size"),
                     value = prefs.bubbleLabelSizeSp,
                     valueText = "${prefs.bubbleLabelSizeSp} sp",
                     range = ThemePrefs.BUBBLE_LABEL_MIN.toFloat()..ThemePrefs.BUBBLE_LABEL_MAX.toFloat(),
@@ -864,28 +847,28 @@ fun UiCustomizationScreen(
             "flashbubbles" -> {
             item {
                 FlashBehaviorRow(
-                    level = 1, label = "Tap",
+                    level = 1, label = tr("Tap"),
                     value = prefs.flashTapBehavior,
                     onPick = { v -> ThemeStore.update { it.copy(flashTapBehavior = v) } },
                 )
             }
             item {
                 FlashBehaviorRow(
-                    level = 1, label = "Long-tap",
+                    level = 1, label = tr("Long-tap"),
                     value = prefs.flashLongTapBehavior,
                     onPick = { v -> ThemeStore.update { it.copy(flashLongTapBehavior = v) } },
                 )
             }
             item {
                 FlashTaskRow(
-                    level = 1, label = "Kill-flash task (gets %APP_PACKAGE)",
+                    level = 1, label = tr("Kill-flash task (gets %APP_PACKAGE)"),
                     value = prefs.flashKillTaskName,
                     onChange = { v -> ThemeStore.update { it.copy(flashKillTaskName = v) } },
                 )
             }
             item {
                 FlashTaskRow(
-                    level = 1, label = "Kill-all task (kill icon / notification tap)",
+                    level = 1, label = tr("Kill-all task (kill icon / notification tap)"),
                     value = prefs.flashKillAllTaskName,
                     onChange = { v -> ThemeStore.update { it.copy(flashKillAllTaskName = v) } },
                 )
@@ -895,7 +878,7 @@ fun UiCustomizationScreen(
             "picker" -> {
             item {
                 SliderRow(
-                    level = 1, label = "Font size",
+                    level = 1, label = tr("Font size"),
                     value = prefs.pickerFontSizeSp, valueText = "${prefs.pickerFontSizeSp} sp",
                     range = ThemePrefs.PICKER_FONT_MIN.toFloat()..ThemePrefs.PICKER_FONT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(pickerFontSizeSp = v) } },
@@ -903,7 +886,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Row spacing",
+                    level = 1, label = tr("Row spacing"),
                     value = prefs.pickerRowPadDp, valueText = "${prefs.pickerRowPadDp} dp",
                     range = 0f..ThemePrefs.PICKER_PAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(pickerRowPadDp = v) } },
@@ -914,16 +897,16 @@ fun UiCustomizationScreen(
                 // asking for a bigger icon meant asking for bigger type — and 白い熊 wanted both,
                 // separately. Zero hands it back to the type, the way it was.
                 SliderRow(
-                    level = 1, label = "Task icon size",
+                    level = 1, label = tr("Task icon size"),
                     value = prefs.pickerIconDp,
-                    valueText = if (prefs.pickerIconDp == 0) "follow the font" else "${prefs.pickerIconDp} dp",
+                    valueText = if (prefs.pickerIconDp == 0) tr("follow the font") else "${prefs.pickerIconDp} dp",
                     range = 0f..ThemePrefs.PICKER_ICON_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(pickerIconDp = v) } },
                 )
             }
             item {
                 SliderRow(
-                    level = 1, label = "Indent per level",
+                    level = 1, label = tr("Indent per level"),
                     value = prefs.pickerIndentDp, valueText = "${prefs.pickerIndentDp} dp",
                     range = 0f..ThemePrefs.PICKER_INDENT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(pickerIndentDp = v) } },
@@ -931,7 +914,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Group box roundness",
+                    level = 1, label = tr("Group box roundness"),
                     value = prefs.pickerGroupCornerDp, valueText = "${prefs.pickerGroupCornerDp} dp",
                     range = 0f..ThemePrefs.PICKER_CORNER_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(pickerGroupCornerDp = v) } },
@@ -939,7 +922,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Group box border",
+                    level = 1, label = tr("Group box border"),
                     value = prefs.pickerGroupBorderDp, valueText = "${prefs.pickerGroupBorderDp} dp",
                     range = 0f..ThemePrefs.PICKER_BORDER_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(pickerGroupBorderDp = v) } },
@@ -952,7 +935,7 @@ fun UiCustomizationScreen(
             item { ImportReviewPreview(level = 1, prefs = prefs) }
             item {
                 SliderRow(
-                    level = 1, label = "Header & stats size",
+                    level = 1, label = tr("Header & stats size"),
                     value = prefs.importHeaderSp, valueText = "${prefs.importHeaderSp} sp",
                     range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(importHeaderSp = v) } },
@@ -960,7 +943,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Section title size",
+                    level = 1, label = tr("Section title size"),
                     value = prefs.importSectionSp, valueText = "${prefs.importSectionSp} sp",
                     range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(importSectionSp = v) } },
@@ -968,7 +951,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Item row size",
+                    level = 1, label = tr("Item row size"),
                     value = prefs.importItemSp, valueText = "${prefs.importItemSp} sp",
                     range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(importItemSp = v) } },
@@ -976,16 +959,16 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Warnings size",
+                    level = 1, label = tr("Warnings size"),
                     value = prefs.importWarnSp, valueText = "${prefs.importWarnSp} sp",
                     range = 12f..ThemePrefs.IMPORT_TEXT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(importWarnSp = v) } },
                 )
             }
-            item { ColorRow(1, "Conflict colour", prefs.importConflictColor, ColorTarget.ImportConflict) { colorTarget = it } }
+            item { ColorRow(1, tr("Conflict colour"), prefs.importConflictColor, ColorTarget.ImportConflict) { colorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Row spacing",
+                    level = 1, label = tr("Row spacing"),
                     value = prefs.importRowPadDp, valueText = "${prefs.importRowPadDp} dp",
                     range = 0f..ThemePrefs.IMPORT_ROW_PAD_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(importRowPadDp = v) } },
@@ -999,10 +982,10 @@ fun UiCustomizationScreen(
             "charts" -> {
             item { ChartLivePreview(level = 1, prefs = prefs) }
 
-            item { SubHeader(1, "Sizes") }
+            item { SubHeader(1, tr("Sizes")) }
             item {
                 SliderRow(
-                    level = 1, label = "Preview height",
+                    level = 1, label = tr("Preview height"),
                     value = prefs.chartPreviewHeightDp, valueText = "${prefs.chartPreviewHeightDp} dp",
                     range = ThemePrefs.CHART_PREVIEW_H_MIN.toFloat()..ThemePrefs.CHART_PREVIEW_H_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartPreviewHeightDp = v) } },
@@ -1010,7 +993,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Full-screen height",
+                    level = 1, label = tr("Full-screen height"),
                     value = prefs.chartDetailHeightDp, valueText = "${prefs.chartDetailHeightDp} dp",
                     range = ThemePrefs.CHART_DETAIL_H_MIN.toFloat()..ThemePrefs.CHART_DETAIL_H_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartDetailHeightDp = v) } },
@@ -1018,7 +1001,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Space between cards",
+                    level = 1, label = tr("Space between cards"),
                     value = prefs.chartCardGapDp, valueText = "${prefs.chartCardGapDp} dp",
                     range = 0f..ThemePrefs.CHART_GAP_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartCardGapDp = v) } },
@@ -1026,7 +1009,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Axis label size",
+                    level = 1, label = tr("Axis label size"),
                     value = prefs.chartAxisTextSp, valueText = "${prefs.chartAxisTextSp} sp",
                     range = ThemePrefs.CHART_AXIS_SP_MIN.toFloat()..ThemePrefs.CHART_AXIS_SP_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartAxisTextSp = v) } },
@@ -1034,17 +1017,17 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Headline number size",
+                    level = 1, label = tr("Headline number size"),
                     value = prefs.chartHeadlineSp, valueText = "${prefs.chartHeadlineSp} sp",
                     range = ThemePrefs.CHART_HEADLINE_MIN.toFloat()..ThemePrefs.CHART_HEADLINE_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartHeadlineSp = v) } },
                 )
             }
 
-            item { SubHeader(1, "Marks") }
+            item { SubHeader(1, trc("chart", "Marks")) }
             item {
                 SliderRow(
-                    level = 1, label = "Line width",
+                    level = 1, label = tr("Line width"),
                     value = prefs.chartLineWidthDp, valueText = "${prefs.chartLineWidthDp} dp",
                     range = 1f..ThemePrefs.CHART_LINE_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartLineWidthDp = v) } },
@@ -1052,7 +1035,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Sample dot size",
+                    level = 1, label = tr("Sample dot size"),
                     value = prefs.chartDotSizeDp, valueText = "${prefs.chartDotSizeDp} dp",
                     range = 0f..ThemePrefs.CHART_DOT_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartDotSizeDp = v) } },
@@ -1060,7 +1043,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Hourly capsule width",
+                    level = 1, label = tr("Hourly capsule width"),
                     value = prefs.chartCapsuleWidthDp, valueText = "${prefs.chartCapsuleWidthDp} dp",
                     range = 2f..ThemePrefs.CHART_MARK_W_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartCapsuleWidthDp = v) } },
@@ -1068,7 +1051,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Step bar width",
+                    level = 1, label = tr("Step bar width"),
                     value = prefs.chartBarWidthDp, valueText = "${prefs.chartBarWidthDp} dp",
                     range = 1f..ThemePrefs.CHART_MARK_W_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartBarWidthDp = v) } },
@@ -1076,7 +1059,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Blood-pressure cap width",
+                    level = 1, label = tr("Blood-pressure cap width"),
                     value = prefs.chartDumbbellWidthDp, valueText = "${prefs.chartDumbbellWidthDp} dp",
                     range = 2f..ThemePrefs.CHART_MARK_W_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartDumbbellWidthDp = v) } },
@@ -1084,26 +1067,26 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Sleep block height",
-                    value = prefs.chartHypnogramBandPct, valueText = "${prefs.chartHypnogramBandPct} % of its row",
+                    level = 1, label = tr("Sleep block height"),
+                    value = prefs.chartHypnogramBandPct, valueText = tr("%1\$s %% of its row", prefs.chartHypnogramBandPct),
                     range = 10f..100f,
                     onChange = { v -> ThemeStore.update { it.copy(chartHypnogramBandPct = v) } },
                 )
             }
             item {
                 SliderRow(
-                    level = 1, label = "Rounded data-end radius",
+                    level = 1, label = tr("Rounded data-end radius"),
                     value = prefs.chartCornerRadiusDp, valueText = "${prefs.chartCornerRadiusDp} dp",
                     range = 0f..ThemePrefs.CHART_CORNER_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartCornerRadiusDp = v) } },
                 )
             }
 
-            item { SubHeader(1, "Ink") }
+            item { SubHeader(1, tr("Ink")) }
             item { ChartColorRow(1, ChartColorTarget.Grid, prefs) { chartColorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Grid opacity",
+                    level = 1, label = tr("Grid opacity"),
                     value = prefs.chartGridOpacityPct, valueText = "${prefs.chartGridOpacityPct} %",
                     range = 0f..100f,
                     onChange = { v -> ThemeStore.update { it.copy(chartGridOpacityPct = v) } },
@@ -1112,7 +1095,7 @@ fun UiCustomizationScreen(
             item { ChartColorRow(1, ChartColorTarget.AxisText, prefs) { chartColorTarget = it } }
             item {
                 SliderRow(
-                    level = 1, label = "Area fill under a line",
+                    level = 1, label = tr("Area fill under a line"),
                     value = prefs.chartFillOpacityPct, valueText = "${prefs.chartFillOpacityPct} %",
                     range = 0f..100f,
                     onChange = { v -> ThemeStore.update { it.copy(chartFillOpacityPct = v) } },
@@ -1120,7 +1103,7 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "Glow behind a line",
+                    level = 1, label = tr("Glow behind a line"),
                     value = prefs.chartGlowOpacityPct, valueText = "${prefs.chartGlowOpacityPct} %",
                     range = 0f..100f,
                     onChange = { v -> ThemeStore.update { it.copy(chartGlowOpacityPct = v) } },
@@ -1128,53 +1111,53 @@ fun UiCustomizationScreen(
             }
             item {
                 SliderRow(
-                    level = 1, label = "No-measurement tint",
+                    level = 1, label = tr("No-measurement tint"),
                     value = prefs.chartGapTintPct, valueText = "${prefs.chartGapTintPct} %",
                     range = 0f..100f,
                     onChange = { v -> ThemeStore.update { it.copy(chartGapTintPct = v) } },
                 )
             }
 
-            item { SubHeader(1, "What gets drawn") }
+            item { SubHeader(1, tr("What gets drawn")) }
             item {
                 SwitchRow(
-                    level = 1, label = "Grid",
+                    level = 1, label = tr("Grid"),
                     icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
-                    description = "The recessive lines behind the data.",
+                    description = tr("The recessive lines behind the data."),
                     checked = prefs.chartShowGrid,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowGrid = v) } },
                 )
             }
             item {
                 SwitchRow(
-                    level = 1, label = "Sample dots",
+                    level = 1, label = tr("Sample dots"),
                     icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
-                    description = "The real readings, drawn over the smoothed line. Turning these off hides where the curve is interpolating.",
+                    description = tr("The real readings, drawn over the smoothed line. Turning these off hides where the curve is interpolating."),
                     checked = prefs.chartShowDots,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowDots = v) } },
                 )
             }
             item {
                 SwitchRow(
-                    level = 1, label = "Flagged-sample ✕ marks",
+                    level = 1, label = tr("Flagged-sample ✕ marks"),
                     icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
-                    description = "Readings the outlier filter dropped, shown at their real value.",
+                    description = tr("Readings the outlier filter dropped, shown at their real value."),
                     checked = prefs.chartShowRejected,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowRejected = v) } },
                 )
             }
             item {
                 SwitchRow(
-                    level = 1, label = "Tint stretches with no measurement",
+                    level = 1, label = tr("Tint stretches with no measurement"),
                     icon = Icons.Filled.Visibility, iconRole = IconRole.VIEW,
-                    description = "Off, a gap looks the same as a flat reading — the chart stops showing that the band was not measuring.",
+                    description = tr("Off, a gap looks the same as a flat reading — the chart stops showing that the band was not measuring."),
                     checked = prefs.chartShowGaps,
                     onCheckedChange = { v -> ThemeStore.update { it.copy(chartShowGaps = v) } },
                 )
             }
             item {
                 SliderRow(
-                    level = 1, label = "Opening time span",
+                    level = 1, label = tr("Opening time span"),
                     value = prefs.chartDefaultSpanHours, valueText = "${prefs.chartDefaultSpanHours} h",
                     range = 1f..ThemePrefs.CHART_SPAN_MAX.toFloat(),
                     onChange = { v -> ThemeStore.update { it.copy(chartDefaultSpanHours = v) } },
@@ -1182,7 +1165,7 @@ fun UiCustomizationScreen(
             }
             item { ChartCurveRow(1, prefs.chartCurveMode) { v -> ThemeStore.update { it.copy(chartCurveMode = v) } } }
 
-            item { SubHeader(1, "Series colours") }
+            item { SubHeader(1, tr("Series colours")) }
             item { ChartColorRow(1, ChartColorTarget.HeartRate, prefs) { chartColorTarget = it } }
             item { ChartColorRow(1, ChartColorTarget.BandState, prefs) { chartColorTarget = it } }
             item { ChartColorRow(1, ChartColorTarget.Spo2, prefs) { chartColorTarget = it } }
@@ -1197,8 +1180,8 @@ fun UiCustomizationScreen(
             item {
                 PillRow(
                     level = 1,
-                    label = "Restore the validated chart palette",
-                    description = "Puts every chart knob above back to what shipped — the colours that pass the checks in the preview.",
+                    label = tr("Restore the validated chart palette"),
+                    description = tr("Puts every chart knob above back to what shipped — the colours that pass the checks in the preview."),
                     icon = Icons.Filled.Restore,
                     iconRole = IconRole.DELETE,
                     onClick = { ThemeStore.resetChartsToDefault() },
@@ -1211,8 +1194,8 @@ fun UiCustomizationScreen(
             item {
                 PillRow(
                     level = 1,
-                    label = "Reset section order",
-                    description = "Puts the sections of this page, and the chips at its top, back in their built-in order. What is unfolded stays unfolded.",
+                    label = tr("Reset section order"),
+                    description = tr("Puts the sections of this page, and the chips at its top, back in their built-in order. What is unfolded stays unfolded."),
                     icon = Icons.Filled.Restore,
                     iconRole = IconRole.DELETE,
                     onClick = { ThemeStore.update { it.copy(uiSectionOrder = "") } },
@@ -1221,8 +1204,8 @@ fun UiCustomizationScreen(
             item {
                 PillRow(
                     level = 1,
-                    label = "Reset all colours",
-                    description = "Every colour back to black and yellow: the foundation colours, and every item that was set apart in its own section. Fonts, sizes, widths and the chart palette stay.",
+                    label = tr("Reset all colours"),
+                    description = tr("Every colour back to black and yellow: the foundation colours, and every item that was set apart in its own section. Fonts, sizes, widths and the chart palette stay."),
                     destructive = true,
                     icon = Icons.Filled.Palette,
                     iconRole = IconRole.DELETE,
@@ -1232,8 +1215,8 @@ fun UiCustomizationScreen(
             item {
                 PillRow(
                     level = 1,
-                    label = "Reset to black & yellow",
-                    description = "Restore the default appearance — black background, yellow text and borders.",
+                    label = tr("Reset to black & yellow"),
+                    description = tr("Restore the default appearance — black background, yellow text and borders."),
                     destructive = true,
                     icon = Icons.Filled.Restore,
                     iconRole = IconRole.DELETE,
@@ -1282,7 +1265,7 @@ fun UiCustomizationScreen(
                 title = { Text("白い熊 自由作業盤 UI") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Back"))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -1318,11 +1301,10 @@ fun UiCustomizationScreen(
     if (confirmResetColours) {
         AlertDialog(
             onDismissRequest = { confirmResetColours = false },
-            title = { Text("Reset all colours?") },
+            title = { Text(tr("Reset all colours?")) },
             text = {
                 Text(
-                    "The foundation colours and every colour set apart in a section of its own go back to " +
-                        "black and yellow. Fonts, sizes, widths and the chart palette are not touched."
+                    tr("The foundation colours and every colour set apart in a section of its own go back to black and yellow. Fonts, sizes, widths and the chart palette are not touched.")
                 )
             },
             confirmButton = {
@@ -1336,15 +1318,15 @@ fun UiCustomizationScreen(
                         confirmResetColours = false
                     },
                     colors = destructiveButtonColors(),
-                ) { Text("Reset") }
+                ) { Text(tr("Reset")) }
             },
-            dismissButton = { OutlinedButton(onClick = { confirmResetColours = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { confirmResetColours = false }) { Text(tr("Cancel")) } },
         )
     }
 
     roleTarget?.let { target ->
         ColorPickerDialog(
-            title = target.label,
+            title = tr(target.label),
             initial = UiRoles.argb(target, prefs),
             onDismiss = { roleTarget = null },
             onDefault = {
@@ -1360,7 +1342,7 @@ fun UiCustomizationScreen(
 
     chartColorTarget?.let { target ->
         ColorPickerDialog(
-            title = target.label,
+            title = tr(target.label),
             initial = target.get(prefs),
             onDismiss = { chartColorTarget = null },
             onDefault = {
@@ -1376,7 +1358,7 @@ fun UiCustomizationScreen(
 
     colorTarget?.let { target ->
         ColorPickerDialog(
-            title = target.label,
+            title = tr(target.label),
             initial = target.get(prefs),
             onDismiss = { colorTarget = null },
             onDefault = {
@@ -1454,58 +1436,81 @@ fun UiCustomizationScreen(
  * it never changes; [chip] is the short name on the section's index chip. [roles] is set for the
  * sections that are generated from the role table.
  */
-private class PageSection(
+internal class PageSection(
     val id: String,
     val title: String,
     val chip: String,
     val icon: ImageVector,
+    /** One of the seven section-icon colours, by what kind of thing the section is. Heading and chip share it. */
+    val color: UiRole,
     val roles: RoleSection? = null,
 )
 
 /** The section that lists one group of the role table, a swatch row per role. */
 private fun roleSection(group: RoleSection): PageSection {
-    val (chip, icon) = when (group) {
-        RoleSection.TEXT -> "Text" to Icons.Filled.Title
-        RoleSection.BUTTONS -> "Buttons" to Icons.Filled.TouchApp
-        RoleSection.DIALOGS -> "Dialogs" to Icons.Filled.ChatBubble
-        RoleSection.SWITCHES -> "Switches" to Icons.Filled.ToggleOn
-        RoleSection.MARKS -> "Marks" to Icons.Filled.CheckBox
-        RoleSection.MENUS -> "Menus" to Icons.Filled.Menu
-        RoleSection.LISTS -> "Lists" to Icons.Filled.Reorder
-        RoleSection.PAGE -> "This page" to Icons.Filled.Settings
-        RoleSection.BARS -> "Bars" to Icons.Filled.Tab
-        RoleSection.SCENES -> "Scenes" to Icons.Filled.Layers
-        RoleSection.WIDGETS -> "Widgets" to Icons.Filled.Widgets
-        RoleSection.PROGRESS -> "Progress" to Icons.Filled.HourglassEmpty
-        RoleSection.CHARTS -> "健康 chrome" to Icons.Filled.BarChart
-        RoleSection.ISLANDS -> "言語島" to Icons.Filled.Translate
-        RoleSection.SCREENS -> "Screens" to Icons.Filled.Smartphone
+    val (chip, icon, color) = when (group) {
+        RoleSection.TEXT -> Triple("Text", Icons.Filled.Title, UiRole.SECTION_WORDS)
+        RoleSection.BUTTONS -> Triple("Buttons", Icons.Filled.TouchApp, UiRole.SECTION_CONTROLS)
+        RoleSection.DIALOGS -> Triple("Dialogs", Icons.Filled.ChatBubble, UiRole.SECTION_REACH)
+        RoleSection.SWITCHES -> Triple("Switches", Icons.Filled.ToggleOn, UiRole.SECTION_CONTROLS)
+        RoleSection.MARKS -> Triple("Marks", Icons.Filled.CheckBox, UiRole.SECTION_CONTROLS)
+        RoleSection.MENUS -> Triple("Menus", Icons.Filled.Menu, UiRole.SECTION_REACH)
+        RoleSection.LISTS -> Triple("Lists", Icons.Filled.Reorder, UiRole.SECTION_FRAME)
+        RoleSection.PAGE -> Triple("This page", Icons.Filled.Settings, UiRole.SECTION_BASE)
+        RoleSection.BARS -> Triple("Bars", Icons.Filled.Tab, UiRole.SECTION_FRAME)
+        RoleSection.SCENES -> Triple("Scenes", Icons.Filled.Layers, UiRole.SECTION_BASE)
+        RoleSection.WIDGETS -> Triple("Widgets", Icons.Filled.Widgets, UiRole.SECTION_REACH)
+        RoleSection.PROGRESS -> Triple("Progress", Icons.Filled.HourglassEmpty, UiRole.SECTION_FRAME)
+        RoleSection.CHARTS -> Triple("健康 chrome", Icons.Filled.BarChart, UiRole.SECTION_BASE)
+        RoleSection.ISLANDS -> Triple("言語島", Icons.Filled.Translate, UiRole.SECTION_WORDS)
+        RoleSection.SCREENS -> Triple("Screens", Icons.Filled.Smartphone, UiRole.SECTION_BASE)
     }
-    return PageSection("role_" + group.name.lowercase(), group.title, chip, icon, group)
+    return PageSection("role_" + group.name.lowercase(), group.title, chip, icon, color, group)
 }
 
-/** Every section, in the built-in order: the foundation colours first, then each item's own. */
-private val PAGE_SECTIONS: List<PageSection> = listOf(
-    PageSection("exim", "Export / Import", "Export", Icons.Filled.ImportExport),
-    PageSection("colors", "Colors", "Colors", Icons.Filled.Palette),
-    PageSection("borders", "Borders", "Borders", Icons.Filled.BorderOuter),
-) + RoleSection.entries.map(::roleSection) + listOf(
-    PageSection("typography", "Typography", "Fonts", Icons.Filled.TextFields),
-    PageSection("flash", "Flash / toast", "Flash", Icons.Filled.Notifications),
-    PageSection("editor", "Editor", "Editor", Icons.Filled.Edit),
-    PageSection("tasklist", "Task list", "Task list", Icons.Filled.Checklist),
-    PageSection("tasks", "Tasks", "Tasks", Icons.Filled.Task),
-    PageSection("variables", "Variables", "Variables", Icons.Filled.Code),
-    PageSection("monitor", "Monitor", "Monitor", Icons.Filled.Visibility),
-    PageSection("panelbars", "Panel bars", "Panels", Icons.Filled.Tune),
-    PageSection("bubbles", "Freeze bubbles", "Freeze", Icons.Filled.AcUnit),
-    PageSection("flashbubbles", "Flash bubbles (通知明滅)", "通知明滅", Icons.Filled.FlashOn),
-    PageSection("picker", "Shortcut picker", "Picker", Icons.Filled.Apps),
-    PageSection("importreview", "Import review", "Import", Icons.Filled.Download),
-    PageSection("ocr", "「文字認識」 OCR", "OCR", Icons.Filled.CenterFocusStrong),
-    PageSection("charts", "「健康」 charts", "健康", Icons.Filled.BarChart),
-    PageSection("maintenance", "Maintenance", "Reset", Icons.Filled.Build),
-)
+/**
+ * Every section, in the built-in order: the foundation colours first, then each item's own.
+ *
+ * The order is also arranged so that no two neighbours share a section-icon colour (白い熊,
+ * 2026-11-23: no slabs of one colour) — which is why Menus stands between Switches and Marks, and
+ * why the tail is interleaved. `UiPageSectionsTest` holds it to that. An order 白い熊 dragged is
+ * stored and never touched by this.
+ */
+internal val PAGE_SECTIONS: List<PageSection> = listOf(
+    PageSection("exim", "Export / Import", "Export", Icons.Filled.ImportExport, UiRole.SECTION_REACH),
+    PageSection("colors", "Colors", "Colors", Icons.Filled.Palette, UiRole.SECTION_BASE),
+    PageSection("borders", "Borders", "Borders", Icons.Filled.BorderOuter, UiRole.SECTION_FRAME),
+    roleSection(RoleSection.TEXT),
+    roleSection(RoleSection.BUTTONS),
+    roleSection(RoleSection.DIALOGS),
+    roleSection(RoleSection.SWITCHES),
+    roleSection(RoleSection.MENUS),
+    roleSection(RoleSection.MARKS),
+    roleSection(RoleSection.LISTS),
+    roleSection(RoleSection.PAGE),
+    roleSection(RoleSection.BARS),
+    roleSection(RoleSection.SCENES),
+    roleSection(RoleSection.WIDGETS),
+    roleSection(RoleSection.PROGRESS),
+    roleSection(RoleSection.CHARTS),
+    roleSection(RoleSection.ISLANDS),
+    roleSection(RoleSection.SCREENS),
+    PageSection("typography", "Typography", "Fonts", Icons.Filled.TextFields, UiRole.SECTION_WORDS),
+    PageSection("flash", "Flash / toast", "Flash", Icons.Filled.Notifications, UiRole.SECTION_FLASH),
+    PageSection("editor", "Editor", "Editor", Icons.Filled.Edit, UiRole.SECTION_WORDS),
+    PageSection("tasklist", "Task list", "Task list", Icons.Filled.Checklist, UiRole.SECTION_FRAME),
+    PageSection("tasks", "Tasks", "Tasks", Icons.Filled.Task, UiRole.SECTION_BASE),
+    PageSection("variables", "Variables", "Variables", Icons.Filled.Code, UiRole.SECTION_WORDS),
+    PageSection("monitor", "Monitor", "Monitor", Icons.Filled.Visibility, UiRole.SECTION_FRAME),
+    PageSection("panelbars", "Panel bars", "Panels", Icons.Filled.Tune, UiRole.SECTION_CONTROLS),
+    PageSection("flashbubbles", "Flash bubbles (通知明滅)", "通知明滅", Icons.Filled.FlashOn, UiRole.SECTION_REACH),
+    PageSection("bubbles", "Freeze bubbles", "Freeze", Icons.Filled.AcUnit, UiRole.SECTION_CONTROLS),
+    PageSection("picker", "Shortcut picker", "Picker", Icons.Filled.Apps, UiRole.SECTION_REACH),
+    PageSection("ocr", "「文字認識」 OCR", "OCR", Icons.Filled.CenterFocusStrong, UiRole.SECTION_WORDS),
+    PageSection("importreview", "Import review", "Import", Icons.Filled.Download, UiRole.SECTION_REACH),
+    PageSection("charts", "「健康」 charts", "健康", Icons.Filled.BarChart, UiRole.SECTION_BASE),
+    PageSection("maintenance", "Maintenance", "Reset", Icons.Filled.Build, UiRole.SECTION_WARNING),
+).also { sections -> check(sections.mapNotNull { it.roles }.toSet() == RoleSection.entries.toSet()) { "a role section has no place on the UI page" } }
 
 /** The sections as [stored] orders them: unknown ids are ignored, missing ones follow in the built-in order. */
 private fun sectionOrder(stored: String): List<PageSection> {
@@ -1552,11 +1557,13 @@ private class SectionRows(private val list: LazyListScope?) {
     }
 }
 
-private const val CHIPS_PER_ROW = 4
+private val CHIP_LABEL_SIZE = 12.sp
 private val CHIP_SHAPE = RoundedCornerShape(percent = 50)
 
 /**
- * The index under the page title: one small outlined chip per section, about four to a row.
+ * The index under the page title: one small outlined chip per section, each with its section's icon
+ * in the section's colour and exactly as wide as icon, label and padding — never a uniform width
+ * (白い熊, 2026-11-23). The grid wraps.
  *
  * A tap unfolds the section and goes to it. A long-press lifts the chip, and from then on the chips
  * reorder LIVE under the finger — the dragged one moves to the slot of whichever chip the finger is
@@ -1633,14 +1640,12 @@ private fun ChipIndex(order: List<PageSection>, onJump: (String) -> Unit, onReor
                 },
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
-            maxItemsInEachRow = CHIPS_PER_ROW,
         ) {
             shown.forEach { section ->
                 key(section.id) {
                     val lifted = dragged == section.id
-                    Box(
+                    Row(
                         Modifier
-                            .weight(1f)
                             .onGloballyPositioned { bounds[section.id] = it.boundsInRoot() }
                             .clip(CHIP_SHAPE)
                             // Never filled: the chip in the air is told apart by its frame alone.
@@ -1648,13 +1653,20 @@ private fun ChipIndex(order: List<PageSection>, onJump: (String) -> Unit, onReor
                             // A long-press that ends without a move still ends in a release on the
                             // chip; that release belongs to the drag, not to a tap.
                             .clickable { if (dragged == null) onJump(section.id) }
-                            .padding(horizontal = 6.dp, vertical = 5.dp),
-                        contentAlignment = Alignment.Center,
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        // The same drawable and the same colour as the heading, sized by the chip's label.
+                        Icon(
+                            section.icon,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp).size(with(LocalDensity.current) { (CHIP_LABEL_SIZE * 1.25f).toDp() }),
+                            tint = role(section.color),
+                        )
                         Text(
-                            section.chip,
+                            tr(section.chip),
                             color = ink,
-                            fontSize = 12.sp,
+                            fontSize = CHIP_LABEL_SIZE,
                             fontWeight = if (lifted) FontWeight.Bold else null,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1662,15 +1674,13 @@ private fun ChipIndex(order: List<PageSection>, onJump: (String) -> Unit, onReor
                     }
                 }
             }
-            // The last line is filled up with empty slots, or its chips would stretch across it.
-            repeat((CHIPS_PER_ROW - shown.size % CHIPS_PER_ROW) % CHIPS_PER_ROW) { Spacer(Modifier.weight(1f)) }
         }
     }
 }
 
 /**
  * The heading of a folding section: the thin divider above it (which stays, folded or open), the
- * section's icon, the bold title underlined only as wide as its text, and › when folded or ⌄ when
+ * section's icon in the section's colour (the chip's twin), the bold title underlined only as wide as its text, and › when folded or ⌄ when
  * open at the row's right. The whole line folds and unfolds.
  */
 @Composable
@@ -1691,7 +1701,12 @@ private fun SectionHeader(section: PageSection, open: Boolean, onToggle: () -> U
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Sized by the heading, as a row's icon is sized by its label.
-            RoleIcon(section.icon, IconRole.VIEW, Modifier.padding(end = ROW_ICON_GAP).size(rowIconSize(titleStyle)))
+            Icon(
+                section.icon,
+                contentDescription = null,
+                modifier = Modifier.padding(end = ROW_ICON_GAP).size(rowIconSize(titleStyle)),
+                tint = role(section.color),
+            )
             Box(Modifier.weight(1f)) {
                 Column(
                     // Max, not Min. The rule under a heading should be exactly as wide as the heading, and
@@ -1702,7 +1717,7 @@ private fun SectionHeader(section: PageSection, open: Boolean, onToggle: () -> U
                     Modifier.width(IntrinsicSize.Max),
                 ) {
                     Text(
-                        section.title,
+                        tr(section.title),
                         fontSize = titleStyle.fontSize,
                         fontWeight = FontWeight.Bold,
                         color = ink,
@@ -1911,7 +1926,7 @@ private fun ColorRow(
         Column(Modifier.weight(1f)) {
             RowLabel(label)
             RowValue(
-                if (value == target.default) "Default - ${hex6(value)}" else hex6(value),
+                if (value == target.default) tr("Default - %1\$s", hex6(value)) else hex6(value),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -1939,11 +1954,11 @@ private fun roleRowIconRole(uiRole: UiRole): IconRole = when (uiRole) {
 private fun RoleRow(level: Int, uiRole: UiRole, icon: ImageVector, prefs: ThemePrefs, onPick: (UiRole) -> Unit) {
     RowScaffold(level, onClick = { onPick(uiRole) }, icon = icon, iconRole = roleRowIconRole(uiRole), ruled = true) {
         Column(Modifier.weight(1f)) {
-            RowLabel(uiRole.label)
-            RowNote(uiRole.note)
+            RowLabel(trc("role", uiRole.label))
+            RowNote(tr(uiRole.note))
         }
         if (uiRole.key in prefs.roleOverrides) {
-            GlyphButton("↺", "Reset ${uiRole.label}") { UiRoles.reset(uiRole) }
+            GlyphButton("↺", tr("Reset %1\$s", trc("role", uiRole.label))) { UiRoles.reset(uiRole) }
         }
         Swatch(UiRoles.argb(uiRole, prefs))
     }
@@ -1982,7 +1997,7 @@ private fun SliderRow(
 @Composable
 private fun FontRow(level: Int, fileName: String, onClick: () -> Unit) {
     RowScaffold(level, onClick = onClick, icon = Icons.Filled.TextFields, iconRole = IconRole.WRITE) {
-        RowLabel("Font", Modifier.weight(1f))
+        RowLabel(tr("Font"), Modifier.weight(1f))
         RowValue(
             ThemeStore.displayNameFor(fileName),
             style = MaterialTheme.typography.bodyLarge,
@@ -1996,13 +2011,13 @@ private fun WeightRow(level: Int, weight: Int, onPick: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         RowScaffold(level, onClick = { expanded = true }, icon = Icons.Filled.FormatBold, iconRole = IconRole.WRITE) {
-            RowLabel("Weight", Modifier.weight(1f))
-            RowValue(weightLabel(weight), style = MaterialTheme.typography.bodyLarge)
+            RowLabel(tr("Weight"), Modifier.weight(1f))
+            RowValue(trc("weight", weightLabel(weight)), style = MaterialTheme.typography.bodyLarge)
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             WEIGHT_OPTIONS.forEach { (label, w) ->
                 DropdownMenuItem(
-                    text = { Text(label) },
+                    text = { Text(trc("weight", label)) },
                     onClick = {
                         onPick(w)
                         expanded = false
@@ -2030,14 +2045,14 @@ private fun FlashBehaviorRow(level: Int, label: String, value: String, onPick: (
         RowScaffold(level, onClick = { expanded = true }, icon = Icons.Filled.TouchApp, iconRole = IconRole.CONNECT) {
             RowLabel(label, Modifier.weight(1f))
             RowValue(
-                FLASH_BEHAVIOR_OPTIONS.firstOrNull { it.first == value }?.second ?: value,
+                tr(FLASH_BEHAVIOR_OPTIONS.firstOrNull { it.first == value }?.second ?: value),
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             FLASH_BEHAVIOR_OPTIONS.forEach { (v, text) ->
                 DropdownMenuItem(
-                    text = { Text(text) },
+                    text = { Text(tr(text)) },
                     onClick = {
                         onPick(v)
                         expanded = false
@@ -2067,7 +2082,7 @@ private fun FlashTaskRow(level: Int, label: String, value: String, onChange: (St
 
 @Composable
 private fun SampleRow(level: Int) {
-    PreviewBlock(level, caption = "Live sample", spacing = 0.dp) {
+    PreviewBlock(level, caption = tr("Live sample"), spacing = 0.dp) {
         Text(
             "AaIiMmQq 0123  白い熊 自由作業盤  áÁčČ",
             style = MaterialTheme.typography.bodyLarge,
@@ -2089,7 +2104,7 @@ private fun FlashPreview(level: Int, prefs: ThemePrefs) {
                 } else null,
             ) {
                 Text(
-                    text = "Main succeeded (8 ms)",
+                    text = tr("%1\$s succeeded (%2\$s ms)", "Main", 8),
                     color = Color(prefs.flashText),
                     fontSize = prefs.flashTextSizeSp.sp,
                     fontWeight = FontWeight(prefs.flashFontWeight),
@@ -2112,7 +2127,7 @@ private fun TaskIconSizeRow(level: Int, prefs: ThemePrefs) {
         }
     }
     SliderRow(
-        level = level, label = "Task icon size",
+        level = level, label = tr("Task icon size"),
         value = prefs.taskIconSizeDp, valueText = "${prefs.taskIconSizeDp} dp",
         range = ThemePrefs.TASK_ICON_MIN.toFloat()..ThemePrefs.TASK_ICON_MAX.toFloat(),
         onChange = { v -> ThemeStore.update { it.copy(taskIconSizeDp = v) } },
@@ -2148,7 +2163,7 @@ private fun FreezeBubblePreview(level: Int, prefs: ThemePrefs) {
     }
     val font = prefs.bubbleFontFileName.ifBlank { prefs.fontFileName }
     val family = ThemeStore.fontFamily(font)
-    val label = runCatching { context.applicationInfo.loadLabel(context.packageManager).toString() }.getOrDefault("App")
+    val label = runCatching { context.applicationInfo.loadLabel(context.packageManager).toString() }.getOrDefault(tr("App"))
     val badgeDp = (prefs.bubbleIconSizeDp * 0.4f).coerceIn(14f, 26f)
 
     PreviewBlock(level) {
@@ -2203,24 +2218,24 @@ private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
         ) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "Review import",
+                    tr("Review import"),
                     fontSize = prefs.importHeaderSp.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    "2 tasks · 1 profile — 1 already exist",
+                    tr("2 tasks · 1 profile — 1 already exist"),
                     fontSize = prefs.importHeaderSp.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "⚠ Warnings appear here.",
+                    tr("⚠ Warnings appear here."),
                     fontSize = prefs.importWarnSp.sp,
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 Text(
-                    "Tasks (2)",
+                    tr("Tasks (%1\$s)", 2),
                     fontSize = prefs.importSectionSp.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -2231,19 +2246,19 @@ private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "New task",
+                        tr("New task"),
                         fontSize = prefs.importItemSp.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
-                    Text("New", fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("New"), fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = prefs.importRowPadDp.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "Existing task",
+                        tr("Existing task"),
                         fontSize = prefs.importItemSp.sp,
                         color = conflictColor,
                         maxLines = 1,
@@ -2258,7 +2273,7 @@ private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Text("⚠", fontSize = prefs.importItemSp.sp, color = conflictColor)
-                        Text("Overwrite", fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(tr("Overwrite"), fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurface)
                         Text("▾", fontSize = prefs.importItemSp.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
@@ -2381,7 +2396,7 @@ private fun SwitchRow(
 @Composable
 private fun PreviewBlock(
     level: Int,
-    caption: String = "Live preview",
+    caption: String = tr("Live preview"),
     spacing: Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -2440,17 +2455,17 @@ private fun ColorPickerDialog(
                             b = c and 0xFF
                         }
                     },
-                    label = { Text("Hex") },
+                    label = { Text(tr("Hex")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (onDefault != null) {
-                    OutlinedButton(onClick = onDefault) { Text("Default") }
+                    OutlinedButton(onClick = onDefault) { Text(tr("Default")) }
                 }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(argb) }) { Text("Apply") } },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = { onConfirm(argb) }) { Text(tr("Apply")) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 
@@ -2479,7 +2494,7 @@ private fun FontPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Font") },
+        title = { Text(tr("Font")) },
         text = {
             Column(
                 Modifier
@@ -2508,11 +2523,11 @@ private fun FontPickerDialog(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (option.fileName == current) {
-                            Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = role(UiRole.LIST_SELECTED))
+                            Icon(Icons.Filled.CheckCircle, contentDescription = tr("Selected"), tint = role(UiRole.LIST_SELECTED))
                         }
                         if (option.fileName.isNotEmpty() && option.fileName != ThemeStore.MONOSPACE) {
                             IconButton(onClick = { onDelete(option.fileName) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete font", tint = role(UiRole.DELETE))
+                                Icon(Icons.Filled.Delete, contentDescription = tr("Delete font"), tint = role(UiRole.DELETE))
                             }
                         }
                     }
@@ -2521,12 +2536,12 @@ private fun FontPickerDialog(
                 // An action, not an entry of the list: a pill, with the … and the › of what opens a picker.
                 OutlinedButton(onClick = onAddFont) {
                     RoleIcon(Icons.Filled.Add, IconRole.WRITE, Modifier.size(18.dp))
-                    Text("Add font…", Modifier.padding(start = 8.dp))
+                    Text(tr("Add font…"), Modifier.padding(start = 8.dp))
                     Text("›", Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
                 }
             }
         },
-        confirmButton = { Button(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { Button(onClick = onDismiss) { Text(tr("Close")) } },
     )
 }
 
@@ -2586,7 +2601,7 @@ private fun ChartLivePreview(level: Int, prefs: ThemePrefs) {
             ChartStylePreview(prefs, Modifier.padding(10.dp))
         }
     }
-    PreviewBlock(level, caption = "Colour check", spacing = 10.dp) {
+    PreviewBlock(level, caption = tr("Colour check"), spacing = 10.dp) {
         ChartPaletteVerdict(prefs)
     }
 }
@@ -2603,16 +2618,16 @@ private fun ChartCurveRow(level: Int, value: String, onPick: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         RowScaffold(level, onClick = { expanded = true }, icon = Icons.Filled.Timeline) {
-            RowLabel("Line shape", Modifier.weight(1f))
+            RowLabel(tr("Line shape"), Modifier.weight(1f))
             RowValue(
-                CHART_CURVE_OPTIONS.firstOrNull { it.first == value }?.second ?: value,
+                tr(CHART_CURVE_OPTIONS.firstOrNull { it.first == value }?.second ?: value),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
         ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             CHART_CURVE_OPTIONS.forEach { (v, text) ->
                 DropdownMenuItem(
-                    text = { Text(text) },
+                    text = { Text(tr(text)) },
                     onClick = { onPick(v); expanded = false },
                     trailingIcon = if (v == value) ({ Text("✓") }) else null,
                     choice = true,
@@ -2632,9 +2647,9 @@ private fun ChartColorRow(
     val value = target.get(prefs)
     RowScaffold(level, onClick = { onPick(target) }, icon = Icons.Filled.Palette) {
         Column(Modifier.weight(1f)) {
-            RowLabel(target.label)
+            RowLabel(tr(target.label))
             RowValue(
-                if (value == target.get(ThemePrefs.DEFAULT)) "Default - ${hex6(value)}" else hex6(value),
+                if (value == target.get(ThemePrefs.DEFAULT)) tr("Default - %1\$s", hex6(value)) else hex6(value),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -2799,7 +2814,7 @@ private fun ExportImportPanel(
             busy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val out = open() ?: error("Unable to open the export destination")
+                    val out = open() ?: error(tr("Unable to open the export destination"))
                     out.use {
                         SettingsBackup.export(
                             context = context,
@@ -2814,9 +2829,9 @@ private fun ExportImportPanel(
                 .onSuccess { summary ->
                     refresh++
                     onDirChanged()
-                    info = EximInfo.ExportDone("Exported $summary.\n\n$displayName")
+                    info = EximInfo.ExportDone(tr("Exported %1\$s.\n\n%2\$s", summary, displayName))
                 }
-                .onFailure { info = EximInfo.Failure("Export failed: ${it.message ?: "unknown error"}") }
+                .onFailure { info = EximInfo.Failure(tr("Export failed: %1\$s", it.message ?: tr("unknown error"))) }
             busy = false
         }
     }
@@ -2847,7 +2862,7 @@ private fun ExportImportPanel(
                     }
                 }
                     .onSuccess { info = EximInfo.ImportDone(it.summaryLines) }
-                    .onFailure { info = EximInfo.Failure("Import failed: ${it.message ?: "unknown error"}") }
+                    .onFailure { info = EximInfo.Failure(tr("Import failed: %1\$s", it.message ?: tr("unknown error"))) }
                 busy = false
             }
         }
@@ -2855,7 +2870,7 @@ private fun ExportImportPanel(
 
     fun onExport() {
         if (selectedCats().isEmpty()) {
-            info = EximInfo.Failure("No categories selected.")
+            info = EximInfo.Failure(tr("No categories selected."))
             return
         }
         val dir = SettingsBackup.exportDir(context)
@@ -2865,7 +2880,7 @@ private fun ExportImportPanel(
         } else {
             runExport(name) {
                 val file = dir.createFile("application/zip", name)
-                    ?: error("Unable to create a file in the export directory")
+                    ?: error(tr("Unable to create a file in the export directory"))
                 context.contentResolver.openOutputStream(file.uri)
             }
         }
@@ -2884,7 +2899,7 @@ private fun ExportImportPanel(
                     .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 20.dp),
             ) {
                 Text(
-                    "Export / Import — 白い熊 自由作業盤",
+                    tr("Export / Import — 白い熊 自由作業盤"),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = role(UiRole.DIALOG_TITLE),
@@ -2892,7 +2907,7 @@ private fun ExportImportPanel(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    "Everything settable in the app, category by category, as one ZIP of plain JSON files.",
+                    tr("Everything settable in the app, category by category, as one ZIP of plain JSON files."),
                     fontSize = 13.sp,
                     color = role(UiRole.DIM_GOLD),
                     modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
@@ -2900,7 +2915,7 @@ private fun ExportImportPanel(
                 val (dirName, latest) = status
                 // Choosing the directory opens the system picker: a pill with a ›, the directory it
                 // stands at as its label — it used to be a framed box, which read as a field.
-                Text("Export directory", fontSize = 12.sp, color = role(UiRole.DIM_GOLD))
+                Text(tr("Export directory"), fontSize = 12.sp, color = role(UiRole.DIM_GOLD))
                 OutlinedButton(
                     onClick = { dirPicker.launch(SettingsBackup.dirUri(context)) },
                     enabled = !busy,
@@ -2908,16 +2923,16 @@ private fun ExportImportPanel(
                 ) {
                     RoleIcon(Icons.Filled.Storage, IconRole.SHARE, Modifier.size(18.dp))
                     Text(
-                        dirName ?: "Not set — choose a directory",
+                        dirName ?: tr("Not set — choose a directory"),
                         modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
                         color = if (dirName == null) role(UiRole.WARNING) else Color.Unspecified,
                     )
                     Text("›", Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
                 }
                 val (statusMessage, statusWarn) = when {
-                    dirName == null -> "No directory set yet — pick one to enable one-tap export." to true
-                    latest == null -> "No export in this directory yet." to false
-                    else -> "Last export: ${latest.timestampText}" to false
+                    dirName == null -> tr("No directory set yet — pick one to enable one-tap export.") to true
+                    latest == null -> tr("No export in this directory yet.") to false
+                    else -> tr("Last export: %1\$s", latest.timestampText) to false
                 }
                 Text(
                     statusMessage,
@@ -2931,11 +2946,11 @@ private fun ExportImportPanel(
                     color = role(UiRole.LIST_DIVIDER),
                 )
                 val allSelected = SettingsBackup.Cat.entries.all { selected[it] == true }
-                EximCheckRow("Select all", allSelected, bold = true) { checked ->
+                EximCheckRow(tr("Select all"), allSelected, bold = true) { checked ->
                     SettingsBackup.Cat.entries.forEach { selected[it] = checked }
                 }
                 SettingsBackup.Cat.entries.forEach { cat ->
-                    EximCheckRow(cat.label, selected[cat] == true) { selected[cat] = it }
+                    EximCheckRow(tr(cat.label), selected[cat] == true) { selected[cat] = it }
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
@@ -2946,13 +2961,13 @@ private fun ExportImportPanel(
                     Modifier.fillMaxWidth().padding(top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    EximPill("Cancel", enabled = !busy, onClick = onDismiss)
+                    EximPill(tr("Cancel"), enabled = !busy, onClick = onDismiss)
                     Spacer(Modifier.weight(1f))
-                    EximPill("Import", enabled = !busy) {
+                    EximPill(tr("Import"), enabled = !busy) {
                         importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                     }
                     Spacer(Modifier.width(8.dp))
-                    EximPill("Export", enabled = !busy, main = true, onClick = ::onExport)
+                    EximPill(tr("Export"), enabled = !busy, main = true, onClick = ::onExport)
                 }
             }
         }
@@ -2960,33 +2975,33 @@ private fun ExportImportPanel(
 
     when (val current = info) {
         is EximInfo.ExportDone -> EximInfoDialog(
-            title = "✓ Export finished",
+            title = tr("✓ Export finished"),
             body = current.message,
             buttons = {
-                EximPill("OK", main = true) {
+                EximPill(tr("OK"), main = true) {
                     info = null
                     onCloseChain()
                 }
             },
         )
         is EximInfo.ImportDone -> EximInfoDialog(
-            title = "✓ Import finished",
-            body = "Restored:\n\n${current.lines.joinToString("\n")}\n\nRestart to apply everything.",
+            title = tr("✓ Import finished"),
+            body = tr("Restored:\n\n%1\$s\n\nRestart to apply everything.", current.lines.joinToString("\n")),
             buttons = {
-                EximPill("Later") {
+                EximPill(tr("Later")) {
                     info = null
                     onCloseChain()
                 }
                 Spacer(Modifier.width(8.dp))
-                EximPill("Restart now", main = true) { restartApp(context) }
+                EximPill(tr("Restart now"), main = true) { restartApp(context) }
             },
         )
         is EximInfo.Failure -> EximInfoDialog(
-            title = "Export / Import",
+            title = tr("Export / Import"),
             body = current.message,
             warn = true,
             // Failure leaves the panel open underneath — only the info dialog closes.
-            buttons = { EximPill("OK", main = true) { info = null } },
+            buttons = { EximPill(tr("OK"), main = true) { info = null } },
         )
         null -> Unit
     }

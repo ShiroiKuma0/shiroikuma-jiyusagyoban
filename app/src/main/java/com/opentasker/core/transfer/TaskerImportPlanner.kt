@@ -1,6 +1,7 @@
 package com.opentasker.core.transfer
 
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.i18n.tr
 
 private const val TASKER_DISABLED_PROFILE_WARNING =
     "Imported Tasker profiles are disabled by default; review contexts, actions, and required permissions before enabling them."
@@ -32,7 +33,7 @@ object TaskerImportPlanner {
         val emptyWarning = if (hasImportableContent) {
             emptyList()
         } else {
-            listOf("No importable Tasker tasks, profiles, variables, or scenes were found.")
+            listOf(tr("No importable Tasker tasks, profiles, variables, or scenes were found."))
         }
 
         return TaskerImportPreview(

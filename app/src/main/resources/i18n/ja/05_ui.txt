@@ -1,0 +1,637 @@
+# 05_ui — ui/screens: ActiveAutomationViewModel … FrameworkIconPickerDialog
+
+# ActiveAutomationViewModel.kt
+= %1$s step %2$s: code %3$s
+: %1$s ステップ%2$s：コード%3$s
+= %1$s step %2$s: %3$s -> %4$s
+: %1$s ステップ%2$s：%3$s -> %4$s
+= %1$s step %2$s: %3$s (%4$s)
+: %1$s ステップ%2$s：%3$s（%4$s）
+= Project created
+: プロジェクトを作成しました
+= Project updated
+: プロジェクトを更新しました
+= Project and its items deleted
+: プロジェクトとその項目を削除しました
+= Project deleted; items moved to Unfiled
+: プロジェクトを削除し、項目を「未分類」に移しました
+= Restored “%1$s” with %2$s, %3$s and %4$s
+: 「%1$s」を復元しました（%2$s、%3$s、%4$s）
+= Project reordered
+: プロジェクトを並べ替えました
+= Projects reordered
+: プロジェクトを並べ替えました
+= Group “%1$s” deleted
+: グループ「%1$s」を削除しました
+= Error: %1$s
+: エラー：%1$s
+= Reorder failed
+: 並べ替えに失敗しました
+= Group reorder failed
+: グループの並べ替えに失敗しました
+= %1$s moved
+: %1$sを移動しました
+= Deleted %1$s
+: %1$sを削除しました
+= Deleted %1$s; skipped %2$s used by a profile
+: %1$sを削除しました（プロファイルで使用中の%2$s件はスキップ）
+= Delete failed
+: 削除に失敗しました
+= That undo is no longer available
+: この操作はもう元に戻せません
+= Undo failed: %1$s
+: 元に戻せませんでした：%1$s
+= unknown error
+: 不明なエラー
+= Task created
+: タスクを作成しました
+= Renamed
+: 名前を変更しました
+= Duplicated %1$s
+: %1$sを複製しました
+= %1$s (copy)
+: %1$s（コピー）
+= Pasted %1$s
+: %1$sを貼り付けました
+= Task updated
+: タスクを更新しました
+= Save blocked: this task's stored actions couldn't be read — not overwriting them
+: 保存を中止しました：このタスクの保存済みアクションを読み取れなかったため、上書きしません
+= Task is used by %1$s profile(s). Reassign or delete those profiles first.
+: このタスクは%1$s件のプロファイルで使われています。先にそのプロファイルの割り当てを変えるか、プロファイルを削除してください。
+= Task deleted
+: タスクを削除しました
+= Task delete failed
+: タスクを削除できませんでした
+= Scene created
+: シーンを作成しました
+= Scene updated
+: シーンを更新しました
+= Scene deleted
+: シーンを削除しました
+= Profile created
+: プロファイルを作成しました
+= Profile updated
+: プロファイルを更新しました
+= Profile deleted
+: プロファイルを削除しました
+= Template installed as a disabled profile
+: テンプレートを無効のプロファイルとして追加しました
+= %1$s import ready for review
+: %1$sのインポート内容を確認できます
+= Import preview failed
+: インポートの内容を読み取れませんでした
+= Imported %1$s, %2$s
+: インポートしました：%1$s、%2$s
+= Tasker XML import failed
+: Tasker XMLをインポートできませんでした
+= Exported %1$s, %2$s, %3$s
+: エクスポートしました：%1$s、%2$s、%3$s
+= export failed
+: エクスポートに失敗しました
+= Exported nothing
+: エクスポートする項目がありませんでした
+= Exported %1$s
+: エクスポートしました：%1$s
+= , 
+: 、
+= Export failed
+: エクスポートに失敗しました
+= Import ready to review
+: インポートの内容を確認できます
+= import preview failed
+: インポートの内容を読み取れませんでした
+= Imported %1$s, %2$s, %3$s
+: インポートしました：%1$s、%2$s、%3$s
+= import failed
+: インポートに失敗しました
+= Cleared 1 run log entry
+: 実行ログ1件を消去しました
+= Cleared %1$s run log entries
+: 実行ログ%1$s件を消去しました
+= Run log clear failed
+: 実行ログを消去できませんでした
+= Run log retention updated; pruned 1 old entry
+: 実行ログの保持期間を更新し、古い記録1件を削除しました
+= Run log retention updated; pruned %1$s old entries
+: 実行ログの保持期間を更新し、古い記録%1$s件を削除しました
+= Run log retention updated
+: 実行ログの保持期間を更新しました
+= Run log retention update failed
+: 実行ログの保持期間を更新できませんでした
+= Diagnostic report copied to the clipboard.
+: 診断レポートをクリップボードにコピーしました。
+= Failed to copy the diagnostic report
+: 診断レポートをコピーできませんでした
+= Share diagnostic report
+: 診断レポートを共有
+= Failed to share diagnostic report
+: 診断レポートを共有できませんでした
+= A run is already in flight.
+: すでに実行中です。
+= %1$s succeeded (%2$sms)
+: %1$s：成功（%2$sms）
+= %1$s failed (%2$sms)
+: %1$s：失敗（%2$sms）
+= That held run has already been replayed.
+: この保留中の実行は、すでに再実行済みです。
+= That held run no longer carries enough detail to replay.
+: この保留中の実行には、再実行に必要な情報が残っていません。
+= %1$s no longer exists.
+: %1$sはもう存在しません。
+= Launcher does not support pinned shortcuts
+: ランチャーがショートカットの固定に対応していません
+= Pinning "%1$s" to home screen
+: 「%1$s」をホーム画面に固定しています
+= Failed to pin shortcut
+: ショートカットを固定できませんでした
+= Edit undone
+: 編集を元に戻しました
+= No edit history available
+: 元に戻せる編集履歴がありません
+= Undo failed
+: 元に戻せませんでした
+= Variable deleted
+: 変数を削除しました
+= Variable could not be deleted
+: 変数を削除できませんでした
+= Removed 1 dead global
+: 不要なグローバル変数1件を削除しました
+= Removed %1$s dead globals
+: 不要なグローバル変数%1$s件を削除しました
+= Restored %1$s
+: %1$sを復元しました
+= Restored %1$s — %2$s had to be renumbered, so check Monitor → Run on start
+: %1$sを復元しました — %2$s件は番号を振り直したため、「モニター」→「開始時に実行」を確認してください
+= Restored group “%1$s” and %2$s
+: グループ「%1$s」と%2$sを復元しました
+= “%1$s” is gone — nothing to undo into
+: 「%1$s」を戻す先がなくなったため、元に戻せません
+= Operation failed
+: 操作に失敗しました
+= 1 task
+: タスク1件
+= %1$s tasks
+: タスク%1$s件
+= 1 profile
+: プロファイル1件
+= %1$s profiles
+: プロファイル%1$s件
+= 1 disabled profile
+: 無効のプロファイル1件
+= %1$s disabled profiles
+: 無効のプロファイル%1$s件
+= 1 scene
+: シーン1件
+= %1$s scenes
+: シーン%1$s件
+= 1 variable
+: 変数1件
+= %1$s variables
+: 変数%1$s件
+= 1 template
+: テンプレート1件
+= %1$s templates
+: テンプレート%1$s件
+= 1 action
+: アクション1件
+= %1$s actions
+: アクション%1$s件
+= 1 context
+: コンテキスト1件
+= %1$s contexts
+: コンテキスト%1$s件
+= 1 item
+: 項目1件
+= %1$s items
+: 項目%1$s件
+
+# ActivityIconPickerDialog.kt
+= App icons
+: アプリのアイコン
+= Loading…
+: 読み込み中…
+= No activity icons found.
+: アクティビティのアイコンが見つかりません。
+
+# AppMultiSelectDialog.kt
+= Select apps
+: アプリを選択
+= Tile sizing
+: タイルの大きさ
+= Icon
+: アイコン
+= Label
+: ラベル
+= ID
+: ID
+= Pad↕
+: 余白↕
+= Pad↔
+: 余白↔
+= Bold
+: 太字
+= System apps
+: システムアプリ
+= List preinstalled apps too — gallery, dialer, …
+: 最初から入っているアプリも表示 — ギャラリー、電話、…
+= Search (name or app id)
+: 検索（名前またはアプリID）
+= name, or a full package id to add it
+: 名前、または追加するパッケージIDの全体
+= ＋ Add “%1$s”
+: ＋ 「%1$s」を追加
+= No apps to show.
+: 表示できるアプリがありません。
+= Nothing matches “%1$s”.
+: 「%1$s」に一致するものはありません。
+= Search preinstalled system apps too
+: 最初から入っているシステムアプリも検索
+= Cancel
+: キャンセル
+= OK (%1$s)
+: OK（%1$s）
+= Selected
+: 選択中
+
+# AppPickerDialog.kt
+= Pick an app
+: アプリを選択
+= Search
+: 検索
+
+# AutomationFlowScreen.kt
+= Collapse flow
+: フローを折りたたむ
+= Expand flow
+: フローを展開
+
+# ContextEditorDialogs.kt
+= Package name
+: パッケージ名
+= com.example.app (personal profile only)
+: com.example.app（個人用プロファイルのみ）
+= Start HH:mm
+: 開始 HH:mm
+= End HH:mm
+: 終了 HH:mm
+= Days
+: 日
+= Latitude
+: 緯度
+= Longitude
+: 経度
+= Radius meters
+: 半径（メートル）
+= Max accuracy meters
+: 精度の上限（メートル）
+= Dwell seconds
+: 滞在時間（秒）
+= Match when outside
+: 範囲外で成立
+= Fire when away from this place instead of at it (with dwell)
+: この場所にいるときではなく、離れているときに発動します（滞在時間も適用）
+= State key
+: 状態キー
+= Operator
+: 演算子
+= Expected value
+: 期待する値
+= Event type
+: イベントの種類
+= Event state
+: イベントの状態
+= Fold posture
+: 折りたたみの状態
+= for event=fold: folded, semi, unfolded
+: event=foldの場合：folded, semi, unfolded
+= Hardware key
+: 物理キー
+= for event=hardware_key: volume_up, volume_down, power
+: event=hardware_keyの場合：volume_up, volume_down, power
+= Press type
+: 押し方
+= for event=hardware_key: short, long
+: event=hardware_keyの場合：short, long
+= Calendar name
+: カレンダー名
+= Before minutes
+: 何分前
+= Package allowlist
+: 許可するパッケージの一覧
+= Broadcast action
+: ブロードキャストのアクション
+= for event=broadcast: com.example.ACTION (comma-separated for several)
+: event=broadcastの場合：com.example.ACTION（複数はカンマ区切り）
+= NFC tag ID
+: NFCタグのID
+= Sun offset minutes
+: 日の出・日の入りからのずれ（分）
+= Sun window minutes
+: 日の出・日の入りの許容幅（分）
+= Title contains
+: タイトルに含む
+= Optional notification title text
+: 通知のタイトルの文字列（任意）
+= Body contains
+: 本文に含む
+= Optional notification body text
+: 通知の本文の文字列（任意）
+= Any metadata filter
+: メタデータ全体の絞り込み
+= Optional text/package/action filter
+: 文字列・パッケージ・アクションでの絞り込み（任意）
+= Use regex matching
+: 正規表現で照合
+= Plugin package
+: プラグインのパッケージ
+= Plugin config JSON
+: プラグイン設定のJSON
+= Description
+: 説明
+= Optional label from plugin config
+: プラグイン設定から得たラベル（任意）
+= Query timeout ms
+: 問い合わせのタイムアウト（ms）
+= Matches when an app is detected in the foreground.
+: 指定したアプリが前面に表示されている間、成立します。
+= Matches during a clock time window.
+: 指定した時間帯の間、成立します。
+= Matches on selected days, presets, or weekday/weekend ranges.
+: 選んだ曜日、プリセット、または平日・週末の範囲で成立します。
+= Matches near a latitude/longitude radius with optional accuracy and dwell checks.
+: 緯度・経度から指定した半径内にいる間、成立します。精度と滞在時間の確認も任意で指定できます。
+= Matches a device state such as battery level, charging, headphones, or screen.
+: 電池残量、充電、ヘッドホン、画面などの端末の状態に応じて成立します。
+= Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect, calendar, sun, shake, or Locale plugin queries.
+: 起動、通知、NFC、Bluetoothの接続・切断、カレンダー、日の出・日の入り、端末を振る動作、Localeプラグインの問い合わせなど、一度きりのイベントで成立します。
+= Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.
+: Locale/Taskerの条件プラグインが「成立」を返したときに成立します。プラグインには定期的に問い合わせ、最後に得た状態を保持します。
+
+# ContextInspectorScreen.kt
+= Create a profile before reviewing match explanations.
+: 一致の説明を確認するには、まずプロファイルを作成してください。
+= Ready
+: 準備完了
+= %1$s attention
+: 要対応%1$s件
+= Active sources
+: 有効なソース
+= Matching
+: 一致中
+= Enabled
+: 有効
+= Refresh
+: 更新
+= Source error
+: ソースのエラー
+= Not matching
+: 一致していません
+= %1$s via %2$s
+: %1$s（%2$s経由）
+= Match
+: 一致
+= No match
+: 不一致
+= Observed %1$s
+: 観測：%1$s
+= Latest value
+: 最新の値
+= Warning
+: 警告
+= %1$s background risk: %2$s
+: %1$sのバックグラウンド制限の危険度：%2$s
+= %1$s Open the Setup tab for OEM-specific steps.
+: %1$s メーカー別の手順は「セットアップ」タブで確認できます。
+= Context inspector unavailable
+: コンテキストインスペクターを利用できません
+= Runtime context sources have not registered yet. Open Setup to confirm permissions, then refresh after sources begin reporting.
+: 実行時のコンテキストソースがまだ登録されていません。「セットアップ」を開いて権限を確認し、ソースが報告を始めてから更新してください。
+= Usage access is granted for foreground-app context checks.
+: 使用状況へのアクセスが許可されており、前面のアプリを見るコンテキストを確認できます。
+= Usage access is missing; application contexts cannot report foreground packages.
+: 使用状況へのアクセスが許可されていないため、アプリのコンテキストは前面のパッケージを報告できません。
+= Clock source is registered and exact alarms are available for scheduled engine ticks.
+: 時計ソースは登録済みで、エンジンの定期処理に正確なアラームを利用できます。
+= Clock source is registered; exact alarms are denied so scheduled engine ticks use the inexact fallback.
+: 時計ソースは登録済みですが、正確なアラームが拒否されているため、エンジンの定期処理はおおよその時刻で動く代替方式を使います。
+= Battery, charging, screen, headset, and WiFi-related state checks have required runtime access.
+: 電池、充電、画面、ヘッドセット、Wi-Fi関連の状態の確認に必要な実行時のアクセスがそろっています。
+= Battery, charging, screen, and headset checks are available; WiFi state may need location or nearby WiFi setup.
+: 電池、充電、画面、ヘッドセットの確認は利用できます。Wi-Fiの状態には、位置情報または付近のWi-Fiデバイスのセットアップが必要な場合があります。
+= Calendar events can be matched with redacted metadata.
+: カレンダーの予定は、内容を伏せたメタデータで照合できます。
+= Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates.
+: カレンダーのトリガーには「セットアップ」でカレンダーへのアクセスを許可する必要があります。日の出・日の入りの照合には設定済みの座標を使います。
+= Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. %1$s %2$s
+: 起動、システム、通知、NFC、カレンダー、日の出・日の入りのイベントは登録済みです。通知の文字列は照合のためにメモリ内だけで保持し、実行ログには書き込みません。%1$s%2$s
+= Boot, system, NFC, calendar, and sun events are registered. Notification events need Notification Access in Setup before Android will bind the listener. %1$s %2$s
+: 起動、システム、NFC、カレンダー、日の出・日の入りのイベントは登録済みです。通知のイベントは、「セットアップ」で通知へのアクセスを許可するまで、Androidがリスナーを接続しません。%1$s%2$s
+= Source setup status is not specialized yet.
+: このソースには、個別のセットアップ状況の表示がまだありません。
+= just now
+: たった今
+= %1$ss ago
+: %1$s秒前
+= %1$sm ago
+: %1$s分前
+= %1$sh ago
+: %1$s時間前
+= Dwell: inside for %1$s of %2$s.
+: 滞在：範囲内に%1$s（目標%2$s）。
+= Dwell: inside for %1$s.
+: 滞在：範囲内に%1$s。
+= Dwell: inside; waiting for a stable entry time.
+: 滞在：範囲内です。進入時刻が安定するのを待っています。
+= Dwell: latest fix is inside but blocked by accuracy; retained timer at %1$s of %2$s.
+: 滞在：最新の測位は範囲内ですが、精度が足りないため採用されていません。タイマーは%1$s（目標%2$s）のまま保持しています。
+= Dwell: latest fix is inside but blocked by accuracy; retained timer at %1$s.
+: 滞在：最新の測位は範囲内ですが、精度が足りないため採用されていません。タイマーは%1$sのまま保持しています。
+= Dwell: latest fix is inside but blocked by accuracy.
+: 滞在：最新の測位は範囲内ですが、精度が足りないため採用されていません。
+= Dwell: outside radius; timer reset.
+: 滞在：半径の外です。タイマーをリセットしました。
+= Dwell: waiting for valid geofence config and location metadata.
+: 滞在：正しいジオフェンスの設定と位置情報のメタデータを待っています。
+= %1$ss
+: %1$s秒
+= %1$sm %2$ss
+: %1$s分%2$s秒
+= %1$sh %2$sm
+: %1$s時間%2$s分
+
+# EditorDialogs.kt
+= A task with this name already exists in this project.
+: この名前のタスクは、このプロジェクトにすでにあります。
+= No album art in that file
+: このファイルにはジャケット画像がありません
+= Shortcut icon
+: ショートカットのアイコン
+= Selected icon
+: 選択中のアイコン
+= App
+: アプリ
+= Picture
+: 画像
+= Emoji
+: 絵文字
+= Audio
+: 音声
+= Clear
+: 消去
+= Icon pack
+: アイコンパック
+= System
+: システム
+= A profile with this name already exists in this project.
+: この名前のプロファイルは、このプロジェクトにすでにあります。
+= Arbitration
+: 競合時の調整
+= How this profile behaves when it competes with others. Everything here is off by default — a profile left alone runs exactly as before.
+: このプロファイルがほかのプロファイルと競合したときの動作です。ここにある項目はすべて既定で無効で、何も変えなければこれまでどおりに動きます。
+= Priority
+: 優先度
+= Whole number between %1$s and %2$s.
+: %1$sから%2$sまでの整数を入力してください。
+= While this profile matches, it suppresses any matching profile with a STRICTLY lower priority — their tasks are skipped and logged, and they run again the moment this one stops matching. Equal priorities never suppress each other, so leaving every profile at 0 keeps them all independent.
+: このプロファイルが成立している間、成立しているほかのプロファイルのうち、優先度がこれより低いものだけを抑止します。抑止されたプロファイルのタスクはスキップされて記録され、このプロファイルが成立しなくなるとすぐにまた実行されます。優先度が同じプロファイルどうしは抑止し合わないため、すべてを0のままにしておけば、互いに独立して動きます。
+= Grace period (seconds)
+: 猶予時間（秒）
+= Whole number of seconds, 0 to %1$s.
+: 0から%1$sまでの整数（秒）を入力してください。
+= The conditions must hold this long before an activation OR a deactivation is accepted — it debounces a flapping trigger. 0 reacts immediately.
+: 有効化と無効化のどちらも、条件がこの時間だけ続いてから受け付けます。細かく切り替わるトリガーのばたつきを抑えます。0にするとすぐに反応します。
+= Lifetime
+: 有効期間
+= Always
+: 常に
+= Runs for as long as it stays enabled.
+: 有効にしている間、ずっと動作します。
+= Until a date
+: 指定日まで
+= Stops matching at the start of the day you name, and disables itself.
+: 指定した日になった時点で成立しなくなり、自動的に無効になります。
+= Once
+: 1回のみ
+= Runs a single time, then disables itself. Re-enabling it here arms it again.
+: 1回だけ実行し、その後は自動的に無効になります。ここでもう一度有効にすると、再び実行できる状態になります。
+= Expires on (YYYY-MM-DD)
+: 期限日（YYYY-MM-DD）
+= Enter a real date as YYYY-MM-DD, e.g. 2026-12-31.
+: 実在する日付をYYYY-MM-DDの形式で入力してください。例：2026-12-31
+= The profile stops matching at 00:00 local time on this day.
+: この日の現地時刻00:00に、プロファイルは成立しなくなります。
+= Max concurrent runs (optional)
+: 同時実行数の上限（任意）
+= %1$s–%2$s, or blank for the engine default.
+: %1$s–%2$sで指定します。空欄にするとエンジンの既定値を使います。
+= Caps how many of this profile's runs may be in flight at once.
+: このプロファイルの実行を同時にいくつまで進行させるかの上限です。
+= Burst limit (optional)
+: 連続実行数の上限（任意）
+= Caps how many runs this profile may START inside the engine's burst window.
+: エンジンが連続実行を数える時間内に、このプロファイルが開始できる実行の数の上限です。
+= When a run is refused
+: 実行が拒否されたとき
+= Log it
+: 記録する
+= A refused run leaves a skipped entry in the Run Log, saying which limit refused it.
+: 拒否された実行は、どの上限で拒否されたかとともに、スキップとして実行ログに残ります。
+= Drop it quietly
+: 記録せずに破棄
+= No Run Log entry. For a fast trigger whose refusals are noise rather than news.
+: 実行ログには残しません。頻繁に発動するトリガーで、拒否の記録が邪魔になるだけの場合に向いています。
+= Recovery task
+: 復旧タスク
+= Run when this profile's task fails and nothing in it caught the error. It receives the failure as variables — which task, which action, which message — so it can report or repair. It runs once and never triggers its own recovery.
+: このプロファイルのタスクが失敗し、タスクの中でそのエラーが処理されなかったときに実行します。どのタスクの、どのアクションが、どんなメッセージで失敗したかを変数として受け取るため、報告や修復に使えます。実行は1回だけで、復旧タスク自身が失敗しても、もう一度復旧タスクが動くことはありません。
+= None
+: なし
+= A failure is logged and left alone.
+: 失敗は記録するだけで、何もしません。
+= Task icon
+: タスクのアイコン
+= Done
+: 完了
+
+# EmojiPickerDialog.kt
+= Emoji icon
+: 絵文字アイコン
+= Emoji or characters
+: 絵文字または文字
+= Use your keyboard's emoji button, or tap one below.
+: キーボードの絵文字ボタンで入力するか、下から選んでください。
+= Use
+: 使う
+
+# FrameworkIconPickerDialog.kt
+= System icon
+: システムアイコン
+
+# Shown through tr(variable): context type titles (ContextType.name) — ContextEditorDialogs.kt, ContextInspectorScreen.kt, EditorDialogs.kt
+= Application
+: アプリ
+= Time
+: 時刻
+= Day
+: 曜日
+= Location
+: 位置情報
+= State
+: 状態
+= Event
+: イベント
+= Plugin
+: プラグイン
+= application
+: アプリ
+= time
+: 時刻
+= day
+: 日
+= location
+: 位置情報
+= state
+: 状態
+= event
+: イベント
+= plugin
+: プラグイン
+
+# Shown through tr(day): the day buttons of the DAY context — ContextEditorDialogs.kt
+= MON
+: 月
+= TUE
+: 火
+= WED
+: 水
+= THU
+: 木
+= FRI
+: 金
+= SAT
+: 土
+= SUN
+: 日
+
+# Shown through tr(source.status.label): ContextSourceStatus — ContextInspectorScreen.kt
+= Active
+: 有効
+= Waiting
+: 待機中
+= Needs setup
+: セットアップが必要
+= Missing
+: 見つかりません
+= Error
+: エラー
+
+# Shown through tr(riskLevel): OemBatteryGuidance.RiskLevel — ContextInspectorScreen.kt
+= low
+: 低
+= medium
+: 中
+= high
+: 高
+= severe
+: 深刻

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import com.opentasker.core.logging.AppLogger
 import androidx.core.content.edit
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -159,28 +160,29 @@ object ShizukuPowerBackend {
         // under their own package name.
         !managerInstalled && !serviceRunning -> ShizukuPowerStatus(
             state = ShizukuPowerState.NotInstalled,
-            summary = "Shizuku is not running and no Shizuku manager is installed.",
+            summary = tr("Shizuku is not running and no Shizuku manager is installed."),
         )
         killSwitchEnabled -> ShizukuPowerStatus(
             state = ShizukuPowerState.Disabled,
-            summary = "Shizuku power mode is off. Turn it on here to use elevated actions.",
+            summary = tr("Shizuku power mode is off. Turn it on here to use elevated actions."),
         )
         !serviceRunning -> ShizukuPowerStatus(
             state = ShizukuPowerState.ManagerInstalled,
-            summary = "Shizuku manager is installed but the service is not running.",
+            summary = tr("Shizuku manager is installed but the service is not running."),
         )
         !permissionGranted -> ShizukuPowerStatus(
             state = ShizukuPowerState.PermissionNeeded,
-            summary = "Shizuku is running but OpenTasker needs permission.",
+            summary = tr("Shizuku is running but OpenTasker needs permission."),
         )
         !privilegedTransportAvailable -> ShizukuPowerStatus(
             state = ShizukuPowerState.BackendUnavailable,
-            summary = "Shizuku permission is granted, but this build has no privileged user-service transport. " +
-                "Elevated actions cannot run until the transport is available.",
+            summary = tr(
+                "Shizuku permission is granted, but this build has no privileged user-service transport. Elevated actions cannot run until the transport is available.",
+            ),
         )
         else -> ShizukuPowerStatus(
             state = ShizukuPowerState.Ready,
-            summary = "Shizuku is active, permission is granted, and a privileged transport is available.",
+            summary = tr("Shizuku is active, permission is granted, and a privileged transport is available."),
         )
     }.copy(serviceRunning = serviceRunning)
 
@@ -201,8 +203,8 @@ object ShizukuPowerBackend {
             ShizukuActionHint(
                 actionId = actionId,
                 message = listOfNotNull(
-                    "This action requires Shizuku permission and its privileged user-service transport.",
-                    riskByAction[actionId],
+                    tr("This action requires Shizuku permission and its privileged user-service transport."),
+                    riskByAction[actionId]?.let { tr(it) },
                 ).joinToString(" "),
             )
         } else {

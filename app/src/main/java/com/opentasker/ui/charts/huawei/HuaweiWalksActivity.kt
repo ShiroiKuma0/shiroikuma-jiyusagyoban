@@ -1,5 +1,6 @@
 package com.opentasker.ui.charts.huawei
 
+import com.opentasker.i18n.tr
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -451,7 +452,7 @@ class HuaweiWalksActivity : ComponentActivity() {
                                         val outcome = withContext(Dispatchers.IO) {
                                             val box = state.plots[opened.id]?.box
                                             if (box == null) {
-                                                HuaweiChizu.Outcome(false, "this walk has no usable points")
+                                                HuaweiChizu.Outcome(false, tr("this walk has no usable points"))
                                             } else {
                                                 val want = com.opentasker.core.huawei.maps.MapCutouts
                                                     .needed(
@@ -610,7 +611,7 @@ class HuaweiWalksActivity : ComponentActivity() {
                                                     "${walks.size}: ${when_.joinToString(" · ")}$alsoTail"
                                                 }
                                             },
-                                            onFailure = { it.message ?: "failed" },
+                                            onFailure = { it.message ?: tr("failed") },
                                         )
                                         scope.launch {
                                             state = state.copy(downloading = false, message = note)

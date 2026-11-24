@@ -65,6 +65,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.opentasker.i18n.tr
 import com.opentasker.ui.charts.BandLanguage
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
@@ -806,7 +807,7 @@ private fun SyncDialog(
                         }
                         Icon(
                             Icons.Outlined.Info,
-                            contentDescription = "info",
+                            contentDescription = tr("info"),
                             tint = ink,
                             modifier = Modifier
                                 .clip(CircleShape)

@@ -39,6 +39,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -268,7 +269,7 @@ private fun FlowGraphCard(
                 )
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse flow" else "Expand flow",
+                    contentDescription = if (expanded) tr("Collapse flow") else tr("Expand flow"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

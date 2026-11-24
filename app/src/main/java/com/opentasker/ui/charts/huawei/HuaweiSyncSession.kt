@@ -1,5 +1,6 @@
 package com.opentasker.ui.charts.huawei
 
+import com.opentasker.i18n.tr
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -258,7 +259,7 @@ object HuaweiSyncSession {
             PackageManager.PERMISSION_GRANTED
         ) return null
         val nm = context.getSystemService(NotificationManager::class.java) ?: return null
-        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, tr(CHANNEL_NAME), NotificationManager.IMPORTANCE_LOW))
         return nm
     }
 

@@ -5,6 +5,7 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.text.countOf
+import com.opentasker.i18n.tr
 import java.util.Locale
 
 enum class GlobalSearchResultKind {
@@ -52,7 +53,7 @@ fun searchGlobalEntities(
                         kind = GlobalSearchResultKind.VARIABLE,
                         entityId = stableVariableId(variable),
                         title = "%${variable.name}",
-                        detail = if (variable.isSecret) "Secret variable" else "Global variable",
+                        detail = if (variable.isSecret) tr("Secret variable") else tr("Global variable"),
                         projectId = variable.projectId,
                         variableName = variable.name,
                     )
@@ -85,7 +86,7 @@ fun searchGlobalEntities(
                         kind = GlobalSearchResultKind.TASK,
                         entityId = task.id,
                         title = task.name,
-                        detail = countOf(task.actions.size, "action"),
+                        detail = if (task.actions.size == 1) tr("1 action") else tr("%1\$s actions", task.actions.size),
                         projectId = task.projectId,
                     )
                 )
@@ -110,7 +111,7 @@ fun searchGlobalEntities(
                             kind = GlobalSearchResultKind.ACTION,
                             entityId = task.id,
                             title = action.label?.takeIf { it.isNotBlank() } ?: action.type,
-                            detail = "${task.name} • action ${index + 1}",
+                            detail = tr("%1\$s • action %2\$s", task.name, index + 1),
                             projectId = task.projectId,
                             actionIndex = index,
                         )
@@ -146,7 +147,7 @@ fun searchGlobalEntities(
                         kind = GlobalSearchResultKind.PROFILE,
                         entityId = profile.id,
                         title = profile.name,
-                        detail = "Profile${profile.group?.let { " • $it" }.orEmpty()}",
+                        detail = profile.group?.let { tr("Profile • %1\$s", it) } ?: tr("Profile"),
                         projectId = profile.projectId,
                     )
                 )
@@ -174,7 +175,7 @@ fun searchGlobalEntities(
                         kind = GlobalSearchResultKind.SCENE,
                         entityId = scene.id,
                         title = scene.name,
-                        detail = countOf(scene.elements.size, "element"),
+                        detail = if (scene.elements.size == 1) tr("1 element") else tr("%1\$s elements", scene.elements.size),
                         projectId = scene.projectId,
                     )
                 )

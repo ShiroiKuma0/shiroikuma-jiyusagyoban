@@ -1,5 +1,6 @@
 package com.opentasker.ui.charts.compare
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.charts.compare.CompareData.Grain
 import com.opentasker.ui.charts.compare.CompareData.Join
 import kotlin.math.abs
@@ -33,7 +34,7 @@ object CompareStats {
     ) {
         /** The agreement figure NEVER travels without its threshold — the number alone means nothing. */
         val agreement: String
-            get() = if (pairs == 0) "—" else "$within/$pairs within ±${fmt(threshold)}"
+            get() = if (pairs == 0) "—" else tr("%1\$s/%2\$s within ±%3\$s", within, pairs, fmt(threshold))
     }
 
     fun delta(join: Join, threshold: Double): Delta {
@@ -99,24 +100,26 @@ object CompareStats {
         offsetSeconds: Long?,
     ): List<String> {
         val third = buildString {
-            append("対 Pairs·${join.both} both ·${join.huaweiOnly} Huawei only ·${join.humeOnly} Hume only")
+            append(tr("対 Pairs·%1\$s both ·%2\$s Huawei only ·%3\$s Hume only", join.both, join.huaweiOnly, join.humeOnly))
             if (join.grain == Grain.MINUTE) append(" ·±${CompareJoin.PAIR_TOLERANCE_MS / 1000} s")
-            if (join.notCounted > 0) append(" ·${join.notCounted} not counted")
+            if (join.notCounted > 0) append(tr(" ·%1\$s not counted", join.notCounted))
             if (delta.pairs > 0) {
-                append(" ·Δ median ${signed(delta.median)} $unit")
-                append(" (IQR ${fmt(delta.q1)}–${fmt(delta.q3)})")
+                append(tr(" ·Δ median %1\$s %2\$s", signed(delta.median), unit))
+                append(tr(" (IQR %1\$s–%2\$s)", fmt(delta.q1), fmt(delta.q3)))
                 append(" ·${delta.agreement} $unit")
             }
         }
         return listOf(
-            "Huawei ·${join.huaweiSamples} samples" +
-                if (join.impossible > 0) " ·${join.impossible} impossible timestamps" else "",
-            "Hume ·${join.humeSamples} samples",
+            tr("Huawei ·%1\$s samples", join.huaweiSamples) +
+                if (join.impossible > 0) tr(" ·%1\$s impossible timestamps", join.impossible) else "",
+            tr("Hume ·%1\$s samples", join.humeSamples),
             third,
             // The shared scale is stated outright: a stacked comparison lives or dies on both tracks
             // being drawn against the same numbers, and a reader cannot check that by eye.
-            "同一目盛り same scale $scale ·offset " +
-                (offsetSeconds?.let { "${it} s (measured, not applied)" } ?: "0 s (未測定)"),
+            (
+                offsetSeconds?.let { tr("同一目盛り same scale %1\$s ·offset %2\$s s (measured, not applied)", scale, it) }
+                    ?: tr("同一目盛り same scale %1\$s ·offset 0 s (未測定)", scale)
+                ),
         )
     }
 

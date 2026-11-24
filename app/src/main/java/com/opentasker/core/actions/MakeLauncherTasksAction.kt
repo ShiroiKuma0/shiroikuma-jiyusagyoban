@@ -14,6 +14,7 @@ import com.opentasker.core.policy.AppFreeze
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.TaskEntity
+import com.opentasker.i18n.tr
 import com.opentasker.widget.TaskShortcutClip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -142,7 +143,7 @@ class MakeLauncherTasksAction : Action {
         // 3. Show the multi-select app picker, every already-covered app ticked and led with.
         val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_MULTISELECT)
-            putExtra(DialogActivity.EXTRA_TITLE, "Select apps")
+            putExtra(DialogActivity.EXTRA_TITLE, tr("Select apps"))
             putExtra(DialogActivity.EXTRA_PRESELECTED, ticked.joinToString("\n"))
             if (bubbleVar.isNotEmpty()) {
                 putExtra(DialogActivity.EXTRA_TOGGLES, arrayOf("起動作業を作る", "凍結泡を出す"))

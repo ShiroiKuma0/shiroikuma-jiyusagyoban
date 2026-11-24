@@ -1,5 +1,6 @@
 package com.opentasker.core.huawei.pgnss
 
+import com.opentasker.i18n.tr
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
@@ -193,7 +194,7 @@ object PredictedSet {
         val expectedFiles = 8 + config.wuhanIssues
         val fetched = AtomicInteger(0)
         val fetchedBytes = AtomicLong(0)
-        report.step(PgnssStep.DOWNLOAD, "Downloading", "", 0, expectedFiles, 0.0)
+        report.step(PgnssStep.DOWNLOAD, tr("Downloading"), "", 0, expectedFiles, 0.0)
         val src = withContext(Dispatchers.IO) {
             ensureRunning(cancelled)
             sources.fetch(workDir) { p ->
@@ -213,7 +214,7 @@ object PredictedSet {
                     fetchedBytes.addAndGet(p.bytesRead)
                     val units = if (p.name.endsWith(".gz")) fetched.get() else fetched.incrementAndGet()
                     report.step(
-                        PgnssStep.DOWNLOAD, "Downloading", p.name,
+                        PgnssStep.DOWNLOAD, tr("Downloading"), p.name,
                         min(units, expectedFiles), expectedFiles,
                         DOWNLOAD_SHARE * min(units.toDouble() / expectedFiles, 1.0),
                         bytes = fetchedBytes.get(),
@@ -228,7 +229,7 @@ object PredictedSet {
                     // (see `Fetch.fetchOnce`), and it prints no size: "0.0 MB" beside a name reads
                     // as a stalled download rather than as one that has not begun.
                     report.step(
-                        PgnssStep.DOWNLOAD, "Downloading",
+                        PgnssStep.DOWNLOAD, tr("Downloading"),
                         if (p.bytesRead == 0L) "${p.name}  asking" else "${p.name}  ${megabytes(p)}",
                         min(fetched.get(), expectedFiles), expectedFiles,
                         DOWNLOAD_SHARE * min(
@@ -241,7 +242,7 @@ object PredictedSet {
         }
         ensureRunning(cancelled)
         report.step(
-            PgnssStep.DOWNLOAD, "Downloaded", "", expectedFiles, expectedFiles, DOWNLOAD_SHARE,
+            PgnssStep.DOWNLOAD, tr("Downloaded"), "", expectedFiles, expectedFiles, DOWNLOAD_SHARE,
             bytes = fetchedBytes.get(), line = "all sources on disk (${fetchedBytes.get() / 1024} KB)",
         )
         // Said in the run log AND carried into the set's own summary below, because "the build
@@ -250,7 +251,7 @@ object PredictedSet {
         for (note in src.notes) report.line(note)
 
         // ── step 2, build ───────────────────────────────────────────────────────────────────────
-        report.step(PgnssStep.BUILD, "Reading the orbit products", "", 0, 0, DOWNLOAD_SHARE)
+        report.step(PgnssStep.BUILD, tr("Reading the orbit products"), "", 0, 0, DOWNLOAD_SHARE)
         val plan = withContext(dispatcher) { validate(src, captured, config, nowGpsSeconds) }
         for (note in plan.notes) report.line(note)
         ensureRunning(cancelled)
@@ -336,7 +337,7 @@ object PredictedSet {
             }
             val n = tally.advance()
             report.step(
-                PgnssStep.BUILD, "Fitting ${job.system}", job.sat, n, tally.total,
+                PgnssStep.BUILD, tr("Fitting %1\$s", job.system), job.sat, n, tally.total,
                 DOWNLOAD_SHARE + KEPLER_SHARE * tally.fractionOfKepler(keplerJobs.size),
             )
             // NOT FINITE IS NOT "SMALL ENOUGH".
@@ -422,7 +423,7 @@ object PredictedSet {
         // GLONASS: state vectors straight off the precise orbit, no fit anywhere in it, and an
         // hour earlier than the rest.
         report.step(
-            PgnssStep.BUILD, "Writing GLONASS", "", tally.advance(), tally.total,
+            PgnssStep.BUILD, tr("Writing GLONASS"), "", tally.advance(), tally.total,
             DOWNLOAD_SHARE + KEPLER_SHARE,
         )
         val gloStamps = LongArray(plan.stamps.size) { plan.stamps[it] - 3600L }
@@ -445,7 +446,7 @@ object PredictedSet {
 
         // EXTRA: almanacs, the GLONASS channel table and Klobuchar, from public feeds.
         report.step(
-            PgnssStep.BUILD, "Building the almanac file", NAME_EXTRA,
+            PgnssStep.BUILD, tr("Building the almanac file"), NAME_EXTRA,
             tally.advance(), tally.total,
             DOWNLOAD_SHARE + KEPLER_SHARE + GLONASS_SHARE + BDS_SHARE,
         )
@@ -474,7 +475,7 @@ object PredictedSet {
             written[name] = target
             bytes += data.size
             report.step(
-                PgnssStep.BUILD, "Writing", name, tally.advance(), tally.total, 1.0,
+                PgnssStep.BUILD, tr("Writing"), name, tally.advance(), tally.total, 1.0,
             )
         }
 
@@ -522,7 +523,7 @@ object PredictedSet {
             // says the set was assembled from something older than today.
             for (note in src.notes) append(" · $note")
         }
-        report.step(PgnssStep.BUILD, "Built", "", tally.get(), tally.total, 1.0, line = summary)
+        report.step(PgnssStep.BUILD, tr("Built"), "", tally.get(), tally.total, 1.0, line = summary)
         return PgnssBuildResult(
             files = written,
             bytes = bytes,
@@ -818,7 +819,7 @@ object PredictedSet {
             }
             val n = tracked.incrementAndGet()
             report.step(
-                PgnssStep.BUILD, "Integrating BeiDou", sat, tally.advance(), tally.total,
+                PgnssStep.BUILD, tr("Integrating BeiDou"), sat, tally.advance(), tally.total,
                 DOWNLOAD_SHARE + KEPLER_SHARE + GLONASS_SHARE + BDS_SHARE * TRACK_SHARE * n / names.size,
             )
             if (obsTimes.size < 40) {
@@ -1029,7 +1030,7 @@ object PredictedSet {
             }
             val n = done.incrementAndGet()
             report.step(
-                PgnssStep.BUILD, "Fitting BeiDou", job.sat, tally.advance(), tally.total,
+                PgnssStep.BUILD, tr("Fitting BeiDou"), job.sat, tally.advance(), tally.total,
                 DOWNLOAD_SHARE + KEPLER_SHARE + GLONASS_SHARE +
                     BDS_SHARE * (TRACK_SHARE + (1.0 - TRACK_SHARE) * n / jobs.size),
             )
@@ -1316,7 +1317,7 @@ object PredictedSet {
         private var step = PgnssStep.DOWNLOAD
         // Seeded, not empty: [line] can be called before the first [step] — the captured set is read
         // before anything is downloaded — and a report with a blank phase blanks the panel.
-        private var phase = "Starting"
+        private var phase = tr("Starting")
         private var detail = ""
         private var done = 0
         private var total = 0

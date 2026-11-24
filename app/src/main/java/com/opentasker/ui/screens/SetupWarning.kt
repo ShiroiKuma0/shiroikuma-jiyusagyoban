@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -138,7 +139,7 @@ object SetupWarning {
         runCatching {
             val nm = app.getSystemService(NotificationManager::class.java) ?: return
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(CHANNEL_ID, tr(CHANNEL_NAME), NotificationManager.IMPORTANCE_DEFAULT).apply {
                     setSound(null, null)
                     enableVibration(false)
                 },
@@ -153,7 +154,10 @@ object SetupWarning {
             val notification = NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setColor(UiRoles.argb(UiRole.NOTIFICATION_ACCENT))
-                .setContentTitle("設定が外れています · ${off.size} setup item${if (off.size == 1) "" else "s"} switched off")
+                .setContentTitle(
+                    if (off.size == 1) tr("設定が外れています · 1 setup item switched off")
+                    else tr("設定が外れています · %1\$s setup items switched off", off.size),
+                )
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setOngoing(true)
@@ -185,7 +189,7 @@ class SetupWarningActivity : ComponentActivity() {
                     },
                     onAllReady = {
                         SetupWarning.clear(applicationContext)
-                        Toast.makeText(this, "設定はすべて有効です · All setup items are on", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, tr("設定はすべて有効です · All setup items are on"), Toast.LENGTH_SHORT).show()
                         finish()
                     },
                 )
@@ -258,9 +262,8 @@ private fun SetupWarningPanel(onLater: () -> Unit, onAllReady: () -> Unit) {
                 color = MaterialTheme.colorScheme.error,
             )
             Text(
-                "${items.size} setup item${if (items.size == 1) " is" else "s are"} switched off. " +
-                    "Tasks that depend on ${if (items.size == 1) "it" else "them"} fail until " +
-                    "${if (items.size == 1) "it is" else "they are"} switched back on.",
+                if (items.size == 1) tr("1 setup item is switched off. Tasks that depend on it fail until it is switched back on.")
+                else tr("%1\$s setup items are switched off. Tasks that depend on them fail until they are switched back on.", items.size),
                 style = MaterialTheme.typography.bodyLarge,
             )
             LazyColumn(
@@ -272,7 +275,7 @@ private fun SetupWarningPanel(onLater: () -> Unit, onAllReady: () -> Unit) {
                 }
             }
             OutlinedButton(onClick = onLater, modifier = Modifier.fillMaxWidth()) {
-                Text("後で — 通知に残す · Later — keep as a notification")
+                Text(tr("後で — 通知に残す · Later — keep as a notification"))
             }
         }
     }

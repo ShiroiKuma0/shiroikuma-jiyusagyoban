@@ -1,5 +1,6 @@
 package com.opentasker.core.dialog
 
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.Button
 import com.opentasker.ui.components.OutlinedButton
 import android.os.Bundle
@@ -96,7 +97,7 @@ class DialogActivity : ComponentActivity() {
             ) { uri ->
                 val path = com.opentasker.ui.screens.documentUriToFsPath(uri, isTree = true)
                 if (path == null) {
-                    if (uri != null) toast("That place has no path on the phone's storage")
+                    if (uri != null) toast(tr("That place has no path on the phone's storage"))
                     settle(DialogOutcome.Cancelled)
                 } else {
                     settle(DialogOutcome.Confirmed(path))
@@ -112,8 +113,8 @@ class DialogActivity : ComponentActivity() {
         val default = intent.getStringExtra(EXTRA_DEFAULT).orEmpty()
         val items = intent.getStringArrayExtra(EXTRA_ITEMS)?.toList() ?: emptyList()
         val inputType = intent.getStringExtra(EXTRA_INPUT_TYPE).orEmpty()
-        val okLabel = intent.getStringExtra(EXTRA_OK)?.takeIf { it.isNotBlank() } ?: "OK"
-        val cancelLabel = intent.getStringExtra(EXTRA_CANCEL)?.takeIf { it.isNotBlank() } ?: "Cancel"
+        val okLabel = intent.getStringExtra(EXTRA_OK)?.takeIf { it.isNotBlank() } ?: tr("OK")
+        val cancelLabel = intent.getStringExtra(EXTRA_CANCEL)?.takeIf { it.isNotBlank() } ?: tr("Cancel")
         // A TEXT dialog opts out of the dismiss button entirely by passing an explicitly blank cancel
         // label; an absent extra (e.g. the permission-block dialog) keeps the default "Cancel".
         val textCancelLabel: String? =
@@ -214,14 +215,14 @@ class DialogActivity : ComponentActivity() {
         }.getOrNull() ?: return
         val intent = com.opentasker.core.capabilities.CapabilityState.settingsIntent(req, this)
         if (intent == null) {
-            toast("No settings page for ${com.opentasker.core.capabilities.CapabilityState.shortLabel(req)}")
+            toast(tr("No settings page for %1\$s", com.opentasker.core.capabilities.CapabilityState.shortLabel(req)))
             return
         }
         val launched = runCatching { startActivity(intent); true }
             .onFailure { AppLogger.warn(TAG, "Could not open settings for $reqName: ${it.message}") }
             .getOrDefault(false)
         if (!launched) {
-            toast("Couldn't open ${com.opentasker.core.capabilities.CapabilityState.shortLabel(req)} settings")
+            toast(tr("Couldn't open %1\$s settings", com.opentasker.core.capabilities.CapabilityState.shortLabel(req)))
             return
         }
         com.opentasker.core.capabilities.CapabilityPrompt.markSentToSettings(req)
@@ -932,7 +933,7 @@ private fun MarkupText(text: String, style: TextStyle, scale: Float, modifier: M
 @Composable
 private fun SettingsPill(label: String, onClick: () -> Unit) {
     OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Text("Open $label settings", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(tr("Open %1\$s settings", label), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text("›", fontWeight = FontWeight.Bold)
     }
 }

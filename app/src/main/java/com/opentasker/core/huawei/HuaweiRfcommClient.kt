@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import com.opentasker.core.logging.AppLogger
 import android.content.Context
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -147,12 +148,12 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
         val device: BluetoothDevice = runCatching { a.getRemoteDevice(address) }.getOrNull()
             ?: return@withContext "bad address $address"
         if (device.bondState == BluetoothDevice.BOND_BONDED) {
-            onState("already paired")
+            onState(tr("already paired"))
             return@withContext null
         }
 
         a.cancelDiscovery()
-        onState("requesting")
+        onState(tr("requesting"))
         if (!device.createBond()) return@withContext "the phone would not start pairing"
 
         // POLLED, deliberately, rather than waiting on ACTION_BOND_STATE_CHANGED.
@@ -170,12 +171,12 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
         while (System.currentTimeMillis() < deadline) {
             when (device.bondState) {
                 BluetoothDevice.BOND_BONDED -> {
-                    onState("paired")
+                    onState(tr("paired"))
                     return@withContext null
                 }
                 BluetoothDevice.BOND_BONDING -> if (!announced) {
                     announced = true
-                    onState("pairing")
+                    onState(tr("pairing"))
                 }
                 // BOND_NONE after we asked, and after it had begun, means it was refused.
                 BluetoothDevice.BOND_NONE -> if (announced) {

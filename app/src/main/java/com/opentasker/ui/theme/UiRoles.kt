@@ -120,12 +120,12 @@ enum class UiRole(
     MENU_ROW_FRAME("menu_row_frame", RoleSection.MENUS, "Menu row · frame", "The pill of an action row", { accent }),
     MENU_LABEL("menu_label", RoleSection.MENUS, "Menu row · label", "The words of a menu row", { accent }),
     MENU_DIVIDER("menu_divider", RoleSection.MENUS, "Menu · divider", "The line between two groups of rows", { mix(background, accent, 0.7f) }),
-    ICON_CONNECT("icon_connect", RoleSection.MENUS, "Icon · run, start, connect", "Rows that run or start something, place a call, load", { 0xFF00FF00.toInt() }),
-    ICON_MESSAGE("icon_message", RoleSection.MENUS, "Icon · write, edit", "Rows that write, rename, edit or reply", { 0xFF4D94FF.toInt() }),
-    ICON_CONTACT("icon_contact", RoleSection.MENUS, "Icon · person, group, project", "Rows about a person, a group or a project", { 0xFF00FFFF.toInt() }),
-    ICON_SHARE("icon_share", RoleSection.MENUS, "Icon · copy, share, export", "Rows that copy, move, share, export or import", { 0xFFFF8000.toInt() }),
+    ICON_CONNECT("icon_connect", RoleSection.MENUS, "Icon · run, start, connect", "Rows that run or start something, place a call, load", { ThemePrefs.HEAVY_GREEN }),
+    ICON_MESSAGE("icon_message", RoleSection.MENUS, "Icon · write, edit", "Rows that write, rename, edit or reply", { ThemePrefs.HEAVY_BLUE }),
+    ICON_CONTACT("icon_contact", RoleSection.MENUS, "Icon · person, group, project", "Rows about a person, a group or a project", { ThemePrefs.LIGHT_BLUE }),
+    ICON_SHARE("icon_share", RoleSection.MENUS, "Icon · copy, share, export", "Rows that copy, move, share, export or import", { ThemePrefs.ORANGE }),
     ICON_VIEW("icon_view", RoleSection.MENUS, "Icon · view, open, settings", "Rows that view or open a page, or lead to settings", { accent }),
-    ICON_BLOCK("icon_block", RoleSection.MENUS, "Icon · stop, disable, leave", "Rows that stop, disable, block, close or leave", { 0xFFFF00FF.toInt() }),
+    ICON_BLOCK("icon_block", RoleSection.MENUS, "Icon · stop, disable, leave", "Rows that stop, disable, block, close or leave", { ThemePrefs.ROSE }),
 
     // ---- lists and pickers
     LIST_DIVIDER("list_divider", RoleSection.LISTS, "List · divider", "The line between two groups of a list or a picker", { mix(background, accent, 0.7f) }),
@@ -142,6 +142,16 @@ enum class UiRole(
     PAGE_CHIP_LABEL("page_chip_label", RoleSection.PAGE, "Index chip · label", "The words on the index chips", { accent }),
     PAGE_LABEL("page_label", RoleSection.PAGE, "Setting · label", "The bold label of a setting", { accent }),
     PAGE_VALUE("page_value", RoleSection.PAGE, "Setting · value", "The value shown at a setting's right", { text }),
+
+    // The icon of a section's heading and of its chip says what KIND of thing the section is. These
+    // seven are not the menu icon roles: a menu's green means "connect", here it means "a control".
+    SECTION_BASE("section_base", RoleSection.PAGE, "Section icon · the base", "Sections about what the app is, and its settings", { accent }),
+    SECTION_CONTROLS("section_controls", RoleSection.PAGE, "Section icon · controls", "Sections about what you operate: buttons, switches, marks", { ThemePrefs.HEAVY_GREEN }),
+    SECTION_WORDS("section_words", RoleSection.PAGE, "Section icon · words", "Sections about what is written and read: text, fonts, editors", { ThemePrefs.LIGHT_BLUE }),
+    SECTION_FRAME("section_frame", RoleSection.PAGE, "Section icon · the frame", "Sections about the frame and its boxes: lists, bars, borders", { ThemePrefs.HEAVY_BLUE }),
+    SECTION_REACH("section_reach", RoleSection.PAGE, "Section icon · reaching out", "Sections where the app asks, offers or hands over: dialogs, menus, export", { ThemePrefs.ORANGE }),
+    SECTION_WARNING("section_warning", RoleSection.PAGE, "Section icon · warning", "Sections that reset or wipe", { ThemePrefs.DELETE_RED }),
+    SECTION_FLASH("section_flash", RoleSection.PAGE, "Section icon · a brief flash", "The one section about what flashes up and goes", { ThemePrefs.ROSE }),
 
     // ---- bars and tabs
     TAB_INK("tab_ink", RoleSection.BARS, "Tabs · ink", "Lines and labels of the paper tabs", { accent }),

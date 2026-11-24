@@ -78,6 +78,7 @@ import com.opentasker.ui.theme.role
 import com.opentasker.ui.components.dialogFrame
 import com.opentasker.widget.WidgetEditor
 import com.opentasker.widget.WidgetTemplate
+import com.opentasker.i18n.tr
 
 /**
  * The "Widgets" tab: a library of named widget-layout templates. Create / edit a template in the
@@ -125,7 +126,7 @@ fun WidgetTemplatesScreen(
 
         if (templates.isEmpty()) {
             Text(
-                "No templates yet. Create one, design it in the editor, then point a Set Widget action at it by name.",
+                tr("No templates yet. Create one, design it in the editor, then point a Set Widget action at it by name."),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),
             )
@@ -227,7 +228,7 @@ private fun TemplateRow(
                 Text(template.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse template" else "Expand template",
+                    contentDescription = if (expanded) tr("Collapse template") else tr("Expand template"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -240,9 +241,9 @@ private fun TemplateRow(
                 ) {
                     TemplatePreview(template.layout)
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit template") }
-                    IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy layout JSON") }
-                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete template") }
+                    IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = tr("Edit template")) }
+                    IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = tr("Copy layout JSON")) }
+                    IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = tr("Delete template")) }
                 }
             }
         }
@@ -290,20 +291,20 @@ private fun NameDialog(existing: List<String>, onConfirm: (String) -> Unit, onDi
     val clash = trimmed in existing
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New template") },
+        title = { Text(tr("New template")) },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Template name") },
+                    label = { Text(tr("Template name")) },
                     singleLine = true,
                     isError = clash,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (clash) {
                     Text(
-                        "A template with that name already exists.",
+                        tr("A template with that name already exists."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 4.dp),
@@ -312,9 +313,9 @@ private fun NameDialog(existing: List<String>, onConfirm: (String) -> Unit, onDi
             }
         },
         confirmButton = {
-            Button(enabled = trimmed.isNotEmpty() && !clash, onClick = { onConfirm(trimmed) }) { Text("Design") }
+            Button(enabled = trimmed.isNotEmpty() && !clash, onClick = { onConfirm(trimmed) }) { Text(tr("Design")) }
         },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
     )
 }
 

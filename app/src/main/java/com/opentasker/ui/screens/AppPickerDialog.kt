@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.dialogFrame
 import com.opentasker.ui.theme.UiRole
 import com.opentasker.ui.theme.role
@@ -82,12 +83,12 @@ internal fun AppPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
             modifier = Modifier.dialogFrame(RoundedCornerShape(28.dp)),
         ) {
             Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).padding(16.dp)) {
-                Text("Pick an app", style = MaterialTheme.typography.titleMedium, color = role(UiRole.DIALOG_TITLE))
+                Text(tr("Pick an app"), style = MaterialTheme.typography.titleMedium, color = role(UiRole.DIALOG_TITLE))
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search") },
+                    label = { Text(tr("Search")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

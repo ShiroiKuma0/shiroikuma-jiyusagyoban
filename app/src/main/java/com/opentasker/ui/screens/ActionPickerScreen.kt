@@ -48,6 +48,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -140,7 +141,10 @@ fun AdvancedActionPickerScreen(
             val matches = actions.filter {
                 it.name.contains(query, ignoreCase = true) ||
                     category.contains(query, ignoreCase = true) ||
-                    it.description.contains(query, ignoreCase = true)
+                    it.description.contains(query, ignoreCase = true) ||
+                    tr(it.name).contains(query, ignoreCase = true) ||
+                    tr(category).contains(query, ignoreCase = true) ||
+                    tr(it.description).contains(query, ignoreCase = true)
             }
             if (matches.isEmpty()) null else category to matches
         }
@@ -150,10 +154,10 @@ fun AdvancedActionPickerScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Add action") },
+                title = { Text(tr("Add action")) },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Back"))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -171,7 +175,7 @@ fun AdvancedActionPickerScreen(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search actions") },
+                    label = { Text(tr("Search actions")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
@@ -218,7 +222,7 @@ private fun CategoryHeaderRow(category: String, count: Int, expanded: Boolean, o
                 tint = MaterialTheme.colorScheme.primary,
             )
             RoleIcon(categoryIcon, categoryRole, Modifier.size(22.dp))
-            Text(category, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text(tr(category), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         // The line under a category heading is the group divider of this list.
@@ -255,10 +259,10 @@ private fun ActionAccordionItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             RoleIcon(categoryIcon, categoryRole, Modifier.size(20.dp))
-            Text(metadata.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tr(metadata.name), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (effectiveLevel != CapabilityLevel.Supported) {
                 Text(
-                    if (effectiveLevel == CapabilityLevel.Unsupported) "Unsupported" else "Setup",
+                    if (effectiveLevel == CapabilityLevel.Unsupported) tr("Unsupported") else tr("Setup"),
                     style = MaterialTheme.typography.labelSmall,
                     color = role(UiRole.WARNING),
                 )
@@ -271,17 +275,17 @@ private fun ActionAccordionItem(
                     .padding(start = 96.dp, end = 16.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr(metadata.description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 CapabilityNote(capability)
                 if (metadata.fields.isNotEmpty()) {
-                    Text("Fields", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(tr("Fields"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     metadata.fields.forEach { field ->
                         Text(
                             buildString {
-                                append("• ").append(field.label)
+                                append("• ").append(tr(field.label))
                                 append(" (").append(field.fieldType.name.lowercase()).append(")")
-                                if (field.required) append(" — required")
-                                field.hint?.let { append(" — ").append(it) }
+                                if (field.required) append(" — ").append(tr("required"))
+                                field.hint?.let { append(" — ").append(tr(it)) }
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -289,7 +293,7 @@ private fun ActionAccordionItem(
                     }
                 }
                 OutlinedButton(onClick = onAdd, enabled = capability.canAdd) {
-                    Text("Add to task")
+                    Text(tr("Add to task"))
                 }
             }
         }

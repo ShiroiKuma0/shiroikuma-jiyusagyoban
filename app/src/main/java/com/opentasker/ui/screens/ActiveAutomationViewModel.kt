@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.opentasker.i18n.tr
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
 import com.opentasker.core.actions.ActionMetadataRegistry
@@ -134,7 +135,7 @@ internal fun taskerImportReviewState(report: TaskerXmlImportReport) = TaskerImpo
         "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
     },
     unsupportedActionRows = report.unsupportedActions.map {
-        "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
+        tr("%1\$s step %2\$s: code %3\$s", it.taskName, it.actionIndex + 1, it.taskerCode)
     },
 )
 
@@ -144,10 +145,10 @@ internal fun macroDroidImportReviewState(report: MacroDroidImportReport) = Taske
     preview = MacroDroidImportPlanner.preview(report),
     title = "Review MacroDroid import",
     mappedActionRows = report.mappedActions.map {
-        "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} -> ${it.openTaskerActionIds.joinToString()}"
+        tr("%1\$s step %2\$s: %3\$s -> %4\$s", it.macroName, it.actionIndex + 1, it.classType, it.openTaskerActionIds.joinToString())
     },
     unsupportedActionRows = report.unsupportedActions.map {
-        "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} (${it.reason})"
+        tr("%1\$s step %2\$s: %3\$s (%4\$s)", it.macroName, it.actionIndex + 1, it.classType, it.reason)
     },
 )
 
@@ -265,17 +266,17 @@ class ActiveAutomationViewModel(
     }
 
     // ---- Project CRUD (used by ProjectsManagementScreen) ----
-    fun createProject(name: String, color: Int?) = launchWithMessage("Project created") {
+    fun createProject(name: String, color: Int?) = launchWithMessage(tr("Project created")) {
         val nextOrder = (db.projectDao().getAll().maxOfOrNull { it.sortOrder } ?: -1) + 1
         db.projectDao().insert(Project(name = name.trim(), color = color, sortOrder = nextOrder).toEntity())
     }
 
-    fun updateProject(project: Project) = launchWithMessage("Project updated") {
+    fun updateProject(project: Project) = launchWithMessage(tr("Project updated")) {
         db.projectDao().update(project.toEntity())
     }
 
     fun deleteProject(project: Project, deleteItems: Boolean) = launchWithMessage(
-        if (deleteItems) "Project and its items deleted" else "Project deleted; items moved to Unfiled"
+        if (deleteItems) tr("Project and its items deleted") else tr("Project deleted; items moved to Unfiled")
     ) { offer ->
         val pid = project.id
         // Everything the delete is about to touch, captured whole. A project delete is the largest
@@ -331,14 +332,15 @@ class ActiveAutomationViewModel(
             }
             undoTasks.forEach { undoIcons.remove(it.id) }
             TaskWidgetProvider.requestRefresh(appContext)
-            "Restored “${project.name}” with ${undoTasks.size} task${plural(undoTasks.size)}, " +
-                "${undoProfiles.size} profile${plural(undoProfiles.size)} and " +
-                "${undoScenes.size} scene${plural(undoScenes.size)}"
+            tr(
+                "Restored “%1\$s” with %2\$s, %3\$s and %4\$s",
+                project.name, countTasks(undoTasks.size), countProfiles(undoProfiles.size), countScenes(undoScenes.size),
+            )
         }
     }
 
     /** Reorder by reassigning contiguous sortOrder so the moved project shifts one slot. */
-    fun moveProject(project: Project, up: Boolean) = launchWithMessage("Project reordered") {
+    fun moveProject(project: Project, up: Boolean) = launchWithMessage(tr("Project reordered")) {
         val ordered = db.projectDao().getAll()
             .sortedWith(compareBy({ it.sortOrder }, { it.name.lowercase() }))
             .toMutableList()
@@ -358,7 +360,7 @@ class ActiveAutomationViewModel(
      * tab to MANUAL so the dragged order sticks (a drag implies manual, like tasks). Backs both the Projects
      * tab list and the top project-tabs drag-reorder.
      */
-    fun reorderProjects(orderedIds: List<Long>) = launchWithMessage("Projects reordered") {
+    fun reorderProjects(orderedIds: List<Long>) = launchWithMessage(tr("Projects reordered")) {
         val byId = db.projectDao().getAll().associateBy { it.id }
         db.withTransaction {
             orderedIds.forEachIndexed { position, id ->
@@ -380,7 +382,7 @@ class ActiveAutomationViewModel(
         db.itemGroupDao().upsert(group.copy(name = name.trim()))
     }
 
-    fun deleteGroup(group: ItemGroupEntity) = launchWithMessage("Group “${group.name}” deleted") { offer ->
+    fun deleteGroup(group: ItemGroupEntity) = launchWithMessage(tr("Group “%1\$s” deleted", group.name)) { offer ->
         // Captured BEFORE the orphaning, because that is the part the undo has to put back: the
         // group row alone would return an empty group with its members still scattered.
         val members = db.itemMetaDao().getAll().filter { it.tab == group.tab && it.groupId == group.id }
@@ -435,7 +437,7 @@ class ActiveAutomationViewModel(
                 }
                 // 3. Force MANUAL sort so the freshly written positions drive the tab's order.
                 ListSortStore.set(sortTab, SortMethod.MANUAL)
-            }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Reorder failed"}")) }
+            }.onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Reorder failed")))) }
         }
     }
 
@@ -457,7 +459,7 @@ class ActiveAutomationViewModel(
                     }
                 }
             }
-        }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Group reorder failed"}")) }
+        }.onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Group reorder failed")))) }
     }
 
     fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
@@ -468,22 +470,22 @@ class ActiveAutomationViewModel(
     }
 
     fun moveProfilesToProject(items: List<Profile>, projectId: Long?) =
-        launchWithMessage("${items.size} profile${plural(items.size)} moved") {
+        launchWithMessage(tr("%1\$s moved", countProfiles(items.size))) {
             items.forEach { db.profileDao().update(it.copy(projectId = projectId).toEntity()) }
         }
 
     fun moveTasksToProject(items: List<Task>, projectId: Long?) =
-        launchWithMessage("${items.size} task${plural(items.size)} moved") {
+        launchWithMessage(tr("%1\$s moved", countTasks(items.size))) {
             items.forEach { db.taskDao().update(it.copy(projectId = projectId).toEntity()) }
         }
 
     fun moveScenesToProject(items: List<Scene>, projectId: Long?) =
-        launchWithMessage("${items.size} scene${plural(items.size)} moved") {
+        launchWithMessage(tr("%1\$s moved", countScenes(items.size))) {
             items.forEach { db.sceneDao().update(it.copy(projectId = projectId).toEntity()) }
         }
 
     fun deleteScenes(items: List<Scene>) =
-        launchWithMessage("Deleted ${items.size} scene${plural(items.size)}") { offer ->
+        launchWithMessage(tr("Deleted %1\$s", countScenes(items.size))) { offer ->
             val rows = items.map { it.toEntity() }
             items.forEach {
                 db.sceneDao().delete(it.toEntity())
@@ -493,7 +495,7 @@ class ActiveAutomationViewModel(
         }
 
     fun deleteProfiles(items: List<Profile>) =
-        launchWithMessage("Deleted ${items.size} profile${plural(items.size)}") { offer ->
+        launchWithMessage(tr("Deleted %1\$s", countProfiles(items.size))) { offer ->
             val rows = items.map { it.toEntity() }
             items.forEach { db.profileDao().delete(it.toEntity()); locationDwellStateStore.clearProfile(it.id) }
             offer { restoreProfiles(rows) }
@@ -510,16 +512,18 @@ class ActiveAutomationViewModel(
                 val rows = free.map { it.toEntity() }
                 free.forEach { db.taskDao().delete(it.toEntity()); undoIcons[it.id] = it.iconPath }
                 TaskWidgetProvider.requestRefresh(appContext)
-                rows to buildString {
-                    append("Deleted ${free.size} task${plural(free.size)}")
-                    if (used.isNotEmpty()) append("; skipped ${used.size} used by a profile")
+                val text = if (used.isNotEmpty()) {
+                    tr("Deleted %1\$s; skipped %2\$s used by a profile", countTasks(free.size), used.size)
+                } else {
+                    tr("Deleted %1\$s", countTasks(free.size))
                 }
+                rows to text
             }
                 .onSuccess { (rows, text) ->
                     val token = if (rows.isEmpty()) null else offerUndo(rows.map { it.id }) { restoreTasks(rows) }
                     events.send(UiMessage(text, token))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Delete failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Delete failed")))) }
         }
     }
 
@@ -591,13 +595,13 @@ class ActiveAutomationViewModel(
     fun undo(token: String) {
         val pending = pendingUndos.remove(token)
         if (pending == null) {
-            viewModelScope.launch { events.send(UiMessage("That undo is no longer available")) }
+            viewModelScope.launch { events.send(UiMessage(tr("That undo is no longer available"))) }
             return
         }
         viewModelScope.launch {
             runCatching { pending.work() }
                 .onSuccess { events.send(UiMessage(it)) }
-                .onFailure { events.send(UiMessage("Undo failed: ${it.message ?: "unknown error"}")) }
+                .onFailure { events.send(UiMessage(tr("Undo failed: %1\$s", it.message ?: tr("unknown error")))) }
         }
     }
 
@@ -657,11 +661,11 @@ class ActiveAutomationViewModel(
             .onFailure { AppLogger.warn("OpenTasker.UI", "Couldn't date an edit for the Last edited order", it) }
     }
 
-    fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null, freezeBubble: Boolean = false) = launchWithMessage("Task created") {
+    fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null, freezeBubble: Boolean = false) = launchWithMessage(tr("Task created")) {
         edited(EditHistoryDao.TYPE_TASK, db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, iconPath = iconPath, freezeBubble = freezeBubble).toEntity()))
     }
 
-    fun renameTask(task: Task, name: String) = launchWithMessage("Renamed") {
+    fun renameTask(task: Task, name: String) = launchWithMessage(tr("Renamed")) {
         val n = name.trim()
         if (n.isNotEmpty() && n != task.name) db.taskDao().update(task.copy(name = n).toEntity())
     }
@@ -675,10 +679,10 @@ class ActiveAutomationViewModel(
     }
 
     /** Clone tasks in place (same project), each "<name> (copy)". */
-    fun duplicateTasks(items: List<Task>) = launchWithMessage("Duplicated ${items.size} task${plural(items.size)}") {
+    fun duplicateTasks(items: List<Task>) = launchWithMessage(tr("Duplicated %1\$s", countTasks(items.size))) {
         val taken = db.taskDao().getAll().map { it.name }.toMutableSet()
         items.forEach { t ->
-            val name = uniqueTaskName("${t.name} (copy)", taken)
+            val name = uniqueTaskName(tr("%1\$s (copy)", t.name), taken)
             taken += name
             db.taskDao().insert(t.copy(id = 0, name = name, iconPath = null).toEntity())
         }
@@ -686,7 +690,7 @@ class ActiveAutomationViewModel(
 
     /** Paste clipboard tasks into [projectId]. On a Cut, [cutIds] are deleted first so a move keeps its
      *  original name; on a Copy [cutIds] is empty and same-named pastes get a " (2)" suffix. */
-    fun pasteTasks(items: List<Task>, projectId: Long?, cutIds: List<Long>) = launchWithMessage("Pasted ${items.size} task${plural(items.size)}") {
+    fun pasteTasks(items: List<Task>, projectId: Long?, cutIds: List<Long>) = launchWithMessage(tr("Pasted %1\$s", countTasks(items.size))) {
         cutIds.forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } }
         val taken = db.taskDao().getAll().map { it.name }.toMutableSet()
         items.forEach { t ->
@@ -696,7 +700,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) { offer ->
+    fun updateTask(task: Task, message: String = tr("Task updated")) = launchWithMessage(message) { offer ->
         val previous = db.taskDao().getById(task.id)
         if (previous != null) {
             // Offered whenever the edit made the list SHORTER, whatever route it came by — the
@@ -709,7 +713,7 @@ class ActiveAutomationViewModel(
             if (before > task.actions.size) {
                 val removed = before - task.actions.size
                 val json = previous.actionsJson
-                offer { restoreTaskActions(task.id, json, "$removed action${plural(removed)}") }
+                offer { restoreTaskActions(task.id, json, countActions(removed)) }
             }
             // DATA-LOSS GUARD (白い熊 critical): if the STORED actions currently fail to decode, the
             // in-memory task was built from an empty fallback — writing it would clobber recoverable JSON.
@@ -722,7 +726,7 @@ class ActiveAutomationViewModel(
                     "ActiveAutomationVM",
                     "BLOCKED save of task ${task.id} '${task.name}': stored actions unreadable (${prevIssue.message}); not overwriting with empty",
                 )
-                events.send(UiMessage("Save blocked: this task's stored actions couldn't be read — not overwriting them"))
+                events.send(UiMessage(tr("Save blocked: this task's stored actions couldn't be read — not overwriting them")))
                 return@launchWithMessage
             }
             // Trace every task write so a rogue overwriter (dropping actions) is identifiable in logcat.
@@ -761,7 +765,7 @@ class ActiveAutomationViewModel(
                 val profilesUsingTask = db.profileDao().getAll().map { it.toDomain() }
                     .filter { it.enterTaskId == task.id || it.exitTaskId == task.id }
                 if (profilesUsingTask.isNotEmpty()) {
-                    events.send(UiMessage("Task is used by ${profilesUsingTask.size} profile(s). Reassign or delete those profiles first."))
+                    events.send(UiMessage(tr("Task is used by %1\$s profile(s). Reassign or delete those profiles first.", profilesUsingTask.size)))
                     return@launch
                 }
                 val row = task.toEntity()
@@ -777,9 +781,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { row ->
                     val token = offerUndo(listOf(row.id)) { restoreTasks(listOf(row)) }
-                    events.send(UiMessage("Task deleted", token))
+                    events.send(UiMessage(tr("Task deleted"), token))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Task delete failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Task delete failed")))) }
         }
     }
 
@@ -788,7 +792,7 @@ class ActiveAutomationViewModel(
         bgColor: String? = null, cornerRadiusDp: Int = 16, scrimAlpha: Int = 55,
         borderColor: String? = null, borderWidth: Int = 0,
         defaultPosition: String = "center", defaultModal: Boolean = true, defaultDismissOnOutside: Boolean = true,
-    ) = launchWithMessage("Scene created") {
+    ) = launchWithMessage(tr("Scene created")) {
         val sceneId = db.sceneDao().insert(
             Scene(
                 name = name.trim(),
@@ -808,13 +812,13 @@ class ActiveAutomationViewModel(
         edited(EditHistoryDao.TYPE_SCENE, sceneId)
     }
 
-    fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
+    fun updateScene(scene: Scene, message: String = tr("Scene updated")) = launchWithMessage(message) {
         db.sceneDao().update(scene.toEntity())
         // A scene save writes no edit-history row here, so the stamp is its only date.
         edited(EditHistoryDao.TYPE_SCENE, scene.id)
     }
 
-    fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") { offer ->
+    fun deleteScene(scene: Scene) = launchWithMessage(tr("Scene deleted")) { offer ->
         val row = scene.toEntity()
         db.sceneDao().delete(row)
         offer { restoreScenes(listOf(row)) }
@@ -830,7 +834,7 @@ class ActiveAutomationViewModel(
         projectId: Long? = null,
         policy: ProfilePolicyDraft = ProfilePolicyDraft.from(null),
     ) =
-        launchWithMessage("Profile created") {
+        launchWithMessage(tr("Profile created")) {
             val profile = Profile(
                 name = name.trim(),
                 enabled = enabled,
@@ -844,7 +848,7 @@ class ActiveAutomationViewModel(
             edited(EditHistoryDao.TYPE_PROFILE, db.profileDao().insert(profile.toEntity()))
         }
 
-    fun updateProfile(profile: Profile, message: String = "Profile updated") =
+    fun updateProfile(profile: Profile, message: String = tr("Profile updated")) =
         launchWithMessage(message) { offer ->
             requireValidProfileFieldLimits(profile)
             // Atomic read-check-snapshot-update (upstream deep-audit), so racing writers
@@ -871,7 +875,7 @@ class ActiveAutomationViewModel(
                     if (before > profile.contexts.size) {
                         val removed = before - profile.contexts.size
                         val json = previousEntity.contextsJson
-                        offer { restoreProfileContexts(profile.id, json, "$removed context${plural(removed)}") }
+                        offer { restoreProfileContexts(profile.id, json, countContexts(removed)) }
                     }
                     db.editHistoryDao().insert(
                         EditHistoryEntity(
@@ -894,7 +898,7 @@ class ActiveAutomationViewModel(
             }
         }
 
-    fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") { offer ->
+    fun deleteProfile(profile: Profile) = launchWithMessage(tr("Profile deleted")) { offer ->
         val row = profile.toEntity()
         db.profileDao().delete(row)
         offer { restoreProfiles(listOf(row)) }
@@ -908,7 +912,7 @@ class ActiveAutomationViewModel(
     }
 
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
-        launchWithMessage("Template installed as a disabled profile") {
+        launchWithMessage(tr("Template installed as a disabled profile")) {
             val applied = template.instantiate(slotValues)
             db.withTransaction {
                 val taskId = db.taskDao().insert(applied.task.toEntity())
@@ -932,9 +936,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _taskerImportReview.value = it
-                    events.send(UiMessage("${it.title.removePrefix("Review ").removeSuffix(" import")} import ready for review"))
+                    events.send(UiMessage(tr("%1\$s import ready for review", it.title.removePrefix("Review ").removeSuffix(" import"))))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Import preview failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Import preview failed")))) }
         }
     }
 
@@ -955,11 +959,13 @@ class ActiveAutomationViewModel(
                 .onSuccess { importReport ->
                     _taskerImportReview.value = null
                     events.send(UiMessage(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
+                        tr(
+                            "Imported %1\$s, %2\$s",
+                            countTasks(importReport.insertedTasks), countDisabledProfiles(importReport.insertedProfiles),
+                        )
                     ))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Tasker XML import failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Tasker XML import failed")))) }
         }
     }
 
@@ -982,12 +988,13 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { bundle ->
                     events.send(UiMessage(
-                        "Exported ${bundle.tasks.size} task${plural(bundle.tasks.size)}, " +
-                            "${bundle.profiles.size} profile${plural(bundle.profiles.size)}, " +
-                            "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
+                        tr(
+                            "Exported %1\$s, %2\$s, %3\$s",
+                            countTasks(bundle.tasks.size), countProfiles(bundle.profiles.size), countScenes(bundle.scenes.size),
+                        )
                     ))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "export failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("export failed")))) }
         }
     }
 
@@ -1030,15 +1037,15 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { bundle ->
                     val parts = buildList {
-                        if (bundle.profiles.isNotEmpty()) add("${bundle.profiles.size} profile${plural(bundle.profiles.size)}")
-                        if (bundle.tasks.isNotEmpty()) add("${bundle.tasks.size} task${plural(bundle.tasks.size)}")
-                        if (bundle.scenes.isNotEmpty()) add("${bundle.scenes.size} scene${plural(bundle.scenes.size)}")
-                        if (bundle.variables.isNotEmpty()) add("${bundle.variables.size} variable${plural(bundle.variables.size)}")
-                        if (bundle.templates.isNotEmpty()) add("${bundle.templates.size} template${plural(bundle.templates.size)}")
+                        if (bundle.profiles.isNotEmpty()) add(countProfiles(bundle.profiles.size))
+                        if (bundle.tasks.isNotEmpty()) add(countTasks(bundle.tasks.size))
+                        if (bundle.scenes.isNotEmpty()) add(countScenes(bundle.scenes.size))
+                        if (bundle.variables.isNotEmpty()) add(countVariables(bundle.variables.size))
+                        if (bundle.templates.isNotEmpty()) add(countTemplates(bundle.templates.size))
                     }
-                    events.send(UiMessage("Exported ${parts.joinToString().ifEmpty { "nothing" }}"))
+                    events.send(UiMessage(if (parts.isEmpty()) tr("Exported nothing") else tr("Exported %1\$s", parts.joinToString(tr(", ")))))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Export failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Export failed")))) }
         }
     }
 
@@ -1055,9 +1062,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _openTaskerBundleReview.value = it
-                    events.send(UiMessage("Import ready to review"))
+                    events.send(UiMessage(tr("Import ready to review")))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "import preview failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("import preview failed")))) }
         }
     }
 
@@ -1086,12 +1093,15 @@ class ActiveAutomationViewModel(
                 .onSuccess { importReport ->
                     _openTaskerBundleReview.value = null
                     events.send(UiMessage(
-                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
-                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
-                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
+                        tr(
+                            "Imported %1\$s, %2\$s, %3\$s",
+                            countTasks(importReport.insertedTasks),
+                            countDisabledProfiles(importReport.insertedProfiles),
+                            countScenes(importReport.insertedScenes),
+                        )
                     ))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "import failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("import failed")))) }
         }
     }
 
@@ -1104,8 +1114,8 @@ class ActiveAutomationViewModel(
             runCatching {
                 withContext(Dispatchers.IO) { db.runLogDao().clearUnpinned() }
             }
-                .onSuccess { deleted -> events.send(UiMessage("Cleared $deleted run log entr${if (deleted == 1) "y" else "ies"}")) }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Run log clear failed"}")) }
+                .onSuccess { deleted -> events.send(UiMessage(if (deleted == 1) tr("Cleared 1 run log entry") else tr("Cleared %1\$s run log entries", deleted))) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Run log clear failed")))) }
         }
     }
 
@@ -1118,10 +1128,15 @@ class ActiveAutomationViewModel(
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
-                    val suffix = if (deleted > 0) "; pruned $deleted old entry${plural(deleted)}" else ""
-                    events.send(UiMessage("Run log retention updated$suffix"))
+                    events.send(UiMessage(
+                        when {
+                            deleted == 1 -> tr("Run log retention updated; pruned 1 old entry")
+                            deleted > 0 -> tr("Run log retention updated; pruned %1\$s old entries", deleted)
+                            else -> tr("Run log retention updated")
+                        }
+                    ))
                 }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Run log retention update failed"}")) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Run log retention update failed")))) }
         }
     }
 
@@ -1144,9 +1159,9 @@ class ActiveAutomationViewModel(
                 val clipboard = appContext.getSystemService(ClipboardManager::class.java)
                     ?: throw IllegalStateException("Clipboard service is unavailable")
                 clipboard.setPrimaryClip(ClipData.newPlainText("白い熊 自由作業盤 Diagnostic Report", report))
-                events.send(UiMessage("Diagnostic report copied to the clipboard."))
+                events.send(UiMessage(tr("Diagnostic report copied to the clipboard.")))
             } catch (ex: Exception) {
-                events.send(UiMessage("Error: ${ex.message ?: "Failed to copy the diagnostic report"}"))
+                events.send(UiMessage(tr("Error: %1\$s", ex.message ?: tr("Failed to copy the diagnostic report"))))
             }
         }
     }
@@ -1161,9 +1176,9 @@ class ActiveAutomationViewModel(
                     putExtra(Intent.EXTRA_TEXT, report)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                appContext.startActivity(Intent.createChooser(intent, tr("Share diagnostic report")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (ex: Exception) {
-                events.send(UiMessage("Error: ${ex.message ?: "Failed to share diagnostic report"}"))
+                events.send(UiMessage(tr("Error: %1\$s", ex.message ?: tr("Failed to share diagnostic report"))))
             }
         }
     }
@@ -1191,7 +1206,7 @@ class ActiveAutomationViewModel(
      */
     fun runActionNow(task: Task, index: Int) {
         viewModelScope.launch {
-            if (_runActionBusy.value) { events.send(UiMessage("A run is already in flight.")); return@launch }
+            if (_runActionBusy.value) { events.send(UiMessage(tr("A run is already in flight."))); return@launch }
             val single = SingleActionRun.taskFor(task, index) ?: return@launch
             val action = single.actions.first()
             val label = action.label?.takeIf { it.isNotBlank() }
@@ -1209,8 +1224,12 @@ class ActiveAutomationViewModel(
                     source = SingleActionRun.sourceFor(label),
                     admissionController = ExecutionAdmissionRegistry.current(appContext),
                 )
-                val status = if (result.report.success) "succeeded" else "failed"
-                events.send(UiMessage("$label $status (${result.report.durationMs}ms)"))
+                // The run log keeps the English label (above); the message shows it translated.
+                val shown = action.label?.takeIf { it.isNotBlank() } ?: tr(label)
+                events.send(UiMessage(
+                    if (result.report.success) tr("%1\$s succeeded (%2\$sms)", shown, result.report.durationMs)
+                    else tr("%1\$s failed (%2\$sms)", shown, result.report.durationMs)
+                ))
             } finally {
                 _runActionBusy.value = false
             }
@@ -1228,17 +1247,17 @@ class ActiveAutomationViewModel(
                 val entryId = entry.id
                 val consumed = runCatching { db.runLogDao().clearHeld(entryId) }.getOrDefault(0)
                 if (consumed == 0) {
-                    events.send(UiMessage("That held run has already been replayed."))
+                    events.send(UiMessage(tr("That held run has already been replayed.")))
                     return@launch
                 }
                 val payload = HeldExecutionPayloadCodec.decode(entry.heldPayload)
                 if (payload == null) {
-                    events.send(UiMessage("That held run no longer carries enough detail to replay."))
+                    events.send(UiMessage(tr("That held run no longer carries enough detail to replay.")))
                     return@launch
                 }
                 val task = runCatching { db.taskDao().getById(payload.taskId)?.toDomain() }.getOrNull()
                 if (task == null) {
-                    events.send(UiMessage("${payload.taskName} no longer exists."))
+                    events.send(UiMessage(tr("%1\$s no longer exists.", payload.taskName)))
                     return@launch
                 }
                 val result = executeAndLogTask(
@@ -1249,8 +1268,10 @@ class ActiveAutomationViewModel(
                     metadata = payload.metadata,
                     initialVariables = payload.initialVariables,
                 )
-                val status = if (result.report.success) "succeeded" else "failed"
-                events.send(UiMessage("${task.name} $status (${result.report.durationMs}ms)"))
+                events.send(UiMessage(
+                    if (result.report.success) tr("%1\$s succeeded (%2\$sms)", task.name, result.report.durationMs)
+                    else tr("%1\$s failed (%2\$sms)", task.name, result.report.durationMs)
+                ))
             } finally {
                 _runActionBusy.value = false
             }
@@ -1259,7 +1280,7 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            if (_runActionBusy.value) { events.send(UiMessage("A run is already in flight.")); return@launch }
+            if (_runActionBusy.value) { events.send(UiMessage(tr("A run is already in flight."))); return@launch }
             _runActionBusy.value = true
             // finally, not a plain trailing assignment: executeAndLogTask is not wrapped in a
             // runCatching here, so a throw would otherwise leave the flag standing and disable
@@ -1271,8 +1292,10 @@ class ActiveAutomationViewModel(
                     task = task,
                     source = "Manual run",
                 )
-                val status = if (result.report.success) "succeeded" else "failed"
-                events.send(UiMessage("${task.name} $status (${result.report.durationMs}ms)"))
+                events.send(UiMessage(
+                    if (result.report.success) tr("%1\$s succeeded (%2\$sms)", task.name, result.report.durationMs)
+                    else tr("%1\$s failed (%2\$sms)", task.name, result.report.durationMs)
+                ))
             } finally {
                 _runActionBusy.value = false
             }
@@ -1282,14 +1305,14 @@ class ActiveAutomationViewModel(
     fun pinTaskShortcut(task: Task) {
         viewModelScope.launch {
             if (!TaskShortcutHelper.canPinShortcut(appContext)) {
-                events.send(UiMessage("Launcher does not support pinned shortcuts"))
+                events.send(UiMessage(tr("Launcher does not support pinned shortcuts")))
                 return@launch
             }
             val requested = TaskShortcutHelper.requestPinShortcut(appContext, task)
             if (requested) {
-                events.send(UiMessage("Pinning \"${task.name}\" to home screen"))
+                events.send(UiMessage(tr("Pinning \"%1\$s\" to home screen", task.name)))
             } else {
-                events.send(UiMessage("Failed to pin shortcut"))
+                events.send(UiMessage(tr("Failed to pin shortcut")))
             }
         }
     }
@@ -1304,8 +1327,8 @@ class ActiveAutomationViewModel(
                 db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
                 true
             }.onSuccess { undone ->
-                events.send(UiMessage(if (undone) "Edit undone" else "No edit history available"))
-            }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Undo failed"}")) }
+                events.send(UiMessage(if (undone) tr("Edit undone") else tr("No edit history available")))
+            }.onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Undo failed")))) }
         }
     }
 
@@ -1319,8 +1342,8 @@ class ActiveAutomationViewModel(
                 db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
                 true
             }.onSuccess { undone ->
-                events.send(UiMessage(if (undone) "Edit undone" else "No edit history available"))
-            }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Undo failed"}")) }
+                events.send(UiMessage(if (undone) tr("Edit undone") else tr("No edit history available")))
+            }.onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Undo failed")))) }
         }
     }
 
@@ -1345,8 +1368,8 @@ class ActiveAutomationViewModel(
                 LocaleConditionGrantStore(appContext)
                     .revokeAllForBinding(LocaleConditionGrantStore.variableKey(projectId, name))
             }
-                .onSuccess { events.send(UiMessage("Variable deleted")) }
-                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Variable could not be deleted"}")) }
+                .onSuccess { events.send(UiMessage(tr("Variable deleted"))) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Variable could not be deleted")))) }
         }
     }
 
@@ -1367,7 +1390,7 @@ class ActiveAutomationViewModel(
      *  super-global (projectId 0); deleting the exact row leaves every project's live copy untouched. The
      *  runtime cache is unset too, so it never lingers with a stale copy (which diverged the export). */
     fun deleteDeadGlobals(vars: List<com.opentasker.core.model.Variable>) =
-        launchWithMessage("Removed ${vars.size} dead global${plural(vars.size)}") {
+        launchWithMessage(if (vars.size == 1) tr("Removed 1 dead global") else tr("Removed %1\$s dead globals", vars.size)) {
             vars.forEach {
                 db.variableDao().delete(it.projectId, it.name)
                 com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
@@ -1411,22 +1434,22 @@ class ActiveAutomationViewModel(
         // Restored: the icons are theirs again, so release them from the holding pen unharmed.
         entities.forEach { undoIcons.remove(it.id) }
         TaskWidgetProvider.requestRefresh(appContext)
-        val what = "${entities.size} task${plural(entities.size)}"
+        val what = countTasks(entities.size)
         return if (renumbered == 0) {
-            "Restored $what"
+            tr("Restored %1\$s", what)
         } else {
-            "Restored $what — $renumbered had to be renumbered, so check Monitor → Run on start"
+            tr("Restored %1\$s — %2\$s had to be renumbered, so check Monitor → Run on start", what, renumbered)
         }
     }
 
     private suspend fun restoreProfiles(entities: List<ProfileEntity>): String {
         db.withTransaction { entities.forEach { db.profileDao().insert(it) } }
-        return "Restored ${entities.size} profile${plural(entities.size)}"
+        return tr("Restored %1\$s", countProfiles(entities.size))
     }
 
     private suspend fun restoreScenes(entities: List<SceneEntity>): String {
         db.withTransaction { entities.forEach { db.sceneDao().insert(it) } }
-        return "Restored ${entities.size} scene${plural(entities.size)}"
+        return tr("Restored %1\$s", countScenes(entities.size))
     }
 
     /**
@@ -1446,19 +1469,19 @@ class ActiveAutomationViewModel(
             members.forEach { db.itemMetaDao().upsert(it) }
             children.forEach { db.itemGroupDao().upsert(it) }
         }
-        return "Restored group “${group.name}” and ${members.size} item${plural(members.size)}"
+        return tr("Restored group “%1\$s” and %2\$s", group.name, countItems(members.size))
     }
 
     private suspend fun restoreTaskActions(taskId: Long, actionsJson: String, what: String): String {
-        val current = db.taskDao().getById(taskId) ?: return "“$what” is gone — nothing to undo into"
+        val current = db.taskDao().getById(taskId) ?: return tr("“%1\$s” is gone — nothing to undo into", what)
         db.taskDao().update(current.copy(actionsJson = actionsJson))
-        return "Restored $what"
+        return tr("Restored %1\$s", what)
     }
 
     private suspend fun restoreProfileContexts(profileId: Long, contextsJson: String, what: String): String {
-        val current = db.profileDao().getById(profileId) ?: return "“$what” is gone — nothing to undo into"
+        val current = db.profileDao().getById(profileId) ?: return tr("“%1\$s” is gone — nothing to undo into", what)
         db.profileDao().update(current.copy(contextsJson = contextsJson))
-        return "Restored $what"
+        return tr("Restored %1\$s", what)
     }
 
     /**
@@ -1481,7 +1504,7 @@ class ActiveAutomationViewModel(
                     // The undo is dropped rather than left dangling: if the change did not happen,
                     // an offer to reverse it would reverse something nobody did.
                     token?.let { t -> pendingUndos.remove(t) }
-                    events.send(UiMessage("Error: ${it.message ?: "Operation failed"}"))
+                    events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Operation failed"))))
                 }
         }
     }
@@ -1563,3 +1586,15 @@ internal fun readBoundedDocumentBytes(context: Context, uri: Uri, maxBytes: Int,
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
+
+// A count with its noun, as one translated phrase ("3 tasks" / 「タスク3件」) to put into a message.
+private fun countTasks(n: Int): String = if (n == 1) tr("1 task") else tr("%1\$s tasks", n)
+private fun countProfiles(n: Int): String = if (n == 1) tr("1 profile") else tr("%1\$s profiles", n)
+private fun countDisabledProfiles(n: Int): String =
+    if (n == 1) tr("1 disabled profile") else tr("%1\$s disabled profiles", n)
+private fun countScenes(n: Int): String = if (n == 1) tr("1 scene") else tr("%1\$s scenes", n)
+private fun countVariables(n: Int): String = if (n == 1) tr("1 variable") else tr("%1\$s variables", n)
+private fun countTemplates(n: Int): String = if (n == 1) tr("1 template") else tr("%1\$s templates", n)
+private fun countActions(n: Int): String = if (n == 1) tr("1 action") else tr("%1\$s actions", n)
+private fun countContexts(n: Int): String = if (n == 1) tr("1 context") else tr("%1\$s contexts", n)
+private fun countItems(n: Int): String = if (n == 1) tr("1 item") else tr("%1\$s items", n)

@@ -37,6 +37,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.opentasker.i18n.tr
 
 /**
  * "Lift, float, drop" reorder state for a scrolling column of variable-height rows. The dragged row is
@@ -149,7 +150,7 @@ fun <T> ReorderableColumn(
                         ) {
                             Icon(
                                 Icons.Filled.DragIndicator,
-                                contentDescription = "Drag to reorder",
+                                contentDescription = tr("Drag to reorder"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

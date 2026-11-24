@@ -28,6 +28,7 @@ import com.opentasker.core.storage.GengoshimaDao
 import com.opentasker.core.storage.GengoshimaIslandEntity
 import com.opentasker.core.storage.GengoshimaSentenceEntity
 import com.opentasker.core.storage.GengoshimaVocabEntity
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
 import com.opentasker.ui.components.OutlinedButton
@@ -185,17 +186,17 @@ internal fun VocabEditDialog(
         title = { Text(title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(term, { term = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("語 / term") })
-                OutlinedTextField(reading, { reading = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("読み（ひらがな）/ reading") })
-                OutlinedTextField(meaning, { meaning = it }, Modifier.fillMaxWidth(), label = { Text("訳 — 複数は ; で / translation, senses split by ;") })
-                OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text("注 / note") })
-                Text("島 / island", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(term, { term = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(tr("語 / term")) })
+                OutlinedTextField(reading, { reading = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(tr("読み（ひらがな）/ reading")) })
+                OutlinedTextField(meaning, { meaning = it }, Modifier.fillMaxWidth(), label = { Text(tr("訳 — 複数は ; で / translation, senses split by ;")) })
+                OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text(tr("注 / note")) })
+                Text(tr("島 / island"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     islands.forEach { i ->
                         TogglePill(i.nameJa.ifBlank { i.nameEn }, i.id == islandId, choice = true) { islandId = i.id }
                     }
                 }
-                if (meaning.isBlank()) Text("訳が要ります / a translation is required", fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+                if (meaning.isBlank()) Text(tr("訳が要ります / a translation is required"), fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
             }
         },
         confirmButton = {
@@ -216,9 +217,9 @@ internal fun ExampleAddDialog(term: String, onDismiss: () -> Unit, onSave: (ja: 
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(ja, { ja = it }, Modifier.fillMaxWidth(), label = { Text("日本語") })
-                OutlinedTextField(en, { en = it }, Modifier.fillMaxWidth(), label = { Text("English") })
+                OutlinedTextField(en, { en = it }, Modifier.fillMaxWidth(), label = { Text(tr("English")) })
                 Text(
-                    "島の最後に普通の文として入り、音声が付きます。\nIt joins the island as an ordinary sentence and is voiced.",
+                    tr("島の最後に普通の文として入り、音声が付きます。\nIt joins the island as an ordinary sentence and is voiced."),
                     fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

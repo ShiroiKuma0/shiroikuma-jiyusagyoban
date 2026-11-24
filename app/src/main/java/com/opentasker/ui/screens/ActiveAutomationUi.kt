@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.Upload
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -705,7 +706,7 @@ fun ActiveAutomationUi(
             }
         }
         if (!opened) {
-            scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+            scope.launch { snackbarHostState.showSnackbar(tr("Flow target no longer exists")) }
         }
     }
 
@@ -717,7 +718,7 @@ fun ActiveAutomationUi(
             // Everything else keeps the old short flash.
             val result = snackbarHostState.showSnackbar(
                 message = message.text,
-                actionLabel = message.undoToken?.let { "Undo" },
+                actionLabel = message.undoToken?.let { tr("Undo") },
                 withDismissAction = message.undoToken != null,
                 duration = if (message.undoToken != null) {
                     SnackbarDuration.Indefinite
@@ -733,18 +734,18 @@ fun ActiveAutomationUi(
 
     var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
     val headerDetail = when (screen) {
-        OpenTaskerScreen.Profiles -> "${profiles.count { it.enabled }} enabled - ${profiles.size} total"
-        OpenTaskerScreen.Tasks -> "${tasks.sumOf { it.actions.size }} actions - ${tasks.size} tasks"
-        OpenTaskerScreen.Vars -> "${visibleVariables.size} variables"
-        OpenTaskerScreen.Flow -> "${profiles.size} profiles - ${tasks.size} tasks"
-        OpenTaskerScreen.Scenes -> "${scenes.sumOf { it.elements.size }} elements - ${scenes.size} scenes"
-        OpenTaskerScreen.Widgets -> "${widgetTemplates.size} widget templates"
-        OpenTaskerScreen.Inspector -> "Live context health"
-        OpenTaskerScreen.Setup -> "Permission and reliability checks"
-        OpenTaskerScreen.RunLog -> "${runLogs.size} recent entries"
-        OpenTaskerScreen.Monitor -> "Engine and live state"
-        OpenTaskerScreen.Projects -> "${projects.size} projects"
-        OpenTaskerScreen.Help -> "Schema and action reference"
+        OpenTaskerScreen.Profiles -> tr("%1\$s enabled - %2\$s total", profiles.count { it.enabled }, profiles.size)
+        OpenTaskerScreen.Tasks -> tr("%1\$s actions - %2\$s tasks", tasks.sumOf { it.actions.size }, tasks.size)
+        OpenTaskerScreen.Vars -> tr("%1\$s variables", visibleVariables.size)
+        OpenTaskerScreen.Flow -> tr("%1\$s profiles - %2\$s tasks", profiles.size, tasks.size)
+        OpenTaskerScreen.Scenes -> tr("%1\$s elements - %2\$s scenes", scenes.sumOf { it.elements.size }, scenes.size)
+        OpenTaskerScreen.Widgets -> tr("%1\$s widget templates", widgetTemplates.size)
+        OpenTaskerScreen.Inspector -> tr("Live context health")
+        OpenTaskerScreen.Setup -> tr("Permission and reliability checks")
+        OpenTaskerScreen.RunLog -> tr("%1\$s recent entries", runLogs.size)
+        OpenTaskerScreen.Monitor -> tr("Engine and live state")
+        OpenTaskerScreen.Projects -> tr("%1\$s projects", projects.size)
+        OpenTaskerScreen.Help -> tr("Schema and action reference")
     }
 
     if (showUiCustomization) {
@@ -755,11 +756,11 @@ fun ActiveAutomationUi(
     if (exitBusy) {
         AlertDialog(
             onDismissRequest = { /* the exit tasks are already running — no way back from here */ },
-            title = { Text("Shutting down") },
+            title = { Text(tr("Shutting down")) },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    Text("Running the run-on-exit tasks…")
+                    Text(tr("Running the run-on-exit tasks…"))
                 }
             },
             confirmButton = {},
@@ -771,7 +772,7 @@ fun ActiveAutomationUi(
     exitReport?.let { report ->
         AlertDialog(
             onDismissRequest = { exitReport = null },
-            title = { Text(if (report.clean) "Ready to exit" else "Still running") },
+            title = { Text(if (report.clean) tr("Ready to exit") else tr("Still running")) },
             text = {
                 Column(
                     Modifier.verticalScroll(rememberScrollState()),
@@ -779,23 +780,22 @@ fun ActiveAutomationUi(
                 ) {
                     Text(
                         if (report.ran.isEmpty()) {
-                            "No run-on-exit tasks are configured (set them under Monitor ⇨ Run on exit)."
+                            tr("No run-on-exit tasks are configured (set them under Monitor ⇨ Run on exit).")
                         } else {
-                            "Ran on exit: ${report.ran.joinToString()}."
+                            tr("Ran on exit: %1\$s.", report.ran.joinToString())
                         },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     if (report.timedOut.isNotEmpty()) {
                         Text(
-                            "Gave up waiting after 30s (still going): ${report.timedOut.joinToString()}.",
+                            tr("Gave up waiting after 30s (still going): %1\$s.", report.timedOut.joinToString()),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
                     if (report.missing.isNotEmpty()) {
                         Text(
-                            "Configured but no longer exist — stale “Run on exit” entries: " +
-                                "${report.missing.joinToString()}.",
+                            tr("Configured but no longer exist — stale “Run on exit” entries: %1\$s.", report.missing.joinToString()),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -803,27 +803,28 @@ fun ActiveAutomationUi(
                     HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
                     if (report.leftovers.isEmpty()) {
                         Text(
-                            "Nothing is left running. Only the engine service remains, and it is stopped next.",
+                            tr("Nothing is left running. Only the engine service remains, and it is stopped next."),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
                         Text(
-                            "${report.leftovers.size} thing${if (report.leftovers.size == 1) "" else "s"} " +
-                                "should already have stopped and did not — they are forced down on OK:",
+                            if (report.leftovers.size == 1) {
+                                tr("1 thing should already have stopped and did not — they are forced down on OK:")
+                            } else {
+                                tr("%1\$s things should already have stopped and did not — they are forced down on OK:", report.leftovers.size)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         report.leftovers.forEach { entry ->
                             Text(
-                                "• ${entry.kind.title}: ${entry.label} — ${entry.detail}",
+                                "• ${tr(entry.kind.title)}: ${entry.label} — ${entry.detail}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                     Text(
-                        "This report is also written to the run log. Nothing will restart the app by itself " +
-                            "afterwards — not the per-minute alarm, a widget, the tile or a sister app; open " +
-                            "白い熊 自由作業盤 to start it again.",
+                        tr("This report is also written to the run log. Nothing will restart the app by itself afterwards — not the per-minute alarm, a widget, the tile or a sister app; open 白い熊 自由作業盤 to start it again."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -834,9 +835,9 @@ fun ActiveAutomationUi(
                     exitReport = null
                     AppShutdown.finish(context, report)
                     hostActivity?.finishAndRemoveTask()
-                }) { Text("Stop everything & exit") }
+                }) { Text(tr("Stop everything & exit")) }
             },
-            dismissButton = { OutlinedButton(onClick = { exitReport = null }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { exitReport = null }) { Text(tr("Cancel")) } },
         )
     }
 
@@ -880,7 +881,7 @@ fun ActiveAutomationUi(
                             )
                         }
                         Text(
-                            "${screen.label} - $headerDetail",
+                            "${tr(screen.label)} - $headerDetail",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -908,7 +909,7 @@ fun ActiveAutomationUi(
                         IconButton(onClick = expandAll.second) {
                             Icon(
                                 if (expandAll.first) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
-                                contentDescription = if (expandAll.first) "Collapse all" else "Expand all",
+                                contentDescription = if (expandAll.first) tr("Collapse all") else tr("Expand all"),
                             )
                         }
                     }
@@ -926,11 +927,11 @@ fun ActiveAutomationUi(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "More options (long-press: 白い熊 自由作業盤 UI)")
+                        Icon(Icons.Filled.MoreVert, contentDescription = tr("More options (long-press: 白い熊 自由作業盤 UI)"))
                     }
                     ThemedDropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
                         DropdownMenuItem(
-                            text = { Text("白い熊 自由作業盤 UI") },
+                            text = { Text(tr("白い熊 自由作業盤 UI")) },
                             icon = Icons.Filled.Settings,
                             role = IconRole.VIEW,
                             opens = true,
@@ -940,19 +941,19 @@ fun ActiveAutomationUi(
                         // Restart is the everyday one: the same teardown as an exit, minus the stop flag,
                         // followed by a fresh start — re-establishes the context layer after a bad state.
                         DropdownMenuItem(
-                            text = { Text("Restart engine") },
+                            text = { Text(tr("Restart engine")) },
                             icon = Icons.Filled.RestartAlt,
                             role = IconRole.CONNECT,
                             onClick = {
                                 showOverflow = false
                                 AppShutdown.restartEngine(context)
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("Engine restarted — run-on-start tasks will re-run.")
+                                    snackbarHostState.showSnackbar(tr("Engine restarted — run-on-start tasks will re-run."))
                                 }
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Exit app fully") },
+                            text = { Text(tr("Exit app fully")) },
                             icon = Icons.Filled.PowerSettingsNew,
                             role = IconRole.BLOCK,
                             // Opens the shutdown report, which is where the exit is confirmed.
@@ -1140,7 +1141,7 @@ fun ActiveAutomationUi(
                                 }
                             }
                             Text(
-                                destination.label,
+                                tr(destination.label),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = primary,
                                 maxLines = 1,
@@ -1218,7 +1219,7 @@ fun ActiveAutomationUi(
                 onEditProfile = { openProfileDialog(it) },
                 onDeleteProfile = { openDeleteProfile(it) },
                 onToggleProfile = { profile, enabled ->
-                    viewModel.updateProfile(profile.copy(enabled = enabled), "Profile ${if (enabled) "enabled" else "disabled"}")
+                    viewModel.updateProfile(profile.copy(enabled = enabled), if (enabled) tr("Profile enabled") else tr("Profile disabled"))
                 },
                 onAddContext = { openContextPicker(it) },
                 onEditContext = { profile, index, context ->
@@ -1254,9 +1255,9 @@ fun ActiveAutomationUi(
                 onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
                 runBusy = runActionBusy,
-                onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
+                onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) tr("Freeze bubble on") else tr("Freeze bubble off")) },
                 onSetTaskEnabled = { t, on ->
-                    viewModel.updateTask(t.copy(enabled = on), if (on) "Task enabled" else "Task disabled")
+                    viewModel.updateTask(t.copy(enabled = on), if (on) tr("Task enabled") else tr("Task disabled"))
                 },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { openActionPicker(it) },
@@ -1277,7 +1278,7 @@ fun ActiveAutomationUi(
                 },
                 onRunAction = viewModel::runActionNow,
                 onApplyActions = { task, newActions ->
-                    viewModel.updateTask(task.copy(actions = newActions), "Actions updated")
+                    viewModel.updateTask(task.copy(actions = newActions), tr("Actions updated"))
                 },
                 onPickTaskIcon = { iconPickerTask = it },
                 contentPadding = innerPadding,
@@ -1297,7 +1298,7 @@ fun ActiveAutomationUi(
                         screenOrdinal = OpenTaskerScreen.Profiles.ordinal
                         openContextPicker(profile)
                     } else {
-                        scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+                        scope.launch { snackbarHostState.showSnackbar(tr("Flow target no longer exists")) }
                     }
                 },
                 onAddAction = { taskId ->
@@ -1306,7 +1307,7 @@ fun ActiveAutomationUi(
                         screenOrdinal = OpenTaskerScreen.Tasks.ordinal
                         openActionPicker(task)
                     } else {
-                        scope.launch { snackbarHostState.showSnackbar("Flow target no longer exists") }
+                        scope.launch { snackbarHostState.showSnackbar(tr("Flow target no longer exists")) }
                     }
                 },
             )
@@ -1454,11 +1455,11 @@ fun ActiveAutomationUi(
                     is DeleteTarget.SceneTarget -> viewModel.deleteScene(target.scene)
                     is DeleteTarget.ActionTarget -> viewModel.updateTask(
                         target.task.copy(actions = target.task.actions.filterIndexed { i, _ -> i != target.index }),
-                        "Action removed",
+                        tr("Action removed"),
                     )
                     is DeleteTarget.ContextTarget -> viewModel.updateProfile(
                         target.profile.copy(contexts = target.profile.contexts.filterIndexed { i, _ -> i != target.index }),
-                        "Context removed",
+                        tr("Context removed"),
                     )
                 }
                 clearPendingDelete()
@@ -1622,7 +1623,7 @@ fun ActiveAutomationUi(
                 val updatedActions = state.index?.let { index ->
                     state.task.actions.mapIndexed { i, existing -> if (i == index) action else existing }
                 } ?: (state.task.actions + action)
-                viewModel.updateTask(state.task.copy(actions = updatedActions), if (state.index == null) "Action added" else "Action updated")
+                viewModel.updateTask(state.task.copy(actions = updatedActions), if (state.index == null) tr("Action added") else tr("Action updated"))
                 clearActionEdit()
             },
         )
@@ -1648,7 +1649,7 @@ fun ActiveAutomationUi(
                 } ?: (state.profile.contexts + context)
                 viewModel.updateProfile(
                     state.profile.copy(contexts = updatedContexts),
-                    if (state.index == null) "Context added" else "Context updated",
+                    if (state.index == null) tr("Context added") else tr("Context updated"),
                 )
                 clearContextEdit()
             },

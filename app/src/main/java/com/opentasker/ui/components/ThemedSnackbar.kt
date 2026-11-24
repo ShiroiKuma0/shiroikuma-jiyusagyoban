@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.opentasker.i18n.tr
 import com.opentasker.ui.theme.ThemeStore
 
 /**
@@ -88,7 +89,7 @@ fun ThemedSnackbar(data: SnackbarData) {
                 IconButton(onClick = { data.dismiss() }) {
                     Icon(
                         Icons.Filled.Close,
-                        contentDescription = "Dismiss",
+                        contentDescription = tr("Dismiss"),
                         tint = Color(prefs.flashText),
                     )
                 }

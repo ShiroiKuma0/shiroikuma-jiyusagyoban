@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Dynamic context catalog. Stable context/config keys remain in Kotlin; presentation lives here. -->
+    <string name="context_type_application_title" formatted="false">アプリ</string>
+    <string name="context_type_application_description" formatted="false">指定したアプリが前面に表示されている間、成立します。</string>
+    <string name="context_type_time_title" formatted="false">時刻</string>
+    <string name="context_type_time_description" formatted="false">指定した時間帯の間、成立します。</string>
+    <string name="context_type_day_title" formatted="false">曜日</string>
+    <string name="context_type_day_description" formatted="false">選んだ曜日、プリセット、または平日・週末の範囲で成立します。</string>
+    <string name="context_type_location_title" formatted="false">位置情報</string>
+    <string name="context_type_location_description" formatted="false">緯度・経度から指定した半径内にいる間、成立します。精度と滞在時間の確認も任意で指定できます。</string>
+    <string name="context_type_state_title" formatted="false">状態</string>
+    <string name="context_type_state_description" formatted="false">電池、充電、メディア、画面の向き、近接、行動、速度、ローミング、テザリング、通話の状態で成立します。</string>
+    <string name="context_type_event_title" formatted="false">イベント</string>
+    <string name="context_type_event_description" formatted="false">起動完了、通知、NFC、Bluetoothの接続・切断・セキュリティ、カレンダー、太陽、振る動作、Localeプラグインへの問い合わせなど、一度きりのイベントで成立します。</string>
+    <string name="context_type_plugin_title" formatted="false">プラグイン</string>
+    <string name="context_type_plugin_description" formatted="false">Locale/Taskerの条件プラグインが「成立」を返したときに成立します。プラグインには定期的に問い合わせ、最後に得た状態を保持します。</string>
+    <string name="context_field_application_package_label" formatted="false">パッケージ名</string>
+    <string name="context_field_application_package_hint" formatted="false">com.example.app（仕事用プロファイルのアプリは見えません）</string>
+    <string name="context_field_application_component_label" formatted="false">前面のコンポーネント（任意）</string>
+    <string name="context_field_application_component_hint" formatted="false">com.example.app.PlayerActivity または com.example.app.*</string>
+    <string name="context_field_time_start_label" formatted="false">開始（HH:mm）</string>
+    <string name="context_field_time_start_hint" formatted="false">09:00、または %Sunrise のようなグローバル変数</string>
+    <string name="context_field_time_end_label" formatted="false">終了（HH:mm）</string>
+    <string name="context_field_time_end_hint" formatted="false">17:00、または %Sunset のようなグローバル変数</string>
+    <string name="context_field_day_days_label" formatted="false">曜日</string>
+    <string name="context_field_day_days_hint" formatted="false">weekdays, weekends, MON-FRI</string>
+    <string name="context_field_location_latitude_label" formatted="false">緯度</string>
+    <string name="context_field_location_longitude_label" formatted="false">経度</string>
+    <string name="context_field_location_radius_label" formatted="false">半径（メートル）</string>
+    <string name="context_field_location_radius_hint" formatted="false">100</string>
+    <string name="context_field_location_accuracy_label" formatted="false">精度の上限（メートル）</string>
+    <string name="context_field_location_accuracy_hint" formatted="false">50</string>
+    <string name="context_field_location_dwell_label" formatted="false">滞在時間（秒）</string>
+    <string name="context_field_location_dwell_hint" formatted="false">300</string>
+    <string name="context_field_location_outside_label" formatted="false">範囲外で成立</string>
+    <string name="context_field_location_outside_hint" formatted="false">この場所にいるときではなく、離れているときに発動します（滞在時間も適用）</string>
+    <string name="context_field_state_key_label" formatted="false">状態キー</string>
+    <string name="context_field_state_key_hint" formatted="false">battery_level, charging, orientation, proximity, activity, speed, roaming, tethering, call_state, bt_near, health_steps, health_heart_rate, health_sleep_minutes, health_exercise_minutes</string>
+    <string name="context_field_state_poll_minutes_label" formatted="false">確認の間隔（分）</string>
+    <string name="context_field_state_poll_minutes_hint" formatted="false">健康の測定値のみ。15～1440、既定は15</string>
+    <string name="context_field_state_operator_label" formatted="false">演算子</string>
+    <string name="context_field_state_operator_hint" formatted="false">=, &gt;=, &lt;=, &gt;, &lt;, ~（Wi-Fi名のパターン）</string>
+    <string name="context_field_state_value_label" formatted="false">期待する値</string>
+    <string name="context_field_state_value_hint" formatted="false">portrait、near、walking、10、true、ringing、Bluetoothデバイスの名前かアドレス、または既存の状態値</string>
+    <string name="context_state_preset_orientation" formatted="false">縦向き</string>
+    <string name="context_state_preset_proximity" formatted="false">近接</string>
+    <string name="context_state_preset_activity" formatted="false">歩行中</string>
+    <string name="context_state_preset_speed" formatted="false">速度 ≥ 10 m/s</string>
+    <string name="context_state_preset_roaming" formatted="false">ローミング中</string>
+    <string name="context_state_preset_tethering" formatted="false">テザリング中</string>
+    <string name="context_state_preset_work_profile" formatted="false">仕事用プロファイル一時停止中</string>
+    <string name="context_state_preset_call" formatted="false">着信中</string>
+    <string name="context_state_preset_bt_near" formatted="false">Bluetoothデバイスが近くにある</string>
+    <string name="context_state_preset_health_steps" formatted="false">今日の歩数が10,000歩</string>
+    <string name="context_state_preset_health_heart_rate" formatted="false">心拍数が100を超える</string>
+    <string name="context_state_preset_health_sleep" formatted="false">睡眠が6時間未満</string>
+    <string name="context_state_preset_health_exercise" formatted="false">今日の運動が30分</string>
+    <string name="context_field_event_type_label" formatted="false">イベントの種類</string>
+    <string name="context_field_event_type_hint" formatted="false">boot_completed, notification, nfc, bluetooth, bluetooth_key_missing, bluetooth_encryption_change, calendar, sunrise, sunset, shake, camera, mic, package_added, package_removed, package_replaced</string>
+    <string name="context_field_event_state_label" formatted="false">イベントの状態</string>
+    <string name="context_field_event_state_hint" formatted="false">during, upcoming, connected, disconnected</string>
+    <string name="context_field_event_calendar_label" formatted="false">カレンダー名</string>
+    <string name="context_field_event_calendar_hint" formatted="false">仕事</string>
+    <string name="context_field_event_before_label" formatted="false">何分前（分）</string>
+    <string name="context_field_event_before_hint" formatted="false">15</string>
+    <string name="context_field_event_package_label" formatted="false">許可するパッケージの一覧</string>
+    <string name="context_field_event_package_hint" formatted="false">com.example.app, com.chat.app</string>
+    <string name="context_field_event_tag_label" formatted="false">NFCタグのID</string>
+    <string name="context_field_event_tag_hint" formatted="false">04AABBCC</string>
+    <string name="context_field_event_latitude_label" formatted="false">緯度</string>
+    <string name="context_field_event_latitude_hint" formatted="false">40.7128</string>
+    <string name="context_field_event_longitude_label" formatted="false">経度</string>
+    <string name="context_field_event_longitude_hint" formatted="false">-74.0060</string>
+    <string name="context_field_event_offset_label" formatted="false">太陽時刻からのずれ（分）</string>
+    <string name="context_field_event_offset_hint" formatted="false">-30</string>
+    <string name="context_field_event_window_label" formatted="false">太陽時刻の許容幅（分）</string>
+    <string name="context_field_event_window_hint" formatted="false">5</string>
+    <string name="context_field_event_elevation_label" formatted="false">太陽高度</string>
+    <string name="context_field_event_elevation_hint" formatted="false">空欄なら日の出・日の入り。civil、nautical、astronomical、または -4 のような度数</string>
+    <string name="context_field_event_topic_label" formatted="false">プッシュのトピック</string>
+    <string name="context_field_event_topic_hint" formatted="false">topic-name</string>
+    <string name="context_field_event_id_label" formatted="false">プッシュイベントのID</string>
+    <string name="context_field_event_id_hint" formatted="false">完全一致させる配信ID（任意）</string>
+    <string name="context_field_event_title_label" formatted="false">タイトルに含む</string>
+    <string name="context_field_event_title_hint" formatted="false">通知のタイトルの文字列（任意）</string>
+    <string name="context_field_event_body_label" formatted="false">本文に含む</string>
+    <string name="context_field_event_body_hint" formatted="false">通知の本文の文字列（任意）</string>
+    <string name="context_field_event_filter_label" formatted="false">メタデータ全体の絞り込み</string>
+    <string name="context_field_event_filter_hint" formatted="false">文字列・パッケージ・アクションでの絞り込み（任意）</string>
+    <string name="context_field_event_regex_label" formatted="false">正規表現で照合</string>
+    <string name="context_field_plugin_package_label" formatted="false">プラグインのパッケージ</string>
+    <string name="context_field_plugin_package_hint" formatted="false">com.example.plugin</string>
+    <string name="context_field_plugin_bundle_label" formatted="false">プラグイン設定のJSON</string>
+    <string name="context_field_plugin_bundle_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
+    <string name="locale_plugin_configure">プラグイン側で設定</string>
+    <string name="locale_plugin_configure_missing">このアプリには、OpenTaskerから開けるプラグイン設定画面がありません。</string>
+    <string name="locale_plugin_configure_failed">プラグインの設定を保存できませんでした: %1$s</string>
+    <string name="locale_plugin_configure_refused">OpenTaskerはプラグインの設定を開きませんでした: %1$s</string>
+    <string name="context_field_plugin_blurb_label" formatted="false">説明</string>
+    <string name="context_field_plugin_blurb_hint" formatted="false">プラグイン設定から得たラベル（任意）</string>
+    <string name="context_field_plugin_timeout_label" formatted="false">問い合わせのタイムアウト（ミリ秒）</string>
+    <string name="context_field_plugin_timeout_hint" formatted="false">5000</string>
+    <string name="context_day_mon" formatted="false">月</string>
+    <string name="context_day_tue" formatted="false">火</string>
+    <string name="context_day_wed" formatted="false">水</string>
+    <string name="context_day_thu" formatted="false">木</string>
+    <string name="context_day_fri" formatted="false">金</string>
+    <string name="context_day_sat" formatted="false">土</string>
+    <string name="context_day_sun" formatted="false">日</string>
+    <string name="context_preset_during_meeting" formatted="false">会議中</string>
+    <string name="context_preset_15_before" formatted="false">15分前</string>
+    <string name="context_preset_30_before" formatted="false">30分前</string>
+    <string name="context_preset_all_day_busy" formatted="false">終日予定あり</string>
+    <string name="context_preset_at_sunrise" formatted="false">日の出</string>
+    <string name="context_preset_at_sunset" formatted="false">日の入り</string>
+    <string name="context_preset_30_after" formatted="false">30分後</string>
+    <string name="context_preset_civil_dawn" formatted="false">市民薄明の始まり</string>
+    <string name="context_preset_nautical_dawn" formatted="false">航海薄明の始まり</string>
+    <string name="context_preset_astronomical_dawn" formatted="false">天文薄明の始まり</string>
+    <string name="context_preset_civil_dusk" formatted="false">市民薄明の終わり</string>
+    <string name="context_preset_nautical_dusk" formatted="false">航海薄明の終わり</string>
+    <string name="context_preset_astronomical_dusk" formatted="false">天文薄明の終わり</string>
+    <string name="context_preset_all_bluetooth_disconnected" formatted="false">Bluetoothデバイスがすべて切断</string>
+    <string name="context_preset_bluetooth_key_missing" formatted="false">Bluetoothの鍵がない</string>
+    <string name="context_preset_bluetooth_encrypted" formatted="false">Bluetooth接続が暗号化されている</string>
+    <string name="context_preset_bluetooth_unencrypted" formatted="false">Bluetooth接続が暗号化されていない</string>
+    <string name="context_preset_screen_recording_visible" formatted="false">画面録画に映っている</string>
+    <string name="context_preset_screen_recording_not_visible" formatted="false">画面録画に映っていない</string>
+    <!-- Home-screen widget and configuration activity. -->
+    <string name="widget_choose_task_title" formatted="false">ウィジェットのタスクを選択</string>
+    <string name="widget_choose_task_subtitle" formatted="false">タスクをタップして、このホーム画面ウィジェットに割り当てます</string>
+    <string name="widget_setup_required" formatted="false">設定が必要です</string>
+    <string name="widget_empty_title" formatted="false">先にタスクを作成してください</string>
+    <string name="widget_empty_body" formatted="false">ウィジェットは、保存済みのOpenTaskerのタスクをホーム画面から実行します。アプリでタスクを作成してから、ここに戻って割り当ててください。</string>
+    <string name="widget_selectable_task" formatted="false">選択できるタスク</string>
+    <string name="widget_assign" formatted="false">割り当て</string>
+    <string name="widget_action_title" formatted="false">ウィジェットのアクション</string>
+    <string name="widget_run_selected_task" formatted="false">選択したタスクを実行</string>
+    <string name="widget_tap_to_run" formatted="false">タップして実行</string>
+    <plurals name="run_log_active_executions">
+        <item quantity="one">%1$d件の自動化を実行中</item>
+        <item quantity="other">%1$d件の自動化を実行中</item>
+    </plurals>
+    <plurals name="run_log_variable_changes">
+        <item quantity="one">%1$d個の変数を設定</item>
+        <item quantity="other">%1$d個の変数を設定</item>
+    </plurals>
+    <plurals name="widget_action_count">
+        <item quantity="one">%1$d個のアクション</item>
+        <item quantity="other">%1$d個のアクション</item>
+    </plurals>
+    <plurals name="widget_saved_task_count">
+        <item quantity="one">保存済みのタスクが%1$d件あります。このウィジェットをタップしたときに実行するタスクを選んでください。</item>
+        <item quantity="other">保存済みのタスクが%1$d件あります。このウィジェットをタップしたときに実行するタスクを選んでください。</item>
+    </plurals>
+    <!-- Scene overlay service and fallback views. -->
+    <string name="scene_overlay_default_button" formatted="false">ボタン</string>
+    <string name="scene_overlay_unsupported_element">%1$sは利用できません</string>
+    <string name="scene_overlay_notification_title" formatted="false">シーンのオーバーレイを表示中</string>
+    <string name="scene_overlay_channel_name" formatted="false">シーンのオーバーレイ</string>
+    <!-- Action eligibility and setup diagnostics displayed by the dynamic catalog. -->
+    <string name="capability_ready" formatted="false">準備完了</string>
+    <string name="capability_unknown_action">不明なアクションは分類されておらず、追加、インポート、有効化はできません。</string>
+    <string name="capability_notification_permission" formatted="false">Android 13以降では通知の権限が必要です。</string>
+    <string name="capability_notification_cancel_permission" formatted="false">表示中の通知を、タグとIDの両方またはどちらかで指定して取り消します。Android 13以降では通知の権限が必要です。</string>
+    <string name="capability_notification_progress" formatted="false">Android 13以降では通知の権限が必要です。Android 16以降ではProgressStyleを使い、進行中は継続通知の優先表示（任意）を要求します。使えない場合は通常の進行状況バーで表示します。</string>
+    <string name="capability_locale_fire_setup" formatted="false">Locale互換のプラグインがインストールされている必要があります。要求は明示的に指定したパッケージにだけ送られます。</string>
+    <string name="capability_locale_query_setup" formatted="false">Locale互換の条件プラグインがインストールされている必要があります。問い合わせは宛先を明示した順序付きブロードキャストで、タイムアウトも処理します。</string>
+    <string name="capability_wifi_unsupported" formatted="false">Android 10以降では、通常のアプリがWi-Fiを直接切り替えることはできません。</string>
+    <string name="capability_bluetooth_unsupported" formatted="false">Android 13以降では、通常のアプリがBluetoothを直接有効・無効にすることはできません。</string>
+    <string name="capability_bluetooth_permission" formatted="false">Bluetoothの権限が必要です。</string>
+    <string name="capability_write_settings" formatted="false">「システム設定の変更」の特別なアクセスが必要です。</string>
+    <string name="capability_settings_write_setup" formatted="false">GlobalまたはSecureの設定を書き込むには、パソコンからケーブル経由で一度だけ許可するアクセスが必要です。「セットアップ」で設定します。Systemテーブルには、代わりに「システム設定の変更」を使います。</string>
+    <string name="capability_app_kill_unsupported" formatted="false">他のアプリの強制停止には、通常のアプリには与えられないシステムのアプリ管理アクセスが必要です。</string>
+    <string name="capability_app_archive_ready" formatted="false">Android 15以降のPackageInstallerのアーカイブ要求を使います。OpenTaskerは正規のインストール元ではないため、要求のたびにAndroidが画面上で確認を求めます。このアクションはOpenTaskerを開いた状態で実行してください。</string>
+    <string name="capability_app_archive_unsupported" formatted="false">パッケージのアーカイブ要求にはAndroid 15（API 35）以降が必要です。</string>
+    <string name="capability_local_network_setup" formatted="false">Android 17以降では、LANブロードキャストにローカルネットワークへのアクセスが必要です。「セットアップ」で許可してください。</string>
+    <string name="capability_dnd_access" formatted="false">おやすみモードへのアクセスが必要です。</string>
+    <string name="capability_zen_rule_access" formatted="false">おやすみモードへのアクセスが必要です。Android 15以降では、デバイス効果を伴うOpenTasker独自のおやすみモードのルールを使います。</string>
+    <string name="capability_torch_ready" formatted="false">カメラのライトを使います。</string>
+    <string name="capability_aod_unsupported" formatted="false">常時表示ディスプレイの変更にはShizukuが必要です。機種によってはこの設定がまったく効きません。常に点灯するディスプレイは電池を多く消費します。</string>
+    <string name="capability_sun_times_setup" formatted="false">緯度または経度が空欄の場合にだけ、端末の位置を読み取るために位置情報へのアクセスが必要です。</string>
+    <string name="capability_location_get_setup" formatted="false">「セットアップ」の「フォアグラウンドの位置情報」の行で位置情報へのアクセスを許可する必要があります。プロファイルから実行する場合は「バックグラウンドの位置情報」の行も必要です。</string>
+    <string name="capability_wifi_scan_setup" formatted="false">スキャンには位置情報へのアクセスが必要で、Android 13以降では「付近のWi-Fiデバイス」も必要です。Androidはスキャンの頻度を制限するため、結果は新しいものではなく、最後に保持されたスキャンの結果になることがあります。</string>
+    <string name="capability_airplane_unsupported" formatted="false">機内モードの変更には、Shizuku、または「セットアップ」でOpenTaskerをデジタルアシスタントアプリに設定することが必要です。オンにすると、何かがオフに戻すまで、通話、モバイルデータ、そして通常はWi-Fiも切れます。</string>
+    <string name="capability_mobile_data_unsupported" formatted="false">モバイルデータの変更にはShizukuが必要です。オフにすると、この端末への遠隔アクセスを含め、データ通信を必要とするものがすべて止まります。</string>
+    <string name="capability_hotspot_unsupported" formatted="false">Wi-FiテザリングにはAndroid 11以降とShizukuが必要です。保存されたパスワードを知っている人は誰でも接続でき、接続した機器はあなたのモバイルデータを使います。</string>
+    <string name="capability_hotspot_android_version" formatted="false">Wi-FiテザリングのアクションにはAndroid 11以降が必要です。</string>
+    <string name="capability_screenshot_unsupported" formatted="false">スクリーンショットにはShizukuが必要です。撮るたびに、パスワードやメッセージも含め、画面に映っているものがそのままOpenTaskerのストレージに保存されます。</string>
+    <string name="capability_reboot_unsupported" formatted="false">再起動にはShizukuが必要です。端末は警告なしにすぐ再起動し、保存していない作業は失われます。起動時のトリガーに再起動のタスクを付けると、ループすることがあります。</string>
+    <string name="capability_lock_setup" formatted="false">「画面ロック」のデバイス管理者が必要です。「セットアップ」で有効にします。</string>
+    <string name="capability_tile_ready" formatted="false">設定済みのOpenTaskerのクイック設定タイルを更新します。</string>
+    <string name="capability_temporary_state_ready" formatted="false">設定を変更し、後で元に戻します。再起動をはさんでも戻ります。</string>
+    <string name="capability_ime_info_ready" formatted="false">使用中のキーボードと、有効になっているキーボードを報告します。</string>
+    <string name="capability_ime_set_unsupported" formatted="false">Androidではキーボードの切り替えは利用者自身にしかできないため、通常のアプリにはできません。</string>
+    <string name="capability_screen_off_unsupported" formatted="false">画面を消すにはShizukuが必要です。誰かが端末を使っていても画面は消え、ロックされることもあります。</string>
+    <string name="capability_wake_unsupported" formatted="false">スリープの解除にはShizukuが必要です。触れなくても画面が点灯し、ロック画面にあるものが表示され、電池を消費します。</string>
+    <string name="capability_vpn_tunnel_setup" formatted="false">WireGuardまたはTailscaleが必要です。WireGuardでは、その制御の権限と、「リモートコントロールアプリを許可」をオンにすることも必要です。</string>
+    <string name="capability_shizuku_script_setup" formatted="false">Shizukuへのアクセスと、承認済みのスクリプトハッシュが必要です。</string>
+    <string name="capability_termux_setup" formatted="false">Termux 0.109以降、「Run commands in Termux environment」の権限、承認済みのスクリプトハッシュが必要です。</string>
+    <string name="capability_tasker_import_unsupported" formatted="false">インポートしたTaskerのアクションを、対応するOpenTaskerのアクションに置き換えられませんでした。</string>
+    <string name="capability_macrodroid_import_unsupported" formatted="false">インポートしたMacroDroidのアクションを、対応するOpenTaskerのアクションに置き換えられませんでした。</string>
+    <string name="capability_sms_permission" formatted="false">SMSの権限が必要です。</string>
+    <string name="capability_calendar_event_add_setup" formatted="false">「セットアップ」の「カレンダーの編集」の行と、新しい予定を受け付けるカレンダーが必要です。</string>
+    <string name="capability_calendar_event_query_setup" formatted="false">「セットアップ」の「カレンダーへのアクセス」の行が必要です。</string>
+    <string name="capability_contacts_permission" formatted="false">無人での検索には、連絡先の権限を明示的に許可する必要があります。Android 17以降では、項目を限定したシステムの選択画面も使えます。</string>
+    <string name="capability_audio_output_restricted" formatted="false">Android 17では、OpenTaskerのサービスがフォアグラウンドで動いていないかぎり、音声の出力ができません。</string>
+    <string name="capability_audio_output_ready" formatted="false">音声を出力できます。</string>
+    <string name="capability_media_key_restricted" formatted="false">Android 17では、OpenTaskerのサービスがフォアグラウンドで動いていないかぎり、メディアキーを送れません。</string>
+    <string name="capability_media_key_ready" formatted="false">メディアキーを送れます。</string>
+    <string name="capability_volume_restricted" formatted="false">Android 17では、OpenTaskerのサービスがフォアグラウンドで動いていないかぎり、音量を変更できません。</string>
+    <string name="capability_volume_policy" formatted="false">おやすみモードのポリシーへのアクセスが必要になることがあります。</string>
+</resources>

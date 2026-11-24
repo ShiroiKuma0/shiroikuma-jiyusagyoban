@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.i18n.tr
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.ui.theme.ThemedSwitch
 import android.provider.Settings
@@ -205,7 +206,7 @@ fun SceneLibraryScreen(
                         defaultPosition = defaultPosition, defaultModal = defaultModal,
                         defaultDismissOnOutside = defaultDismissOnOutside,
                     ),
-                    "Scene updated",
+                    tr("Scene updated"),
                 )
                 editSceneTargetId = null
             },
@@ -230,7 +231,7 @@ fun SceneLibraryScreen(
                         },
                     )
                 }
-                onUpdateScene(updatedScene, if (state.index == null) "Element added" else "Element updated")
+                onUpdateScene(updatedScene, if (state.index == null) tr("Element added") else tr("Element updated"))
                 elementEditorSceneId = null
                 elementEditorIndex = null
             },
@@ -249,7 +250,7 @@ fun SceneLibraryScreen(
                 if (index != null) {
                     onUpdateScene(
                         state.scene.copy(elements = state.scene.elements.filterIndexed { i, _ -> i != index }),
-                        "Element removed",
+                        tr("Element removed"),
                     )
                 }
                 pendingElementDeleteSceneId = null
@@ -322,7 +323,7 @@ fun SceneLibraryScreen(
                                     if (i == index) element else existing
                                 },
                             ),
-                            "Element moved",
+                            tr("Element moved"),
                         )
                     },
                     onEditScene = { editSceneTargetId = scene.id },
@@ -339,11 +340,11 @@ fun SceneLibraryScreen(
                 // The list's own order is by name already, so the choice is that or Last edited.
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        LibrarySortButton(sceneSort, defaultLabel = "Name", offerName = false)
+                        LibrarySortButton(sceneSort, defaultLabel = tr("Name"), offerName = false)
                     }
                 }
                 if (sceneSort.order == LibrarySortOrder.LastEdited) {
-                    item { LibrarySortNotice(sceneSort.order, defaultLabel = "Name") }
+                    item { LibrarySortNotice(sceneSort.order, defaultLabel = tr("Name")) }
                     // A VIEW: flat, no groups, no drag handles — so nothing here can write an order.
                     val sorted = sortLibrary(sortedScenes, LibrarySortOrder.LastEdited, { it.name }) { lastEdited[lastEditedKey(EditHistoryDao.TYPE_SCENE, it.id)] }
                     items(sorted, key = { it.id }) { scene -> sceneCard(scene) }
@@ -368,7 +369,7 @@ fun SceneLibraryScreen(
 
     if (showMoveDialog) {
         ProjectPickerDialog(
-            title = "Move ${selectedIds.size} scene${plural(selectedIds.size)}",
+            title = if (selectedIds.size == 1) tr("Move 1 scene") else tr("Move %1\$s scenes", selectedIds.size),
             projects = projects,
             currentProjectId = currentProjectId,
             onPick = { pid ->
@@ -591,7 +592,7 @@ private fun SceneCard(
                     // Collapsed: size + element count, plus an issue count when there is anything wrong.
                     Text(
                         text = pluralStringResource(R.plurals.scenes_card_summary, scene.elements.size, scene.widthDp, scene.heightDp, scene.elements.size) +
-                            if (!expanded && issues.isNotEmpty()) " - ${issues.size} issue${plural(issues.size)}" else "",
+                            if (!expanded && issues.isNotEmpty()) (if (issues.size == 1) tr(" - 1 issue") else tr(" - %1\$s issues", issues.size)) else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -605,7 +606,7 @@ private fun SceneCard(
                         }
                     }
                     IconButton(onClick = onEditScene) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit scene properties")
+                        Icon(Icons.Filled.Edit, contentDescription = tr("Edit scene properties"))
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
@@ -613,7 +614,7 @@ private fun SceneCard(
                 }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse scene" else "Expand scene",
+                    contentDescription = if (expanded) tr("Collapse scene") else tr("Expand scene"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -1144,7 +1145,7 @@ private fun SceneElementEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (state.index == null) "Add Element" else "Edit Element") },
+        title = { Text(if (state.index == null) tr("Add Element") else tr("Edit Element")) },
         text = {
             Column(
                 modifier = Modifier
@@ -1452,7 +1453,7 @@ private fun SceneEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Create Scene" else "Edit Scene") },
+        title = { Text(if (initial == null) tr("Create Scene") else tr("Edit Scene")) },
         text = {
             Column(
                 modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
@@ -1461,40 +1462,40 @@ private fun SceneEditorDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Scene name") },
+                    label = { Text(tr("Scene name")) },
                     isError = nameClash,
                     supportingText = if (nameClash) {
-                        { Text("Another scene in this project already has that name.") }
+                        { Text(tr("Another scene in this project already has that name.")) }
                     } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    NumberField("Width dp", width, { width = it.filter(Char::isDigit).take(4) }, parsedWidth == null || parsedWidth <= 0, Modifier.weight(1f))
-                    NumberField("Height dp", height, { height = it.filter(Char::isDigit).take(4) }, parsedHeight == null || parsedHeight <= 0, Modifier.weight(1f))
+                    NumberField(tr("Width dp"), width, { width = it.filter(Char::isDigit).take(4) }, parsedWidth == null || parsedWidth <= 0, Modifier.weight(1f))
+                    NumberField(tr("Height dp"), height, { height = it.filter(Char::isDigit).take(4) }, parsedHeight == null || parsedHeight <= 0, Modifier.weight(1f))
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text("Panel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                SceneColorField(label = "Background colour", value = bgColor, onChange = { bgColor = it })
+                Text(tr("Panel"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                SceneColorField(label = tr("Background colour"), value = bgColor, onChange = { bgColor = it })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    NumberField("Corner (dp)", corner, { corner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
-                    NumberField("Scrim %", scrim, { scrim = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
+                    NumberField(tr("Corner (dp)"), corner, { corner = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                    NumberField(tr("Scrim %"), scrim, { scrim = it.filter(Char::isDigit).take(3) }, isError = false, modifier = Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
-                        SceneColorField(label = "Border colour", value = borderColor, onChange = { borderColor = it })
+                        SceneColorField(label = tr("Border colour"), value = borderColor, onChange = { borderColor = it })
                     }
-                    NumberField("Border (dp)", border, { border = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
+                    NumberField(tr("Border (dp)"), border, { border = it.filter(Char::isDigit).take(2) }, isError = false, modifier = Modifier.weight(1f))
                 }
                 Text(
-                    "Blanks use the theme: background = black, text/borders = yellow. Scrim is the dim behind a modal scene (0 = clear, 100 = black); border 0 = none.",
+                    tr("Blanks use the theme: background = black, text/borders = yellow. Scrim is the dim behind a modal scene (0 = clear, 100 = black); border 0 = none."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text("Default presentation", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(tr("Default presentation"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    listOf("top" to "Top", "center" to "Center", "bottom" to "Bottom").forEach { (key, text) ->
+                    listOf("top" to tr("Top"), "center" to tr("Center"), "bottom" to tr("Bottom")).forEach { (key, text) ->
                         FilterChip(
                             selected = defaultPosition == key,
                             onClick = { defaultPosition = key },
@@ -1504,15 +1505,15 @@ private fun SceneEditorDialog(
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Modal (block underneath)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(tr("Modal (block underneath)"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     ThemedSwitch(checked = defaultModal, onCheckedChange = { defaultModal = it })
                 }
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Tap outside dismisses", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(tr("Tap outside dismisses"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     ThemedSwitch(checked = defaultDismissOnOutside, onCheckedChange = { defaultDismissOnOutside = it }, enabled = defaultModal)
                 }
                 Text(
-                    "How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input).",
+                    tr("How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input)."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1537,7 +1538,7 @@ private fun SceneEditorDialog(
                     )
                 },
             ) {
-                Text(if (initial == null) "Create" else "Save")
+                Text(if (initial == null) tr("Create") else tr("Save"))
             }
         },
         dismissButton = {
@@ -1560,7 +1561,7 @@ private fun SceneColorField(label: String, value: String, onChange: (String) -> 
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Text(
-                if (parsed == null) "Default" else value.uppercase(),
+                if (parsed == null) tr("Default") else value.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

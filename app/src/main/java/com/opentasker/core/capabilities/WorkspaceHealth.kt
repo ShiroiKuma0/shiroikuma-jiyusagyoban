@@ -1,5 +1,6 @@
 package com.opentasker.core.capabilities
 
+import com.opentasker.i18n.tr
 import android.content.Context
 import com.opentasker.core.model.Task
 
@@ -20,9 +21,9 @@ object WorkspaceHealth {
         task.actions.map { it.type }.distinct().mapNotNull { type ->
             val cap = ActionCapabilityRegistry.get(type)
             when {
-                cap.level == CapabilityLevel.Unsupported -> "$type: unsupported"
+                cap.level == CapabilityLevel.Unsupported -> tr("%1\$s: unsupported", type)
                 cap.blocking && cap.requirement != CapabilityRequirement.None && !reqMet(cap.requirement) ->
-                    "$type: needs ${CapabilityState.shortLabel(cap.requirement)}"
+                    tr("%1\$s: needs %2\$s", type, CapabilityState.shortLabel(cap.requirement))
                 else -> null
             }
         }

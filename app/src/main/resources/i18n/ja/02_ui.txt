@@ -1,0 +1,39 @@
+# 02_ui — ui/charts, ui/charts/compare, ui/charts/huawei
+# The 健康 screens carry their own two-language text (Loc(en, ja), chosen by %Band_Language);
+# only the English that sits outside that mechanism is listed here.
+
+# ChartStylePreview.kt
+= Metric series
+: 指標の系列
+= Metric series (Huawei)
+: 指標の系列（Huawei）
+= Sleep stages
+: 睡眠段階
+= Blood pressure
+: 血圧
+
+# CompareStats.kt
+= %1$s/%2$s within ±%3$s
+: %1$s/%2$s が ±%3$s 以内
+= 対 Pairs·%1$s both ·%2$s Huawei only ·%3$s Hume only
+: 対·両方 %1$s ·Huaweiのみ %2$s ·Humeのみ %3$s
+=  ·%1$s not counted
+:  ·数えない分 %1$s
+=  ·Δ median %1$s %2$s
+:  ·Δ 中央値 %1$s %2$s
+=  (IQR %1$s–%2$s)
+: （四分位範囲 %1$s–%2$s）
+= Huawei ·%1$s samples
+: Huawei ·%1$s 件
+=  ·%1$s impossible timestamps
+:  ·あり得ない時刻 %1$s 件
+= Hume ·%1$s samples
+: Hume ·%1$s 件
+= 同一目盛り same scale %1$s ·offset %2$s s (measured, not applied)
+: 同一目盛り %1$s ·ずれ %2$s 秒（測定値、補正はしていない）
+= 同一目盛り same scale %1$s ·offset 0 s (未測定)
+: 同一目盛り %1$s ·ずれ 0 秒（未測定）
+
+# HuaweiBoardScreen.kt
+= info
+: 情報

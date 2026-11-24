@@ -7,6 +7,7 @@ import com.opentasker.core.storage.HuaweiEcgEntity
 import com.opentasker.core.storage.HuaweiSampleEntity
 import com.opentasker.core.storage.HuaweiSleepEntity
 import com.opentasker.core.storage.HuaweiSyncEntity
+import com.opentasker.i18n.tr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -1192,19 +1193,19 @@ object HuaweiSyncRunner {
         while (ask == null && System.currentTimeMillis() < deadline) {
             if (shouldCancel()) {
                 cancelled = true
-                onProgress("Cancelled", "Called off before the watch asked")
+                onProgress(tr("Cancelled"), "Called off before the watch asked")
                 break
             }
             // Elapsed, not remaining. A countdown implies a deadline matters; what 白い熊 needs to
             // see is how long this has been sitting there, and since when.
             onTick(System.currentTimeMillis() - watchStart)
-            onProgress("Waiting for the watch", null)
+            onProgress(tr("Waiting for the watch"), null)
             ask = session.awaitFrame(HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY, 1_000)
         }
         if (cancelled) log.append("cancelled; ")
         val caughtAt = if (ask != null) System.currentTimeMillis() else 0L
         if (ask != null) {
-            onProgress("The watch asked", "The watch asked for data")
+            onProgress(tr("The watch asked"), "The watch asked for data")
             log.append("watch asked; ")
             runCatching {
                 session.send(
@@ -1222,10 +1223,10 @@ object HuaweiSyncRunner {
                     HuaweiProtocol.parseTlvs(outer.value).firstOrNull { it.tag == 6 }
                         ?.value?.toString(Charsets.UTF_8)
                 }
-                source?.let { onProgress("The watch asked", "It wants: $it") }
+                source?.let { onProgress(tr("The watch asked"), "It wants: $it") }
             }
         } else if (!cancelled) {
-            onProgress("The watch never asked", "The watch never asked — its data is still fresh")
+            onProgress(tr("The watch never asked"), "The watch never asked — its data is still fresh")
             log.append("watch did not ask; ")
         }
 
@@ -1273,7 +1274,7 @@ object HuaweiSyncRunner {
                 val again = session.awaitFrame(
                     HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY, 3_000,
                 ) ?: return@run null
-                onProgress("The watch asked again", "Another round — answering")
+                onProgress(tr("The watch asked again"), "Another round — answering")
                 log.append("watch asked again; ")
                 runCatching {
                     session.send(
@@ -1291,7 +1292,7 @@ object HuaweiSyncRunner {
                             ?.value?.toString(Charsets.UTF_8)
                     }?.let {
                         source = it
-                        onProgress("The watch asked again", "It wants: $it")
+                        onProgress(tr("The watch asked again"), "It wants: $it")
                     }
                 }
                 runCatching {
@@ -1321,7 +1322,7 @@ object HuaweiSyncRunner {
                 // a half-written file the band believes is whole is worse than a slow exit.
                 if (shouldCancel()) {
                     cancelled = true
-                    onProgress("Cancelled", "Stopped between rounds")
+                    onProgress(tr("Cancelled"), "Stopped between rounds")
                     log.append("cancelled between rounds; ")
                     break@loop
                 }
@@ -1337,7 +1338,7 @@ object HuaweiSyncRunner {
                 }
                 HuaweiGnssServer.Transfer.Step.FILE_DONE -> {
                     onProgress(
-                        if (done()) "Done" else "Waiting for the watch to ask again",
+                        if (done()) tr("Done") else tr("Waiting for the watch to ask again"),
                         "${transfer.served.last()} complete",
                     )
                     onServed(served.toList(), transfer.bytes)
@@ -1706,7 +1707,7 @@ object HuaweiSyncRunner {
                     if (!client.isBonded(request.address) && HuaweiSettings.isBound(context, request.address)) {
                         HuaweiSettings.clearBind(context, request.address)
                     }
-                    phase("pairing", "accept on the watch, then on the phone")
+                    phase("pairing", tr("accept on the watch, then on the phone"))
                     client.ensureBonded(request.address, request.timeoutSec * 1000L) { state ->
                         HuaweiSyncState.phase("pairing", state)
                     }?.let { return@withTimeoutOrNull close(false, it) }
@@ -1751,7 +1752,7 @@ object HuaweiSyncRunner {
                                     "connected to something else. Run 時計接続（D3） to re-bind.",
                             )
                         }
-                        phase("handshake", "re-binding — the watch forgot this phone")
+                        phase("handshake", tr("re-binding — the watch forgot this phone"))
                         HuaweiSettings.clearBind(context, request.address)
                         val fresh = api.bind(authId, api.fetchPin(link.authVersion), requestId)
                         HuaweiSettings.saveBind(
@@ -1775,7 +1776,7 @@ object HuaweiSyncRunner {
                 // dictionary acknowledged our queries and answered none while that was missing.
                 var reconnectNote = ""
                 if (!configure && isWatch(context, request.address)) {
-                    phase("device", "Health's reconnect")
+                    phase("device", tr("Health's reconnect"))
                     reconnectNote = runCatching {
                         val r = HuaweiD3Reconnect.run(
                             context, session, api, HuaweiSettings.deviceName(context, request.address) ?: "HUAWEI WATCH D3",
@@ -1834,7 +1835,7 @@ object HuaweiSyncRunner {
                     // but that is ordinary companion traffic, not setup, so waiting it out would
                     // hold the radio for no reason: the band is single-connection, and a standing
                     // Bluetooth session on this phone once cost 1322 mAh in a day.
-                    phase("serving", "the watch is still talking — staying on the line")
+                    phase("serving", tr("the watch is still talking — staying on the line"))
                     var served = 0
                     val startedServing = System.currentTimeMillis()
                     val floor = startedServing + SERVE_MIN_MS

@@ -32,6 +32,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.opentasker.i18n.tr
 import com.opentasker.ui.components.DropdownMenuItem
 import com.opentasker.ui.components.OutlinedButton
 import com.opentasker.ui.components.ThemedDropdownMenu
@@ -175,14 +176,14 @@ internal fun LibrarySortButton(
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     val options = buildList {
-        add(LibrarySortOrder.Default to defaultLabel)
-        if (offerName) add(LibrarySortOrder.Name to "Name")
-        add(LibrarySortOrder.LastEdited to "Last edited")
+        add(LibrarySortOrder.Default to tr(defaultLabel))
+        if (offerName) add(LibrarySortOrder.Name to tr("Name"))
+        add(LibrarySortOrder.LastEdited to tr("Last edited"))
     }
     val current = options.firstOrNull { it.first == control.order } ?: options.first()
     Box(modifier) {
         OutlinedButton(onClick = { open = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
-            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort order", modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = tr("Sort order"), modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text(current.second, maxLines = 1)
         }
@@ -208,8 +209,11 @@ internal fun LibrarySortButton(
 @Composable
 internal fun LibrarySortNotice(order: LibrarySortOrder, defaultLabel: String = "Manual") {
     Text(
-        text = (if (order == LibrarySortOrder.Name) "Sorted by name" else "Sorted by last edited, newest first") +
-            " — a view only. Groups and your own order are untouched; “$defaultLabel” shows them again.",
+        text = if (order == LibrarySortOrder.Name) {
+            tr("Sorted by name — a view only. Groups and your own order are untouched; “%1\$s” shows them again.", tr(defaultLabel))
+        } else {
+            tr("Sorted by last edited, newest first — a view only. Groups and your own order are untouched; “%1\$s” shows them again.", tr(defaultLabel))
+        },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

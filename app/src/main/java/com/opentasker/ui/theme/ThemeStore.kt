@@ -2,6 +2,7 @@ package com.opentasker.ui.theme
 
 import android.content.Context
 import com.opentasker.core.ocr.OcrTuning
+import com.opentasker.i18n.tr
 import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -181,6 +182,14 @@ data class ThemePrefs(
         const val YELLOW = 0xFFFFFF00.toInt()       // pure yellow, not material #FFEB3B
         const val DIM_GOLD = 0xFFC8C800.toInt()     // explanations and their left rule
         const val DELETE_RED = 0xFFFF0000.toInt()   // what deletes
+
+        // The meaning colours of icons (白い熊, 2026-11-23). 白い熊 is slightly colour-blind: no violet
+        // and no magenta, the two blues far apart, and a heavy green — pure green reads as yellowish.
+        const val HEAVY_GREEN = 0xFF00A550.toInt()
+        const val LIGHT_BLUE = 0xFF00B0FF.toInt()
+        const val HEAVY_BLUE = 0xFF0066FF.toInt()   // never pure blue, which vanishes as a thin glyph on black
+        const val ORANGE = 0xFFFF8000.toInt()
+        const val ROSE = 0xFFFF3D7F.toInt()
 
         const val SCALE_MIN = 80
         const val SCALE_MAX = 160
@@ -790,8 +799,8 @@ object ThemeStore {
     /** System default + monospace + every imported .ttf/.otf, sorted by name. */
     fun availableFonts(): List<FontOption> {
         val options = mutableListOf(
-            FontOption("System default", ""),
-            FontOption("Monospace", MONOSPACE),
+            FontOption(tr("System default"), ""),
+            FontOption(tr("Monospace"), MONOSPACE),
         )
         fontsDir().listFiles()
             ?.filter { it.isFile && it.extension.lowercase() in FONT_EXTENSIONS }
@@ -801,8 +810,8 @@ object ThemeStore {
     }
 
     fun displayNameFor(fileName: String): String = when {
-        fileName.isEmpty() -> "System default"
-        fileName == MONOSPACE -> "Monospace"
+        fileName.isEmpty() -> tr("System default")
+        fileName == MONOSPACE -> tr("Monospace")
         else -> File(fileName).nameWithoutExtension
     }
 
