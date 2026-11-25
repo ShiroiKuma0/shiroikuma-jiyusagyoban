@@ -16,7 +16,7 @@ class ConnectivityMonitor(context: Context) {
     private val started = AtomicBoolean(false)
     @Volatile private var lastState: ConnState? = null
 
-    private val callback = object : ConnectivityManager.NetworkCallback() {
+    private fun newCallback() = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             emitCurrentState()
         }
@@ -29,6 +29,18 @@ class ConnectivityMonitor(context: Context) {
             emitCurrentState()
         }
     }
+
+    private val callback = newCallback()
+
+    /**
+     * A plain request is answered only for networks that are NOT a VPN, so a VPN that comes up or
+     * goes down over an unchanged Wi-Fi was never noticed and `vpn` stayed what it was (白い熊,
+     * 2026-11-25: the profile on `vpn=true` never fired). Two more listeners close that: the
+     * network this app itself uses — it changes when a VPN takes over or lets go — and VPN
+     * networks as such.
+     */
+    private val defaultCallback = newCallback()
+    private val vpnCallback = newCallback()
 
     fun start(): Boolean {
         if (!started.compareAndSet(false, true)) return true
@@ -44,6 +56,16 @@ class ConnectivityMonitor(context: Context) {
             .build()
         try {
             manager.registerNetworkCallback(request, callback)
+            // Each on its own: one refused by the system must not cost the other two.
+            runCatching { manager.registerDefaultNetworkCallback(defaultCallback) }
+                .onFailure { AppLogger.warn(TAG, "Default-network callback refused", it) }
+            runCatching {
+                val vpnRequest = NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    .build()
+                manager.registerNetworkCallback(vpnRequest, vpnCallback)
+            }.onFailure { AppLogger.warn(TAG, "VPN callback refused", it) }
             emitCurrentState()
             AppLogger.debug(TAG, "Connectivity callback registered")
             return true
@@ -59,6 +81,8 @@ class ConnectivityMonitor(context: Context) {
         if (!started.compareAndSet(true, false)) return
         try {
             cm?.unregisterNetworkCallback(callback)
+            runCatching { cm?.unregisterNetworkCallback(defaultCallback) }
+            runCatching { cm?.unregisterNetworkCallback(vpnCallback) }
             AppLogger.debug(TAG, "Connectivity callback unregistered")
         } catch (ex: RuntimeException) {
             AppLogger.warn(TAG, "Connectivity callback was already unregistered", ex)
