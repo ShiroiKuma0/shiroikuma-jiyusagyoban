@@ -103,6 +103,8 @@ object AutomationSensitivityRegistry {
         "workspace.list",
         "workspace.find",
         "package.info",
+        // A wakelock that ends with the run that asked for it; nothing is read or sent.
+        "power.keep_awake",
         "image.badge",
         "flow.fail",
         "system.get_locale",
@@ -174,6 +176,7 @@ object AutomationSensitivityRegistry {
         "setting.get",
         "setting.put",
         "shell.run",
+        "shell.termux",
         "sim.data.set",
         "sim.list",
         "state.get",

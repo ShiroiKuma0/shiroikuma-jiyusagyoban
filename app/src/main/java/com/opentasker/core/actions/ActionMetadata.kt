@@ -23,6 +23,12 @@ data class ActionField(
      * WITHOUT upstream's @StringRes conversion — the fork keeps its inline copy.
      */
     val sensitive: Boolean? = null,
+    /**
+     * A longer note behind an “i” icon beside the field — what the short hint has no room for
+     * (limits, what to use instead). One sentence per entry; each is translated by itself. Drawn for
+     * a CHECKBOX field.
+     */
+    val info: List<String> = emptyList(),
 )
 
 enum class FieldType {
@@ -1137,16 +1143,51 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
-            id = "shell.run",
-            name = "Run Shell",
-            description = "Run a shell command with Shizuku (ADB/root) privileges",
+            id = "shell.termux",
+            name = "Run Termux Shell",
+            description = "Run a command line inside Termux, as Termux, and keep its output. Needs the switch “Allow tasks to run commands in Termux” on this phone",
             category = "System",
             fields = listOf(
-                ActionField("command", "Command", FieldType.MULTILINE, required = true, hint = "runs via sh -c"),
+                ActionField("command", "Command", FieldType.MULTILINE, required = true, hint = "as typed at Termux's prompt — its programs are found without a path, and a script may lie anywhere"),
+                ActionField("profile", "Read ~/.profile first", FieldType.CHECKBOX, hint = "takes PATH and everything else from Termux's ~/.profile; off = Termux's default environment"),
+                ActionField("workdir", "Working directory", hint = "default Termux's home"),
+                ActionField("timeout", "Seconds to wait", FieldType.NUMBER, hint = "default 50, at most 600 — start long-running work detached (nohup … >/dev/null 2>&1 &)"),
                 ActionField("store_stdout", "Store stdout in", hint = "variable (default: stdout)"),
                 ActionField("store_stderr", "Store stderr in", hint = "variable (default: stderr)"),
                 ActionField("store_exit", "Store exit code in", hint = "variable (default: exit)"),
                 ActionField("ignore_exit", "Ignore exit code", FieldType.CHECKBOX, hint = "succeed even if exit code is non-zero"),
+                ActionField("window", "Run in a command window", FieldType.CHECKBOX, hint = "shows the command, what it prints as it prints it, and how it ended in a window over the screen, until the window is closed"),
+                ActionField(
+                    "fullscreen", "Full screen in Termux", FieldType.CHECKBOX,
+                    hint = "with the command window on: run in a terminal session of Termux instead of our window",
+                    info = listOf(
+                        "Off: Termux runs the command unseen, and our window shows what it prints while it runs.",
+                        "Our window only displays. A command that asks for something — a password, a yes or no — cannot be answered there and waits until its time limit; switch this on for such a command.",
+                        "On: the command runs in a terminal session of Termux, which comes to the front and can be typed into. The session stays open until Enter is pressed there.",
+                        "This switch does nothing while “Run in a command window” is off.",
+                    ),
+                ),
+                ActionField("quiet", "Do not flash the output", FieldType.CHECKBOX, hint = "off = what the command printed, and its errors, are flashed when it ends — never while the command window is shown"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "shell.run",
+            name = "Run Shell",
+            description = "Run a shell command through Shizuku or as root, and keep its output. Root mode needs the switch “Allow tasks to run commands as root” on this phone",
+            category = "System",
+            fields = listOf(
+                ActionField("command", "Command", FieldType.MULTILINE, required = true, hint = "runs via sh -c"),
+                ActionField("mode", "Run as", hint = "shizuku (default) — the Android shell user, through Shizuku; root — through su on a rooted phone"),
+                ActionField("timeout", "Seconds to wait", FieldType.NUMBER, hint = "root only: default 50, at most 600 — start long-running work detached (nohup … >/dev/null 2>&1 &)"),
+                ActionField("store_stdout", "Store stdout in", hint = "variable (default: stdout)"),
+                ActionField("store_stderr", "Store stderr in", hint = "variable (default: stderr)"),
+                ActionField("store_exit", "Store exit code in", hint = "variable (default: exit)"),
+                ActionField("ignore_exit", "Ignore exit code", FieldType.CHECKBOX, hint = "succeed even if exit code is non-zero"),
+                ActionField("window", "Run in a command window", FieldType.CHECKBOX, hint = "shows the command, what it prints and how it ended in a window over the screen, until the window is closed"),
+                ActionField("quiet", "Do not flash the output", FieldType.CHECKBOX, hint = "off = what the command printed, and its errors, are flashed when it ends — never while the command window is shown"),
             )
         )
     )
@@ -2012,6 +2053,18 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "power.keep_awake",
+            name = "Keep Awake",
+            description = "Keep the CPU awake until this run ends, so that waits and time limits run in real time while the phone sleeps",
+            category = "System",
+            fields = listOf(
+                ActionField("seconds", "Seconds at most", FieldType.NUMBER, hint = "default 300, at most 3600 — asking again replaces the limit; 0 lets the phone sleep again at once"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "package.info",
             name = "App Version",
             description = "Which build of an app is installed: version, when it was last updated, and which app installed it",
@@ -2528,7 +2581,7 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "script.termux.run",
             name = "Run Termux Script",
-            description = "Plan a Termux:Tasker script run; blocked until the script backend is implemented",
+            description = "Ask Termux to run an approved script from ~/.termux/tasker and keep its output",
             category = "Script",
             fields = listOf(
                 ActionField("executable", "Executable", required = true, hint = "~/.termux/tasker/my_script"),

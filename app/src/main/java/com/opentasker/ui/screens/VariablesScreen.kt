@@ -1,5 +1,10 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material.icons.filled.Lock
+import com.opentasker.core.engine.variables.VariableGuard
+import com.opentasker.ui.theme.ThemedSwitch
+import com.opentasker.ui.theme.UiRole
+import com.opentasker.ui.theme.role
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -449,6 +454,8 @@ private fun VariableRow(
     onDelete: () -> Unit,
 ) {
     val themePrefs by ThemeStore.state.collectAsState()
+    // The protection of this NAME on this phone (VariableGuard); kept on the phone only.
+    var guardLevel by remember(variable.name) { mutableStateOf(VariableGuard.level(variable.name)) }
     Card(
         border = BorderStroke(
             if (selected) 2.dp else 1.dp,
@@ -504,6 +511,14 @@ private fun VariableRow(
                         modifier = Modifier.weight(1f),
                     )
                 }
+                if (guardLevel != VariableGuard.Level.NONE) {
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = if (guardLevel == VariableGuard.Level.LOCKED) tr("Locked") else tr("Protected from imports"),
+                        tint = role(if (guardLevel == VariableGuard.Level.LOCKED) UiRole.ICON_BLOCK else UiRole.DIM_GOLD),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) tr("Collapse variable") else tr("Expand variable"),
@@ -524,6 +539,24 @@ private fun VariableRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                GuardSwitch(
+                    label = tr("Imports cannot change it"),
+                    note = tr("No bundle, restore or command over adb changes or deletes it. Tasks still write it."),
+                    checked = guardLevel != VariableGuard.Level.NONE,
+                    onChange = { on ->
+                        guardLevel = if (on) VariableGuard.Level.IMPORT else VariableGuard.Level.NONE
+                        VariableGuard.setLevel(variable.name, guardLevel)
+                    },
+                )
+                GuardSwitch(
+                    label = tr("Tasks cannot change it either"),
+                    note = tr("Only this tab changes it. A task that tries fails and says so."),
+                    checked = guardLevel == VariableGuard.Level.LOCKED,
+                    onChange = { on ->
+                        guardLevel = if (on) VariableGuard.Level.LOCKED else VariableGuard.Level.IMPORT
+                        VariableGuard.setLevel(variable.name, guardLevel)
+                    },
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -538,6 +571,19 @@ private fun VariableRow(
                 }
             }
         }
+    }
+}
+
+/** One protection switch of a variable's opened card: bold label, dim-gold note beneath, the switch at the right. */
+@Composable
+private fun GuardSwitch(label: String, note: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = role(UiRole.DIM_GOLD))
+        }
+        Spacer(Modifier.width(8.dp))
+        ThemedSwitch(checked = checked, onCheckedChange = onChange)
     }
 }
 

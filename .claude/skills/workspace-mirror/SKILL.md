@@ -30,6 +30,27 @@ Each per-item file is the bundle's object **verbatim**.
 broadcasts; `result=-1` (RESULT_OK) = success, `result=1` = failure with the message in `data=`. All adb
 calls UNSANDBOXED.
 
+**Since +017 (2026-11-24) the bridge is gated — send every command through `scripts/bridge.py`.**
+A phone on which 白い熊 approved the PC's key refuses a raw `am broadcast` with
+`ERROR:this phone accepts signed commands only`. The script signs (ECDSA P-256, key in
+`~/.config/shiroikuma-jiyusagyoban/bridge-key.pem`, in no repository), adds the counter, and quotes the
+` -- [NNN]` names correctly; it also works unchanged on a phone that asks for no signature.
+
+```bash
+python3 scripts/bridge.py info <target>                    # id, enabled, signed, key, waiting
+python3 scripts/bridge.py send <target> EXPORT_WORKSPACE
+python3 scripts/bridge.py send <target> IMPORT_BUNDLE --path x_<stamp>.json --local /path/on/pc/x_<stamp>.json
+python3 scripts/bridge.py send <target> RUN_TASK --task '運動（Huawei） -- [727]' --project 健康
+python3 scripts/bridge.py send <target> DELETE_ITEMS --path del_<stamp>.json --local /path/on/pc/del_<stamp>.json
+python3 scripts/bridge.py offer <target>                   # new phone: 白い熊 approves the fingerprint in Settings → Export / Import
+```
+
+`<target>` is an adb serial (`RFCX61K7H3X`, `192.168.1.87:5555`, `skhw:15555`) or `ssh:skhw`.
+`--local` is compulsory for a command that reads a file once the phone wants signatures: the file's
+SHA-256 is signed, so push the very file you name. The switch “Allow control over adb” (same settings
+section, on by default) closes the bridge entirely — the answer is then `ERROR:control over adb is
+switched off`. The raw commands below show what each action takes; they still work on an unsigned phone.
+
 ```bash
 # EXPORT the whole workspace → /sdcard/tmp/白い熊 自由作業盤.<stamp>.json (path echoed in data=)
 adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \

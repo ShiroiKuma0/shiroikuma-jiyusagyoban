@@ -432,6 +432,10 @@ android {
 
     androidResources {
         generateLocaleConfig = true
+        // The fork ships English and Japanese only (白い熊, 2026-11-24: "Remove Chinese."). Upstream's
+        // Chinese files stay in the tree for the rebase; they are left out of the APK here, and the
+        // App language picker reads what the build declares.
+        localeFilters += listOf("en", "ja")
     }
 
     packaging {

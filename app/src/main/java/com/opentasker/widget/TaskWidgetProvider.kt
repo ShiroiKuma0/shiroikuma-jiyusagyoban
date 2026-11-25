@@ -175,6 +175,8 @@ class TaskWidgetProvider : AppWidgetProvider() {
                 Intent(context, TaskRunActivity::class.java).apply {
                     putExtra(TaskRunActivity.EXTRA_TASK_ID, taskId)
                     putExtra(TaskRunActivity.EXTRA_SOURCE, TaskRunActivity.SOURCE_WIDGET)
+                    // Our own widget: its tap runs without the shortcut question (ShortcutGate).
+                    ShortcutGate.seal(context, this)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 }
             } else {

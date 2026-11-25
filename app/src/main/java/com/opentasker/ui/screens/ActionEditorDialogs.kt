@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -70,6 +71,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.outlined.Info
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -94,6 +96,10 @@ import androidx.compose.ui.window.Dialog
  * covers the display name, the description and the stable action id, so `file.read` finds the action
  * as readily as "Read file" does.
  */
+/** The action dialogs take almost the whole page: this share of its width and of its height. */
+private const val PAGE_DIALOG_WIDTH = 0.96f
+private const val PAGE_DIALOG_HEIGHT = 0.94f
+
 internal fun filterActionPickerItems(
     items: List<ActionMetadata>,
     query: String,
@@ -125,6 +131,10 @@ internal fun ActionPickerDialog(
             .map { (category, actions) -> category to actions.sortedBy { it.name } }
     }
     AlertDialog(
+        // Almost the whole page, in width and height (白い熊, 2026-11-24): the list shows as many
+        // actions, and as much of each description, as the screen can hold.
+        modifier = Modifier.fillMaxWidth(PAGE_DIALOG_WIDTH).fillMaxHeight(PAGE_DIALOG_HEIGHT),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_add_action)) },
         text = {
@@ -154,7 +164,7 @@ internal fun ActionPickerDialog(
                     )
                 } else {
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 360.dp),
+                        modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                     ) {
                         actionGroups.forEach { (category, actions) ->
@@ -312,18 +322,20 @@ internal fun ActionConfigDialog(
     }
 
     AlertDialog(
-        // More width: this is the full editor, so give it room without being a full page. The edge
-        // is the dialog frame role, drawn by the app's AlertDialog.
-        modifier = Modifier.fillMaxWidth(0.96f),
+        // Almost the whole page, in width and height (白い熊, 2026-11-24: "so we can show the max text
+        // everywhere"). The platform's default dialog width is switched off below — on the unfolded
+        // Mate XT it kept the editor at two thirds of the screen whatever this modifier asked for.
+        // The edge is the dialog frame role, drawn by the app's AlertDialog.
+        modifier = Modifier.fillMaxWidth(PAGE_DIALOG_WIDTH).fillMaxHeight(PAGE_DIALOG_HEIGHT),
         onDismissRequest = onDismiss,
         // Back and Cancel still dismiss in one tap; only a stray tap on the scrim is refused.
         // These forms carry many fields, and discarding them has no undo because nothing was
         // saved yet.
-        properties = DialogProperties(dismissOnClickOutside = false),
+        properties = DialogProperties(dismissOnClickOutside = false, usePlatformDefaultWidth = false),
         title = { Text(tr(state.metadata.name)) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 620.dp),
+                modifier = Modifier.fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
@@ -468,6 +480,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
     when (field.fieldType) {
         FieldType.CHECKBOX -> {
             val checked = value.toBoolean()
+            var infoOpen by remember(field.key) { mutableStateOf(false) }
             val stateDescriptionLabel = if (checked) stringResource(R.string.label_on) else stringResource(R.string.label_off)
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
@@ -492,6 +505,26 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                     Text(label, style = MaterialTheme.typography.labelLarge)
                     field.hint?.let {
                         Text(tr(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (infoOpen) {
+                        field.info.forEach { line ->
+                            Text(
+                                "• " + tr(line),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                }
+                }
+                if (field.info.isNotEmpty()) {
+                    // Its own tap target: the row around it toggles the switch.
+                    IconButton(onClick = { infoOpen = !infoOpen }) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = tr("More about this switch"),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
                 ThemedSwitch(checked = checked, onCheckedChange = null)

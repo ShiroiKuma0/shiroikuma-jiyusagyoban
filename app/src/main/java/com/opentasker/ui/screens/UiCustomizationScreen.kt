@@ -39,6 +39,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -391,6 +394,29 @@ fun UiCustomizationScreen(
     var automationEnabled by remember { mutableStateOf(AutomationAuth.enabled(context)) }
     var automationRequireToken by remember { mutableStateOf(AutomationAuth.requireToken(context)) }
     var automationToken by remember { mutableStateOf(AutomationAuth.token(context)) }
+    var showLanguagePicker by remember { mutableStateOf(false) }
+    // What a task may do on this phone (CommandSwitches): both off until switched on here.
+    var allowRootCommands by remember { mutableStateOf(com.opentasker.core.actions.CommandSwitches.rootAllowed(context)) }
+    var allowTermuxCommands by remember { mutableStateOf(com.opentasker.core.actions.CommandSwitches.termuxAllowed(context)) }
+
+    // The adb bridge's gate (BridgeAuth): the switch, the approved key, a key waiting for approval.
+    // A key is offered from the PC while this page may be open, so the three are re-read while shown.
+    var bridgeEnabled by remember { mutableStateOf(com.opentasker.core.transfer.BridgeAuth.enabled(context)) }
+    var bridgeSigned by remember { mutableStateOf(com.opentasker.core.transfer.BridgeAuth.requireSignature(context)) }
+    var bridgeKey by remember { mutableStateOf(com.opentasker.core.transfer.BridgeAuth.publicKey(context)) }
+    var bridgeWaitingKey by remember { mutableStateOf(com.opentasker.core.transfer.BridgeAuth.waitingKey(context)) }
+    fun reloadBridge() {
+        bridgeEnabled = com.opentasker.core.transfer.BridgeAuth.enabled(context)
+        bridgeSigned = com.opentasker.core.transfer.BridgeAuth.requireSignature(context)
+        bridgeKey = com.opentasker.core.transfer.BridgeAuth.publicKey(context)
+        bridgeWaitingKey = com.opentasker.core.transfer.BridgeAuth.waitingKey(context)
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(2_000)
+            reloadBridge()
+        }
+    }
 
     // Export/Import (Kōjiki-style): the settable backup directory + its latest export, re-queried
     // on page open and after every pick/export via the refresh tick.
@@ -438,6 +464,24 @@ fun UiCustomizationScreen(
             header(id) { SectionHeader(section, open = id in openNow, onToggle = { toggleSection(id) }) }
             // A folded section emits no rows at all: its heading and the line above it are all of it.
             if (id in openNow) when (id) {
+            LANGUAGE_SECTION -> {
+            item {
+                val current = com.opentasker.i18n.AppLanguage.tag(context)
+                PillRow(
+                    level = 1,
+                    label = tr(
+                        "Language: %1\$s",
+                        if (current.isEmpty()) tr("System default") else com.opentasker.i18n.AppLanguage.entry(current).name,
+                    ),
+                    description = tr("The language of this app only. The rest of the phone keeps its own."),
+                    main = true,
+                    opens = true,
+                    icon = Icons.Filled.Language,
+                    iconRole = IconRole.VIEW,
+                    onClick = { showLanguagePicker = true },
+                )
+            }
+            }
             "exim" -> {
             // --- Export / Import (Kōjiki UI-page flow) ---
             item {
@@ -534,6 +578,128 @@ fun UiCustomizationScreen(
                         scope.launch { snackbarHostState.showSnackbar(tr("Automation token regenerated — update pasted copies")) }
                     },
                 )
+            }
+            // ── What a task may do on this phone: commands as root, commands in Termux. ──
+            item {
+                SwitchRow(
+                    level = 1,
+                    label = tr("Allow tasks to run commands as root"),
+                    description = tr("Off: “Run Shell” in root mode is refused on this phone. On: any task here may run any command as root. Kept on this phone only — no import or restore can switch it on."),
+                    checked = allowRootCommands,
+                    icon = Icons.Filled.Lock,
+                    iconRole = IconRole.BLOCK,
+                    onCheckedChange = {
+                        com.opentasker.core.actions.CommandSwitches.setRootAllowed(context, it)
+                        allowRootCommands = it
+                    },
+                )
+            }
+            item {
+                SwitchRow(
+                    level = 1,
+                    label = tr("Allow tasks to run commands in Termux"),
+                    description = tr("Off: “Run Termux Shell” is refused on this phone. On: any task here may run any command inside Termux, with Termux's files and keys. Kept on this phone only — no import or restore can switch it on."),
+                    checked = allowTermuxCommands,
+                    icon = Icons.Filled.Lock,
+                    iconRole = IconRole.BLOCK,
+                    onCheckedChange = {
+                        com.opentasker.core.actions.CommandSwitches.setTermuxAllowed(context, it)
+                        allowTermuxCommands = it
+                    },
+                )
+            }
+            item {
+                PillRow(
+                    level = 1,
+                    label = tr("Forget pinned provider apps"),
+                    description = tr("A task that asks another app (Jami, Messēji) remembers which app answered and its signing key, and refuses a different one. Use this after you replaced such an app yourself; the next call pins it anew."),
+                    destructive = true,
+                    icon = Icons.Filled.Refresh,
+                    iconRole = IconRole.DELETE,
+                    onClick = {
+                        val n = com.opentasker.core.actions.ProviderOwnerPins.forgetAll(context)
+                        scope.launch { snackbarHostState.showSnackbar(tr("Forgot %1\$s pinned app(s)", n)) }
+                    },
+                )
+            }
+            // ── Control over adb: the bridge the PC imports, exports and runs tasks through. ──
+            item {
+                SwitchRow(
+                    level = 1,
+                    label = tr("Allow control over adb"),
+                    description = tr("Lets the PC import bundles, export the workspace and run tasks over adb, without the screen. Off: every such command is refused. Nothing on the phone itself needs this."),
+                    checked = bridgeEnabled,
+                    icon = Icons.Filled.ImportExport,
+                    iconRole = IconRole.SHARE,
+                    onCheckedChange = {
+                        com.opentasker.core.transfer.BridgeAuth.setEnabled(context, it)
+                        reloadBridge()
+                    },
+                )
+            }
+            if (bridgeKey == null && bridgeWaitingKey == null) item {
+                SettingNote(tr("No PC key is approved, so any app on this phone can send these commands. Offer the key from the PC, then approve it here."), warn = true)
+            }
+            bridgeWaitingKey?.let { waiting ->
+                item {
+                    PillRow(
+                        level = 1,
+                        label = tr("Approve the waiting PC key"),
+                        description = tr("Fingerprint %1\$s. Approve only if the PC shows the same. From then on, only commands signed with this key are accepted.", com.opentasker.core.transfer.BridgeAuth.fingerprint(waiting)),
+                        main = true,
+                        icon = Icons.Filled.Lock,
+                        iconRole = IconRole.BLOCK,
+                        onClick = {
+                            com.opentasker.core.transfer.BridgeAuth.approveWaitingKey(context)
+                            reloadBridge()
+                            scope.launch { snackbarHostState.showSnackbar(tr("PC key approved — commands must now be signed")) }
+                        },
+                    )
+                }
+                item {
+                    PillRow(
+                        level = 1,
+                        label = tr("Discard the waiting PC key"),
+                        description = tr("Throws the offered key away. The approved key, if any, stays."),
+                        destructive = true,
+                        icon = Icons.Filled.Refresh,
+                        iconRole = IconRole.DELETE,
+                        onClick = {
+                            com.opentasker.core.transfer.BridgeAuth.discardWaitingKey(context)
+                            reloadBridge()
+                        },
+                    )
+                }
+            }
+            bridgeKey?.let { key ->
+                item {
+                    SwitchRow(
+                        level = 1,
+                        label = tr("Require signed commands"),
+                        description = tr("On: only commands signed with the approved PC key are accepted (fingerprint %1\$s). Off: any app on this phone can send them.", com.opentasker.core.transfer.BridgeAuth.fingerprint(key)),
+                        checked = bridgeSigned,
+                        icon = Icons.Filled.Lock,
+                        iconRole = IconRole.BLOCK,
+                        onCheckedChange = {
+                            com.opentasker.core.transfer.BridgeAuth.setRequireSignature(context, it)
+                            reloadBridge()
+                        },
+                    )
+                }
+                item {
+                    PillRow(
+                        level = 1,
+                        label = tr("Remove the approved PC key"),
+                        description = tr("Forgets the key. Commands are then accepted unsigned again, until a new key is approved."),
+                        destructive = true,
+                        icon = Icons.Filled.Refresh,
+                        iconRole = IconRole.DELETE,
+                        onClick = {
+                            com.opentasker.core.transfer.BridgeAuth.removeKey(context)
+                            reloadBridge()
+                        },
+                    )
+                }
             }
 
             }
@@ -1286,6 +1452,7 @@ fun UiCustomizationScreen(
         }
     }
 
+    if (showLanguagePicker) AppLanguageDialog(onDismiss = { showLanguagePicker = false })
     if (showEximPanel) {
         ExportImportPanel(
             onDismiss = { showEximPanel = false },
@@ -1477,6 +1644,8 @@ private fun roleSection(group: RoleSection): PageSection {
  * stored and never touched by this.
  */
 internal val PAGE_SECTIONS: List<PageSection> = listOf(
+    // Always first, and so the first chip (白い熊, 2026-11-24).
+    PageSection(LANGUAGE_SECTION, "App language", "App language", Icons.Filled.Language, UiRole.SECTION_WORDS),
     PageSection("exim", "Export / Import", "Export", Icons.Filled.ImportExport, UiRole.SECTION_REACH),
     PageSection("colors", "Colors", "Colors", Icons.Filled.Palette, UiRole.SECTION_BASE),
     PageSection("borders", "Borders", "Borders", Icons.Filled.BorderOuter, UiRole.SECTION_FRAME),
@@ -1512,11 +1681,19 @@ internal val PAGE_SECTIONS: List<PageSection> = listOf(
     PageSection("maintenance", "Maintenance", "Reset", Icons.Filled.Build, UiRole.SECTION_WARNING),
 ).also { sections -> check(sections.mapNotNull { it.roles }.toSet() == RoleSection.entries.toSet()) { "a role section has no place on the UI page" } }
 
-/** The sections as [stored] orders them: unknown ids are ignored, missing ones follow in the built-in order. */
-private fun sectionOrder(stored: String): List<PageSection> {
+internal const val LANGUAGE_SECTION = "language"
+
+/**
+ * The sections as [stored] orders them: unknown ids are ignored, missing ones follow in the built-in
+ * order. "App language" is the exception: an order stored before that section existed gets it FIRST —
+ * nothing dragged it anywhere yet — while an order that names it is left exactly as it was dragged.
+ */
+internal fun sectionOrder(stored: String): List<PageSection> {
     val byId = PAGE_SECTIONS.associateBy { it.id }
     val named = stored.split(',').mapNotNull { byId[it.trim()] }.distinct()
-    return named + PAGE_SECTIONS.filter { it !in named }
+    val language = byId.getValue(LANGUAGE_SECTION)
+    val head = if (language in named) emptyList() else listOf(language)
+    return head + named + PAGE_SECTIONS.filter { it !in named && it !== language }
 }
 
 /** The ids of the unfolded sections. Nothing stored means everything folded. */
@@ -3095,4 +3272,90 @@ private fun restartApp(context: Context) {
     val launch = pm.getLaunchIntentForPackage(context.packageName) ?: return
     context.startActivity(Intent.makeRestartActivityTask(launch.component))
     Runtime.getRuntime().exit(0)
+}
+
+
+/**
+ * The App language picker, in the look settled for it (black-yellow skill, 2026-11-24): plain rows,
+ * and only the current language in a pill — full width, 3 dp, its name bold. Each row: the radio
+ * ring, the language in its own language with its region beneath in dim gold, and the tag in a
+ * right-aligned monospace column. "System default" comes first, with no region and no tag. A
+ * hairline stands between rows, but never against the pill.
+ */
+@Composable
+internal fun AppLanguageDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val current = remember { com.opentasker.i18n.AppLanguage.tag(context) }
+    val rows = remember {
+        listOf(com.opentasker.i18n.AppLanguage.Entry("", "", "")) + com.opentasker.i18n.AppLanguage.entries(context)
+    }
+    val divider = role(UiRole.LIST_DIVIDER)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("App language")) },
+        text = {
+            LazyColumn {
+                items(rows.size) { index ->
+                    val entry = rows[index]
+                    val chosen = entry.tag == current
+                    val afterChosen = index > 0 && rows[index - 1].tag == current
+                    if (index > 0 && !chosen && !afterChosen) {
+                        Box(Modifier.fillMaxWidth().padding(start = 44.dp).height(1.dp).background(divider))
+                    }
+                    LanguageRow(
+                        name = if (entry.tag.isEmpty()) tr("System default") else entry.name,
+                        region = entry.region,
+                        tag = entry.tag,
+                        chosen = chosen,
+                        onClick = {
+                            onDismiss()
+                            if (!chosen) com.opentasker.i18n.AppLanguage.set(context, entry.tag)
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = { OutlinedButton(onClick = onDismiss) { Text(tr("Cancel")) } },
+    )
+}
+
+@Composable
+private fun LanguageRow(name: String, region: String, tag: String, chosen: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(percent = 50)
+    val ring = role(if (chosen) UiRole.RADIO_ON else UiRole.RADIO_OFF)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = if (chosen) 4.dp else 0.dp)
+            .then(if (chosen) Modifier.border(3.dp, role(UiRole.BUTTON_MAIN_FRAME), shape) else Modifier)
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Canvas(Modifier.size(18.dp)) {
+            drawCircle(ring, radius = size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
+            if (chosen) drawCircle(ring, radius = size.minDimension / 4)
+        }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (chosen) FontWeight.Bold else null,
+                color = role(UiRole.DIALOG_BODY),
+            )
+            if (region.isNotEmpty()) {
+                Text(region, style = MaterialTheme.typography.bodySmall, color = role(UiRole.DIM_GOLD))
+            }
+        }
+        if (tag.isNotEmpty()) {
+            Text(
+                tag,
+                modifier = Modifier.padding(start = 12.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                color = role(UiRole.DIM_GOLD),
+            )
+        }
+    }
 }

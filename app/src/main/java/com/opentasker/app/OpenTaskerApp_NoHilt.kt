@@ -118,6 +118,9 @@ class OpenTaskerApp_NoHilt : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // The app's own language (UI page → App language), before anything draws or builds a text —
+        // in every process, the player's included.
+        com.opentasker.i18n.AppLanguage.install(this)
         // 言語島's player runs in a process of its own (`:gengoshima`) so a player fault cannot
         // take the automation engine down with it. Everything below belongs to the MAIN process
         // only: run in the player's, it would open a second Room instance, reconcile the execution
@@ -204,6 +207,8 @@ class OpenTaskerApp_NoHilt : Application() {
                 // runs, and expose the running build as %APPVER so a task can flash it (catch stale
                 // installs). Both moved inside this coroutine when upstream took database
                 // preparation off the main thread: out in initializeAfterUnlock, _db is still null.
+                // The protection marks first: nothing may be written before they are known.
+                com.opentasker.core.engine.variables.VariableGuard.init(this@OpenTaskerApp_NoHilt)
                 com.opentasker.core.engine.variables.PersistentGlobalScope.init(requireNotNull(_db).variableDao())
                 com.opentasker.core.engine.variables.PersistentGlobalScope.set(0L, "APPVER", com.opentasker.app.BuildConfig.VERSION_NAME)
 

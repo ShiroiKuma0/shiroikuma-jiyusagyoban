@@ -1051,20 +1051,19 @@
                 <action android:name="shiroikuma.jiyusagyoban.action.SET_STARTUP_TASKS" />
                 <action android:name="shiroikuma.jiyusagyoban.action.GENGOSHIMA_TOKENS" />
                 <action android:name="shiroikuma.jiyusagyoban.action.GENGOSHIMA_IMPORT" />
+                <action android:name="shiroikuma.jiyusagyoban.action.BRIDGE_INFO" />
+                <action android:name="shiroikuma.jiyusagyoban.action.BRIDGE_OFFER_KEY" />
+                <action android:name="shiroikuma.jiyusagyoban.action.PROTECT_VARIABLES" />
             </intent-filter>
         </receiver>
 
         <!--
-            A sister app (白い熊 応用管理) runs a task about one app, with %pkg / %label injected.
-            Gated by AutomationCallers through a caller-created PendingIntent; see SisterTaskReceiver.
+            The broadcast door through which a sister app ran a task about one app
+            (RUN_TASK_WITH_TARGET, SisterTaskReceiver) is CLOSED since +024 (白い熊, 2026-11-24, audit
+            V-06): it knew its caller only by a PendingIntent, which is a bearer object. 応用管理 calls
+            `run_task` on the automation provider instead (from its +126), where the system names
+            the caller. GatesStayOnThePhoneTest fails the build if the door is declared again.
         -->
-        <receiver
-            android:name="com.opentasker.core.automation.SisterTaskReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="shiroikuma.jiyusagyoban.action.RUN_TASK_WITH_TARGET" />
-            </intent-filter>
-        </receiver>
 
         <!-- Sister-app state-export automation contract (保存復元): headless category-ZIP export +
              category listing, gated by the automation token (AutomationAuth); replies ride a fresh
@@ -1135,6 +1134,12 @@
 
         <receiver
             android:name="com.opentasker.core.scripting.TermuxResultReceiver"
+            android:exported="false" />
+
+        <!-- Termux's answer to a RUN_COMMAND, as a service start: a broadcast would queue behind
+             the broadcast that started the waiting task. -->
+        <service
+            android:name="com.opentasker.core.scripting.TermuxResultService"
             android:exported="false" />
 
         <receiver

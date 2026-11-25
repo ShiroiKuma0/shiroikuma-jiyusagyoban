@@ -292,7 +292,27 @@ class OpenFileAction : Action {
 
 internal fun safeUserFile(ctx: ActionContext, path: String, mustExist: Boolean = false): File? {
     if (path.isBlank() || path.contains('\u0000')) return null
-    return resolveSandboxTarget(File(ctx.app.filesDir, "user_files").canonicalFile, path, mustExist)
+    return resolveSandboxTarget(File(ctx.app.filesDir, "user_files").canonicalFile, sandboxRelative(ctx, path), mustExist)
+}
+
+/**
+ * An absolute path that already lies inside the sandbox, expressed relative to it. The app hands
+ * such paths out itself — `Call Provider` writes a returned file to `user_files/provider` and puts
+ * its full path in a variable — and resolving one against the base again made it
+ * `…/user_files/data/user/0/…`, a file that does not exist: `Delete File` then answered "outside"
+ * and every remotely installed APK stayed behind (436 MB on one relay phone, 2026-11-24).
+ * Both spellings of the app's directory are recognised; anything else is returned unchanged and
+ * meets the same containment checks as before.
+ */
+internal fun sandboxRelative(ctx: ActionContext, path: String): String =
+    sandboxRelative(File(ctx.app.filesDir, "user_files"), path)
+
+internal fun sandboxRelative(sandbox: File, path: String): String {
+    if (!path.startsWith("/")) return path
+    val root = listOf(sandbox.path, sandbox.absolutePath, runCatching { sandbox.canonicalPath }.getOrNull())
+        .filterNotNull().distinct()
+        .firstOrNull { path == it || path.startsWith("$it/") }
+    return if (root != null) path.removePrefix(root).ifEmpty { "." } else path
 }
 
 /**
@@ -326,7 +346,7 @@ internal fun safeTarget(
     // one: /sdcard is a symlink to /storage/emulated/0, so matching on the canonical path alone
     // turned "/sdcard/〇/…" into "/storage/emulated/0/sdcard/〇/…" — a real doubled root that got
     // created and written to, silently.
-    val relative = if (!shared) path else {
+    val relative = if (!shared) sandboxRelative(ctx, path) else {
         val root = EXTERNAL_ROOTS.plus(base.path)
             .firstOrNull { path == it || path.startsWith("$it/") }
         if (root != null) path.removePrefix(root) else path

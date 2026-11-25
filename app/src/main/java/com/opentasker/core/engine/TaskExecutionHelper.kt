@@ -59,7 +59,68 @@ suspend fun executeAndLogTask(
      * its first action. A run skipped at any of those never calls it.
      */
     onAdmitted: () -> Unit = {},
-): TaskExecutionResult = withContext(Dispatchers.IO) {
+): TaskExecutionResult {
+    // One wakelock holder per outermost run: a task this run calls inherits it, and it is given
+    // back when the outermost run ends, however it ends. Nothing is held unless a step asks.
+    val inheritedAwake = currentCoroutineContext()[RunAwake]
+    val runAwake = inheritedAwake ?: RunAwake()
+    return try {
+        withContext(Dispatchers.IO + runAwake) { executeAndLogTaskBody(
+            appContext = appContext,
+            db = db,
+            task = task,
+            source = source,
+            metadata = metadata,
+            initialVariables = initialVariables,
+            visibleActivity = visibleActivity,
+            audioForegroundService = audioForegroundService,
+            eventLocals = eventLocals,
+            logTag = logTag,
+            admissionController = admissionController,
+            profileId = profileId,
+            profileLimits = profileLimits,
+            overflowPolicy = overflowPolicy,
+            profileFallbackTaskId = profileFallbackTaskId,
+            allowFallback = allowFallback,
+            execution = execution,
+            onAdmitted = onAdmitted,
+        ) }
+    } finally {
+        if (inheritedAwake == null) runAwake.release()
+    }
+}
+
+private suspend fun executeAndLogTaskBody(
+    appContext: Context,
+    db: AppDatabase,
+    task: Task,
+    source: String,
+    metadata: List<String> = emptyList(),
+    initialVariables: Map<String, String> = emptyMap(),
+    visibleActivity: Boolean = false,
+    audioForegroundService: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE,
+    eventLocals: Map<String, String> = emptyMap(),
+    logTag: String = TAG,
+    admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
+    profileId: Long? = null,
+    /** The profile's own active/burst overrides, when it sets any; null falls back to the global limits. */
+    profileLimits: ExecutionAdmissionProfileLimits? = null,
+    /** Whether a rejected run leaves a visible run-log entry (LOG) or is dropped quietly (SILENT). */
+    overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
+    /** The profile's own recovery task, tried before the global one. */
+    profileFallbackTaskId: Long? = null,
+    /**
+     * False inside a fallback run, so a failing recovery task cannot trigger its own recovery. One
+     * level is the whole contract — recursion here would turn one broken task into a loop.
+     */
+    allowFallback: Boolean = true,
+    execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
+    /**
+     * Called once the task starts: past admission, the journal and the collision policy, before
+     * its first action. A run skipped at any of those never calls it.
+     */
+    onAdmitted: () -> Unit = {},
+): TaskExecutionResult = withContext(currentCoroutineContext()) {
     RunTrace.attach(appContext)
     RunTrace.line("trigger '${task.name}' #${task.id} source=$source profile=${profileId ?: "-"}")
     // Switched off in the editor. Checked HERE, at the one place every run funnels through, so a

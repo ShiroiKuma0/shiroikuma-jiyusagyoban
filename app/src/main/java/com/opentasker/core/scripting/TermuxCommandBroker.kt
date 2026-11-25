@@ -50,14 +50,19 @@ internal object TermuxCommandBroker {
             pending[requestId] = deferred
         }
 
-        val callbackIntent = Intent(context, TermuxResultReceiver::class.java).apply {
+        // The answer comes back as a SERVICE start, not a broadcast. Android hands a process its
+        // manifest broadcasts one at a time, so a task that was itself started by a broadcast still
+        // being worked on (the adb bridge, a sister app's request, the restart after an update)
+        // never saw Termux's answer: it sat in the queue behind the very broadcast that was waiting
+        // for it, and the action ran into its time limit (found on Slave 1, 2026-11-24).
+        val callbackIntent = Intent(context, TermuxResultService::class.java).apply {
             action = RESULT_ACTION
             data = Uri.parse("opentasker://termux-result/$requestId")
             setPackage(context.packageName)
             putExtra(EXTRA_REQUEST_ID, requestId)
         }
         val mutableFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-        val callback = PendingIntent.getBroadcast(
+        val callback = PendingIntent.getService(
             context,
             requestId.hashCode(),
             callbackIntent,
@@ -71,7 +76,9 @@ internal object TermuxCommandBroker {
             action = ACTION_RUN_COMMAND
             putExtra(EXTRA_COMMAND_PATH, request.executable)
             putExtra(EXTRA_ARGUMENTS, request.arguments.toTypedArray())
-            putExtra(EXTRA_BACKGROUND, true)
+            putExtra(EXTRA_BACKGROUND, !request.foreground)
+            // "0": switch to the new session and open Termux, when it runs in a session at all.
+            if (request.foreground) putExtra(EXTRA_SESSION_ACTION, "0")
             putExtra(EXTRA_PENDING_INTENT, callback)
             request.workingDirectory?.let { putExtra(EXTRA_WORKDIR, it) }
             request.stdin?.let { putExtra(EXTRA_STDIN, it) }
@@ -88,9 +95,26 @@ internal object TermuxCommandBroker {
 
     internal fun deliver(intent: Intent) {
         if (intent.action != RESULT_ACTION) return
-        val requestId = intent.data?.lastPathSegment ?: return
-        val result = readResult(intent, requestId) ?: return
-        pending.remove(requestId)?.complete(result)
+        val requestId = intent.data?.lastPathSegment
+        // Each way out says why: a result that is dropped here looks, from the task, exactly like a
+        // Termux that never answered (Slave 1, 2026-11-24).
+        if (requestId == null) {
+            AppLogger.warn(TAG, "Termux result without a request id in its data: ${intent.data}")
+            return
+        }
+        val result = readResult(intent, requestId)
+        if (result == null) {
+            AppLogger.warn(
+                TAG,
+                "Termux result for $requestId not accepted: id extra " +
+                    (if (runCatching { intent.getStringExtra(EXTRA_REQUEST_ID) }.getOrNull() == requestId) "matches" else "differs or is missing") +
+                    ", keys ${runCatching { intent.extras?.keySet()?.joinToString() }.getOrNull()}",
+            )
+            return
+        }
+        val waiting = pending.remove(requestId)
+        if (waiting == null) AppLogger.warn(TAG, "Termux result for $requestId arrived, but nothing waits for it (${pending.size} pending)")
+        waiting?.complete(result)
     }
 
     /**
@@ -141,6 +165,7 @@ internal object TermuxCommandBroker {
     private const val EXTRA_STDIN = "com.termux.RUN_COMMAND_STDIN"
     private const val EXTRA_WORKDIR = "com.termux.RUN_COMMAND_WORKDIR"
     private const val EXTRA_BACKGROUND = "com.termux.RUN_COMMAND_BACKGROUND"
+    private const val EXTRA_SESSION_ACTION = "com.termux.RUN_COMMAND_SESSION_ACTION"
     private const val EXTRA_PENDING_INTENT = "com.termux.RUN_COMMAND_PENDING_INTENT"
     private const val EXTRA_RESULT_BUNDLE = "result"
     private const val RESULT_STDOUT = "stdout"
@@ -154,6 +179,18 @@ internal object TermuxCommandBroker {
 
 class TermuxResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        AppLogger.info("TermuxCommandBroker", "Termux result broadcast received")
         TermuxCommandBroker.deliver(intent)
+    }
+}
+
+/** Takes Termux's answer to a RUN_COMMAND and hands it to the action that waits for it. */
+class TermuxResultService : android.app.Service() {
+    override fun onBind(intent: Intent?): android.os.IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent != null) TermuxCommandBroker.deliver(intent)
+        stopSelf(startId)
+        return START_NOT_STICKY
     }
 }

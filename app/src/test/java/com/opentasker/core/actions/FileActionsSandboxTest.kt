@@ -72,4 +72,33 @@ class FileActionsSandboxTest {
         assertNull(resolveSandboxTarget(baseDir, "dangling/secret.txt"))
         assertNull(resolveSandboxTarget(baseDir, "dangling"))
     }
+
+    @Test
+    fun anAbsolutePathInsideTheSandboxIsTheSameFile() {
+        val baseDir = base()
+        val file = File(baseDir, "provider/fd_1").apply { parentFile!!.mkdirs(); writeText("x") }
+        // The path `Call Provider` hands out, given back to `Delete File`.
+        val relative = sandboxRelative(baseDir, file.absolutePath)
+        assertEquals(file, resolveSandboxTarget(baseDir, relative, mustExist = true))
+    }
+
+    @Test
+    fun anAbsolutePathElsewhereIsStillFoldedIntoTheSandbox() {
+        val baseDir = base()
+        assertEquals("/etc/passwd", sandboxRelative(baseDir, "/etc/passwd"))
+        assertEquals(File(baseDir, "etc/passwd"), resolveSandboxTarget(baseDir, sandboxRelative(baseDir, "/etc/passwd")))
+        // A sibling whose name merely starts like the sandbox is not inside it.
+        assertEquals(baseDir.path + "-other/x", sandboxRelative(baseDir, baseDir.path + "-other/x"))
+    }
+
+    @Test
+    fun aCopyLeftBehindIsSweptAndAFreshOneStays() {
+        val dir = temp.newFolder("provider")
+        val now = 1_800_000_000_000L
+        val stale = File(dir, "fd_1").apply { writeText("x"); setLastModified(now - PROVIDER_COPY_MAX_AGE_MS - 1_000) }
+        val fresh = File(dir, "fd_2").apply { writeText("x"); setLastModified(now - 60_000) }
+        assertEquals(1, sweepStale(dir, now))
+        assertEquals(false, stale.exists())
+        assertEquals(true, fresh.exists())
+    }
 }

@@ -125,6 +125,50 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         val action = intent.action
         val path = intent.getStringExtra(EXTRA_PATH)?.trim().orEmpty()
 
+        // The gate (BridgeAuth): the switch, and — once 白い熊 approved a key — the PC's signature.
+        // The two commands below are answered before it. Neither changes anything that counts:
+        // the info holds no secret, and an offered key only WAITS until it is approved on the phone.
+        when (action) {
+            ACTION_BRIDGE_INFO -> {
+                resultCode = Activity.RESULT_OK
+                resultData = BridgeAuth.info(app)
+                return
+            }
+            ACTION_BRIDGE_OFFER_KEY -> {
+                if (!BridgeAuth.enabled(app)) {
+                    resultCode = Activity.RESULT_FIRST_USER
+                    resultData = "ERROR:control over adb is switched off on this phone (Settings → Export / Import)"
+                    return
+                }
+                try {
+                    val fingerprint = BridgeAuth.offerKey(app, intent.getStringExtra(BridgeAuth.EXTRA_KEY).orEmpty())
+                    resultCode = Activity.RESULT_OK
+                    resultData = "waiting for approval on the phone (Settings → Export / Import): $fingerprint"
+                } catch (e: Exception) {
+                    resultCode = Activity.RESULT_FIRST_USER
+                    resultData = "ERROR:${e.message}"
+                }
+                return
+            }
+        }
+        BridgeAuth.refuse(app, intent)?.let {
+            resultCode = Activity.RESULT_FIRST_USER
+            resultData = it
+            return
+        }
+        // A signed command that reads a file names the file's SHA-256 inside the signed part:
+        // `/sdcard/tmp` is writable by other apps, and a valid signature must not cover a swapped file.
+        val signed = BridgeAuth.requireSignature(app)
+        val expectedSha = intent.getStringExtra(BridgeAuth.EXTRA_SHA256)?.trim()?.lowercase().orEmpty()
+        fun readChecked(file: File): String {
+            val bytes = file.readBytes()
+            if (signed) {
+                require(expectedSha.isNotEmpty()) { "a signed command that reads a file must carry ${BridgeAuth.EXTRA_SHA256}" }
+                require(BridgeAuth.sha256Hex(bytes) == expectedSha) { "${file.name} is not the file that was signed (SHA-256 differs)" }
+            }
+            return String(bytes, Charsets.UTF_8)
+        }
+
         // Room DAOs are suspend-only — go async and answer from IO.
         //
         // **`goAsync()` is not a licence to take as long as the work takes.** A background broadcast
@@ -201,7 +245,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                         require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
                         val file = resolveInTmp(path)
                         require(file.isFile) { "no such file: ${file.absolutePath}" }
-                        val bundle = OpenTaskerBundleCodec.decode(file.readText(Charsets.UTF_8))
+                        val bundle = OpenTaskerBundleCodec.decode(readChecked(file))
                         val report = repository.importBundle(bundle)
                         pending.setResultCode(Activity.RESULT_OK)
                         pending.setResultData(
@@ -220,7 +264,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                         require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
                         val file = resolveInTmp(path)
                         require(file.isFile) { "no such file: ${file.absolutePath}" }
-                        val manifest = json.decodeFromString<DeleteItemsManifest>(file.readText(Charsets.UTF_8))
+                        val manifest = json.decodeFromString<DeleteItemsManifest>(readChecked(file))
                         val result = deleteItems(manifest)
                         pending.setResultCode(Activity.RESULT_OK)
                         pending.setResultData(result.summary)
@@ -234,7 +278,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                         require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
                         val file = resolveInTmp(path)
                         require(file.isFile) { "no such file: ${file.absolutePath}" }
-                        val parsed = com.opentasker.core.gengoshima.VocabImport.parse(file.readText(Charsets.UTF_8))
+                        val parsed = com.opentasker.core.gengoshima.VocabImport.parse(readChecked(file))
                         // Nothing is filed around a line that could not be read: from here there is
                         // no preview to show it in, so the whole file is refused with the lines named.
                         require(parsed.problems.isEmpty()) {
@@ -258,7 +302,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                         require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
                         val file = resolveInTmp(path)
                         require(file.isFile) { "no such file: ${file.absolutePath}" }
-                        val manifest = json.decodeFromString<GengoshimaTokensManifest>(file.readText(Charsets.UTF_8))
+                        val manifest = json.decodeFromString<GengoshimaTokensManifest>(readChecked(file))
                         val dao = OpenTaskerApp_NoHilt.db.gengoshimaDao()
                         val warnings = mutableListOf<String>()
                         var changed = 0
@@ -416,6 +460,26 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                         pending.setResultCode(Activity.RESULT_OK)
                         pending.setResultData(summary.joinToString(", "))
                     }
+                    ACTION_PROTECT_VARIABLES -> {
+                        // Tightening only: a name gets the asked level where that is STRONGER than
+                        // what it has. Lifting a protection is done on the phone, in the Variables tab.
+                        val guard = com.opentasker.core.engine.variables.VariableGuard
+                        val level = when (intent.getStringExtra(EXTRA_LEVEL)?.trim()?.lowercase()) {
+                            "import" -> com.opentasker.core.engine.variables.VariableGuard.Level.IMPORT
+                            "locked" -> com.opentasker.core.engine.variables.VariableGuard.Level.LOCKED
+                            else -> throw IllegalArgumentException("$EXTRA_LEVEL is import or locked")
+                        }
+                        val names = intent.getStringExtra(EXTRA_NAMES).orEmpty()
+                            .split(',').map { guard.clean(it) }.filter { it.isNotEmpty() }
+                        require(names.isNotEmpty()) { "missing $EXTRA_NAMES" }
+                        val raised = names.filter { guard.raise(it, level) }
+                        pending.setResultCode(Activity.RESULT_OK)
+                        pending.setResultData(
+                            "protection ${level.name.lowercase()}: raised ${raised.size} of ${names.size}" +
+                                (if (raised.isEmpty()) "" else " (" + raised.joinToString(",") + ")") +
+                                " · now: " + names.joinToString(",") { "$it=${guard.level(it).name.lowercase()}" },
+                        )
+                    }
                     else -> {
                         pending.setResultCode(Activity.RESULT_FIRST_USER)
                         pending.setResultData("unknown action: $action")
@@ -475,6 +539,10 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         }
         manifest.variables.forEach { name ->
             // Project bucket + super bucket (a pre-project-scoping copy may linger in super).
+            if (com.opentasker.core.engine.variables.VariableGuard.refusesImport(name)) {
+                warnings += "variable is protected on this phone — not deleted: $name"
+                return@forEach
+            }
             var hit = false
             val vpid = pid ?: 0L    // Unfiled variables live in the super bucket
             if (db.variableDao().get(vpid, name) != null) { db.variableDao().delete(vpid, name); hit = true }
@@ -507,6 +575,17 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         const val ACTION_IMPORT_BUNDLE = "shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE"
         const val ACTION_EXPORT_DATA = "shiroikuma.jiyusagyoban.action.EXPORT_DATA"
         const val ACTION_DELETE_ITEMS = "shiroikuma.jiyusagyoban.action.DELETE_ITEMS"
+        /** Answers [BridgeAuth.info]: this phone's bridge id, and whether it wants signed commands. */
+        const val ACTION_BRIDGE_INFO = "shiroikuma.jiyusagyoban.action.BRIDGE_INFO"
+        /** Files the PC's public key ([BridgeAuth.EXTRA_KEY]) as the waiting key; 白い熊 approves it on the phone. */
+        const val ACTION_BRIDGE_OFFER_KEY = "shiroikuma.jiyusagyoban.action.BRIDGE_OFFER_KEY"
+        /**
+         * Protect variables on this phone ([com.opentasker.core.engine.variables.VariableGuard]):
+         * [EXTRA_NAMES] comma-separated, [EXTRA_LEVEL] `import` or `locked`. It only ever tightens.
+         */
+        const val ACTION_PROTECT_VARIABLES = "shiroikuma.jiyusagyoban.action.PROTECT_VARIABLES"
+        const val EXTRA_NAMES = "shiroikuma.jiyusagyoban.extra.NAMES"
+        const val EXTRA_LEVEL = "shiroikuma.jiyusagyoban.extra.LEVEL"
         /**
          * How long the broadcast may be held open. Comfortably under Android's 60 s ceiling for a
          * background broadcast, with room for the reply itself to be delivered.

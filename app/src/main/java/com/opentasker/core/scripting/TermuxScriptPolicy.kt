@@ -26,6 +26,8 @@ internal data class TermuxCommandRequest(
     val workingDirectory: String? = null,
     val stdin: String? = null,
     val timeoutMs: Long,
+    /** Run in a terminal session of Termux, brought to the front, instead of unseen. */
+    val foreground: Boolean = false,
 )
 
 internal data class TermuxCommandResult(

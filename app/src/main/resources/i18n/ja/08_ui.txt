@@ -203,6 +203,30 @@
 : 新しいトークンを作ります。ほかの場所に貼り付けたものは、すべて更新する必要があります。
 = Automation token regenerated — update pasted copies
 : 自動化トークンを再生成しました。貼り付け済みのものを更新してください。
+= Allow control over adb
+: adb からの操作を許可
+= Lets the PC import bundles, export the workspace and run tasks over adb, without the screen. Off: every such command is refused. Nothing on the phone itself needs this.
+: PC が adb 経由で、画面を使わずにバンドルの取り込み、ワークスペースの書き出し、課題の実行を行えるようにします。オフ：そうした命令はすべて拒否されます。端末自体の動作には必要ありません。
+= No PC key is approved, so any app on this phone can send these commands. Offer the key from the PC, then approve it here.
+: 承認済みの PC の鍵がないため、この端末のどのアプリでもこれらの命令を送れます。PC から鍵を届けて、ここで承認してください。
+= Approve the waiting PC key
+: 承認待ちの PC の鍵を承認
+= Fingerprint %1$s. Approve only if the PC shows the same. From then on, only commands signed with this key are accepted.
+: 指紋 %1$s。PC に同じものが表示されている場合にだけ承認してください。以後は、この鍵で署名された命令だけを受け付けます。
+= PC key approved — commands must now be signed
+: PC の鍵を承認しました。以後、命令には署名が必要です。
+= Discard the waiting PC key
+: 承認待ちの PC の鍵を破棄
+= Throws the offered key away. The approved key, if any, stays.
+: 届いた鍵を捨てます。承認済みの鍵があれば、そのまま残ります。
+= Require signed commands
+: 署名付きの命令だけを受け付ける
+= On: only commands signed with the approved PC key are accepted (fingerprint %1$s). Off: any app on this phone can send them.
+: オン：承認済みの PC の鍵（指紋 %1$s）で署名された命令だけを受け付けます。オフ：この端末のどのアプリでも命令を送れます。
+= Remove the approved PC key
+: 承認済みの PC の鍵を削除
+= Forgets the key. Commands are then accepted unsigned again, until a new key is approved.
+: 鍵を忘れます。新しい鍵を承認するまで、命令は再び署名なしで受け付けられます。
 
 # UiCustomizationScreen.kt — Colors, Borders, Flash / toast
 = The foundation colours. Every other colour follows these until it is set apart in its own section.
@@ -573,3 +597,46 @@
 : 健康の基本地図 — 地図が描いた切り抜き、地域ごとに1枚
 = 言語島 — islands · sentences · translations · history · audio
 : 言語島 — 島 · 文 · 翻訳 · 履歴 · 音声
+
+= App language
+: アプリの言語
+= Language: %1$s
+: 言語: %1$s
+= The language of this app only. The rest of the phone keeps its own.
+: このアプリだけの言語です。端末のほかの部分は、それぞれの言語のままです。
+= Allow tasks to run commands as root
+: 課題がrootで命令を実行することを許可
+= Off: “Run Shell” in root mode is refused on this phone. On: any task here may run any command as root. Kept on this phone only — no import or restore can switch it on.
+: オフ：この端末では、root モードの「Run Shell」は拒否されます。オン：この端末のどの課題でも、任意の命令をrootで実行できます。この設定はこの端末だけに保存され、取り込みや復元でオンになることはありません。
+= Allow tasks to run commands in Termux
+: 課題がTermuxで命令を実行することを許可
+= Off: “Run Termux Shell” is refused on this phone. On: any task here may run any command inside Termux, with Termux's files and keys. Kept on this phone only — no import or restore can switch it on.
+: オフ：この端末では「Run Termux Shell」は拒否されます。オン：この端末のどの課題でも、Termuxの中で、Termuxのファイルと鍵を使って任意の命令を実行できます。この設定はこの端末だけに保存され、取り込みや復元でオンになることはありません。
+= Start this task from a shortcut?
+: この課題をショートカットから開始しますか？
+= “%1$s” was asked to start from a shortcut or from another app, and is not allowed to yet. Allow it only if you tapped a shortcut of yours just now.
+: 「%1$s」をショートカットまたは別のアプリから開始するよう求められましたが、まだ許可されていません。たった今ご自分のショートカットをタップした場合にだけ、許可してください。
+= Allow
+: 許可
+= Shortcuts may start it
+: ショートカットから開始できる
+= Locked
+: ロック済み
+= Protected from imports
+: 取り込みから保護
+= Imports cannot change it
+: 取り込みでは変更できない
+= No bundle, restore or command over adb changes or deletes it. Tasks still write it.
+: バンドル、復元、adb からの命令のいずれも、これを変更・削除しません。課題は引き続き書き込めます。
+= Tasks cannot change it either
+: 課題からも変更できない
+= Only this tab changes it. A task that tries fails and says so.
+: このタブからだけ変更できます。課題が変更しようとすると失敗し、その旨を報告します。
+= Forget pinned provider apps
+: 固定した連携アプリを忘れる
+= A task that asks another app (Jami, Messēji) remembers which app answered and its signing key, and refuses a different one. Use this after you replaced such an app yourself; the next call pins it anew.
+: 別のアプリ（Jami、Messēji）に問い合わせる課題は、答えたアプリとその署名鍵を覚え、別のものは拒否します。ご自分でそのアプリを入れ替えた後に使ってください。次の呼び出しで改めて固定されます。
+= Forgot %1$s pinned app(s)
+: 固定したアプリ %1$s 件を忘れました。
+= “%1$s” was asked to start by another app and is not allowed — allow it in the task's card
+: 別のアプリが「%1$s」の開始を求めましたが、許可されていません。課題のカードで許可してください。

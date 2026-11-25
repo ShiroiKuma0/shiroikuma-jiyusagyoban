@@ -978,3 +978,63 @@
 : String[] として送る
 = on for Messēji's part_uris even with one picture; several URIs always go as a String[]
 : Messējiの part_uris では、画像が1枚でもオンにします。URIが複数ある場合は、常に String[] として送られます。
+= Keep Awake
+: スリープ防止
+= Keep the CPU awake until this run ends, so that waits and time limits run in real time while the phone sleeps
+: この実行が終わるまでCPUを眠らせません。電話がスリープしていても、待機や制限時間が実際の時間どおりに進みます。
+= Seconds at most
+: 最長の秒数
+= default 300, at most 3600 — asking again replaces the limit; 0 lets the phone sleep again at once
+: 既定は300、最長3600。もう一度指定すると制限時間が置き換わります。0 にすると、すぐにスリープできる状態に戻ります。
+= Run a shell command through Shizuku or as root, and keep its output. Root mode needs the switch “Allow tasks to run commands as root” on this phone
+: Shizuku経由、またはrootでシェルコマンドを実行し、その出力を保持します。root モードには、この端末で「課題がrootで命令を実行することを許可」のスイッチをオンにする必要があります。
+= Run as
+: 実行する権限
+= shizuku (default) — the Android shell user, through Shizuku; root — through su on a rooted phone
+: shizuku（既定）はShizuku経由でAndroidのシェルユーザーとして、root はroot化した電話で su を通して実行します。
+= Seconds to wait
+: 待つ秒数
+= root only: default 50, at most 600 — start long-running work detached (nohup … >/dev/null 2>&1 &)
+: root のときだけ有効です。既定は50、最長600。長く動き続ける処理は切り離して開始してください（nohup … >/dev/null 2>&1 &）。
+= Ask Termux to run an approved script from ~/.termux/tasker and keep its output
+: ~/.termux/tasker にある承認済みのスクリプトをTermuxに実行させ、その出力を保持します。
+= Run Termux Shell
+: Termuxでシェルコマンドを実行
+= Run a command line inside Termux, as Termux, and keep its output. Needs the switch “Allow tasks to run commands in Termux” on this phone
+: Termuxの中で、Termuxとしてコマンドを実行し、その出力を保持します。この端末で「課題がTermuxで命令を実行することを許可」のスイッチをオンにする必要があります。
+= as typed at Termux's prompt — its programs are found without a path, and a script may lie anywhere
+: Termuxのプロンプトに入力するとおりに書きます。Termuxのプログラムはパスなしで見つかり、スクリプトはどこに置いてあっても構いません。
+= Read ~/.profile first
+: 先に ~/.profile を読み込む
+= takes PATH and everything else from Termux's ~/.profile; off = Termux's default environment
+: PATHなどをTermuxの ~/.profile から取り込みます。オフのときはTermuxの既定の環境で実行します。
+= default Termux's home
+: 既定はTermuxのホーム
+= default 50, at most 600 — start long-running work detached (nohup … >/dev/null 2>&1 &)
+: 既定は50、最長600。長く動き続ける処理は切り離して開始してください（nohup … >/dev/null 2>&1 &）。
+= Run in a command window
+: コマンドウィンドウで実行
+= runs it in a terminal session of Termux, brought to the front, so that it can be watched
+: Termuxの端末セッションで実行し、Termuxを前面に出して様子を見られるようにします。
+= shows the command, what it prints and how it ended in a window over the screen, until the window is closed
+: コマンド、その出力、終了のしかたを画面の上のウィンドウに表示します。ウィンドウは閉じるまで残ります。
+= Do not flash the output
+: 出力をフラッシュ表示しない
+= off = what the command printed, and its errors, are flashed when it ends
+: オフのときは、コマンドの出力とエラーを終了時にフラッシュ表示します。
+= off = what the command printed, and its errors, are flashed when it ends — never while the command window is shown
+: オフのときは、コマンドの出力とエラーを終了時にフラッシュ表示します。コマンドウィンドウを表示しているときは、フラッシュ表示しません。
+= shows the command, what it prints as it prints it, and how it ended in a window over the screen, until the window is closed
+: コマンド、出力（出たそばから）、終了のしかたを画面の上のウィンドウに表示します。ウィンドウは閉じるまで残ります。
+= Full screen in Termux
+: Termuxで全画面表示
+= with the command window on: run in a terminal session of Termux instead of our window
+: コマンドウィンドウがオンのとき、このアプリのウィンドウの代わりにTermuxの端末セッションで実行します。
+= Off: Termux runs the command unseen, and our window shows what it prints while it runs.
+: オフのとき：Termuxがコマンドを裏で実行し、このアプリのウィンドウが実行中の出力を表示します。
+= Our window only displays. A command that asks for something — a password, a yes or no — cannot be answered there and waits until its time limit; switch this on for such a command.
+: このアプリのウィンドウは表示するだけです。パスワードや「はい／いいえ」などの入力を求めるコマンドには答えられず、制限時間まで待ち続けます。そのようなコマンドではこのスイッチをオンにしてください。
+= On: the command runs in a terminal session of Termux, which comes to the front and can be typed into. The session stays open until Enter is pressed there.
+: オンのとき：コマンドはTermuxの端末セッションで実行されます。Termuxが前面に出て、入力もできます。セッションは、そこでEnterを押すまで開いたままです。
+= This switch does nothing while “Run in a command window” is off.
+: 「コマンドウィンドウで実行」がオフの間は、このスイッチは何もしません。

@@ -1,6 +1,14 @@
 package com.opentasker.widget
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.opentasker.ui.components.AlertDialog
+import com.opentasker.ui.components.Button
+import com.opentasker.ui.components.OutlinedButton
+import com.opentasker.ui.theme.OpenTaskerTheme
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -24,7 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.opentasker.core.logging.AppLogger
 
-class TaskRunActivity : Activity() {
+class TaskRunActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +84,14 @@ class TaskRunActivity : Activity() {
                     return@launch
                 }
                 val task = decoded.value
+                // The gate (ShortcutGate): this screen is open to every app, so a task runs from here
+                // only if 白い熊 allowed it for shortcuts — or the tap came from one of our own widgets.
+                // Anything else gets a question on the screen instead of a run.
+                if (!ShortcutGate.isSealed(applicationContext, intent) && !ShortcutGate.allowed(applicationContext, task.name)) {
+                    AppLogger.error(TAG, "not allowed for shortcuts, asking: ${task.name}")
+                    runOnUiThread { askToAllow(task.name) }
+                    return@launch
+                }
                 val result = executeAndLogTask(
                     appContext = applicationContext,
                     db = db,
@@ -122,6 +138,33 @@ class TaskRunActivity : Activity() {
      * through here, so none can toast without finishing (a transparent Activity left on screen) or
      * finish without saying why. The success path uses the themed flash instead.
      */
+    /**
+     * The one-time question for a task that is not allowed for shortcuts yet. "Allow" remembers it
+     * and runs the request again; anything else closes without running. An app that fires this
+     * screen for a task of its choosing gets no further than this dialog, which names the task.
+     */
+    private fun askToAllow(taskName: String) {
+        setContent {
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
+                AlertDialog(
+                    onDismissRequest = { finish() },
+                    title = { Text(tr("Start this task from a shortcut?")) },
+                    text = {
+                        Text(tr("“%1\$s” was asked to start from a shortcut or from another app, and is not allowed to yet. Allow it only if you tapped a shortcut of yours just now.", taskName))
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            ShortcutGate.setAllowed(applicationContext, taskName, true)
+                            recreate()
+                        }) { Text(tr("Allow")) }
+                    },
+                    dismissButton = { OutlinedButton(onClick = { finish() }) { Text(tr("Cancel")) } },
+                )
+            }
+        }
+    }
+
     private fun finishWithMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         finish()

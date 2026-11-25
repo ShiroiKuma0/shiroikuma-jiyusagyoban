@@ -751,6 +751,13 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 // dead shadow-copy of the real project-global — skip it rather than seed one.
                 val n = variable.name
                 if (pid == 0L && n.isNotEmpty() && n[0].isUpperCase() && n.any { it.isLowerCase() }) return@forEach
+                // A variable protected on this phone (VariableGuard) is never written by an import —
+                // not overwritten, not renamed beside, not created: the owner of the command channel
+                // and the relay's cursors are exactly what a bundle must not be able to set.
+                if (com.opentasker.core.engine.variables.VariableGuard.refusesImport(n)) {
+                    importWarnings += "%$n is protected on this phone — left as it is"
+                    return@forEach
+                }
                 val taken = takenVarNamesByScope.getOrPut(pid) { mutableSetOf() }
                 val collides = variable.name.lowercase() in taken
                 when (strategyFor("variables", variable.name.lowercase())) {

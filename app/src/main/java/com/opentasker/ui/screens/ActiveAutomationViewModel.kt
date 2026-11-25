@@ -307,7 +307,7 @@ class ActiveAutomationViewModel(
             // delete them either way — otherwise they'd dangle (dead projectId, frozen-stale, unreachable).
             db.variableDao().getAll().filter { it.projectId == pid }.forEach {
                 db.variableDao().delete(it.projectId, it.name)
-                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unsetByHand(it.projectId, it.name)
             }
             // The project's foldable groups are project-scoped — delete them with the project so they don't
             // orphan. (Reassigned items keep their notes; a now-dangling groupId just reads as ungrouped.)
@@ -1310,6 +1310,8 @@ class ActiveAutomationViewModel(
             }
             val requested = TaskShortcutHelper.requestPinShortcut(appContext, task)
             if (requested) {
+                // Pinned by hand in the app: that is the permission to start it from a shortcut.
+                com.opentasker.widget.ShortcutGate.setAllowed(appContext, task.name, true)
                 events.send(UiMessage(tr("Pinning \"%1\$s\" to home screen", task.name)))
             } else {
                 events.send(UiMessage(tr("Failed to pin shortcut")))
@@ -1353,7 +1355,7 @@ class ActiveAutomationViewModel(
         viewModelScope.launch {
             db.variableDao().insert(VariableEntity(projectId = projectId, name = name, value = value))
             // Keep the runtime cache in sync (it warms once at startup; UI edits must route through it too).
-            com.opentasker.core.engine.variables.PersistentGlobalScope.set(projectId, name, value)
+            com.opentasker.core.engine.variables.PersistentGlobalScope.setByHand(projectId, name, value)
         }
     }
 
@@ -1362,7 +1364,7 @@ class ActiveAutomationViewModel(
             // Report real success/failure (upstream deep-audit): no optimistic toast on a failed delete.
             runCatching {
                 db.variableDao().delete(projectId, name)
-                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(projectId, name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unsetByHand(projectId, name)
                 // A Locale-condition grant outlives the variable it names unless it is revoked here,
                 // so a variable recreated under the same name would honour the old token again.
                 LocaleConditionGrantStore(appContext)
@@ -1393,7 +1395,7 @@ class ActiveAutomationViewModel(
         launchWithMessage(if (vars.size == 1) tr("Removed 1 dead global") else tr("Removed %1\$s dead globals", vars.size)) {
             vars.forEach {
                 db.variableDao().delete(it.projectId, it.name)
-                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unsetByHand(it.projectId, it.name)
             }
         }
 

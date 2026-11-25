@@ -326,3 +326,13 @@
 : アプリごとの共有リレーの生成とインストールはShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
 = Create launcher tasks runs through Shizuku — install and start Shizuku, then grant this app access.
 : 起動タスクの作成はShizukuを通して行います。Shizukuをインストールして起動し、このアプリにアクセスを許可してください。
+= Keeps the CPU awake until this run ends, so its waits and time limits run in real time on a sleeping phone.
+: この実行が終わるまでCPUを眠らせないので、スリープ中の電話でも待機や制限時間が実際の時間どおりに進みます。
+= Needs Shizuku installed, started and granted — or, in root mode, root allowed to this app by the root manager and the switch “Allow tasks to run commands as root” on.
+: Shizukuのインストール・起動・許可が必要です。root モードでは、root管理アプリでこのアプリにrootを許可し、「課題がrootで命令を実行することを許可」のスイッチをオンにしてください。
+= Needs Termux, “Run commands in Termux environment” granted to this app, and allow-external-apps switched on in Termux.
+: Termuxが必要です。このアプリに「Termux環境でコマンドを実行」の権限を与え、Termuxで allow-external-apps をオンにしてください。
+= — ended, exit code %1$s —
+: — 終了しました。終了コード %1$s —
+= More about this switch
+: このスイッチの説明

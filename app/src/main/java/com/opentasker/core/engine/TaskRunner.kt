@@ -1157,6 +1157,9 @@ internal fun actionTimeoutMs(actionType: String): Long = when {
     // Copying a 60 MB APK into the installer and waiting for it to verify and install; the
     // action bounds itself at 280 s.
     actionType == "package.install" -> PACKAGE_INSTALL_TIMEOUT_MS
+    // Root and plain mode bound themselves at up to 600 s; the engine must outlast that for the
+    // action's own message to reach the run log.
+    actionType == "shell.run" || actionType == "shell.termux" -> SHELL_RUN_TIMEOUT_MS
     // A script may run for TermuxScriptPolicy.MAX_TIMEOUT_MS after a hash check of up to
     // HASH_TIMEOUT_MS, and the contact picker waits two minutes for a choice. Each reports its
     // own limit, which the engine must outlast for that message to reach the run log.
@@ -1222,6 +1225,7 @@ internal fun actionTimeoutMs(actionType: String): Long = when {
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val LONG_REQUEST_TIMEOUT_MS = 180_000L
 private const val PACKAGE_INSTALL_TIMEOUT_MS = 330_000L
+private const val SHELL_RUN_TIMEOUT_MS = 630_000L
 private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
 private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s) + 60 s margin
 private const val ARTICLE_ACTION_TIMEOUT_MS = 1_800_000L // 30 minutes — a long article, many pages

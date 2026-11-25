@@ -35,6 +35,11 @@ class ClearVariableAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val name = args["name"]?.trim().orEmpty()
         if (name.isEmpty()) return ActionResult.Failure("missing name")
+        com.opentasker.core.engine.variables.VariableGuard.let { guard ->
+            if (guard.refusesTaskWrite(name, ctx.variables.get(guard.clean(name)), null)) {
+                return ActionResult.Failure(guard.lockedMessage(name))
+            }
+        }
         ctx.variables.unset(name)
         ctx.logger("Cleared %$name")
         return ActionResult.Success

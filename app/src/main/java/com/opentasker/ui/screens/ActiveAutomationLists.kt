@@ -1414,6 +1414,24 @@ private fun TaskCard(
                     }
                 }
                 item {
+                    // Whether a shortcut — or any other app — may start this task (ShortcutGate).
+                    val gateContext = LocalContext.current
+                    var mayStart by remember(task.name) {
+                        mutableStateOf(com.opentasker.widget.ShortcutGate.allowed(gateContext, task.name))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr("Shortcuts may start it"), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(8.dp))
+                        ThemedSwitch(
+                            checked = mayStart,
+                            onCheckedChange = {
+                                com.opentasker.widget.ShortcutGate.setAllowed(gateContext, task.name, it)
+                                mayStart = it
+                            },
+                        )
+                    }
+                }
+                item {
                     TextButton(onClick = onDelete) {
                         Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.task_delete))
                         Spacer(Modifier.width(6.dp))

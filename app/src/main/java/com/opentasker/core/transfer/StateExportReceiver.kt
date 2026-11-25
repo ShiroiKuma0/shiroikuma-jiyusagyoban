@@ -72,6 +72,24 @@ class StateExportReceiver : BroadcastReceiver() {
             reply(it)
             return
         }
+        // A broadcast names no sender, so by default any app can order the full backup (audit V-05).
+        // Two limits for a request that does not come from this app's own tasks ([SelfSeal]): it may
+        // not choose the directory — the archive goes where 白い熊 configured it, nowhere else — and
+        // it may not be repeated faster than once a minute, so it cannot fill the storage.
+        if (action == ACTION_EXPORT_STATE && !SelfSeal.isOwn(app, intent)) {
+            if (pathOverride.isNotEmpty()) {
+                reply("ERROR:only 自由作業盤's own tasks may name a directory — leave `path` out to use the configured export directory")
+                return
+            }
+            val now = android.os.SystemClock.elapsedRealtime()
+            synchronized(StateExportReceiver::class.java) {
+                if (lastOutsideExportMs != 0L && now - lastOutsideExportMs < OUTSIDE_EXPORT_GAP_MS) {
+                    reply("ERROR:too soon — one export a minute from outside this app")
+                    return
+                }
+                lastOutsideExportMs = now
+            }
+        }
 
         when (action) {
             ACTION_LIST_CATEGORIES -> {
@@ -194,6 +212,8 @@ class StateExportReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private const val OUTSIDE_EXPORT_GAP_MS = 60_000L
+        @Volatile private var lastOutsideExportMs = 0L
         const val ACTION_EXPORT_STATE = "shiroikuma.jiyusagyoban.action.EXPORT_STATE"
         const val ACTION_LIST_CATEGORIES = "shiroikuma.jiyusagyoban.action.LIST_CATEGORIES"
         const val ACTION_CANCEL_EXPORT = "shiroikuma.jiyusagyoban.action.CANCEL_EXPORT"

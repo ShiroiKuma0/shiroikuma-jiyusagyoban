@@ -511,9 +511,19 @@ private fun TextDialog(
             // A long body scrolls instead of being clipped — the reason a reference sheet can be shown
             // here at all. The scroll container is height-bounded by the dialog itself (the text slot
             // is weighted), so this changes nothing for a body that already fits.
+            // "full" is a page: the body sits in a framed box that takes all the height between the
+            // title and the buttons, the text scrolls INSIDE it, and the buttons stand at the very
+            // bottom — not floating under a short text with half the dialog empty (白い熊, 2026-11-25).
+            val frame = if (size == DialogSize.FULL) {
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .border(1.5.dp, role(UiRole.DIALOG_FRAME), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            } else Modifier
             Column(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = frame.verticalScroll(rememberScrollState()),
             ) {
                 if (text.isNotBlank()) {
                     if (markup) MarkupBody(text, textScale)

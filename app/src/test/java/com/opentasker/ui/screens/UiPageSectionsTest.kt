@@ -34,4 +34,21 @@ class UiPageSectionsTest {
     fun sectionIdsAreUnique() {
         assertEquals(PAGE_SECTIONS.size, PAGE_SECTIONS.map { it.id }.toSet().size)
     }
+
+    @Test
+    fun appLanguageIsTheFirstSection() {
+        assertEquals(LANGUAGE_SECTION, PAGE_SECTIONS.first().id)
+        assertEquals(UiRole.SECTION_WORDS, PAGE_SECTIONS.first().color)
+        assertEquals(LANGUAGE_SECTION, sectionOrder("").first().id)
+    }
+
+    @Test
+    fun anOrderStoredBeforeAppLanguageExistedGetsItFirst() {
+        assertEquals(listOf(LANGUAGE_SECTION, "colors", "exim"), sectionOrder("colors,exim").take(3).map { it.id })
+    }
+
+    @Test
+    fun anOrderThatNamesAppLanguageIsLeftAsDragged() {
+        assertEquals(listOf("colors", LANGUAGE_SECTION, "exim"), sectionOrder("colors,language,exim").take(3).map { it.id })
+    }
 }

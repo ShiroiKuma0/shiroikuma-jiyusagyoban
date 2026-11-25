@@ -368,6 +368,15 @@ class SetVariableAction : DeclaredAction(ActionCatalog.require("var.set")) {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val name = args["name"] ?: return ActionResult.Failure("missing name")
         val value = args["value"] ?: ""
+        // A variable locked on this phone: say so, instead of a write that silently does nothing.
+        // (A path write changes part of the value, so for a path any write counts as a change.)
+        com.opentasker.core.engine.variables.VariableGuard.let { guard ->
+            val base = guard.clean(name)
+            val isPath = name.contains('.') || name.contains('[')
+            if (guard.refusesTaskWrite(base, if (isPath) null else ctx.variables.get(base), value)) {
+                return ActionResult.Failure(guard.lockedMessage(base))
+            }
+        }
         // A value typed under a name like %api_token is hidden in the editor, so it is here too.
         val typedSecret = ActionArgumentSensitivity.isSensitive(id, "value", args)
         // A name filled in from a secret, like %cache_%Pin, holds that secret, so the line leaves it out.

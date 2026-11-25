@@ -243,7 +243,8 @@ object ActionCapabilityRegistry {
         "dialog.list" to dialogCapability(),
         "dialog.text" to dialogCapability(),
         "dialog.pickdir" to dialogCapability(),
-        "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
+        "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs Shizuku installed, started and granted — or, in root mode, root allowed to this app by the root manager and the switch “Allow tasks to run commands as root” on.", CapabilityRequirement.Shizuku, blocking = true),
+        "shell.termux" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs Termux, “Run commands in Termux environment” granted to this app, and allow-external-apps switched on in Termux."),
         // Switching which SIM carries data goes through ISub.setDefaultDataSubId, which needs
         // MODIFY_PHONE_STATE — held by shell, so Shizuku is the whole requirement.
         "sim.data.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
@@ -253,6 +254,7 @@ object ActionCapabilityRegistry {
         "package.install" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs “Install unknown apps” allowed for this app. Silent on Android 12+ for an update of this app itself, and for another app from the second install on; otherwise the accessibility service presses the confirmation."),
         "workspace.import" to ActionCapability(CapabilityLevel.Supported, "Imports an OpenTasker bundle file into this workspace, overwriting same-name items in place."),
         "package.info" to ActionCapability(CapabilityLevel.Supported, "Reads which build of an installed app is on this phone."),
+        "power.keep_awake" to ActionCapability(CapabilityLevel.Supported, "Keeps the CPU awake until this run ends, so its waits and time limits run in real time on a sleeping phone."),
         "workspace.list" to ActionCapability(CapabilityLevel.Supported, "Lists this workspace's projects, profiles or tasks as text."),
         "workspace.find" to ActionCapability(CapabilityLevel.Supported, "Finds the one task or profile a name means, given as name or name @ project."),
         "workspace.profile" to ActionCapability(CapabilityLevel.Supported, "Switches one of this app's profiles, given as name or name @ project, and reports the outcome."),

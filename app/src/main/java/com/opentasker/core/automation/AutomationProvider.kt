@@ -1,5 +1,6 @@
 package com.opentasker.core.automation
 
+import kotlinx.coroutines.launch
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Context
@@ -87,12 +88,46 @@ class AutomationProvider : ContentProvider() {
                     )
                 },
             )
+            METHOD_RUN_TASK -> ok(runTask(ctx, callingPackage.orEmpty(), extras))
             METHOD_CANCEL -> {
                 AutomationJobs.cancel(extras?.getString(KEY_JOB_ID))
                 ok("OK:cancelled")
             }
             else -> fail("ERROR:unknown method: $method")
         }
+    }
+
+    /**
+     * Run a named task about one app — it replaced the broadcast door `RUN_TASK_WITH_TARGET` (audit V-06). The
+     * caller was identified above by the system (binder uid, package, pinned certificate), so no
+     * identity object travels and nothing a third app holds can stand in for 応用管理.
+     *
+     * Extras: [KEY_TASK] (required), [KEY_PROJECT], [KEY_TARGET_PACKAGE] → `%pkg`,
+     * [KEY_TARGET_LABEL] → `%label`. Answers `OK:ran '<task>' in <n>ms`, `ERROR:…`, or — when the
+     * run is still going after [RUN_REPLY_BY_MS] — `OK:running '<task>'`, the run carrying on.
+     */
+    private fun runTask(ctx: Context, source: String, extras: Bundle?): String {
+        val app = ctx.applicationContext
+        val taskName = extras?.getString(KEY_TASK)?.trim().orEmpty()
+        if (taskName.isEmpty()) return "ERROR:missing $KEY_TASK"
+        if (com.opentasker.core.engine.EngineShutdown.refuse(app, "sister run ($source)")) {
+            return "ERROR:白い熊 自由作業盤 is stopped — open the app to start it again"
+        }
+        val projectName = extras?.getString(KEY_PROJECT)?.trim().orEmpty()
+        val variables = mapOf(
+            "pkg" to extras?.getString(KEY_TARGET_PACKAGE).orEmpty(),
+            "label" to extras?.getString(KEY_TARGET_LABEL).orEmpty(),
+        )
+        val answer = kotlinx.coroutines.CompletableDeferred<String>()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            answer.complete(
+                runCatching { SisterTaskRunner.run(app, source, taskName, projectName, variables) }
+                    .getOrElse { "ERROR:${it.message ?: it.javaClass.simpleName}" },
+            )
+        }
+        return kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeoutOrNull(RUN_REPLY_BY_MS) { answer.await() } ?: "OK:running '$taskName'"
+        }.also { com.opentasker.core.engine.RunTrace.line("sister run (provider) from '$source' → $it") }
     }
 
     /**
@@ -166,6 +201,12 @@ class AutomationProvider : ContentProvider() {
         const val METHOD_EXPORT = "export"
         const val METHOD_IMPORT = "import"
         const val METHOD_CANCEL = "cancel"
+        const val METHOD_RUN_TASK = "run_task"
+        const val KEY_TASK = "task"
+        const val KEY_PROJECT = "project"
+        const val KEY_TARGET_PACKAGE = "target_package"
+        const val KEY_TARGET_LABEL = "target_label"
+        private const val RUN_REPLY_BY_MS = 6_000L
 
         /** The only caller limited to one method (`gengoshima_intake`). */
         private const val KXKB = "shiroikuma.kxkb"

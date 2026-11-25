@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
@@ -82,7 +84,31 @@ class PackageInstallAction : Action {
     override val id = "package.install"
     override val category = ActionCategory.APP
 
+    private companion object {
+        /** Longer than the longest install this action allows (280 s), its start-again included. */
+        const val AWAKE_LIMIT_MS = 360_000L
+
+        /** How long a session that asked for a tap is given before it is abandoned. */
+        const val ASKED_LIMIT_MS = 60_000L
+    }
+
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        // Awake for the whole install, whatever the task around it asked for: the limits below are
+        // counted on a clock that stands still while the CPU sleeps, and on an unplugged relay phone
+        // the 240 s of this action once took 18 minutes (Slave 1, 2026-11-24).
+        val awake = runCatching {
+            (ctx.app.getSystemService(Context.POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "opentasker:package-install")
+                .apply { setReferenceCounted(false); acquire(AWAKE_LIMIT_MS) }
+        }.getOrNull()
+        return try {
+            install(ctx, args)
+        } finally {
+            runCatching { awake?.takeIf { it.isHeld }?.release() }
+        }
+    }
+
+    private suspend fun install(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val prefix = args["prefix"]?.trim()?.ifBlank { null } ?: "pi"
         fun put(key: String, value: String) = ctx.variables.set("${prefix}_$key", value)
         listOf("message", "package", "label", "version", "old_version", "kept", "started", "start_message", "route").forEach { put(it, "") }
@@ -156,9 +182,14 @@ class PackageInstallAction : Action {
         }
 
         // Root first, for any app but this one.
+        var rootRefused = false
         if (!self && args["route"]?.trim()?.lowercase() != "session") {
-            val rooted = withContext(Dispatchers.IO) { RootInstall.available() }
-            if (rooted) {
+            val root = withContext(Dispatchers.IO) { RootInstall.state() }
+            // A rooted phone whose root manager says no to this app looks exactly like a phone with
+            // no root, and then quietly takes the route that may need a tap. Say so in the result.
+            rootRefused = root == RootInstall.State.REFUSED
+            if (rootRefused) ctx.logger("Install $pkg $newName: this phone has root, but it is refused to this app")
+            if (root == RootInstall.State.GRANTED) {
                 put("route", "root")
                 ctx.logger("Install $pkg $newName: through root")
                 val (ok, detail) = withContext(Dispatchers.IO) { RootInstall.install(file, app.packageName, timeoutSec) }
@@ -169,7 +200,8 @@ class PackageInstallAction : Action {
                 return ActionResult.Success
             }
         }
-        put("route", "session")
+        put("route", if (rootRefused) "session (root is refused to 白い熊 自由作業盤 on this phone — allow it in the root manager)" else "session")
+        val rootNote = if (rootRefused) " Root exists on this phone but is refused to 白い熊 自由作業盤: allow it in the root manager (Magisk → Superuser) and no tap is needed." else ""
 
         if (!pm.canRequestPackageInstalls()) {
             return fail("白い熊 自由作業盤 is not allowed to install apps — allow “Install unknown apps” for it on that phone")
@@ -236,18 +268,35 @@ class PackageInstallAction : Action {
                 }
             }
             ctx.logger("Install $pkg $newName: session $sessionId committed")
-            val result = withTimeoutOrNull(timeoutSec * 1000L) { outcome.await() }
+            // Counted on the clock that keeps running while the phone sleeps. Once Android has asked
+            // for a tap, nothing but a tap ends the session, so that wait is the short one: the
+            // accessibility press takes 25 s at most, and a hand on the phone needs no longer.
+            val committedAt = SystemClock.elapsedRealtime()
+            var result: Pair<Boolean, String>? = null
+            var asked = false
+            while (result == null) {
+                result = withTimeoutOrNull(2_000L) { outcome.await() }
+                if (result != null) break
+                val waited = SystemClock.elapsedRealtime() - committedAt
+                asked = PackageInstallResultReceiver.askedUser[sessionId] == true
+                if (waited >= timeoutSec * 1000L || (asked && waited >= ASKED_LIMIT_MS)) break
+            }
+            PackageInstallResultReceiver.askedUser.remove(sessionId)
+            val waitedSec = (SystemClock.elapsedRealtime() - committedAt) / 1000
             return when {
                 result == null -> {
                     if (self) PendingSelfUpdate.clear(app)
+                    // Left alone, a session that waits for a tap stays "active" for good; two of them
+                    // were found on Slave 1, one of them two days old.
+                    runCatching { installer.abandonSession(sessionId) }
                     fail(
-                        if (PackageInstallResultReceiver.askedUser.remove(sessionId) == true)
-                            "the phone is asking for a tap to confirm, and nothing pressed it within ${timeoutSec}s. " +
+                        if (asked)
+                            "the phone is asking for a tap to confirm, and nothing pressed it within ${waitedSec}s. " +
                                 "Unlock that phone, send the command again and tap Update (or Install) once — " +
                                 "after that, updates of this app need no tap. The accessibility service that presses it is " +
                                 (if (ShiroiKumaAccessibilityService.isConnected) "on, but cannot reach a prompt behind the lock screen"
-                                else "OFF on that phone")
-                        else "the installer did not answer within ${timeoutSec}s",
+                                else "OFF on that phone") + "." + rootNote
+                        else "the installer did not answer within ${waitedSec}s",
                     )
                 }
                 result.first -> {
@@ -274,29 +323,52 @@ class PackageInstallAction : Action {
 
 /** Installing through root: `pm install` fed from this process, with this app named as the installer. */
 private object RootInstall {
-    /** Whether `su` answers as root. A root manager may show its own prompt the first time. */
-    fun available(): Boolean = runCatching {
-        val process = ProcessBuilder("su", "-c", "id -u").redirectErrorStream(true).start()
-        process.outputStream.close()
-        if (!process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)) {
-            process.destroy()
-            return false
-        }
-        process.exitValue() == 0 && process.inputStream.bufferedReader().use { it.readText() }.trim() == "0"
-    }.getOrDefault(false)
+    enum class State { GRANTED, REFUSED, ABSENT }
 
-    /** The APK goes in on standard input, so it may lie where only this app can read it. */
+    /**
+     * Whether `su` answers as root. [State.REFUSED] is a phone that has `su` and whose root manager
+     * says no to this app — a remembered denial, or a prompt nobody answered (a root manager may
+     * show one the first time, and on a phone nobody holds it times out into a denial).
+     */
+    fun state(): State {
+        val process = runCatching { ProcessBuilder("su", "-c", "id -u").redirectErrorStream(true).start() }
+            .getOrElse { return State.ABSENT }
+        return runCatching {
+            process.outputStream.close()
+            if (!process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                return State.REFUSED
+            }
+            val answer = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            if (process.exitValue() == 0 && answer == "0") State.GRANTED else State.REFUSED
+        }.getOrDefault(State.REFUSED)
+    }
+
+    /**
+     * The APK goes in on standard input, so it may lie where only this app can read it. One limit
+     * covers everything — feeding the bytes included: a `pm` that never reads would otherwise hold
+     * the copy, and the task with it, for good.
+     */
     fun install(file: File, installer: String, timeoutSec: Int): Pair<Boolean, String> = runCatching {
         val process = ProcessBuilder("su", "-c", "pm install -r -i $installer -S ${file.length()}")
             .redirectErrorStream(true).start()
         val output = StringBuilder()
         val reader = Thread { runCatching { process.inputStream.bufferedReader().use { output.append(it.readText()) } } }
         reader.start()
+        val timedOut = java.util.concurrent.atomic.AtomicBoolean(false)
+        val watchdog = Thread {
+            runCatching {
+                if (!process.waitFor(timeoutSec.toLong(), java.util.concurrent.TimeUnit.SECONDS)) {
+                    timedOut.set(true)
+                    process.destroyForcibly()
+                }
+            }
+        }.apply { isDaemon = true; start() }
+        // Killing the process closes the pipe, which ends this copy with an exception.
         runCatching { process.outputStream.use { out -> file.inputStream().use { it.copyTo(out, 1 shl 16) } } }
-        if (!process.waitFor(timeoutSec.toLong(), java.util.concurrent.TimeUnit.SECONDS)) {
-            process.destroy()
-            return false to "pm did not answer within ${timeoutSec}s"
-        }
+        process.waitFor()
+        watchdog.interrupt()
+        if (timedOut.get()) return false to "pm did not answer within ${timeoutSec}s"
         reader.join(5_000)
         val text = output.toString().trim()
         (process.exitValue() == 0 && text.contains("Success")) to text.lines().lastOrNull { it.isNotBlank() }.orEmpty().take(300)

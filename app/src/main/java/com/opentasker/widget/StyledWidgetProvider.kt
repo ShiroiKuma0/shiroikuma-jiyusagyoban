@@ -73,6 +73,8 @@ class StyledWidgetProvider : AppWidgetProvider() {
                     if (tapName.isNotBlank()) putExtra(TaskRunActivity.EXTRA_TASK_NAME, tapName)
                     else putExtra(TaskRunActivity.EXTRA_TASK_ID, legacyTapId)
                     putExtra(TaskRunActivity.EXTRA_SOURCE, TaskRunActivity.SOURCE_WIDGET)
+                    // Our own widget: its tap runs without the shortcut question (ShortcutGate).
+                    ShortcutGate.seal(context, this)
                 }
                 val pi = PendingIntent.getActivity(
                     context, id, intent,

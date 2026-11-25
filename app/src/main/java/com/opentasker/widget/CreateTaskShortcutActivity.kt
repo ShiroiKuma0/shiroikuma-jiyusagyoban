@@ -131,6 +131,8 @@ class CreateTaskShortcutActivity : ComponentActivity() {
 
     private fun finishWithShortcut(task: Task) {
         val shortcut = TaskShortcutHelper.buildShortcut(this, task)
+        // 白い熊 picked this task for a shortcut, here on the phone: that is the permission.
+        ShortcutGate.setAllowed(applicationContext, task.name, true)
         setResult(RESULT_OK, ShortcutManagerCompat.createShortcutResultIntent(this, shortcut))
         finish()
     }

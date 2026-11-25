@@ -56,7 +56,18 @@ object PersistentGlobalScope : GlobalVariableScope {
 
     override fun get(projectId: Long, name: String): String? = buckets[projectId]?.get(name)
 
+    /**
+     * A write from a task, a scene or the engine. A variable 白い熊 locked on this phone
+     * ([VariableGuard]) is left as it is — silently here, because a hundred actions store their
+     * results through this one door; `var.set` and `var.clear` say so in their own result.
+     */
     override fun set(projectId: Long, name: String, value: String) {
+        if (VariableGuard.refusesTaskWrite(name, get(projectId, name), value)) return
+        setByHand(projectId, name, value)
+    }
+
+    /** A write made in the Variables tab — the one hand a locked variable still obeys. */
+    fun setByHand(projectId: Long, name: String, value: String) {
         bucket(projectId)[name] = value
         _revision.update { it + 1 }
         val d = dao ?: return
@@ -64,6 +75,12 @@ object PersistentGlobalScope : GlobalVariableScope {
     }
 
     override fun unset(projectId: Long, name: String) {
+        if (VariableGuard.refusesTaskWrite(name, get(projectId, name), null)) return
+        unsetByHand(projectId, name)
+    }
+
+    /** As [setByHand], for a delete made in the Variables tab. */
+    fun unsetByHand(projectId: Long, name: String) {
         buckets[projectId]?.remove(name)
         _revision.update { it + 1 }
         val d = dao ?: return

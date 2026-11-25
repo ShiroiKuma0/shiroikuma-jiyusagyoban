@@ -81,6 +81,9 @@ class SendIntentAction : Action {
             cls != null -> intent.component = ComponentName(pkg!!, cls)
             pkg != null -> intent.setPackage(pkg)
         }
+        // An intent addressed to this app alone carries its mark, so its own doors can tell a task
+        // of ours from a stranger (SelfSeal). Nothing else ever receives it.
+        com.opentasker.core.transfer.SelfSeal.markIfOwn(ctx.app, intent)
         // setData() and setType() clear each other, so set them together when both present.
         when {
             dataUri != null && mime != null -> intent.setDataAndType(dataUri, mime)

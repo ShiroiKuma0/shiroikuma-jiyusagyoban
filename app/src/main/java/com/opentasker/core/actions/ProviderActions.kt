@@ -69,8 +69,12 @@ class ProviderCallAction : Action {
         val arg = args["arg"]?.ifEmpty { null }
         val prefix = args["prefix"]?.trim()?.ifBlank { null } ?: DEFAULT_PREFIX
         val timeoutSec = args["timeout"]?.trim()?.toIntOrNull()?.coerceIn(1, MAX_TIMEOUT_SEC) ?: DEFAULT_TIMEOUT_SEC
-        val fileDir = args["file_dir"]?.trim()?.ifBlank { null }?.let(::File)
-            ?: File(ctx.app.filesDir, "user_files/provider")
+        val ownDir = File(ctx.app.filesDir, "user_files/provider")
+        val fileDir = args["file_dir"]?.trim()?.ifBlank { null }?.let(::File) ?: ownDir
+        // The app's own directory holds copies a task uses at once and then deletes. One that a task
+        // left behind — it stopped early, it failed, its delete step was refused — is swept here, so
+        // nothing piles up whatever the task did (白い熊, 2026-11-24: 436 MB of installed APKs).
+        if (fileDir == ownDir) withContext(Dispatchers.IO) { sweepStale(ownDir, System.currentTimeMillis()) }
 
         val extras = Bundle()
         for (i in 1..MAX_EXTRAS) {
@@ -81,6 +85,8 @@ class ProviderCallAction : Action {
         val providerPackage = runCatching {
             ctx.app.packageManager.resolveContentProvider(authority, 0)?.packageName
         }.getOrNull() ?: return ActionResult.Failure("no provider '$authority' on this phone (or it is not visible to us)")
+        // The app behind the authority is pinned on first use — its name and its signing key.
+        ProviderOwnerPins.refuse(ctx.app, authority, providerPackage)?.let { return ActionResult.Failure(it) }
 
         args["grant_uri"]?.trim()?.ifBlank { null }?.let { rawList ->
             val uris = rawList.split(LIST_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }.map { raw ->
@@ -269,3 +275,12 @@ class CopyFromUriAction : Action {
         }
     }
 }
+
+/** How long a copy in the app's own provider directory may lie unused before it is swept. */
+internal const val PROVIDER_COPY_MAX_AGE_MS = 6 * 60 * 60 * 1000L
+
+/** Deletes the files in [dir] last written more than [PROVIDER_COPY_MAX_AGE_MS] before [now]; returns how many. */
+internal fun sweepStale(dir: File, now: Long): Int =
+    dir.listFiles().orEmpty().count { file ->
+        file.isFile && now - file.lastModified() > PROVIDER_COPY_MAX_AGE_MS && runCatching { file.delete() }.getOrDefault(false)
+    }
