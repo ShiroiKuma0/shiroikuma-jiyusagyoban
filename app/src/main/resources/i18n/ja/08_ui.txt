@@ -640,3 +640,15 @@
 : 固定したアプリ %1$s 件を忘れました。
 = “%1$s” was asked to start by another app and is not allowed — allow it in the task's card
 : 別のアプリが「%1$s」の開始を求めましたが、許可されていません。課題のカードで許可してください。
+= Termux permission missing
+: Termuxの権限がありません
+= Termux is not ready
+: Termuxの準備ができていません
+= The switch is on, but Android has not granted this app the permission “Run commands in Termux environment”. Until it is granted, every command a task sends to Termux is refused.
+: スイッチはオンですが、Androidがこのアプリに「Termux環境でコマンドを実行」の権限をまだ与えていません。許可されるまで、課題がTermuxへ送る命令はすべて拒否されます。
+= The switch is on, but commands cannot reach Termux yet: %1$s
+: スイッチはオンですが、命令はまだTermuxに届きません：%1$s
+= Granted — tasks can now run commands in Termux
+: 許可されました。課題がTermuxで命令を実行できます。
+= Not granted — in the settings: Permissions → Additional permissions → “Run commands in Termux environment”
+: 許可されていません。設定で：権限 → その他の権限 →「Termux環境でコマンドを実行」

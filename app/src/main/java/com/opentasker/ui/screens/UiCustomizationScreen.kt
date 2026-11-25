@@ -398,6 +398,63 @@ fun UiCustomizationScreen(
     // What a task may do on this phone (CommandSwitches): both off until switched on here.
     var allowRootCommands by remember { mutableStateOf(com.opentasker.core.actions.CommandSwitches.rootAllowed(context)) }
     var allowTermuxCommands by remember { mutableStateOf(com.opentasker.core.actions.CommandSwitches.termuxAllowed(context)) }
+    // Set when the Termux switch goes on while Termux cannot be asked yet: opens the dialog that says why.
+    var termuxNotReady by remember { mutableStateOf<com.opentasker.core.scripting.TermuxScriptStatus?>(null) }
+    fun openOwnAppSettings() {
+        runCatching {
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+    val termuxPermissionRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            android.widget.Toast.makeText(context, tr("Granted — tasks can now run commands in Termux"), android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            // Android showed no prompt, or it was declined: the grant is then made in the app's settings.
+            android.widget.Toast.makeText(
+                context,
+                tr("Not granted — in the settings: Permissions → Additional permissions → “Run commands in Termux environment”"),
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+            openOwnAppSettings()
+        }
+    }
+    termuxNotReady?.let { status ->
+        val needsPermission = status.state == com.opentasker.core.scripting.TermuxScriptState.PermissionRequired
+        AlertDialog(
+            onDismissRequest = { termuxNotReady = null },
+            title = { Text(if (needsPermission) tr("Termux permission missing") else tr("Termux is not ready")) },
+            text = {
+                Text(
+                    if (needsPermission) {
+                        tr("The switch is on, but Android has not granted this app the permission “Run commands in Termux environment”. Until it is granted, every command a task sends to Termux is refused.")
+                    } else {
+                        tr("The switch is on, but commands cannot reach Termux yet: %1\$s", status.summary)
+                    },
+                )
+            },
+            confirmButton = {
+                if (needsPermission) {
+                    Button(onClick = {
+                        termuxNotReady = null
+                        termuxPermissionRequest.launch(com.opentasker.core.scripting.TermuxScriptBackend.RUN_COMMAND_PERMISSION)
+                    }) { Text(tr("Grant")) }
+                } else {
+                    Button(onClick = { termuxNotReady = null }) { Text(tr("Close")) }
+                }
+            },
+            dismissButton = {
+                if (needsPermission) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { termuxNotReady = null; openOwnAppSettings() }) { Text(tr("Open settings")) }
+                        OutlinedButton(onClick = { termuxNotReady = null }) { Text(tr("Later")) }
+                    }
+                }
+            },
+        )
+    }
 
     // The adb bridge's gate (BridgeAuth): the switch, the approved key, a key waiting for approval.
     // A key is offered from the PC while this page may be open, so the three are re-read while shown.
@@ -605,6 +662,13 @@ fun UiCustomizationScreen(
                     onCheckedChange = {
                         com.opentasker.core.actions.CommandSwitches.setTermuxAllowed(context, it)
                         allowTermuxCommands = it
+                        // The switch is only half of it: without Termux, or without Android's own
+                        // permission, every command is still refused — say so now, not at the first
+                        // task that fails (白い熊, 2026-11-25: the Slaves' /tunnel).
+                        if (it) {
+                            val status = com.opentasker.core.scripting.TermuxScriptBackend.inspect(context)
+                            if (!status.isReady) termuxNotReady = status
+                        }
                     },
                 )
             }
