@@ -19,6 +19,6 @@ class GenerateShareRelaysAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val intent = Intent(ctx.app, ShareAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { ctx.app.startActivity(intent) }
-            .fold({ ActionResult.Success }, { ActionResult.Failure("could not open Share apps: ${it.message}") })
+            .fold({ ActionResult.Success }, { ActionResult.Failure("could not open Share tiles: ${it.message}") })
     }
 }

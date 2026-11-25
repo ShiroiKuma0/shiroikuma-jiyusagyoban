@@ -3082,8 +3082,8 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "share.relays",
-            name = "Share Apps (relay generator)",
-            description = "Open the Share apps screen: pick an app, edit its name + icon, and generate a per-app share-sheet tile (a tiny relay APK) that unfreezes the app and forwards the shared content to it.",
+            name = "Share Tiles (tile maker)",
+            description = "Open the Share tiles screen: pick an app or a task, edit the tile's name + icon, and create its own tile in the system share dialog (a tiny helper package). An app tile unfreezes the app and forwards the shared content to it; a task tile starts the task with the shared files.",
             category = "App",
             fields = emptyList()
         )

@@ -976,3 +976,7 @@
 : Catch
 = End Try
 : End Try
+= Share Tiles (tile maker)
+: 共有タイル（タイルの作成）
+= Open the Share tiles screen: pick an app or a task, edit the tile's name + icon, and create its own tile in the system share dialog (a tiny helper package). An app tile unfreezes the app and forwards the shared content to it; a task tile starts the task with the shared files.
+: 「共有タイル」画面を開きます。アプリまたはタスクを選び、タイルの名前とアイコンを編集して、システムの共有ダイアログに専用のタイル（小さな補助パッケージ）を作成します。アプリのタイルはアプリの凍結を解除して共有された内容を渡し、タスクのタイルは共有されたファイルを渡してタスクを始めます。

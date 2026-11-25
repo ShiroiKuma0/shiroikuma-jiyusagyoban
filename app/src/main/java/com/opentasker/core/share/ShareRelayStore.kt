@@ -27,6 +27,9 @@ enum class RelayState {
  * One share target: an app that gets its own relay APK (own package = own system-share-sheet tile).
  * [targetPackage] is the app the relay forwards to (and unfreezes); [relayPackage] is the generated
  * relay's own package. [label]/[iconPath] are the editable tile identity.
+ *
+ * A target can also be a TASK (白い熊, 2026-11-25): [targetPackage] is then `task:<task name>` and
+ * the share starts that task with the shared files as its variables — see [ShareForwardActivity].
  */
 @Serializable
 data class ShareRelayEntry(
@@ -37,7 +40,10 @@ data class ShareRelayEntry(
     val state: RelayState = RelayState.DRAFT,
     /** The signing-cert fingerprint the installed relay was built with (detects key rotation). */
     val signedFingerprint: String? = null,
-)
+) {
+    /** The task this tile starts, or null when it forwards to an app. */
+    val taskName: String? get() = ShareRelayStore.taskNameOf(targetPackage)
+}
 
 /**
  * Process-wide, SharedPreferences-backed list of share-relay targets. Device-local: the app selection
@@ -52,6 +58,14 @@ object ShareRelayStore {
     private const val K_COPY_STREAMS = "copy_streams"
 
     const val MAX_TARGETS = 8
+
+    /** What [ShareRelayEntry.targetPackage] starts with when the target is a task, not an app. */
+    const val TASK_PREFIX = "task:"
+
+    fun taskKey(taskName: String): String = TASK_PREFIX + taskName
+
+    fun taskNameOf(target: String): String? =
+        target.takeIf { it.startsWith(TASK_PREFIX) }?.removePrefix(TASK_PREFIX)?.takeIf { it.isNotBlank() }
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private lateinit var prefs: SharedPreferences

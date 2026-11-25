@@ -6,11 +6,13 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -62,7 +64,8 @@ import kotlinx.coroutines.withContext
  * The "Share apps" screen: manage per-target share relays. Add an app (frozen-inclusive picker),
  * edit its share-tile name + icon, Generate/Regenerate its relay APK (built, signed, and installed
  * on-device via Shizuku), and Remove it (uninstalls the relay). Each relay becomes its own tile in
- * the system share sheet that unfreezes the app and forwards the shared content.
+ * the system share sheet that unfreezes the app and forwards the shared content. A TASK can be added
+ * as a target as well ("Add a task"): its tile starts the task with the shared files as variables.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +75,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
     val relays by ShareRelayStore.relays.collectAsState()
     var copyStreams by remember { mutableStateOf(ShareRelayStore.copyStreams) }
     var showPicker by remember { mutableStateOf(false) }
+    var showTaskPicker by remember { mutableStateOf(false) }
     var iconEditFor by remember { mutableStateOf<ShareRelayEntry?>(null) }
     val busy = remember { mutableStateListOf<String>() }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_LONG).show()
@@ -79,7 +83,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(tr("Share apps")) },
+                title = { Text(tr("Share tiles")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Back")) }
                 },
@@ -99,6 +103,14 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                 )
             }
 
+            item {
+                Text(
+                    tr("A task can have a tile too. Sharing to it starts the task with the shared files in %share_paths (real paths, each quoted for a shell) and their number in %share_count. A file in shared storage is passed in place; anything else is copied for the run and the copy is deleted when the task ends."),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             if (!ShizukuShell.available()) {
                 item {
                     Card(
@@ -112,7 +124,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Text(
-                                tr("Shizuku is needed to install and remove relays."),
+                                tr("Shizuku is needed to create and delete tiles."),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
                             )
@@ -135,7 +147,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                             busy.remove(entry.targetPackage)
                             toast(
                                 when (outcome) {
-                                    is RelayGenerator.Outcome.Installed -> tr("%1\$s: installed", entry.label)
+                                    is RelayGenerator.Outcome.Installed -> tr("%1\$s: tile in place", entry.label)
                                     is RelayGenerator.Outcome.ShizukuUnavailable -> tr("Shizuku unavailable")
                                     is RelayGenerator.Outcome.Failed -> "${entry.label}: ${outcome.message}"
                                 },
@@ -163,6 +175,15 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                 ) {
                     Text(if (relays.size < ShareRelayStore.MAX_TARGETS) tr("Add apps") else tr("Maximum %1\$s reached", ShareRelayStore.MAX_TARGETS))
                 }
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = { showTaskPicker = true },
+                    enabled = relays.size < ShareRelayStore.MAX_TARGETS,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) { Text(tr("Add a task")) }
             }
 
             item {
@@ -201,10 +222,41 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
         )
     }
 
+    if (showTaskPicker) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showTaskPicker = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.86f)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                com.opentasker.widget.TaskPickerScreen(
+                    onPick = { task ->
+                        showTaskPicker = false
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                val key = ShareRelayStore.taskKey(task.name)
+                                if (ShareRelayStore.find(key) == null) {
+                                    // Its own picture file: removing the tile deletes it.
+                                    val glyph = task.name.trim().take(1).ifEmpty { "?" }
+                                    ShareRelayStore.addDraft(key, task.name, TaskIconStore.saveFromText(context, glyph))
+                                }
+                            }
+                        }
+                    },
+                    onCancel = { showTaskPicker = false },
+                )
+            }
+        }
+    }
+
     iconEditFor?.let { entry ->
         TaskIconPickerDialog(
             initialIconPath = entry.iconPath,
-            targetPackage = entry.targetPackage,
+            targetPackage = entry.targetPackage.takeIf { entry.taskName == null },
             title = tr("Icon — %1\$s", entry.label),
             onDismiss = { iconEditFor = null },
             onConfirm = { path ->
@@ -250,7 +302,7 @@ private fun RelayRow(
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    entry.targetPackage,
+                    entry.taskName?.let { tr("Task: %1\$s", it) } ?: entry.targetPackage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -267,9 +319,9 @@ private fun RelayRow(
                     shape = RoundedCornerShape(10.dp),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text(if (entry.state == RelayState.GENERATED) tr("Reinstall") else if (entry.state == RelayState.STALE) tr("Regenerate") else tr("Generate"))
+                    else Text(if (entry.state == RelayState.GENERATED) tr("Recreate tile") else if (entry.state == RelayState.STALE) tr("Update tile") else tr("Create tile"))
                 }
-                OutlinedButton(onClick = onRemove, enabled = !busy, shape = RoundedCornerShape(10.dp)) { Text(tr("Remove")) }
+                OutlinedButton(onClick = onRemove, enabled = !busy, shape = RoundedCornerShape(10.dp)) { Text(tr("Delete tile")) }
             }
         }
     }
@@ -278,9 +330,9 @@ private fun RelayRow(
 @Composable
 private fun StateBadge(state: RelayState) {
     val (text, color) = when (state) {
-        RelayState.DRAFT -> tr("not generated") to MaterialTheme.colorScheme.onSurfaceVariant
-        RelayState.GENERATED -> tr("✓ installed") to MaterialTheme.colorScheme.tertiary
-        RelayState.STALE -> tr("needs regenerate") to MaterialTheme.colorScheme.error
+        RelayState.DRAFT -> tr("no tile yet") to MaterialTheme.colorScheme.onSurfaceVariant
+        RelayState.GENERATED -> tr("✓ tile in place") to MaterialTheme.colorScheme.tertiary
+        RelayState.STALE -> tr("tile out of date") to MaterialTheme.colorScheme.error
     }
     Text(text, style = MaterialTheme.typography.labelMedium, color = color)
 }

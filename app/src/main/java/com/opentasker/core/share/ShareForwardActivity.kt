@@ -30,6 +30,9 @@ import java.io.File
  * slots), forwards the shared content to it, and drops a re-freeze bubble ([FreezeBubbleStore]) so the
  * app can be frozen again from the Desktop.
  *
+ * A target can be a task instead of an app: the share then starts that task with the shared files as
+ * its variables, and only for a share that proves it comes from our own tile — see [ShareTaskTarget].
+ *
  * Exported (no permission) so a relay — a separately-signed app — can call it by explicit component;
  * it has no SEND intent-filter, so the main app itself is not a share-sheet tile (only the relays are).
  *
@@ -53,7 +56,46 @@ class ShareForwardActivity : Activity() {
             ?.removePrefix(SHORTCUT_ID_PREFIX)
             ?.trim()?.takeIf { it.isNotEmpty() }
         if (target == null) { finish(); return }
-        process(target)
+        val taskName = ShareRelayStore.taskNameOf(target)
+        if (taskName != null) processTask(target, taskName) else process(target)
+    }
+
+    /**
+     * A tile that starts a task: prove the tile, turn the share into paths, start the task, finish.
+     * See [ShareTaskTarget] for the rules. The paths are worked out (and the rare copy made) before
+     * this activity finishes, because the read grants of the share end with it.
+     */
+    private fun processTask(target: String, taskName: String) {
+        scope.launch {
+            val entry = ShareRelayStore.find(target)
+            if (entry == null) {
+                toastAndFinish(tr("This share tile is no longer set up — delete it under Share tiles")); return@launch
+            }
+            if (!ShareTaskTarget.provenTile(this@ShareForwardActivity, intent, entry)) {
+                toastAndFinish(tr("“%1\$s” cannot prove it is our tile — recreate it under Share tiles", entry.label)); return@launch
+            }
+            val uris = collectUris(intent)
+            if (uris.isEmpty()) {
+                toastAndFinish(tr("“%1\$s” sends files — this share holds none", entry.label)); return@launch
+            }
+            val staging = ShareTaskTarget.newStaging(this@ShareForwardActivity)
+            val shared = ShareTaskTarget.collect(this@ShareForwardActivity, uris, staging)
+            if (shared == null) {
+                runCatching { staging.deleteRecursively() }
+                toastAndFinish(tr("Could not read the shared content")); return@launch
+            }
+            val app = applicationContext
+            ShareTaskTarget.run(
+                app, taskName,
+                ShareTaskTarget.variables(shared, intent.getStringExtra(Intent.EXTRA_SUBJECT)),
+                staging,
+            ) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(app, tr("Task “%1\$s” not found", taskName), Toast.LENGTH_LONG).show()
+                }
+            }
+            runOnUiThread { finish() }
+        }
     }
 
     /** Unfreeze (if needed) + forward + bubble, then finish. Runs off the main thread. */

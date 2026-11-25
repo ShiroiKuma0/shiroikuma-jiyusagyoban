@@ -485,3 +485,39 @@
 : 失敗
 = Timeout
 : タイムアウト
+= A task can have a tile too. Sharing to it starts the task with the shared files in %share_paths (real paths, each quoted for a shell) and their number in %share_count. A file in shared storage is passed in place; anything else is copied for the run and the copy is deleted when the task ends.
+: タスクにも共有先のタイルを作れます。共有するとそのタスクが始まり、共有したファイルは %share_paths（実際のパス。シェル用に一つずつ引用符で囲んであります）に、その数は %share_count に入ります。共有ストレージにあるファイルはそのままの場所で渡します。それ以外は実行の間だけ複製し、タスクが終わると複製を削除します。
+= Add a task
+: タスクを追加
+= Task: %1$s
+: タスク: %1$s
+= This share tile is no longer set up — delete it under Share tiles
+: この共有タイルはもう設定されていません — 「共有タイル」で削除してください
+= “%1$s” cannot prove it is our tile — recreate it under Share tiles
+: 「%1$s」は本アプリのタイルであることを示せません — 「共有タイル」で作り直してください
+= “%1$s” sends files — this share holds none
+: 「%1$s」はファイルを送ります — この共有にはファイルがありません
+= Could not read the shared content
+: 共有された内容を読み取れませんでした
+= Task “%1$s” not found
+: タスク「%1$s」が見つかりません
+= Share tiles
+: 共有タイル
+= Shizuku is needed to create and delete tiles.
+: タイルの作成と削除には Shizuku が必要です。
+= %1$s: tile in place
+: %1$s：タイルを設置しました
+= Create tile
+: タイルを作成
+= Recreate tile
+: タイルを作り直す
+= Update tile
+: タイルを更新
+= Delete tile
+: タイルを削除
+= no tile yet
+: タイル未作成
+= ✓ tile in place
+: ✓ タイル設置済み
+= tile out of date
+: タイルが古い

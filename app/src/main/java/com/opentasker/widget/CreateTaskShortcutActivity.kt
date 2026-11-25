@@ -150,7 +150,7 @@ private data class TaskEntry(val task: Task) : PickerEntry
 private data class ProjectNode(val title: String, val key: Long, val entries: List<PickerEntry>, val taskCount: Int)
 
 @Composable
-private fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
+internal fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
     val prefs by ThemeStore.state.collectAsState()
     val font = remember(prefs.pickerFontFileName) { ThemeStore.fontFamily(prefs.pickerFontFileName) }
 

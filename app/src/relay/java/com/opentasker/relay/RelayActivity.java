@@ -1,6 +1,7 @@
 package com.opentasker.relay;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -64,6 +65,13 @@ public class RelayActivity extends Activity {
             out.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         }
         out.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        // Proof of where the share comes from: only this app can make a PendingIntent that names
+        // this package as its creator. The main app asks for it before a share may start a task.
+        try {
+            out.putExtra("share.proof", PendingIntent.getActivity(this, 0,
+                    new Intent().setPackage(getPackageName()), PendingIntent.FLAG_IMMUTABLE));
+        } catch (Exception e) {
+        }
         try {
             startActivity(out);
         } catch (Exception e) {
