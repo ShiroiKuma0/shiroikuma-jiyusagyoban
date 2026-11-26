@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.huawei
 
+import com.opentasker.core.huawei.GnssRebuildSchedule
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.ZoneId

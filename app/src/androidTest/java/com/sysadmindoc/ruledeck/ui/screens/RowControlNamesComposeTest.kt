@@ -20,7 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileConfig
-import com.sysadmindoc.ruledeck.core.contexts.TileConfigScreen
+import com.opentasker.core.contexts.TileConfigScreen
 import com.sysadmindoc.ruledeck.core.model.ActionSpec
 import com.sysadmindoc.ruledeck.core.model.Scene
 import com.sysadmindoc.ruledeck.core.model.SceneElement

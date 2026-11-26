@@ -41,12 +41,12 @@ class HomeAssistantWebhookProtocolTest {
             mapOf(
                 "url" to "https://hooks.example.test/ha",
                 "message" to "command_broadcast_intent",
-                "data" to "{\"intent_action\":\"com.sysadmindoc.ruledeck.action.RUN_TASK\"}",
+                "data" to "{\"intent_action\":\"com.opentasker.action.RUN_TASK\"}",
             ),
         ).getOrThrow()
 
         assertEquals(
-            "{\"message\":\"command_broadcast_intent\",\"data\":{\"intent_action\":\"com.sysadmindoc.ruledeck.action.RUN_TASK\"}}",
+            "{\"message\":\"command_broadcast_intent\",\"data\":{\"intent_action\":\"com.opentasker.action.RUN_TASK\"}}",
             config.payload,
         )
     }

@@ -14,8 +14,8 @@ class AudioEligibilityWiringTest {
 
     @Test
     fun visibleUiStartMarksAutomationServiceWhileInUseEligible() {
-        val activity = source("com/sysadmindoc/ruledeck/MainActivity.kt")
-        val service = source("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt")
+        val activity = source("com/opentasker/app/MainActivity.kt")
+        val service = source("com/opentasker/core/engine/AutomationService.kt")
 
         assertTrue(activity.contains("putExtra(AutomationService.EXTRA_STARTED_FROM_VISIBLE_UI, true)"))
         assertTrue(service.contains("AudioForegroundServiceEligibility.BACKGROUND_STARTED"))
@@ -27,12 +27,12 @@ class AudioEligibilityWiringTest {
     fun theTemporaryStateRestoreSeesTheServicesEligibility() {
         // The restore runs from WorkManager, outside the service. It reads the eligibility the
         // service publishes; with the default context it claimed none and Android 17 refused it.
-        val service = source("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt")
+        val service = source("com/opentasker/core/engine/AutomationService.kt")
         assertTrue(service.contains("ServiceAudioEligibility.current = value"))
         assertTrue(service.contains("ServiceAudioEligibility.current = audioForegroundServiceEligibility"))
         assertTrue(service.contains("ServiceAudioEligibility.current = AudioForegroundServiceEligibility.NONE"))
 
-        val restore = source("com/sysadmindoc/ruledeck/core/actions/TemporaryStateAction.kt")
+        val restore = source("com/opentasker/core/actions/TemporaryStateAction.kt")
         assertTrue(restore.contains("action.run(temporaryStateRestoreContext(applicationContext), restoreArgs)"))
         assertTrue(restore.contains("AudioRuntimeEligibility(foregroundService = ServiceAudioEligibility.current)"))
     }
@@ -48,7 +48,7 @@ class AudioEligibilityWiringTest {
         assertTrue(hardening.contains("AppVisibilityTracker.isAppVisible"))
         assertTrue(hardening.contains("ExactAlarmSupport.canScheduleExactAlarms(ctx.app)"))
 
-        val widgetActivity = source("com/sysadmindoc/ruledeck/widget/TaskRunActivity.kt")
+        val widgetActivity = source("com/opentasker/widget/TaskRunActivity.kt")
         assertTrue(widgetActivity.contains("visibleActivity = true"))
     }
 

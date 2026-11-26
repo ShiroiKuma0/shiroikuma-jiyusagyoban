@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.external
 
+import com.opentasker.core.external.AutomationTargetReceiver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,9 +15,9 @@ import javax.xml.parsers.DocumentBuilderFactory
  */
 class ExportedReceiverHardeningTest {
     private val hardenedReceivers = setOf(
-        "com.sysadmindoc.ruledeck.core.external.AutomationTargetReceiver",
-        "com.sysadmindoc.ruledeck.core.plugins.locale.LocaleSettingFireReceiver",
-        "com.sysadmindoc.ruledeck.core.plugins.locale.LocaleConditionQueryReceiver",
+        "com.opentasker.core.external.AutomationTargetReceiver",
+        "com.opentasker.core.plugins.locale.LocaleSettingFireReceiver",
+        "com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver",
     )
 
     private fun manifestRoot(): Element =

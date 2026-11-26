@@ -12,7 +12,7 @@ import androidx.annotation.RequiresApi
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.sysadmindoc.ruledeck.core.engine.EngineHeartbeatStore
-import com.sysadmindoc.ruledeck.core.engine.EngineWatchdogWorker
+import com.opentasker.core.engine.EngineWatchdogWorker
 import com.sysadmindoc.ruledeck.core.engine.ActiveExecutionRegistry
 import com.sysadmindoc.ruledeck.core.engine.EngineExitCorrelation
 import com.sysadmindoc.ruledeck.core.engine.EngineExitCorrelationState

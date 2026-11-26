@@ -6,7 +6,7 @@ import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.engine.SUB_TASK_PARAM_PREFIX
-import com.sysadmindoc.ruledeck.core.scheduling.TaskAlarms
+import com.opentasker.core.scheduling.TaskAlarms
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

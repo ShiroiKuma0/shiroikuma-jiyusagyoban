@@ -1,0 +1,681 @@
+package com.opentasker.ui.charts.huawei
+
+import com.sysadmindoc.ruledeck.ui.charts.huawei.*
+import com.sysadmindoc.ruledeck.i18n.tr
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSettings
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSyncRunner
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSyncEngine
+import androidx.compose.ui.graphics.ImageBitmap
+import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiGpsTrack
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiWorkoutImport
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiWorkoutStore
+import com.sysadmindoc.ruledeck.core.huawei.maps.WalkPlot
+import com.sysadmindoc.ruledeck.ui.charts.BandLanguage
+import com.sysadmindoc.ruledeck.ui.charts.ChartStyle
+import com.sysadmindoc.ruledeck.ui.charts.LocalBandLanguage
+import com.sysadmindoc.ruledeck.ui.charts.LocalChartStyle
+import com.sysadmindoc.ruledeck.ui.theme.RuleDeckTheme
+import com.sysadmindoc.ruledeck.ui.theme.ThemeStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+
+/**
+ * 「運動（Huawei）」 — the walks, in their own window.
+ *
+ * A window rather than a dialog for the same reason the watch-face picker is one: asking the band
+ * for walks runs for tens of seconds over Bluetooth, and the grid has to still be there afterwards.
+ *
+ * Work runs on `HuaweiSyncRunner.scope` rather than the composition's, so closing the window
+ * mid-download does not abandon a half-written walk.
+ */
+/** Everything one load produces, so the IO block hands back one value rather than four. */
+private data class Loaded(
+    val walks: List<HuaweiWorkoutStore.Workout>,
+    val efforts: Map<String, HuaweiWorkoutStore.Effort>,
+    val plots: Map<String, WalkPlot>,
+    val bases: Map<String, ImageBitmap>,
+    val coverage: Map<String, com.sysadmindoc.ruledeck.core.huawei.maps.WalkTrack.Coverage>,
+)
+
+/** Everything this app writes for 白い熊 lands here — the probe, the exports, the bundles. */
+private const val EXPORT_DIR = "/sdcard/tmp"
+
+/**
+ * Marks the busy state as "asking 地図 for an area", not "sharing a walk".
+ *
+ * Both use the same field because both mean the same thing to every button on the screen — one
+ * 地図 round trip is in flight — but the cells need to tell them apart to say which is happening.
+ */
+private const val CUTOUT = "cutout:"
+
+class HuaweiWalksActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        renderFrom(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        renderFrom(intent)
+    }
+
+    private fun renderFrom(intent: Intent?) {
+        val days = intent?.getIntExtra(EXTRA_DAYS, 0)?.takeIf { it > 0 } ?: 7
+        // Which third of the library this window is for. One activity rather than three, because
+        // a lift, a rehab session and a walk differ in what is DRAWN and in nothing else — not in
+        // how they are fetched, listed, opened, annotated or stored — and three copies of this
+        // file would have to be kept in step with each other for ever.
+        val kind = intent?.getStringExtra(EXTRA_KIND)
+            ?.let { name -> HuaweiWorkoutStore.Kind.entries.firstOrNull { it.label == name } }
+            ?: HuaweiWorkoutStore.Kind.WALK
+        val lang = BandLanguage.parse(HuaweiSettings.language(applicationContext))
+
+        setContent {
+            val themePrefs by ThemeStore.state.collectAsState()
+            val chartStyle = remember(themePrefs) { ChartStyle.from(themePrefs) }
+            RuleDeckTheme(prefs = themePrefs) {
+                CompositionLocalProvider(
+                    LocalBandLanguage provides lang,
+                    LocalChartStyle provides chartStyle,
+                ) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        var state by remember { mutableStateOf(HuaweiWalksState(kind = kind)) }
+                        var open by remember { mutableStateOf<String?>(null) }
+                        // The calendar is a view of this same window's list, not another activity:
+                        // that is what lets a tile open the session behind it in one step.
+                        var calendar by remember { mutableStateOf(false) }
+                        // 機能訓練 only — a day done without the band, marked by hand.
+                        var tickDay by remember { mutableStateOf<Long?>(null) }
+                        // The day being written about, on any of the three. A day with no session is
+                        // the one the calendar could hold nothing about until 2026-09-11, and it is
+                        // the day most worth a sentence: what happened instead of the walk.
+                        var notingDay by remember { mutableStateOf<Long?>(null) }
+                        val scope = rememberCoroutineScope()
+                        val dao = remember { RuleDeckApp_NoHilt.db.huaweiWorkoutDao() }
+
+                        /**
+                         * Load the list AND everything it draws, in one pass off the main thread.
+                         *
+                         * The efforts, the routes and the cutout bitmaps are resolved here rather
+                         * than by the cells. Two reasons, and the second is the load-bearing one:
+                         * a blob read per cell per recomposition is waste, and an ASYNCHRONOUS read
+                         * inside a cell never runs under the screenshot engine, so every preview of
+                         * this grid would draw empty and stop being evidence of anything.
+                         */
+                        suspend fun reload() {
+                            val loaded = withContext(Dispatchers.IO) {
+                                // Filtered here rather than in the store: the store holds every
+                                // workout the band recorded, and which of them a window shows is
+                                // the window's business.
+                                val walks = HuaweiWorkoutStore.ofKind(dao, kind)
+                                val efforts = walks.mapNotNull { w ->
+                                    HuaweiWorkoutStore.effortOf(dao, w)?.let { w.id to it }
+                                }.toMap()
+                                val keys = dao.cutoutKeys()
+                                val decoded = walks.filter { it.hasTrack }.mapNotNull { w ->
+                                    val raw = HuaweiWorkoutStore.trackOf(dao, w) ?: return@mapNotNull null
+                                    val track = HuaweiGpsTrack.decode(raw) ?: return@mapNotNull null
+                                    Triple(w, track, track.points.map { p -> p.latitude to p.longitude })
+                                }
+                                val plots = decoded.associate { (w, _, points) ->
+                                    w.id to com.sysadmindoc.ruledeck.core.huawei.maps.WalkTrack.plot(points, keys)
+                                }
+                                // Measured here, once, for the same reason the efforts are: a cell
+                                // that walked its own polyline would do it on every recomposition,
+                                // and the screenshot engine would never run it at all.
+                                val coverage = decoded.associate { (w, track, points) ->
+                                    w.id to com.sysadmindoc.ruledeck.core.huawei.maps.WalkTrack.coverage(
+                                        points = points,
+                                        trackStartSeconds = track.startSeconds,
+                                        workoutStartSeconds = w.startSeconds,
+                                        bandMetres = w.distanceMetres ?: 0,
+                                    )
+                                }
+                                // One decode per cutout, not per walk: a neighbourhood's worth of
+                                // walking shares one megabyte of picture, and decoding it forty
+                                // times is forty megabytes of bitmap for one image.
+                                val bases = plots.values.mapNotNull { it.cutout?.id }.distinct()
+                                    .mapNotNull { key ->
+                                        HuaweiWorkoutStore.cutout(dao, key)?.let { png ->
+                                            // The cells' own budget, not the picture's. A cutout
+                                            // fetched for the zoom viewer is 3072 px and would be
+                                            // 28 MB of bitmap here — more than the whole cache.
+                                            WalkMap.decode(png, com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts.MAX_CUTOUT_PX)
+                                                ?.let { key to it }
+                                        }
+                                    }.toMap()
+                                Loaded(walks, efforts, plots, bases, coverage)
+                            }
+                            state = state.copy(
+                                walks = loaded.walks, efforts = loaded.efforts,
+                                plots = loaded.plots, bases = loaded.bases,
+                                coverage = loaded.coverage, loading = false,
+                            )
+                        }
+
+                        /**
+                         * Run one 地図 round trip and fold the answer back into the screen.
+                         *
+                         * On [HuaweiSyncRunner.scope] rather than the composition's: the render can
+                         * take a minute or two, and closing the window must not abandon a walk
+                         * halfway into another app's library.
+                         */
+                        fun run(walk: HuaweiWorkoutStore.Workout, op: suspend (HuaweiWorkoutStore.Workout) -> HuaweiChizu.Outcome) {
+                            HuaweiSyncRunner.scope.launch {
+                                val outcome = op(walk)
+                                scope.launch {
+                                    state = state.copy(sharing = null, message = outcome.message)
+                                    reload()
+                                }
+                            }
+                        }
+
+                        /**
+                         * Areas we have already asked 地図 about in this window, successfully or not.
+                         *
+                         * Without it a neighbourhood 地図 has no data for would be re-requested on
+                         * every reload, for ever, each one a round trip that can run for minutes.
+                         * One attempt per area per window: reopening the window is the retry.
+                         */
+                        var askedFor by remember { mutableStateOf(emptySet<String>()) }
+
+                        /**
+                         * A walk with no base map ASKS FOR ONE. It does not report its absence.
+                         *
+                         * 白い熊, 2026-09-04: *"If no map — it shouldn't display no map, it should
+                         * request from chizu. This must be automatic in the app — I pull a new walk,
+                         * no map exists for it, it must automatically request from chizu."* The old
+                         * text read as the feature being broken, which is exactly what it was: a
+                         * screen that knew what was missing, knew who to ask, and waited to be told.
+                         *
+                         * **One request per AREA, not per walk.** A cutout is five tiles by five and
+                         * every walk that crosses it draws over the same one — ten walks from the
+                         * same door need a single fetch. The plots are keyed by walk and the fetches
+                         * by cutout id, and that difference is what makes this cheap rather than a
+                         * storm of near-identical requests.
+                         *
+                         * **Serial, one at a time.** 地図 renders under a single shared rasterizer,
+                         * so concurrent requests do not run in parallel — they queue, each with its
+                         * own clock already running. Firing six at once is the surest way to make
+                         * this fail for a reason that has nothing to do with the contract.
+                         */
+                        LaunchedEffect(state.plots, state.bases, askedFor, state.busy) {
+                            if (state.busy || state.loading) return@LaunchedEffect
+                            // `plot.cutout` is the one that ALREADY COVERS this walk, so it is
+                            // null in exactly the case we are here to fix. Reading the wanted id
+                            // from it asked for nothing, for every walk, while every cell said it
+                            // was asking — found by looking at the screen rather than at the code.
+                            // What is wanted is the cutout that WOULD cover the box, which is the
+                            // same call the manual button makes.
+                            val next = state.plots.values
+                                .mapNotNull { plot ->
+                                    if (plot.cutout != null) return@mapNotNull null
+                                    plot.box?.let { box ->
+                                        com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts.needed(
+                                            box,
+                                            com.sysadmindoc.ruledeck.core.huawei.maps.WalkTrack.zoomFor(box),
+                                        )
+                                    }
+                                }
+                                .distinctBy { it.id }
+                                .firstOrNull { it.id !in state.bases && it.id !in askedFor }
+                                ?: return@LaunchedEffect
+                            val cutout = next
+                            askedFor = askedFor + next.id
+                            state = state.copy(sharing = CUTOUT + next.id, message = null)
+                            HuaweiSyncRunner.scope.launch {
+                                val outcome = withContext(Dispatchers.IO) {
+                                    HuaweiChizu.basemap(applicationContext, cutout, dao, lang)
+                                }
+                                scope.launch {
+                                    // A failure is worth saying once. A success needs no words —
+                                    // the picture appearing IS the message.
+                                    state = state.copy(
+                                        sharing = null,
+                                        message = if (outcome.ok) null else outcome.message,
+                                    )
+                                    reload()
+                                }
+                            }
+                        }
+
+                        // The one-time move of the old on-disk archive into the database runs
+                        // here, before the first list: it is where a workout window is opened, and
+                        // it must not need 白い熊 to press anything for their history to survive.
+                        LaunchedEffect(kind) {
+                            withContext(Dispatchers.IO) {
+                                HuaweiWorkoutImport.runOnce(
+                                    applicationContext, dao, File(HuaweiWorkoutImport.LEGACY_DIR),
+                                )
+                            }
+                            reload()
+                        }
+
+                        val insets = WindowInsets.systemBars.asPaddingValues()
+                        val opened = state.walks.firstOrNull { it.id == open }
+
+                        // Read once per walk opened, off the main thread. The window is the band's
+                        // own start..end; a walk whose sensor was off simply has no rows, and the
+                        // card then shows nothing rather than an average over an empty set.
+                        LaunchedEffect(open) {
+                            val walk = state.walks.firstOrNull { it.id == open }
+                            state = state.copy(
+                                heart = walk?.let {
+                                    withContext(Dispatchers.IO) {
+                                        runCatching {
+                                            RuleDeckApp_NoHilt.db.huaweiSampleDao().statsFor(
+                                                HuaweiSyncEngine.METRIC_HEART_RATE,
+                                                it.startSeconds,
+                                                it.endSeconds ?: (it.startSeconds + 6 * 3600),
+                                            )
+                                        }.getOrNull()
+                                    }
+                                }?.takeIf { it.n > 0 },
+                            )
+                        }
+
+                        if (calendar) {
+                            val zone = remember { java.time.ZoneId.systemDefault() }
+                            HuaweiWorkoutCalendarScreen(
+                                kind = kind,
+                                workouts = state.walks,
+                                // Only 機能訓練 has anything authored to show. The other two are
+                                // whatever the band recorded, and nothing else can be true of them.
+                                ticked = if (kind == HuaweiWorkoutStore.Kind.REHAB) {
+                                    com.sysadmindoc.ruledeck.core.band.RehabLog.all(applicationContext)
+                                } else {
+                                    emptySet()
+                                },
+                                // Every kind has day notes now, one prefs file each. Read on each
+                                // composition rather than held in state: a write closes its dialog,
+                                // which recomposes this, which re-reads — one source, no cache to
+                                // forget to invalidate.
+                                notes = dayNotesFor(kind).all(applicationContext),
+                                zone = zone,
+                                contentPadding = insets,
+                                // A filled tile is the way to its session, which is what makes this
+                                // an index rather than only a record.
+                                onOpenSession = { w ->
+                                    open = w.id
+                                    calendar = false
+                                },
+                                onTapEmptyDay = { day ->
+                                    val key = com.sysadmindoc.ruledeck.core.band.RehabLog
+                                        .dateKeyOf(java.time.LocalDate.ofEpochDay(day))
+                                    // 機能訓練 asks the tick first, since a day done without the
+                                    // band has to be markable and its note hangs off that dialog.
+                                    // The other two have nothing to tick, so the tap IS the note.
+                                    if (kind == HuaweiWorkoutStore.Kind.REHAB) tickDay = key
+                                    else notingDay = key
+                                },
+                                onBack = { calendar = false },
+                            )
+                            tickDay?.let { key ->
+                                HuaweiRehabDayDialog(
+                                    dateKey = key,
+                                    done = com.sysadmindoc.ruledeck.core.band.RehabLog.done(applicationContext, key),
+                                    note = com.sysadmindoc.ruledeck.core.band.DayNotes.REHAB
+                                        .note(applicationContext, key),
+                                    onPick = { done ->
+                                        com.sysadmindoc.ruledeck.core.band.RehabLog
+                                            .setDone(applicationContext, key, done)
+                                        tickDay = null
+                                    },
+                                    // This was a no-op, so 機能訓練's note pill has been inert
+                                    // since the dialog was written: it looked like a control and
+                                    // answered nothing. The tick dialog closes and the editor opens
+                                    // in its place, on the same day.
+                                    onEditNote = {
+                                        tickDay = null
+                                        notingDay = key
+                                    },
+                                    onDismiss = { tickDay = null },
+                                )
+                            }
+                            notingDay?.let { key ->
+                                com.sysadmindoc.ruledeck.ui.charts.NoteDialog(
+                                    title = com.sysadmindoc.ruledeck.ui.charts.nightDateFull(key, lang),
+                                    note = dayNotesFor(kind).note(applicationContext, key),
+                                    onSave = { text ->
+                                        // Blank deletes, as everywhere else a note is written.
+                                        dayNotesFor(kind).setNote(applicationContext, key, text)
+                                        notingDay = null
+                                    },
+                                    onDismiss = { notingDay = null },
+                                )
+                            }
+                        } else if (opened != null) {
+                            HuaweiWalkDetailScreen(
+                                walk = opened,
+                                sharing = state.sharing == opened.id,
+                                busy = state.busy,
+                                message = state.message,
+                                heart = state.heart,
+                                contentPadding = insets,
+                                effort = state.efforts[opened.id],
+                                plot = state.plots[opened.id],
+                                base = state.plots[opened.id]?.cutout?.id?.let { state.bases[it] },
+                                zoomBase = state.zoomBase,
+                                coverage = state.coverage[opened.id],
+                                exported = state.exported,
+                                onShare = {
+                                    state = state.copy(sharing = opened.id, message = null)
+                                    run(opened) { w ->
+                                        // Regenerated for the hand-over and thrown away after it.
+                                        val gpx = HuaweiWorkoutStore.gpxOf(
+                                            dao, w, "${w.kind} ${walkWhen(w)}",
+                                        ).orEmpty()
+                                        HuaweiChizu.share(applicationContext, w, gpx, dao, lang)
+                                    }
+                                },
+                                onOpenInChizu = {
+                                    state = state.copy(sharing = opened.id, message = null)
+                                    run(opened) { HuaweiChizu.show(applicationContext, it) }
+                                },
+                                onBack = { open = null },
+                                // On the runner's scope, like every other write here: the file is
+                                // small and the write is milliseconds, but a note lost because the
+                                // window was closed as it was saved would be a note 白い熊 believes
+                                // is on file. The reload afterwards is what puts it back on screen.
+                                onAnnotate = { note, stops ->
+                                    HuaweiSyncRunner.scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            HuaweiWorkoutStore.annotate(dao, opened, note, stops)
+                                        }
+                                        scope.launch { reload() }
+                                    }
+                                },
+                                // Both write to /sdcard/tmp, where everything this app hands 白い熊
+                                // goes, and both report the path: a file nobody can find has not
+                                // been exported. On the runner's scope, so closing the window
+                                // mid-write does not abandon a half-written file.
+                                onExportHeart = {
+                                    HuaweiSyncRunner.scope.launch {
+                                        val written = withContext(Dispatchers.IO) {
+                                            state.efforts[opened.id]?.let { e ->
+                                                HuaweiWorkoutStore.exportHeart(opened, e, File(EXPORT_DIR))
+                                            }
+                                        }
+                                        scope.launch {
+                                            state = state.copy(
+                                                exported = written?.absolutePath
+                                                    ?: HuaweiText.walksExportFailed[lang],
+                                            )
+                                        }
+                                    }
+                                },
+                                onExportGpx = {
+                                    HuaweiSyncRunner.scope.launch {
+                                        val written = withContext(Dispatchers.IO) {
+                                            HuaweiWorkoutStore.exportGpx(dao, opened, File(EXPORT_DIR))
+                                        }
+                                        scope.launch {
+                                            state = state.copy(
+                                                exported = written?.absolutePath
+                                                    ?: HuaweiText.walksExportFailed[lang],
+                                            )
+                                        }
+                                    }
+                                },
+                                onFetchMap = {
+                                    if (state.busy) return@HuaweiWalkDetailScreen
+                                    state = state.copy(sharing = opened.id, message = null)
+                                    HuaweiSyncRunner.scope.launch {
+                                        // Resolve the cutout from the track itself, so what is
+                                        // asked for is exactly what the drawing will look for.
+                                        val outcome = withContext(Dispatchers.IO) {
+                                            val box = state.plots[opened.id]?.box
+                                            if (box == null) {
+                                                HuaweiChizu.Outcome(false, tr("this walk has no usable points"))
+                                            } else {
+                                                val want = com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts
+                                                    .needed(
+                                                        box,
+                                                        com.sysadmindoc.ruledeck.core.huawei.maps.WalkTrack
+                                                            .zoomFor(box),
+                                                    )
+                                                HuaweiChizu.basemap(applicationContext, want, dao, lang)
+                                            }
+                                        }
+                                        scope.launch {
+                                            state = state.copy(sharing = null, message = outcome.message)
+                                            reload()
+                                        }
+                                    }
+                                },
+                                onZoomOpen = {
+                                    HuaweiSyncRunner.scope.launch {
+                                        // Two jobs, in this order, because the first is instant and
+                                        // the second may take 地図 a while: show the picture we
+                                        // already hold at full resolution, THEN go and get a
+                                        // sharper one. Opening the viewer must never wait on a
+                                        // round trip.
+                                        val plot = state.plots[opened.id]
+                                        val key = plot?.cutout?.id
+                                        if (key != null) {
+                                            val big = withContext(Dispatchers.IO) {
+                                                HuaweiWorkoutStore.cutout(dao, key)?.let { png ->
+                                                    WalkMap.decode(
+                                                        png,
+                                                        com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts
+                                                            .VIEWER_CUTOUT_PX,
+                                                    )
+                                                }
+                                            }
+                                            scope.launch { state = state.copy(zoomBase = big) }
+                                        }
+                                        val box = plot?.box ?: return@launch
+                                        val want = com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts.detailed(
+                                            box,
+                                            com.sysadmindoc.ruledeck.core.huawei.maps.WalkTrack.zoomFor(
+                                                box,
+                                                com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts
+                                                    .VIEWER_CUTOUT_PX,
+                                            ),
+                                        )
+                                        // Already held, or already the one being drawn on: there is
+                                        // nothing sharper to be had, so do not spend a 地図 round
+                                        // trip re-fetching a picture we have.
+                                        if (want.id in state.bases || want.id == key) return@launch
+                                        if (state.busy || state.sharing != null) return@launch
+                                        scope.launch {
+                                            state = state.copy(sharing = opened.id, message = null)
+                                        }
+                                        val outcome = withContext(Dispatchers.IO) {
+                                            HuaweiChizu.basemap(
+                                                applicationContext, want, dao, lang,
+                                                budgetPx = com.sysadmindoc.ruledeck.core.huawei.maps
+                                                    .MapCutouts.VIEWER_CUTOUT_PX,
+                                            )
+                                        }
+                                        // cover() ranks on zoom, so once this is stored it becomes
+                                        // the walk's cutout — the cells get it too, sub-sampled to
+                                        // their own budget.
+                                        val sharper = if (outcome.ok) {
+                                            withContext(Dispatchers.IO) {
+                                                HuaweiWorkoutStore.cutout(dao, want.id)?.let { png ->
+                                                    WalkMap.decode(
+                                                        png,
+                                                        com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts
+                                                            .VIEWER_CUTOUT_PX,
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            null
+                                        }
+                                        scope.launch {
+                                            state = state.copy(
+                                                sharing = null,
+                                                message = if (outcome.ok) null else outcome.message,
+                                                zoomBase = sharper ?: state.zoomBase,
+                                            )
+                                            reload()
+                                        }
+                                    }
+                                },
+                                // Twenty-eight megabytes of bitmap has no business outliving the
+                                // screen that asked for it.
+                                onZoomClose = { state = state.copy(zoomBase = null) },
+                            )
+                        } else {
+                            HuaweiWalksScreen(
+                                state = state,
+                                contentPadding = insets,
+                                onDownload = {
+                                    if (state.busy) return@HuaweiWalksScreen
+                                    state = state.copy(downloading = true, message = null)
+                                    HuaweiSyncRunner.scope.launch {
+                                        val now = System.currentTimeMillis() / 1000
+                                        val result = HuaweiSyncRunner.fetchWorkouts(
+                                            applicationContext,
+                                            HuaweiSettings.address(applicationContext),
+                                            now - days * 86_400L,
+                                            now,
+                                            dao,
+                                        )
+                                        val note = result.fold(
+                                            onSuccess = { fetched ->
+                                                // The band is asked for the whole window in one
+                                                // session — a lift and a walk cost the same round
+                                                // trips and there is no filter to send it — so
+                                                // both windows fetch everything and each reports
+                                                // only its own. Anything else would tell 白い熊
+                                                // that 「重量挙げ」 had just downloaded nine walks.
+                                                val walks = fetched.filter { kind.matches(it.summary.type) }
+                                                // Not `kind` per walk: every one of them is a
+                                                // "walk", so that printed "walk · walk · walk · …"
+                                                // and told 白い熊 nothing (2026-08-30). What is
+                                                // actually wanted is how many arrived and when.
+                                                // What arrived for the OTHER two windows, named
+                                                // rather than left to be discovered.
+                                                //
+                                                // 白い熊, 2026-09-11: *"when I pull lifting - it
+                                                // pulls also rehab?"* — it always did, and every
+                                                // window always pulled all three, but a message that
+                                                // reported only this window's share made the fetch
+                                                // look narrower than it is. The others are a tail on
+                                                // the line rather than a second message: this window
+                                                // still answers about itself first.
+                                                val elsewhere = HuaweiWorkoutStore.Kind.entries
+                                                    .filter { it != kind }
+                                                    .mapNotNull { other ->
+                                                        fetched.count { other.matches(it.summary.type) }
+                                                            .takeIf { it > 0 }
+                                                            ?.let { "$it ${HuaweiText.titleFor(other)[lang]}" }
+                                                    }
+                                                val alsoTail = elsewhere.takeIf { it.isNotEmpty() }
+                                                    ?.joinToString(
+                                                        separator = " · ",
+                                                        prefix = " (${HuaweiText.pullAlso[lang]} ",
+                                                        postfix = ")",
+                                                    )
+                                                    .orEmpty()
+                                                if (walks.isEmpty()) {
+                                                    HuaweiText.noneFoundFor(kind)[lang] + alsoTail
+                                                }
+                                                else {
+                                                    val fmt = java.text.SimpleDateFormat(
+                                                        "MM-dd HH:mm", java.util.Locale.US,
+                                                    )
+                                                    val when_ = walks
+                                                        .mapNotNull { it.summary.startSeconds }
+                                                        .sorted()
+                                                        .map { fmt.format(java.util.Date(it * 1000)) }
+                                                    "${walks.size}: ${when_.joinToString(" · ")}$alsoTail"
+                                                }
+                                            },
+                                            onFailure = { it.message ?: tr("failed") },
+                                        )
+                                        scope.launch {
+                                            state = state.copy(downloading = false, message = note)
+                                            reload()
+                                        }
+                                    }
+                                },
+                                onShare = { walk ->
+                                    if (state.busy) return@HuaweiWalksScreen
+                                    state = state.copy(sharing = walk.id, message = null)
+                                    run(walk) { w ->
+                                        val gpx = HuaweiWorkoutStore.gpxOf(
+                                            dao, w, "${w.kind} ${walkWhen(w)}",
+                                        ).orEmpty()
+                                        HuaweiChizu.share(applicationContext, w, gpx, dao, lang)
+                                    }
+                                },
+                                onOpenInChizu = { walk ->
+                                    if (state.busy) return@HuaweiWalksScreen
+                                    state = state.copy(sharing = walk.id, message = null)
+                                    run(walk) { HuaweiChizu.show(applicationContext, it) }
+                                },
+                                onOpen = { open = it.id },
+                                onOpenCalendar = { calendar = true },
+                                // The same write the walk's own screen makes, from the grid's pill.
+                                // On the runner's scope like every other annotation here: a count
+                                // lost because the window was closed as it was filed would be a
+                                // count 白い熊 believes is on file.
+                                onSetStops = { walk, n ->
+                                    HuaweiSyncRunner.scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            HuaweiWorkoutStore.annotate(dao, walk, walk.note, n)
+                                        }
+                                        scope.launch { reload() }
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        const val EXTRA_DAYS = "shiroikuma.jiyusagyoban.extra.HUAWEI_WALK_DAYS"
+        const val EXTRA_KIND = "shiroikuma.jiyusagyoban.extra.HUAWEI_WORKOUT_KIND"
+
+        fun open(
+            context: Context,
+            days: Int?,
+            kind: HuaweiWorkoutStore.Kind = HuaweiWorkoutStore.Kind.WALK,
+        ) {
+            context.startActivity(
+                Intent(context, HuaweiWalksActivity::class.java).apply {
+                    // CLEAR_TOP with three modes would hand 「重量挙げ」 the walks window that is
+                    // already open and re-render it as itself; the intent carries the mode and
+                    // onNewIntent re-reads it, so one instance serves all three.
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    days?.takeIf { it > 0 }?.let { putExtra(EXTRA_DAYS, it) }
+                    putExtra(EXTRA_KIND, kind.label)
+                },
+            )
+        }
+    }
+}

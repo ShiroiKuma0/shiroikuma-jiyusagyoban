@@ -4,7 +4,7 @@ import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
-import com.sysadmindoc.ruledeck.ui.charts.compare.BandCompareActivity
+import com.opentasker.ui.charts.compare.BandCompareActivity
 
 /**
  * Open 「バンド比較」.

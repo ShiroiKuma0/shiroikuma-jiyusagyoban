@@ -4,7 +4,7 @@ import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
-import com.sysadmindoc.ruledeck.core.huawei.AlmanacWatch
+import com.opentasker.core.huawei.AlmanacWatch
 
 /**
  * Keep SEARCHING for a newer almanac in the background, and say so the moment one is published.

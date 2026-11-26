@@ -6,7 +6,7 @@ import com.sysadmindoc.ruledeck.core.actions.ActionArgumentSensitivity
 import com.sysadmindoc.ruledeck.core.capabilities.CapabilityPrompt
 import com.sysadmindoc.ruledeck.core.capabilities.CapabilityState
 import com.sysadmindoc.ruledeck.core.diagnostics.ExportRedactionPolicy
-import com.sysadmindoc.ruledeck.core.dialog.DialogActivity
+import com.opentasker.core.dialog.DialogActivity
 import com.sysadmindoc.ruledeck.core.expressions.InertTemplateText
 import com.sysadmindoc.ruledeck.core.expressions.TemplateExpansionTrace
 import com.sysadmindoc.ruledeck.core.expressions.TemplateExpressionEngine

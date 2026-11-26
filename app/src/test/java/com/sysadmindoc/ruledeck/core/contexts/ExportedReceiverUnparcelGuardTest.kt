@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.PushEventReceiver
 import com.sysadmindoc.ruledeck.ProductionSources
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,7 +22,7 @@ class ExportedReceiverUnparcelGuardTest {
 
     @Test
     fun theExportedPushReceiverGuardsItsExtras() {
-        val receiver = ProductionSources.read("com/sysadmindoc/ruledeck/core/contexts/PushEventReceiver.kt")
+        val receiver = ProductionSources.read("com/opentasker/core/contexts/PushEventReceiver.kt")
         val parser = ProductionSources.read("com/sysadmindoc/ruledeck/core/contexts/PushContextEvents.kt")
 
         assertTrue(
@@ -41,7 +42,7 @@ class ExportedReceiverUnparcelGuardTest {
     @Test
     fun theExportedLocaleFireReceiverGuardsItsBundle() {
         val onReceive = ProductionSources.block(
-            "com/sysadmindoc/ruledeck/core/plugins/locale/LocalePluginTarget.kt",
+            "com/opentasker/core/plugins/locale/LocalePluginTarget.kt",
             "class LocaleSettingFireReceiver",
             "if (!LocaleGrantStore(context).isValid(grant, taskId))",
         )

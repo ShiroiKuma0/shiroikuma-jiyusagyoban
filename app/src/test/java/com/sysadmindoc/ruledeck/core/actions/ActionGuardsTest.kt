@@ -987,25 +987,25 @@ class ActionGuardsTest {
     @Test
     fun notificationChannelResolvesKnownKeys() {
         val quiet = NotificationChannels.resolve("quiet")
-        assertEquals("ruledeck.quiet", quiet.id)
+        assertEquals("opentasker.quiet", quiet.id)
 
         val default = NotificationChannels.resolve("default")
-        assertEquals("ruledeck.actions", default.id)
+        assertEquals("opentasker.actions", default.id)
 
         val urgent = NotificationChannels.resolve("urgent")
-        assertEquals("ruledeck.urgent", urgent.id)
+        assertEquals("opentasker.urgent", urgent.id)
     }
 
     @Test
     fun notificationChannelFallsBackToDefault() {
         val unknown = NotificationChannels.resolve("nonexistent")
-        assertEquals("ruledeck.actions", unknown.id)
+        assertEquals("opentasker.actions", unknown.id)
     }
 
     @Test
     fun notificationChannelTrimsAndLowercases() {
         val padded = NotificationChannels.resolve("  URGENT  ")
-        assertEquals("ruledeck.urgent", padded.id)
+        assertEquals("opentasker.urgent", padded.id)
     }
 
     // --- Local network permission guard (pre-API-37 path) ---

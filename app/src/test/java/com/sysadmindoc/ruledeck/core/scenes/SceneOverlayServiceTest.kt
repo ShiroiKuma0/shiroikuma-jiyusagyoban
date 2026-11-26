@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.scenes
 
+import com.opentasker.core.scenes.SceneOverlayService
 import com.sysadmindoc.ruledeck.core.model.SceneElement
 import com.sysadmindoc.ruledeck.core.model.SceneElementType
 import org.junit.Assert.assertEquals
@@ -43,7 +44,7 @@ class SceneOverlayServiceTest {
     fun taskFiringOverlayControlsFilterObscuredTouches() {
         // Tapjacking guard: the BUTTON and the task-bound SLIDER both fire tasks, so both must
         // drop touches delivered while obscured by a malicious overlay.
-        val source = loadMainSource("com/sysadmindoc/ruledeck/core/scenes/SceneOverlayService.kt")
+        val source = loadMainSource("com/opentasker/core/scenes/SceneOverlayService.kt")
         val guards = source.split("filterTouchesWhenObscured = true").size - 1
         assertTrue(
             "Every task-firing overlay control must set filterTouchesWhenObscured (found $guards)",
@@ -53,12 +54,12 @@ class SceneOverlayServiceTest {
 
     @Test
     fun channelIdIsStable() {
-        assertEquals("ruledeck.scenes", SceneOverlayService.CHANNEL_ID)
+        assertEquals("opentasker.scenes", SceneOverlayService.CHANNEL_ID)
     }
 
     @Test
     fun channelNameIsResourceBacked() {
-        val source = loadMainSource("com/sysadmindoc/ruledeck/core/scenes/SceneOverlayService.kt")
+        val source = loadMainSource("com/opentasker/core/scenes/SceneOverlayService.kt")
         assertTrue(source.contains("getString(R.string.scene_overlay_channel_name)"))
     }
 
@@ -71,12 +72,12 @@ class SceneOverlayServiceTest {
     @Test
     fun intentExtraKeysAreNamespaced() {
         assertTrue(
-            "EXTRA_SCENE_ID should be namespaced under com.sysadmindoc.ruledeck",
-            SceneOverlayService.EXTRA_SCENE_ID.startsWith("com.sysadmindoc.ruledeck."),
+            "EXTRA_SCENE_ID should be namespaced under com.opentasker (the fork keeps the names the phones have stored)",
+            SceneOverlayService.EXTRA_SCENE_ID.startsWith("com.opentasker."),
         )
         assertTrue(
-            "EXTRA_SCENE_JSON should be namespaced under com.sysadmindoc.ruledeck",
-            SceneOverlayService.EXTRA_SCENE_JSON.startsWith("com.sysadmindoc.ruledeck."),
+            "EXTRA_SCENE_JSON should be namespaced under com.opentasker (the fork keeps the names the phones have stored)",
+            SceneOverlayService.EXTRA_SCENE_JSON.startsWith("com.opentasker."),
         )
     }
 
@@ -89,7 +90,7 @@ class SceneOverlayServiceTest {
             .map { services.item(it) }
             .firstOrNull {
                 it.attributes.getNamedItem("android:name")?.nodeValue ==
-                    "com.sysadmindoc.ruledeck.core.scenes.SceneOverlayService"
+                    "com.opentasker.core.scenes.SceneOverlayService"
             }
 
         requireNotNull(overlayService) { "SceneOverlayService not found in AndroidManifest.xml" }

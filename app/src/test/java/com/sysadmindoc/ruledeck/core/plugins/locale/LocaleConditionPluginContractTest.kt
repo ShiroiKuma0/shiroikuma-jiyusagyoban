@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.plugins.locale
 
+import com.opentasker.core.plugins.locale.LocaleConditionEditActivity
+import com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,8 +18,8 @@ class LocaleConditionPluginContractTest {
             .documentElement
         val activities = manifest.getElementsByTagName("activity")
         val receivers = manifest.getElementsByTagName("receiver")
-        val editor = findComponent(activities, "com.sysadmindoc.ruledeck.core.plugins.locale.LocaleConditionEditActivity")
-        val receiver = findComponent(receivers, "com.sysadmindoc.ruledeck.core.plugins.locale.LocaleConditionQueryReceiver")
+        val editor = findComponent(activities, "com.opentasker.core.plugins.locale.LocaleConditionEditActivity")
+        val receiver = findComponent(receivers, "com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver")
 
         assertEquals("true", editor.getAttribute("android:exported"))
         assertEquals("true", receiver.getAttribute("android:exported"))
@@ -28,7 +30,7 @@ class LocaleConditionPluginContractTest {
 
     @Test
     fun queryTargetUsesBoundedAsyncFailClosedPath() {
-        val source = source("com/sysadmindoc/ruledeck/core/plugins/locale/LocaleConditionQueryReceiver.kt")
+        val source = source("com/opentasker/core/plugins/locale/LocaleConditionQueryReceiver.kt")
 
         assertTrue(source.contains("goAsync()"))
         assertTrue(source.contains("private val queryScope = CoroutineScope"))
@@ -41,7 +43,7 @@ class LocaleConditionPluginContractTest {
 
     @Test
     fun editorOmitsSecretVariablesAndUsesTypedConditionBundles() {
-        val source = source("com/sysadmindoc/ruledeck/core/plugins/locale/LocaleConditionEditActivity.kt")
+        val source = source("com/opentasker/core/plugins/locale/LocaleConditionEditActivity.kt")
 
         assertTrue(source.contains("filterNot { it.isSecret }"))
         assertTrue(source.contains("LocaleConditionTarget.profileActive"))

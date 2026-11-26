@@ -20,7 +20,7 @@ class NfcDeliveryGateTest {
     @Test
     fun aTagIntentAddressedToMainActivityItselfIsIgnored() {
         // Another app's forged start names the exported MainActivity, since the alias refuses it.
-        assertFalse(NfcDeliveryGate.isFreshSystemDelivery("com.sysadmindoc.ruledeck.MainActivity", 0, restored = false))
+        assertFalse(NfcDeliveryGate.isFreshSystemDelivery("com.opentasker.app.MainActivity", 0, restored = false))
         assertFalse(NfcDeliveryGate.isFreshSystemDelivery(null, 0, restored = false))
     }
 

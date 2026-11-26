@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.external
 
+import com.opentasker.core.external.AutomationTargetReceiver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -120,8 +121,8 @@ class ExternalExecutionLedgerTest {
     @Test
     fun runTaskNeverExecutesTheTaskInsideTheBroadcastWindow() {
         val source = listOf(
-            File("src/main/java/com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
-            File("app/src/main/java/com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
+            File("src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+            File("app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
         ).first { it.exists() }.readText()
 
         assertFalse(
@@ -146,11 +147,11 @@ class ExternalExecutionLedgerTest {
         ).first { it.exists() }.readText()
 
         val receiverBlock = manifest
-            .substringAfter("com.sysadmindoc.ruledeck.core.external.AutomationTargetReceiver")
+            .substringAfter("com.opentasker.core.external.AutomationTargetReceiver")
             .substringBefore("</receiver>")
         assertTrue(
             "QUERY_EXECUTION must be filtered on the permission-guarded receiver",
-            "com.sysadmindoc.ruledeck.action.QUERY_EXECUTION" in receiverBlock,
+            "com.opentasker.action.QUERY_EXECUTION" in receiverBlock,
         )
         assertTrue(
             "the receiver must keep enforcing its declared filters",

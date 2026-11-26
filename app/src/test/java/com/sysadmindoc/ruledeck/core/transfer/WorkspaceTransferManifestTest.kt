@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.transfer
 
+import com.opentasker.core.transfer.WorkspaceTransferReceiver
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,7 +22,7 @@ class WorkspaceTransferManifestTest {
 
     @Test
     fun everyHandledActionIsDeclaredInTheManifest() {
-        val source = sourceFile("app/src/main/java/com/sysadmindoc/ruledeck/core/transfer/WorkspaceTransferReceiver.kt")
+        val source = sourceFile("app/src/main/java/com/opentasker/core/transfer/WorkspaceTransferReceiver.kt")
         val manifest = sourceFile("app/src/main/AndroidManifest.xml").readText()
 
         // The constants, then the branches that actually dispatch on them: an action with a

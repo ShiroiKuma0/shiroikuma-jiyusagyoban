@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
  * user service. An ordinary app process is never used as a fallback.
  */
 object ShizukuShellRunner {
-    private const val USER_SERVICE_TAG = "ruledeck-power"
+    private const val USER_SERVICE_TAG = "opentasker-power"
     private const val USER_SERVICE_VERSION = 3
     private const val CONNECTION_TIMEOUT_SECONDS = 2L
     private const val POWER_MODE_OFF = "Shizuku power mode is off, so nothing ran. Turn it on from its row in Setup."

@@ -101,7 +101,7 @@ object GenerationRunner {
     data class Step(val title: String, val state: StepState = StepState.WAIT, val detail: String = "", val key: K? = null)
 
     /**
-     * The whole run, for the progress window ([com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaProgressActivity]).
+     * The whole run, for the progress window ([com.opentasker.ui.gengoshima.GengoshimaProgressActivity]).
      *
      * Kept after the run ends — with its [result] — until the window is dismissed, so reopening it
      * from the notification an hour later still says how it went (白い熊, 2026-09-30: the run ends on a
@@ -247,7 +247,7 @@ object GenerationRunner {
                 val dao = RuleDeckApp_NoHilt.db.gengoshimaDao()
                 val plan = AnkiIslands.plan(false, settings, dao.islands(), dao.allSentences(), dao.tombstones(), lastIslandNames(app))
                 if (!plan.empty && start(app, settings, Mode.EDITOR)) {
-                    app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaProgressActivity.intent(app))
+                    app.startActivity(com.opentasker.ui.gengoshima.GengoshimaProgressActivity.intent(app))
                     return@launch
                 }
             }
@@ -277,7 +277,7 @@ object GenerationRunner {
         if (!mutex.tryLock()) return Summary(0, 0, 0, null, "already running")
         val app = context.applicationContext
         val wake = (app.getSystemService(Context.POWER_SERVICE) as PowerManager)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ruledeck:gengoshima")
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "opentasker:gengoshima")
             .apply { acquire(WAKE_MS) }
         _progress.value = newProgress(mode, settings.ankiSync, splitOnly)
         _working.value = only.orEmpty()
@@ -1141,7 +1141,7 @@ object GenerationRunner {
         /** Tapping it, running or finished, brings the progress window back — from any app. */
         fun openWindow(): android.app.PendingIntent = android.app.PendingIntent.getActivity(
             app, NOTIFICATION_ID,
-            com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaProgressActivity.intent(app),
+            com.opentasker.ui.gengoshima.GengoshimaProgressActivity.intent(app),
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
         )
 

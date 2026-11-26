@@ -48,7 +48,7 @@ class NfcDeliveryInstrumentedTest {
     @Test
     fun aForgedTagSentToMainActivityPublishesNothing() = runBlocking {
         withTagIds { seen ->
-            context.startActivity(tagIntent(FORGED_TAG, "com.sysadmindoc.ruledeck.MainActivity"))
+            context.startActivity(tagIntent(FORGED_TAG, "com.opentasker.app.MainActivity"))
             delay(QUIET_MS)
             assertFalse("a forged tag reached the NFC trigger", NfcContextEvents.tagIdHex(FORGED_TAG) in seen)
             // MainActivity is on top now, so this one goes through onNewIntent.

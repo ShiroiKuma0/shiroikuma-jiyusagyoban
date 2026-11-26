@@ -6,7 +6,7 @@ import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.huawei.HuaweiSettings
 import com.sysadmindoc.ruledeck.ui.charts.BandLanguage
-import com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiBoardActivity
+import com.opentasker.ui.charts.huawei.HuaweiBoardActivity
 
 /**
  * `Huawei Band board` — open 健康 -- [727], the window everything else is reached from.

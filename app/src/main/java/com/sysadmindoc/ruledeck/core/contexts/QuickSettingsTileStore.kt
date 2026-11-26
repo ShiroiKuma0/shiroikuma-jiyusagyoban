@@ -1,5 +1,9 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.QuickSettingsTileService
+import com.opentasker.core.contexts.QuickSettingsTileServiceSlot2
+import com.opentasker.core.contexts.QuickSettingsTileServiceSlot3
+import com.opentasker.core.contexts.QuickSettingsTileServiceSlot4
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon

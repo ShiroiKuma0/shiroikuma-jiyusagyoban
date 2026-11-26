@@ -201,7 +201,7 @@ class ExternalExecutionStore(context: Context) {
     private fun String.sanitize(): String = replace(FIELD_SEPARATOR, " ").take(MAX_FIELD_CHARS)
 
     companion object {
-        private const val PREFS_NAME = "ruledeck_external_executions"
+        private const val PREFS_NAME = "opentasker_external_executions"
         private const val KEY_RECORDS = "records"
         private const val FIELD_SEPARATOR = "\u001F"
         private const val FIELD_COUNT = 8

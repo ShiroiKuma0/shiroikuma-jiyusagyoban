@@ -1,5 +1,8 @@
 package com.sysadmindoc.ruledeck.core.huawei
 
+import com.opentasker.core.huawei.AlmanacWatch
+import com.opentasker.core.huawei.GnssForecastReminder
+import com.opentasker.core.huawei.GnssForecastReminderReceiver
 import com.sysadmindoc.ruledeck.ProductionSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,9 +64,9 @@ class GnssForecastReminderTest {
         val manifest = java.io.File(ProductionSources.repoRoot.toFile(), "app/src/main/AndroidManifest.xml").readText()
         assertTrue(
             "the receiver itself must be declared",
-            "com.sysadmindoc.ruledeck.core.huawei.GnssForecastReminderReceiver" in manifest,
+            "com.opentasker.core.huawei.GnssForecastReminderReceiver" in manifest,
         )
-        for (action in listOf("com.sysadmindoc.ruledeck.huawei.GNSS_FORECAST_WARN", "com.sysadmindoc.ruledeck.huawei.GNSS_FORECAST_END")) {
+        for (action in listOf("com.opentasker.huawei.GNSS_FORECAST_WARN", "com.opentasker.huawei.GNSS_FORECAST_END")) {
             assertTrue("$action is scheduled but not declared", "android:name=\"$action\"" in manifest)
         }
     }
@@ -175,7 +178,7 @@ class GnssForecastReminderTest {
     /** A notification nobody can open is a dead end at the moment someone wants to know more. */
     @Test
     fun `tapping the notification opens the full dialog`() {
-        val src = ProductionSources.read("com/sysadmindoc/ruledeck/core/huawei/GnssForecastReminder.kt")
+        val src = ProductionSources.read("com/opentasker/core/huawei/GnssForecastReminder.kt")
         assertTrue("there is a content intent at all", "builder.setContentIntent(" in src)
         assertTrue("and it opens a text dialog", "DialogActivity.TYPE_TEXT" in src)
         for (loud in listOf("EXTRA_MARKUP", "EXTRA_SIZE", "EXTRA_TEXT_SCALE")) {
@@ -237,7 +240,7 @@ class GnssForecastReminderTest {
     fun `the almanac watch says it is searching, how often, and how to stop`() {
         assertEquals(30L, AlmanacWatch.EVERY_MINUTES)
         assertEquals(24L, AlmanacWatch.GIVE_UP_HOURS)
-        val reminder = ProductionSources.read("com/sysadmindoc/ruledeck/core/huawei/GnssForecastReminder.kt")
+        val reminder = ProductionSources.read("com/opentasker/core/huawei/GnssForecastReminder.kt")
         assertTrue(
             "the ongoing notification must name the cadence in its own title",
             "衛星：概略暦を探しています（\$everyMinutes 分ごと）" in reminder,
@@ -266,7 +269,7 @@ class GnssForecastReminderTest {
             "and must not promise a rebuild the watch never performs",
             "this will rebuild when a " !in build,
         )
-        val watch = ProductionSources.read("com/sysadmindoc/ruledeck/core/huawei/AlmanacWatch.kt")
+        val watch = ProductionSources.read("com/opentasker/core/huawei/AlmanacWatch.kt")
         assertTrue(
             "starting the watch is what raises that notification",
             "GnssForecastReminder.watchingForAlmanac(app, haveVintage, GIVE_UP_HOURS, EVERY_MINUTES)" in watch,
@@ -276,7 +279,7 @@ class GnssForecastReminderTest {
             "GnssForecastReminder.almanacWatchStopped(app)" in watch,
         )
         val manifest = java.io.File(ProductionSources.repoRoot.toFile(), "app/src/main/AndroidManifest.xml").readText()
-        for (action in listOf("com.sysadmindoc.ruledeck.huawei.ALMANAC_CHECK", "com.sysadmindoc.ruledeck.huawei.ALMANAC_STOP")) {
+        for (action in listOf("com.opentasker.huawei.ALMANAC_CHECK", "com.opentasker.huawei.ALMANAC_STOP")) {
             assertTrue("$action is sent but not declared", "android:name=\"$action\"" in manifest)
         }
     }
@@ -292,7 +295,7 @@ class GnssForecastReminderTest {
      */
     @Test
     fun `the search publishes its own state, and every exit clears it`() {
-        val watch = ProductionSources.read("com/sysadmindoc/ruledeck/core/huawei/AlmanacWatch.kt")
+        val watch = ProductionSources.read("com/opentasker/core/huawei/AlmanacWatch.kt")
         assertTrue(
             "the panel reads this name, so it may not drift",
             "STATE_VAR = \"HUAWEI_PgnssWatching\"" in watch,

@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.plugins.locale
 
+import com.opentasker.core.plugins.locale.LocalePluginTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -19,7 +20,7 @@ class LocalePluginTargetTest {
 
     @Test
     fun bundleKeysFollowRuleDeckNamespace() {
-        assertTrue(LocalePluginTarget.BUNDLE_KEY_TASK_ID.startsWith("com.sysadmindoc.ruledeck."))
-        assertTrue(LocalePluginTarget.BUNDLE_KEY_TASK_NAME.startsWith("com.sysadmindoc.ruledeck."))
+        assertTrue(LocalePluginTarget.BUNDLE_KEY_TASK_ID.startsWith("com.opentasker."))
+        assertTrue(LocalePluginTarget.BUNDLE_KEY_TASK_NAME.startsWith("com.opentasker."))
     }
 }

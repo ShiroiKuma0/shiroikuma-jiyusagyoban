@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.scheduling
 
+import com.opentasker.core.scheduling.TaskAlarms
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

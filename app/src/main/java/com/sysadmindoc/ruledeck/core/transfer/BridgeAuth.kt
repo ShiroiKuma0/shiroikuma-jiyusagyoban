@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.transfer
 
+import com.opentasker.core.transfer.WorkspaceTransferReceiver
 import android.content.Context
 import android.content.Intent
 import java.security.KeyFactory

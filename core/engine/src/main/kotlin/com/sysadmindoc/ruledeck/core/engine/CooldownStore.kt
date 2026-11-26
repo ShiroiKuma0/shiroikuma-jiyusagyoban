@@ -61,7 +61,7 @@ class CooldownStore(context: Context) {
     companion object {
         // Process-wide: an old service's late restore and the next service's reserve share the prefs.
         private val LOCK = Any()
-        private const val PREFS_NAME = "ruledeck_cooldowns"
+        private const val PREFS_NAME = "opentasker_cooldowns"
         internal const val KEY_PREFIX = "cd_"
     }
 }

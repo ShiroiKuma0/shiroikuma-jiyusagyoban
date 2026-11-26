@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.plugins.locale
 
+import com.opentasker.core.plugins.locale.LocaleConditionEditActivity
 import android.content.Context
 import com.sysadmindoc.ruledeck.core.model.ContextSpec
 import java.security.MessageDigest

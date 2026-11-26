@@ -8,7 +8,7 @@ import androidx.core.app.NotificationCompat
 /** Shared eligibility and compatibility handling for Android 16 promoted ongoing notifications. */
 object PromotedOngoingNotificationSupport {
     const val MIN_PLATFORM_API = 36
-    const val ENGINE_CHANNEL_ID = "ruledeck.engine.live"
+    const val ENGINE_CHANNEL_ID = "opentasker.engine.live"
     val ENGINE_CHANNEL_IMPORTANCE: Int = NotificationManager.IMPORTANCE_LOW
 
     data class Eligibility(

@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.automation
 
+import com.opentasker.core.automation.AutomationProvider
 import android.content.Context
 import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
 import com.sysadmindoc.ruledeck.core.engine.ActionTraceStatus

@@ -78,7 +78,7 @@ import com.sysadmindoc.ruledeck.core.ocr.lineConfidences
 import com.sysadmindoc.ruledeck.ui.charts.ChartPalette
 import com.sysadmindoc.ruledeck.ui.components.SelectionChip
 import com.sysadmindoc.ruledeck.ui.screens.FOCUS_OCR
-import com.sysadmindoc.ruledeck.ui.screens.UiCustomizationActivity
+import com.opentasker.ui.screens.UiCustomizationActivity
 import com.sysadmindoc.ruledeck.ui.theme.ThemePrefs
 import com.sysadmindoc.ruledeck.ui.theme.ThemeStore
 import kotlin.math.roundToInt

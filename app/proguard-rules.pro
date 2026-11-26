@@ -4,7 +4,7 @@
 
 # Keep manifest-declared entry points
 -keep class com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
--keep class com.sysadmindoc.ruledeck.MainActivity
+-keep class com.opentasker.app.MainActivity
 
 # Room generated code
 -keep class * extends androidx.room.RoomDatabase

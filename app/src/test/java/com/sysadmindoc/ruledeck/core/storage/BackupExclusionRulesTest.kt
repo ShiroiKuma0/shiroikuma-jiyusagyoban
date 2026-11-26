@@ -23,7 +23,7 @@ class BackupExclusionRulesTest {
             if (child.nodeName != "exclude") continue
             val domain = child.attributes?.getNamedItem("domain")?.nodeValue
             val path = child.attributes?.getNamedItem("path")?.nodeValue
-            if (domain == "database" && path == "ruledeck.db") hasDb = true
+            if (domain == "database" && path == "opentasker.db") hasDb = true
             if (domain == "sharedpref" && (path == null || path.isEmpty())) hasSharedPref = true
         }
         return hasDb && hasSharedPref

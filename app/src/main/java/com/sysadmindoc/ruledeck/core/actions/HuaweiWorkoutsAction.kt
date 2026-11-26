@@ -51,7 +51,7 @@ class HuaweiWorkoutsAction : Action {
         // a second action id. Its value used to be the directory they lived in; there is no such
         // directory now, so any non-empty value means "open it".
         args["browse"]?.trim()?.ifEmpty { null }?.let {
-            com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, days, kind)
+            com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, days, kind)
             ctx.variables.set("${prefix}Summary", "opened the ${kind.label} window")
             return ActionResult.Success
         }

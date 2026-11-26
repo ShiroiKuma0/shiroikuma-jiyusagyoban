@@ -33,6 +33,10 @@ spec.loader.exec_module(ren)
 SRC_ROOTS = ("app/src", "core", "baselineprofile", "benchmark", "app/proguard-rules.pro", "app/baseline-prof.txt")
 JAVA_MAIN = pathlib.Path("app/src/main/java")
 OLD_NS, NEW_NS = "com.opentasker.app", "com.sysadmindoc.ruledeck"
+# Upstream 38408aeb moved the approved Termux scripts from Termux's own conventional directory to one
+# named after the app. The scripts on the phones, and the approvals that name their paths, are where
+# they always were.
+EXTRA = {"~/.termux/ruledeck": "~/.termux/tasker"}
 MODS = r"(?:(?:public|internal|open|abstract|sealed|data|enum|annotation|value|inline|const|lateinit|suspend|tailrec|operator|infix|external|fun)\s+)*"
 DECL = re.compile(r"^" + MODS + r"(?:class|object|interface|fun|val|var|typealias)\s+(?:<[^>]*>\s*)?(?:[\w.<>?, ]+\.)?(\w+)", re.M)
 
@@ -90,6 +94,16 @@ def main():
         new = ren.apply(old)
         if new != old:
             restored += sub_all(re.escape('"' + new + '"'), lambda m, o=old: '"' + o + '"')
+    # Tests quote the stored values inside longer strings (a source line, a full extra name built on a prefix).
+    tests = [f for f in text_files if re.search(r"/src/(test|androidTest)/", f)]
+    for old in sorted(lines("literals.txt"), key=len, reverse=True):
+        new = ren.apply(old)
+        # Never the bare word: "ruledeck" alone is also a directory in every source path.
+        if new != old and re.search(r"[._:]", old.strip("._:")):
+            restored += sub_all(r"(?<![\w./])" + re.escape(new) + r"(?![\w/])", lambda m, o=old: o, files=tests)
+    # Values upstream changed outside the rename's own substitutions, which the phones also hold.
+    for new, old in EXTRA.items():
+        restored += sub_all(re.escape(new), lambda m, o=old: o)
     print(f"stored text values put back: {restored} occurrences")
 
     # ── 2. the manifest's components ─────────────────────────────────────────────────────────────
@@ -97,7 +111,7 @@ def main():
     aliases = [n for k, n in comps if k == "alias"]
     classes = [n for k, n in comps if k != "alias"]
     kotlin = [f for f in text_files if f.endswith(".kt")]
-    moved, names = {}, {}                      # file → (newpkg, oldpkg) ; (newpkg, oldpkg) → exported names
+    moved, names, stems = {}, {}, {}           # file → (newpkg, oldpkg) ; (newpkg, oldpkg) → exported names / file stems
     missing = []
     for old in classes:
         oldpkg, cls = split(old)
@@ -121,6 +135,7 @@ def main():
         body = read(f)
         exported = {m.group(1) for m in DECL.finditer(body)}
         names.setdefault((newpkg, oldpkg), set()).update(exported)
+        stems.setdefault((newpkg, oldpkg), set()).add(pathlib.Path(f).stem)
         target = str(JAVA_MAIN / oldpkg.replace(".", "/") / pathlib.Path(f).name)
         body = re.sub(r"^package\s+" + re.escape(newpkg) + r"\s*$", "package " + oldpkg, body, count=1, flags=re.M)
         star = f"import {newpkg}.*"
@@ -137,6 +152,16 @@ def main():
     for m in missing:
         print("   NOT FOUND:", m)
 
+    # A package whose every file moved back no longer exists; a star import of it would not compile.
+    for f, (newpkg, oldpkg) in sorted(moved.items()):
+        target = JAVA_MAIN / oldpkg.replace(".", "/") / pathlib.Path(f).name
+        newdir = ROOT / JAVA_MAIN / newpkg.replace(".", "/")
+        if not report and (ROOT / target).is_file() and not (newdir.is_dir() and any(newdir.glob("*.kt"))):
+            body = read(str(target))
+            trimmed = re.sub(r"^import " + re.escape(newpkg) + r"\.\*\n\n?", "", body, count=1, flags=re.M)
+            if trimmed != body:
+                write(str(target), trimmed)
+
     # refresh the file list: paths moved
     text_files[:] = [f for f in tracked(*SRC_ROOTS) if re.search(r"\.(kt|kts|java|xml|pro|txt)$", f)]
     kotlin = [f for f in text_files if f.endswith(".kt")]
@@ -145,6 +170,11 @@ def main():
         # fully qualified references, dotted and slashed (imports, manifest, XML, R8 rules, baseline profile)
         sub_all(r"(?<![\w.])" + re.escape(newpkg) + r"\.(" + alt + r")\b", lambda m, o=oldpkg: o + "." + m.group(1))
         sub_all(r"\b" + re.escape(newpkg.replace(".", "/")) + r"/(" + alt + r")\b", lambda m, o=oldpkg: o.replace(".", "/") + "/" + m.group(1))
+        # source-gate tests name files by path: the file may be called after something other than its class
+        files_alt = "|".join(sorted(map(re.escape, stems.get((newpkg, oldpkg), set())), key=len, reverse=True))
+        if files_alt:
+            sub_all(r"\b" + re.escape(newpkg.replace(".", "/")) + r"/(" + files_alt + r")\.kt\b",
+                    lambda m, o=oldpkg: o.replace(".", "/") + "/" + m.group(1) + ".kt")
         word = re.compile(r"\b(" + alt + r")\b")
         for f in kotlin:
             t = read(f)

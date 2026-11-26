@@ -86,3 +86,10 @@ service	com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 alias	com.opentasker.app.NfcTagDispatch
 alias	com.opentasker.core.health.ViewPermissionUsageActivity
 alias	com.opentasker.core.dialog.ShellDialogActivity
+# Background workers: WorkManager keeps each scheduled job with its worker's class name, and two of
+# these are scheduled with KEEP — renamed, the old job would stay and fail on every run.
+worker	com.opentasker.core.engine.BandPruneWorker
+worker	com.opentasker.core.engine.RunLogPruneWorker
+worker	com.opentasker.core.engine.EngineWatchdogWorker
+worker	com.opentasker.core.health.HealthConnectPollWorker
+worker	com.opentasker.core.actions.TemporaryStateRevertWorker

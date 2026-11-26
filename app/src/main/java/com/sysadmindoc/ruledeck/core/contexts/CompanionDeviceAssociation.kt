@@ -2,6 +2,7 @@
 
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.CompanionPresenceService
 import android.app.Activity
 import android.companion.AssociationInfo
 import android.companion.AssociationRequest

@@ -21,7 +21,7 @@ import kotlin.coroutines.CoroutineContext
 class RunAwake : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RunAwake> {
         const val MAX_SECONDS = 3_600
-        private const val TAG = "ruledeck:run-awake"
+        private const val TAG = "opentasker:run-awake"
     }
 
     private var lock: PowerManager.WakeLock? = null

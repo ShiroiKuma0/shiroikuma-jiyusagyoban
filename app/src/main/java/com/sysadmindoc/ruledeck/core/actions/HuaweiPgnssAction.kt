@@ -9,8 +9,8 @@ import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
-import com.sysadmindoc.ruledeck.core.huawei.AlmanacWatch
-import com.sysadmindoc.ruledeck.core.huawei.GnssForecastReminder
+import com.opentasker.core.huawei.AlmanacWatch
+import com.opentasker.core.huawei.GnssForecastReminder
 import com.sysadmindoc.ruledeck.core.huawei.pgnss.AlmanacCheck
 import com.sysadmindoc.ruledeck.core.huawei.pgnss.PgnssSources
 import com.sysadmindoc.ruledeck.core.huawei.pgnss.PgnssBuildConfig
@@ -215,7 +215,7 @@ class HuaweiPgnssAction : Action {
             ctx.logger("Huawei predicted ephemeris: ${result.summary}")
             for (note in result.notes) ctx.logger("  $note")
             // The next build is planned from this one (and from the watch's next take).
-            com.sysadmindoc.ruledeck.core.huawei.GnssRebuildSchedule.built(ctx.app)
+            com.opentasker.core.huawei.GnssRebuildSchedule.built(ctx.app)
             return ActionResult.Success
         } catch (cancelled: PgnssCancelledException) {
             ctx.variables.set("${prefix}PgnssResult", "NOT REBUILT — cancelled at step ${panel.step}")

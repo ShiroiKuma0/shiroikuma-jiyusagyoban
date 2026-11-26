@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.SmsContextEvents
 import com.sysadmindoc.ruledeck.core.model.ContextSpec
 import com.sysadmindoc.ruledeck.core.model.ContextType
 import org.junit.Assert.assertEquals

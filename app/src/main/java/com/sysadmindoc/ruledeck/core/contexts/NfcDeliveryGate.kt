@@ -15,7 +15,7 @@ import android.content.Intent
  * the profile or retry the write a second time without a tap.
  */
 object NfcDeliveryGate {
-    const val DISPATCH_ALIAS = "com.sysadmindoc.ruledeck.NfcTagDispatch"
+    const val DISPATCH_ALIAS = "com.opentasker.app.NfcTagDispatch"
 
     fun isFreshSystemDelivery(componentClassName: String?, intentFlags: Int, restored: Boolean): Boolean =
         componentClassName == DISPATCH_ALIAS &&

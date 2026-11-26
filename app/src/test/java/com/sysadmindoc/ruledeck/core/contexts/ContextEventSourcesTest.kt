@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.CompanionPresenceService
+import com.opentasker.core.contexts.publishCompanionPresenceEvent
 import android.companion.DevicePresenceEvent
 import android.content.ContextWrapper
 import com.sysadmindoc.ruledeck.core.logging.AppLogger

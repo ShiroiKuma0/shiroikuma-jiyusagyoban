@@ -600,8 +600,8 @@
     <string name="setup_termux_allowlist_title">Approved Termux scripts</string>
     <string name="setup_termux_allowlist_body">Enter the expected SHA-256 from a trusted copy. RuleDeck verifies the script in Termux immediately before every run. Termux also needs allow-external-apps=true in ~/.termux/termux.properties, or it returns no result and the check cannot run. Scripts run without your .bashrc or .profile, so call commands by their full path.</string>
     <string name="setup_termux_script_path_label">Script path</string>
-    <string name="setup_termux_script_path_hint">~/.termux/ruledeck/my_script</string>
-    <string name="setup_termux_script_path_error">Use a script inside ~/.termux/ruledeck without path traversal.</string>
+    <string name="setup_termux_script_path_hint">~/.termux/tasker/my_script</string>
+    <string name="setup_termux_script_path_error">Use a script inside ~/.termux/tasker without path traversal.</string>
     <string name="setup_termux_script_hash_label">Expected SHA-256</string>
     <string name="setup_termux_script_hash_hint">64 hexadecimal characters</string>
     <string name="setup_termux_script_hash_error">Enter exactly 64 hexadecimal characters.</string>

@@ -4,7 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import com.sysadmindoc.ruledeck.automation.receiver.TimeEventReceiver
+import com.opentasker.automation.receiver.TimeEventReceiver
 import com.sysadmindoc.ruledeck.core.logging.AppLogger
 import com.sysadmindoc.ruledeck.core.scheduling.AlarmSchedulePrecision
 import com.sysadmindoc.ruledeck.core.scheduling.ExactAlarmSupport
@@ -70,7 +70,7 @@ class TimeEventScheduler(context: Context) {
         )
 
     companion object {
-        const val ACTION_TIME_TICK = "com.sysadmindoc.ruledeck.automation.TIME_TICK"
+        const val ACTION_TIME_TICK = "com.opentasker.automation.TIME_TICK"
         private const val REQUEST_CODE_TIME_TICK = 13001
         private const val MINUTE_MS = 60_000L
         internal const val RECOVERY_DELAY_MS = 5_000L

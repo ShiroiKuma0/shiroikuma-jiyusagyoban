@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.ContactPickerCoordinator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

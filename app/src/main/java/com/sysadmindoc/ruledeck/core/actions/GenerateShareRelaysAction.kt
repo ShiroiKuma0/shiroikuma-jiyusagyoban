@@ -5,7 +5,7 @@ import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
-import com.sysadmindoc.ruledeck.core.share.ShareAppsActivity
+import com.opentasker.core.share.ShareAppsActivity
 
 /**
  * Opens the "Share apps" screen — the per-target share-relay generator (pick app → edit name → pick

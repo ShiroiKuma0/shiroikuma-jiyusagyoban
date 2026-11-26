@@ -34,7 +34,7 @@ class IntentUriGrantSourceGuardTest {
     @Test
     fun shareReceiverChecksUriAccessOffMainThreadAndSurfacesFailure() {
         val shareEvents = sourceRoot.resolve("com/sysadmindoc/ruledeck/core/contexts/ShareContextEvents.kt").readText()
-        val receiver = sourceRoot.resolve("com/sysadmindoc/ruledeck/core/contexts/ShareReceiverActivity.kt").readText()
+        val receiver = sourceRoot.resolve("com/opentasker/core/contexts/ShareReceiverActivity.kt").readText()
 
         assertTrue(shareEvents.contains("openInputStream"))
         assertTrue(receiver.contains("Dispatchers.IO"))

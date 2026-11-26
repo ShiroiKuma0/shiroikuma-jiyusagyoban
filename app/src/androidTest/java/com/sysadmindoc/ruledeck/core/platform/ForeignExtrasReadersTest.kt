@@ -14,14 +14,14 @@ import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
 import com.sysadmindoc.ruledeck.core.contexts.BroadcastContextEvents
 import com.sysadmindoc.ruledeck.core.contexts.PushContextEvents
 import com.sysadmindoc.ruledeck.core.contexts.ShareContextEvents
-import com.sysadmindoc.ruledeck.core.external.AutomationTargetContract
+import com.opentasker.core.external.AutomationTargetContract
 import com.sysadmindoc.ruledeck.core.model.Profile
-import com.sysadmindoc.ruledeck.core.plugins.locale.LocaleConditionQueryReceiver
+import com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver
 import com.sysadmindoc.ruledeck.core.plugins.locale.LocalePluginContract
 import com.sysadmindoc.ruledeck.core.plugins.locale.LocalePluginRequestQueryEvents
-import com.sysadmindoc.ruledeck.core.plugins.locale.LocalePluginTarget
-import com.sysadmindoc.ruledeck.core.plugins.locale.LocaleSettingFireReceiver
-import com.sysadmindoc.ruledeck.core.scripting.TermuxCommandBroker
+import com.opentasker.core.plugins.locale.LocalePluginTarget
+import com.opentasker.core.plugins.locale.LocaleSettingFireReceiver
+import com.opentasker.core.scripting.TermuxCommandBroker
 import com.sysadmindoc.ruledeck.core.storage.toEntity
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -197,8 +197,8 @@ class ForeignExtrasReadersTest {
     @Test
     fun aTermuxResultKeepsItsOutput() {
         val requestId = "request-1"
-        val sent = Intent("com.sysadmindoc.ruledeck.action.TERMUX_COMMAND_RESULT")
-            .putExtra("com.sysadmindoc.ruledeck.extra.TERMUX_REQUEST_ID", requestId)
+        val sent = Intent("com.opentasker.action.TERMUX_COMMAND_RESULT")
+            .putExtra("com.opentasker.extra.TERMUX_REQUEST_ID", requestId)
             .putExtra("result", Bundle().apply {
                 putString("stdout", "done")
                 putInt("exitCode", 0)

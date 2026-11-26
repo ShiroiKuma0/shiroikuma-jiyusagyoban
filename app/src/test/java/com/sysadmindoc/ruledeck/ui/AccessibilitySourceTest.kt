@@ -128,7 +128,7 @@ class AccessibilitySourceTest {
 
     @Test
     fun sceneOverlayKeepsTouchAndNonTouchMovementContracts() {
-        val source = mainSourceRoot.resolve("com/sysadmindoc/ruledeck/core/scenes/SceneOverlayService.kt").readText()
+        val source = mainSourceRoot.resolve("com/opentasker/core/scenes/SceneOverlayService.kt").readText()
         val requiredMarkers = listOf(
             "HEADER_HEIGHT_DP = 48",
             "CLOSE_BUTTON_SIZE_DP = 48",

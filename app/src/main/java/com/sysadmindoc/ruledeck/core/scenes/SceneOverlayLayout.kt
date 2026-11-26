@@ -1,6 +1,6 @@
 package com.sysadmindoc.ruledeck.core.scenes
 
-import com.sysadmindoc.ruledeck.core.external.AutomationTargetContract
+import com.opentasker.core.external.AutomationTargetContract
 import com.sysadmindoc.ruledeck.core.model.Scene
 import com.sysadmindoc.ruledeck.core.model.SceneElement
 import kotlin.math.roundToInt

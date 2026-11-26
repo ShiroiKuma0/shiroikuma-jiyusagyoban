@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.huawei
 
+import com.opentasker.core.huawei.GnssRebuildSchedule
 import android.content.Context
 import com.sysadmindoc.ruledeck.core.storage.AppDatabase
 import com.sysadmindoc.ruledeck.core.storage.HuaweiBeatEntity

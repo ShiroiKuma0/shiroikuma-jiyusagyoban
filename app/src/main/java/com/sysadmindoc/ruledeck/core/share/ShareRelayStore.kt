@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.share
 
+import com.opentasker.core.share.ShareForwardActivity
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit

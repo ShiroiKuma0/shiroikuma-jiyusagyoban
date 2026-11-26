@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.DirectBootTimeScheduler
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

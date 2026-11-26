@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.charts.huawei
 
+import com.opentasker.ui.charts.huawei.HuaweiBoardActivity
 import com.sysadmindoc.ruledeck.i18n.tr
 import android.Manifest
 import android.app.NotificationChannel
@@ -323,7 +324,7 @@ object HuaweiSyncSession {
     const val RESTART_DELAY_MS = 10_000L
     const val BLUETOOTH_WAIT_MS = 60_000L
 
-    private const val CHANNEL_ID = "ruledeck.huawei.sync"
+    private const val CHANNEL_ID = "opentasker.huawei.sync"
     private const val CHANNEL_NAME = "健康 sync"
     private const val NOTIFICATION_ID = 727_001
 

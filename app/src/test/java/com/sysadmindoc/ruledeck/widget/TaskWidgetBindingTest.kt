@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.widget
 
+import com.opentasker.widget.widgetTaskToLookUp
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

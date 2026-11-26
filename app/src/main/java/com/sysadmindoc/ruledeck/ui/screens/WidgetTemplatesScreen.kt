@@ -61,7 +61,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sysadmindoc.ruledeck.core.widget.WidgetLayoutCodec
 import com.sysadmindoc.ruledeck.core.widget.WidgetRenderer
-import com.sysadmindoc.ruledeck.widget.StyledWidgetProvider
+import com.opentasker.widget.StyledWidgetProvider
 import androidx.compose.ui.layout.ContentScale
 import com.sysadmindoc.ruledeck.ui.components.GroupMoveDialogs
 import com.sysadmindoc.ruledeck.ui.components.GroupOps

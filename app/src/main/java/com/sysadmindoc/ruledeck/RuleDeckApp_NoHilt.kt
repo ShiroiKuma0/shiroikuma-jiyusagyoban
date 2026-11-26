@@ -27,8 +27,8 @@ import com.sysadmindoc.ruledeck.core.storage.PendingRestoreApplyResult
 import com.sysadmindoc.ruledeck.core.storage.VariableRepository
 import com.sysadmindoc.ruledeck.core.diagnostics.CrashLogHandler
 import com.sysadmindoc.ruledeck.core.diagnostics.AdvancedProtectionReader
-import com.sysadmindoc.ruledeck.core.engine.RunLogPruneWorker
-import com.sysadmindoc.ruledeck.core.engine.EngineWatchdogWorker
+import com.opentasker.core.engine.RunLogPruneWorker
+import com.opentasker.core.engine.EngineWatchdogWorker
 import com.sysadmindoc.ruledeck.core.engine.reconcileExecutionJournal
 import com.sysadmindoc.ruledeck.core.engine.DirectBootTriggerStore
 import com.sysadmindoc.ruledeck.core.engine.variables.BuiltInVariables
@@ -128,7 +128,7 @@ class RuleDeckApp_NoHilt : Application() {
         // interrupted — and schedule the workers twice. The player needs none of it.
         if (isSideProcess()) return
         // A recorder dies with its process, so a "recording" notification still up now is a lie.
-        com.sysadmindoc.ruledeck.core.actions.RecordingNotification.clear(this)
+        com.opentasker.core.actions.RecordingNotification.clear(this)
         installStrictModeInDebug()
         // Reading these needs no unlocked storage, so a task that runs before unlock gets them too.
         BuiltInVariables.installDevice { name -> builtInReading(this, name) }
@@ -248,7 +248,7 @@ class RuleDeckApp_NoHilt : Application() {
             // newest tag is never the newest 自由作業盤 — the check is not wired in here.
             // The Hume band is retired and its rows are now history the 健康 report keeps showing, so the
             // 400-day prune would start eating it (from August 2027). Cancelled, never enqueued again.
-            com.sysadmindoc.ruledeck.core.engine.BandPruneWorker.cancel(this)
+            com.opentasker.core.engine.BandPruneWorker.cancel(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
         }

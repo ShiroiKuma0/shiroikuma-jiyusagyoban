@@ -4,7 +4,7 @@ import java.util.Collections
 
 /**
  * Liveness beacon for the trigger engine. The per-minute `sun_tick` stamps [lastTickAt]; the per-minute
- * exact alarm ([com.sysadmindoc.ruledeck.automation.receiver.TimeEventReceiver]) checks [isStale] and, if the tick
+ * exact alarm ([com.opentasker.automation.receiver.TimeEventReceiver]) checks [isStale] and, if the tick
  * has gone quiet while the process is alive (the engine's coroutines died), asks the service to re-arm.
  * Each such recovery is recorded for the monitor view. Pure in-memory — survives only the process.
  */

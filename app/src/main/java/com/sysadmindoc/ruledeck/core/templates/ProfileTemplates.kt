@@ -410,7 +410,7 @@ object ProfileTemplateCatalog {
             availability = TemplateAvailability.Planned,
             safetyNote = "Blocked until external trigger intents are exposed safely.",
             inputs = listOf(
-                TemplateSlot("trigger", "Trigger action", "com.sysadmindoc.ruledeck.intent.FIND_PHONE", selector = BlueprintSelectorKind.TEXT),
+                TemplateSlot("trigger", "Trigger action", "com.opentasker.intent.FIND_PHONE", selector = BlueprintSelectorKind.TEXT),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.EVENT, mapOf("event" to "intent", "filter" to "{trigger}")),

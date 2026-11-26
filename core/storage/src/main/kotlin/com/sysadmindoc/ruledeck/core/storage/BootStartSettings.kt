@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Whether the engine comes back by itself after a device reboot. **On by default** — that is the
- * long-standing behaviour ([com.sysadmindoc.ruledeck.core.engine.BootReceiver] starting the service on
+ * long-standing behaviour ([com.opentasker.core.engine.BootReceiver] starting the service on
  * BOOT_COMPLETED), and the one 白い熊 wants; this only makes it switchable from the Monitor screen.
  *
  * Turning it OFF also means a reboot does *not* undo an "Exit app fully": the shutdown flag
@@ -20,7 +20,7 @@ object BootStartSettings {
     private val _enabled = MutableStateFlow(true)
     val enabled: StateFlow<Boolean> = _enabled
 
-    /** Direct prefs read — for [com.sysadmindoc.ruledeck.core.engine.BootReceiver], which has no loaded state. */
+    /** Direct prefs read — for [com.opentasker.core.engine.BootReceiver], which has no loaded state. */
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY, true)
 
     fun load(context: Context) { _enabled.value = isEnabled(context) }

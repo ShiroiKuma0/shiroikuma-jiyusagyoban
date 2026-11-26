@@ -27,17 +27,17 @@ import kotlinx.serialization.json.contentOrNull
  * topic, title, event ID, and payload size without putting a remote message in logs.
  */
 object PushContextEvents {
-    const val ACTION_PUSH_EVENT = "com.sysadmindoc.ruledeck.action.PUSH_EVENT"
+    const val ACTION_PUSH_EVENT = "com.opentasker.action.PUSH_EVENT"
     /** ntfy's documented action for a notification button that sends a broadcast. */
     const val ACTION_NTFY_USER_ACTION = "io.heckel.ntfy.USER_ACTION"
     /** ntfy's documented action for the incoming-message automation broadcast. */
     const val ACTION_NTFY_MESSAGE_RECEIVED = "io.heckel.ntfy.MESSAGE_RECEIVED"
     const val EVENT_PUSH = "push"
-    const val EXTRA_TOKEN = "com.sysadmindoc.ruledeck.extra.PUSH_TOKEN"
-    const val EXTRA_TOPIC = "com.sysadmindoc.ruledeck.extra.PUSH_TOPIC"
-    const val EXTRA_EVENT_ID = "com.sysadmindoc.ruledeck.extra.PUSH_EVENT_ID"
-    const val EXTRA_TITLE = "com.sysadmindoc.ruledeck.extra.PUSH_TITLE"
-    const val EXTRA_MESSAGE = "com.sysadmindoc.ruledeck.extra.PUSH_MESSAGE"
+    const val EXTRA_TOKEN = "com.opentasker.extra.PUSH_TOKEN"
+    const val EXTRA_TOPIC = "com.opentasker.extra.PUSH_TOPIC"
+    const val EXTRA_EVENT_ID = "com.opentasker.extra.PUSH_EVENT_ID"
+    const val EXTRA_TITLE = "com.opentasker.extra.PUSH_TITLE"
+    const val EXTRA_MESSAGE = "com.opentasker.extra.PUSH_MESSAGE"
 
     // These names are the ntfy Android broadcast contract. Keep them unprefixed when parsing so
     // an ntfy `broadcast` action can target ACTION_PUSH_EVENT directly without a relay app.

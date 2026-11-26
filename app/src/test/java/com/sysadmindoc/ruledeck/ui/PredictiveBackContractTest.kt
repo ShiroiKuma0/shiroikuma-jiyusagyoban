@@ -14,7 +14,7 @@ class PredictiveBackContractTest {
 
     @Test
     fun activityBridgesPredictiveBackAndKeepsRootFallback() {
-        val source = repoRoot.resolve("app/src/main/java/com/sysadmindoc/ruledeck/MainActivity.kt").readText()
+        val source = repoRoot.resolve("app/src/main/java/com/opentasker/app/MainActivity.kt").readText()
         val manifest = repoRoot.resolve("app/src/main/AndroidManifest.xml").readText()
 
         assertTrue(source.contains("OnBackInvokedCallback"))

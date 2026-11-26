@@ -1,13 +1,14 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import android.content.Context
 import com.sysadmindoc.ruledeck.core.bubbles.FlashBubbleOverlayManager
 import com.sysadmindoc.ruledeck.core.bubbles.FreezeBubbleOverlayManager
 import com.sysadmindoc.ruledeck.core.progress.ProgressPanel
-import com.sysadmindoc.ruledeck.core.scenes.SceneOverlayService
+import com.opentasker.core.scenes.SceneOverlayService
 import com.sysadmindoc.ruledeck.i18n.tr
 import com.sysadmindoc.ruledeck.progress.ProgressPanelManager
-import com.sysadmindoc.ruledeck.scenes.SceneActivity
+import com.opentasker.scenes.SceneActivity
 import com.sysadmindoc.ruledeck.scenes.SceneOverlayManager
 
 /**

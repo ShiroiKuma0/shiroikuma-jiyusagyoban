@@ -66,7 +66,7 @@ import com.sysadmindoc.ruledeck.core.transfer.MacroDroidImportPlanner
 import com.sysadmindoc.ruledeck.core.transfer.MacroDroidImportReport
 import com.sysadmindoc.ruledeck.core.transfer.MacroDroidImporter
 import com.sysadmindoc.ruledeck.widget.TaskShortcutHelper
-import com.sysadmindoc.ruledeck.widget.TaskWidgetProvider
+import com.opentasker.widget.TaskWidgetProvider
 import androidx.room.withTransaction
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf

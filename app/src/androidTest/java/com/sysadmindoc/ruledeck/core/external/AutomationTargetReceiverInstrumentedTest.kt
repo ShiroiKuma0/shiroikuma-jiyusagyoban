@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.external
 
+import com.opentasker.core.external.AutomationTargetContract
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context

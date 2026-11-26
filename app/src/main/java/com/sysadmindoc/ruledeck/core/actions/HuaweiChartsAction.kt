@@ -6,7 +6,7 @@ import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.huawei.HuaweiSettings
 import com.sysadmindoc.ruledeck.ui.charts.BandLanguage
-import com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiChartsActivity
+import com.opentasker.ui.charts.huawei.HuaweiChartsActivity
 import com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiMetricSpecs
 
 /**

@@ -110,7 +110,7 @@ import com.sysadmindoc.ruledeck.core.scenes.AlignmentGuide
 import com.sysadmindoc.ruledeck.core.scenes.GuideOrientation
 import com.sysadmindoc.ruledeck.core.scenes.SceneAlignmentGuides
 import com.sysadmindoc.ruledeck.core.scenes.SceneCanvasProjector
-import com.sysadmindoc.ruledeck.core.scenes.SceneOverlayService
+import com.opentasker.core.scenes.SceneOverlayService
 import com.sysadmindoc.ruledeck.core.scenes.SceneElementDrafts
 import com.sysadmindoc.ruledeck.core.scenes.SceneIssue
 import com.sysadmindoc.ruledeck.core.scenes.SceneIssueSeverity

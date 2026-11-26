@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.NotificationTriggerService
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context

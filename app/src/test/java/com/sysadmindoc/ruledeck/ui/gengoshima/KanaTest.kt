@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.ui.gengoshima
 
+import com.opentasker.ui.gengoshima.hiragana
+import com.opentasker.ui.gengoshima.katakana
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

@@ -5,7 +5,7 @@ import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.apps.TargetSignerMismatchException
-import com.sysadmindoc.ruledeck.core.scripting.TermuxCommandBroker
+import com.opentasker.core.scripting.TermuxCommandBroker
 import com.sysadmindoc.ruledeck.core.scripting.TermuxCommandRequest
 import com.sysadmindoc.ruledeck.core.scripting.TermuxScriptBackend
 import com.sysadmindoc.ruledeck.core.shizuku.ShizukuShell

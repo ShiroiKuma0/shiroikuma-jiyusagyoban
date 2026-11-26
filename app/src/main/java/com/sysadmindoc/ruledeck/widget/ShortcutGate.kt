@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.widget
 
+import com.opentasker.widget.TaskRunActivity
 import android.content.Context
 import android.content.Intent
 import java.security.MessageDigest
@@ -29,7 +30,7 @@ object ShortcutGate {
     private const val KEY_SEAL = "seal"
 
     /** On an intent built by this app for one of its own widgets. */
-    const val EXTRA_SEAL = "com.sysadmindoc.ruledeck.widget.SEAL"
+    const val EXTRA_SEAL = "com.opentasker.widget.SEAL"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
 

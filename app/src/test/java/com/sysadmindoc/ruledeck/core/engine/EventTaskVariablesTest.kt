@@ -3,7 +3,7 @@ package com.sysadmindoc.ruledeck.core.engine
 import android.content.ContextWrapper
 import com.sysadmindoc.ruledeck.core.contexts.ContextEvent
 import com.sysadmindoc.ruledeck.core.contexts.NotificationContextEvents
-import com.sysadmindoc.ruledeck.core.contexts.SmsContextEvents
+import com.opentasker.core.contexts.SmsContextEvents
 import com.sysadmindoc.ruledeck.core.model.ActionSpec
 import com.sysadmindoc.ruledeck.core.model.Task
 import kotlinx.coroutines.runBlocking

@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.widget
 
+import com.opentasker.widget.CreateTaskShortcutActivity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context

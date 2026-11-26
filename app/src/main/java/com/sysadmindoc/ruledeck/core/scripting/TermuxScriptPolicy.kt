@@ -186,7 +186,7 @@ internal object TermuxScriptPolicy {
     fun hashCheckRequest(script: PreparedTermuxScript): TermuxCommandRequest =
         TermuxCommandRequest(
             executable = HASH_EXECUTABLE,
-            arguments = listOf("-c", HASH_SCRIPT, "ruledeck-hash", script.executable),
+            arguments = listOf("-c", HASH_SCRIPT, "opentasker-hash", script.executable),
             timeoutMs = minOf(script.timeoutMs, HASH_TIMEOUT_MS),
         )
 
@@ -221,7 +221,7 @@ internal object TermuxScriptPolicy {
             arguments = listOf(
                 "-c",
                 VERIFIED_EXECUTION_SCRIPT,
-                "ruledeck-run",
+                "opentasker-run",
                 expectedHash,
                 script.executable,
             ) + script.arguments,

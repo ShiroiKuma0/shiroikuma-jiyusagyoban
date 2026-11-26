@@ -1,5 +1,11 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.TemporaryStateAction
+import com.opentasker.core.actions.AppArchiveAction
+import com.opentasker.core.actions.AppUnarchiveAction
+import com.opentasker.core.actions.PackageInfoAction
+import com.opentasker.core.actions.PackageInstallAction
+import com.opentasker.core.actions.WorkspaceImportAction
 import com.sysadmindoc.ruledeck.core.capabilities.ActionCapability
 import com.sysadmindoc.ruledeck.core.capabilities.ActionCapabilityRegistry
 import com.sysadmindoc.ruledeck.core.engine.Action

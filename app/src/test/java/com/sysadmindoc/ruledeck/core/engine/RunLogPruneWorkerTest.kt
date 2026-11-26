@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.RunLogPruneWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

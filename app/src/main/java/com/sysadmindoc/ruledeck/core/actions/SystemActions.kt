@@ -106,7 +106,7 @@ class LockDeviceAction : DeclaredAction(ActionCatalog.require("lock")) {
         // The fork's own admin, the one Setup activates and screen.lockdown already uses — upstream's
         // separate LockDeviceAdminReceiver would have put a second identical entry in Settings and
         // asked 白い熊 to activate it as well.
-        val admin = android.content.ComponentName(ctx.app, com.sysadmindoc.ruledeck.core.admin.DeviceAdmin::class.java)
+        val admin = android.content.ComponentName(ctx.app, com.opentasker.core.admin.DeviceAdmin::class.java)
         if (!manager.isAdminActive(admin)) {
             // Named rather than generic: the user can act on this one, and the row is one tap away.
             return ActionResult.Failure(
@@ -137,7 +137,7 @@ class LockdownAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val dpm = ctx.app.getSystemService(android.app.admin.DevicePolicyManager::class.java)
             ?: return ActionResult.Failure("DevicePolicyManager unavailable")
-        val admin = android.content.ComponentName(ctx.app, com.sysadmindoc.ruledeck.core.admin.DeviceAdmin::class.java)
+        val admin = android.content.ComponentName(ctx.app, com.opentasker.core.admin.DeviceAdmin::class.java)
         if (!dpm.isAdminActive(admin)) {
             return ActionResult.Failure("Enable Device Admin first (Permissions → Device admin / lockdown)")
         }

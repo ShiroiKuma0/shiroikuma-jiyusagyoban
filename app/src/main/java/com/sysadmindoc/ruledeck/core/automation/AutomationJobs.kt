@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.automation
 
+import com.opentasker.core.automation.AutomationDataService
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 

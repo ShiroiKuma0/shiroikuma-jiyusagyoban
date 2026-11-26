@@ -22,7 +22,7 @@ class BackupRetentionTest {
             SnapshotFile("ruledeck_backup_2026-09-29_07-00-00.db", NOW - 26 * HOUR),
         )
 
-        val expired = DatabaseBackupManager.expiredBackupNames("ruledeck.db", backups, policy, NOW)
+        val expired = DatabaseBackupManager.expiredBackupNames("opentasker.db", backups, policy, NOW)
 
         assertEquals(setOf("ruledeck_backup_2026-09-29_07-00-00.db"), expired)
     }
@@ -33,7 +33,7 @@ class BackupRetentionTest {
             SnapshotFile("ruledeck_backup_2026-09-${30 - day}_07-00-00.db", NOW - day * 24 * HOUR)
         }
 
-        val expired = DatabaseBackupManager.expiredBackupNames("ruledeck.db", backups, policy, NOW)
+        val expired = DatabaseBackupManager.expiredBackupNames("opentasker.db", backups, policy, NOW)
 
         assertEquals(
             selectExpiredSnapshots(backups, policy, NOW).map(SnapshotFile::name).toSet(),
@@ -44,10 +44,10 @@ class BackupRetentionTest {
 
     @Test
     fun onlyOrdinaryBackupsCountAsTheLatestBackup() {
-        assertTrue(DatabaseBackupManager.isRegularBackupName("ruledeck.db", "ruledeck_backup_2026-09-30_07-00-00.db"))
-        assertFalse(DatabaseBackupManager.isRegularBackupName("ruledeck.db", "ruledeck_pre_restore_2026-09-30_07-00-00.db"))
-        assertFalse(DatabaseBackupManager.isRegularBackupName("ruledeck.db", "ruledeck_restore_failed_2026-09-30_07-00-00.db"))
-        assertFalse(DatabaseBackupManager.isRegularBackupName("ruledeck.db", "other_backup_2026-09-30_07-00-00.db"))
+        assertTrue(DatabaseBackupManager.isRegularBackupName("opentasker.db", "ruledeck_backup_2026-09-30_07-00-00.db"))
+        assertFalse(DatabaseBackupManager.isRegularBackupName("opentasker.db", "ruledeck_pre_restore_2026-09-30_07-00-00.db"))
+        assertFalse(DatabaseBackupManager.isRegularBackupName("opentasker.db", "ruledeck_restore_failed_2026-09-30_07-00-00.db"))
+        assertFalse(DatabaseBackupManager.isRegularBackupName("opentasker.db", "other_backup_2026-09-30_07-00-00.db"))
     }
 
     private companion object {

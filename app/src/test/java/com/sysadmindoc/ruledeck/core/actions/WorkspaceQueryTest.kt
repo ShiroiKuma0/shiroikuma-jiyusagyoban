@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.AppPick
 import com.sysadmindoc.ruledeck.core.actions.WorkspaceQuery.Item
 import com.sysadmindoc.ruledeck.core.actions.WorkspaceQuery.Project
 import org.junit.Assert.assertEquals

@@ -89,7 +89,7 @@ class BandSessionAction : Action {
             "pick" -> {
                 // Opens the chart with a span picker. The Action cannot know when the session was —
                 // only 白い熊 can, by looking at the shape — so this hands over rather than guessing.
-                com.sysadmindoc.ruledeck.ui.charts.BandChartsActivity.open(
+                com.opentasker.ui.charts.BandChartsActivity.open(
                     app,
                     metric = com.sysadmindoc.ruledeck.ui.charts.MetricSpecs.KEY_MARK_SESSION,
                     spanMinutes = null,

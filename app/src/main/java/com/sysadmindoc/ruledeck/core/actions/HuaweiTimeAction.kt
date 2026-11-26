@@ -37,7 +37,7 @@ class HuaweiTimeAction : DeclaredAction(ActionCatalog.require("huawei.time")) {
         // 白い熊's to choose, including the phone's own time, so this is also the reset.
         val pick = args["pick"]?.trim()?.lowercase().orEmpty()
         if (pick in TRUE_WORDS) {
-            com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiBandClockActivity.open(ctx.app)
+            com.opentasker.ui.charts.huawei.HuaweiBandClockActivity.open(ctx.app)
             ctx.variables.set("${prefix}Summary", "opened the watch clock")
             store?.let { ctx.variables.set(it, "opened the watch clock") }
             return ActionResult.Success

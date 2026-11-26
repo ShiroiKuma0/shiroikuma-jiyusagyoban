@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.widget
 
+import com.opentasker.widget.StyledWidgetProvider
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context

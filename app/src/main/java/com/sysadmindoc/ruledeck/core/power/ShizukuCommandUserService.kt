@@ -70,8 +70,8 @@ class ShizukuCommandUserService : IShizukuCommandService.Stub() {
                         FileOutputStream(output).use { destination -> source.copyTo(destination) }
                     }
                 }.onFailure { copyFailure = it }
-            }, "ruledeck-shizuku-screenshot")
-            val errorThread = Thread({ readBounded(process.errorStream) }, "ruledeck-shizuku-screenshot-error")
+            }, "opentasker-shizuku-screenshot")
+            val errorThread = Thread({ readBounded(process.errorStream) }, "opentasker-shizuku-screenshot-error")
             outputThread.start()
             errorThread.start()
             val finished = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -148,8 +148,8 @@ class ShizukuCommandUserService : IShizukuCommandService.Stub() {
             val process = Runtime.getRuntime().exec(command.toTypedArray())
             var stdout = ""
             var stderr = ""
-            val stdoutThread = Thread({ stdout = readBounded(process.inputStream) }, "ruledeck-shizuku-stdout")
-            val stderrThread = Thread({ stderr = readBounded(process.errorStream) }, "ruledeck-shizuku-stderr")
+            val stdoutThread = Thread({ stdout = readBounded(process.inputStream) }, "opentasker-shizuku-stdout")
+            val stderrThread = Thread({ stderr = readBounded(process.errorStream) }, "opentasker-shizuku-stderr")
             stdoutThread.start()
             stderrThread.start()
             val finished = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)

@@ -1,8 +1,9 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import android.content.Context
 import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
-import com.sysadmindoc.ruledeck.core.contexts.NotificationTriggerService
+import com.opentasker.core.contexts.NotificationTriggerService
 import com.sysadmindoc.ruledeck.core.logging.AppLogger
 import com.sysadmindoc.ruledeck.core.model.RunLogEntry
 import com.sysadmindoc.ruledeck.core.storage.ShutdownSettings

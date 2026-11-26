@@ -242,7 +242,7 @@ class BackupEncryptionTest {
     fun nearCapRoundTripKeepsExplicitBuffersBelowThreeFrames() {
         val plaintextBytes = DatabaseBackupManager.MAX_BACKUP_BYTES - 1_024
         val generated = GeneratedInputStream(plaintextBytes)
-        val encryptedFile = Files.createTempFile("ruledeck-near-cap", ".rdbackup").toFile()
+        val encryptedFile = Files.createTempFile("opentasker-near-cap", ".rdbackup").toFile()
         try {
             FileOutputStream(encryptedFile).use { output ->
                 BackupEncryption.encrypt(generated, output, "near-cap".toCharArray())

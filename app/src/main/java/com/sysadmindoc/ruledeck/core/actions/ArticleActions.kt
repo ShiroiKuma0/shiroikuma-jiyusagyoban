@@ -21,8 +21,8 @@ import com.sysadmindoc.ruledeck.core.ocr.OcrTuning
 import com.sysadmindoc.ruledeck.core.ocr.article.ArticleProgress
 import com.sysadmindoc.ruledeck.core.ocr.article.ArticleReader
 import com.sysadmindoc.ruledeck.core.ocr.article.ArticleWriter
-import com.sysadmindoc.ruledeck.ui.article.ArticleBuildActivity
-import com.sysadmindoc.ruledeck.ui.article.ArticleEditActivity
+import com.opentasker.ui.article.ArticleBuildActivity
+import com.opentasker.ui.article.ArticleEditActivity
 import com.sysadmindoc.ruledeck.ui.ocr.flash
 import com.sysadmindoc.ruledeck.ui.theme.ThemeStore
 import java.io.File
@@ -277,7 +277,7 @@ class ArticleToHtmlAction : Action {
         }
 
         private companion object {
-            const val CHANNEL = "ruledeck.article"
+            const val CHANNEL = "opentasker.article"
             const val CHANNEL_NAME = "白い熊 自由作業盤 記事"
             const val ID = 60792
             const val MIN_INTERVAL_MS = 1_200L

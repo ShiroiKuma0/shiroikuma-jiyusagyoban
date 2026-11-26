@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.transfer
 
+import com.opentasker.core.transfer.StateExportReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -231,7 +232,7 @@ object SettingsBackup {
      */
     private val PREF_FILES: Map<Cat, List<String>> = mapOf(
         Cat.APPEARANCE to listOf("shiroikuma_ui_theme"),
-        Cat.WIDGETS to listOf("shiroikuma_widget_templates", "shiroikuma_styled_widgets", "ruledeck_widget_prefs"),
+        Cat.WIDGETS to listOf("shiroikuma_widget_templates", "shiroikuma_styled_widgets", "opentasker_widget_prefs"),
         Cat.BUBBLES to listOf("shiroikuma_freeze_bubbles", "shiroikuma_flash_bubbles"),
         Cat.APP_SETTINGS to listOf(
             "shiroikuma_list_sort", "project_selection", "run_log_retention",

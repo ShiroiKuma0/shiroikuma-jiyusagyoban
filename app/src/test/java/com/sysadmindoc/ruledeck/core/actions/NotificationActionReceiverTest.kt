@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.NotificationActionReceiver
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,7 +18,7 @@ class NotificationActionReceiverTest {
 
     @Test
     fun receiverForwardsToServiceInsteadOfRunningInline() {
-        val receiver = source("com/sysadmindoc/ruledeck/core/actions/NotificationActionReceiver.kt")
+        val receiver = source("com/opentasker/core/actions/NotificationActionReceiver.kt")
         assertFalse(
             "Receiver must not run tasks inside its goAsync window",
             receiver.contains("goAsync()"),

@@ -8,7 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.sysadmindoc.ruledeck.StartupPreparingScreen
+import com.opentasker.app.StartupPreparingScreen
 import com.sysadmindoc.ruledeck.StartupStage
 import com.sysadmindoc.ruledeck.core.engine.PreflightInputs
 import com.sysadmindoc.ruledeck.core.engine.PreflightReport

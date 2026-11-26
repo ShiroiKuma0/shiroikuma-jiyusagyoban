@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck
 
+import com.opentasker.app.MainActivity
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -8,8 +9,8 @@ class MainActivityServiceStartContractTest {
     @Test
     fun mainActivityStartsAutomationForegroundService() {
         val source = listOf(
-            File("src/main/java/com/sysadmindoc/ruledeck/MainActivity.kt"),
-            File("app/src/main/java/com/sysadmindoc/ruledeck/MainActivity.kt"),
+            File("src/main/java/com/opentasker/app/MainActivity.kt"),
+            File("app/src/main/java/com/opentasker/app/MainActivity.kt"),
         ).first { it.exists() }.readText()
 
         assertTrue("MainActivity should start the automation foreground service", "startAutomationService()" in source)

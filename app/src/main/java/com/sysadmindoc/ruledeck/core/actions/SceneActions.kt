@@ -10,9 +10,9 @@ import com.sysadmindoc.ruledeck.core.engine.variables.expandAgainstGlobals
 import com.sysadmindoc.ruledeck.core.model.Scene
 import com.sysadmindoc.ruledeck.core.storage.SceneDao
 import com.sysadmindoc.ruledeck.core.storage.SceneEntity
-import com.sysadmindoc.ruledeck.scenes.SceneActivity
+import com.opentasker.scenes.SceneActivity
 import com.sysadmindoc.ruledeck.scenes.SceneOverlayManager
-import com.sysadmindoc.ruledeck.scenes.WakedanceActivity
+import com.opentasker.scenes.WakedanceActivity
 
 /**
  * Resolve a scene reference (from `scene.show` / `scene.hide`) to a stored scene.

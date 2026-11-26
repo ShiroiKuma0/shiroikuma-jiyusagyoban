@@ -11,7 +11,7 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.sysadmindoc.ruledeck.core.power.ShizukuPowerBackend
 import com.sysadmindoc.ruledeck.i18n.tr
 
@@ -42,7 +42,7 @@ object CapabilityState {
             else ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         CapabilityRequirement.DeviceAdmin -> {
             val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
-            dpm?.isAdminActive(android.content.ComponentName(context, com.sysadmindoc.ruledeck.core.admin.DeviceAdmin::class.java)) == true
+            dpm?.isAdminActive(android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)) == true
         }
         CapabilityRequirement.Microphone ->
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -92,7 +92,7 @@ object CapabilityState {
             CapabilityRequirement.DeviceAdmin ->
                 Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).putExtra(
                     android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-                    android.content.ComponentName(context, com.sysadmindoc.ruledeck.core.admin.DeviceAdmin::class.java),
+                    android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java),
                 )
             CapabilityRequirement.Microphone ->
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))

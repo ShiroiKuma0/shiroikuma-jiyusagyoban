@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.external
 
+import com.opentasker.core.external.AutomationTargetContract
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File

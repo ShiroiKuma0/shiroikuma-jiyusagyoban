@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.PushEventReceiver
+import com.opentasker.core.contexts.UnifiedPushService
 import java.io.File
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,10 +14,10 @@ class UnifiedPushContractTest {
 
     @Test
     fun serviceUsesOfficialConnectorAndLegacyReceiverRemainsAvailable() {
-        val service = File(repoRoot, "app/src/main/java/com/sysadmindoc/ruledeck/core/contexts/UnifiedPushService.kt").readText()
+        val service = File(repoRoot, "app/src/main/java/com/opentasker/core/contexts/UnifiedPushService.kt").readText()
         val connector = File(repoRoot, "app/src/main/java/com/sysadmindoc/ruledeck/core/contexts/UnifiedPushConnector.kt").readText()
         val pushEvents = File(repoRoot, "app/src/main/java/com/sysadmindoc/ruledeck/core/contexts/PushContextEvents.kt").readText()
-        val receiver = File(repoRoot, "app/src/main/java/com/sysadmindoc/ruledeck/core/contexts/PushEventReceiver.kt").readText()
+        val receiver = File(repoRoot, "app/src/main/java/com/opentasker/core/contexts/PushEventReceiver.kt").readText()
         val manifest = File(repoRoot, "app/src/main/AndroidManifest.xml").readText()
         val build = File(repoRoot, "app/build.gradle.kts").readText()
 
@@ -27,7 +29,7 @@ class UnifiedPushContractTest {
         assertTrue(connector.contains(UnifiedPushConnector.DISTRIBUTOR_DISCOVERY_URI))
         assertTrue(build.contains("libs.unifiedpush.connector"))
         assertTrue(manifest.contains("org.unifiedpush.android.connector.PUSH_EVENT"))
-        assertTrue(manifest.contains("com.sysadmindoc.ruledeck.action.PUSH_EVENT"))
+        assertTrue(manifest.contains("com.opentasker.action.PUSH_EVENT"))
         assertTrue(pushEvents.contains("ACTION_NTFY_USER_ACTION"))
         assertTrue(pushEvents.contains("NTFY_EXTRA_ID = \"id\""))
         assertTrue(pushEvents.contains("firstExtraString(EXTRA_TOPIC, NTFY_EXTRA_TOPIC)"))

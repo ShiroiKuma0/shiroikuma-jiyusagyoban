@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.gengoshima
 
+import com.opentasker.ui.gengoshima.hiragana
 import com.sysadmindoc.ruledeck.i18n.tr
 import com.sysadmindoc.ruledeck.ui.components.OutlinedButton
 import android.media.MediaPlayer

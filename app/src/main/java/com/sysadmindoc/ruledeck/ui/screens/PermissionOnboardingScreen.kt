@@ -71,7 +71,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sysadmindoc.ruledeck.BuildConfig
 import com.sysadmindoc.ruledeck.R
 import com.sysadmindoc.ruledeck.core.logging.AppLogger
-import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.sysadmindoc.ruledeck.core.location.LocationPolicyDisclosures
@@ -342,7 +342,7 @@ internal fun rememberPermissionActionRunner(
             }
             is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
             is PermissionAction.DeviceAdmin -> {
-                val admin = android.content.ComponentName(context, com.sysadmindoc.ruledeck.core.admin.DeviceAdmin::class.java)
+                val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
                 val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
                 if (dpm?.isAdminActive(admin) == true) {
                     // Already active → open the device-admin LIST to review / disable it. (EMUI buries
@@ -561,7 +561,7 @@ internal fun buildPermissionItems(
             body = tr("Lets the 物理鍵 lockdown action lock the device and require your PIN/password (biometrics disabled until the next credential entry)."),
             granted = run {
                 val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
-                val admin = android.content.ComponentName(context, com.sysadmindoc.ruledeck.core.admin.DeviceAdmin::class.java)
+                val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
                 dpm?.isAdminActive(admin) == true
             },
             actionLabel = tr("Enable"),

@@ -23,7 +23,7 @@ class LocationForegroundServiceContractTest {
         val automationService = (0 until services.length)
             .asSequence()
             .map { services.item(it) }
-            .first { it.attributes.getNamedItem("android:name")?.nodeValue == "com.sysadmindoc.ruledeck.core.engine.AutomationService" }
+            .first { it.attributes.getNamedItem("android:name")?.nodeValue == "com.opentasker.core.engine.AutomationService" }
         val serviceTypes = automationService.attributes.getNamedItem("android:foregroundServiceType")?.nodeValue.orEmpty()
 
         assertTrue("automation foreground service must retain specialUse type", "specialUse" in serviceTypes.split("|"))

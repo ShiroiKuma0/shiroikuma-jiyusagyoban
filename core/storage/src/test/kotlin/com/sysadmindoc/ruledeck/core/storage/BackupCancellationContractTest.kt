@@ -96,7 +96,7 @@ class BackupCancellationContractTest {
     }
 
     private fun read(fileName: String): String =
-        Path.of("src/main/kotlin/com/sysadmindoc/ruledeck/core/storage/$fileName").readText()
+        Path.of("src/main/kotlin/com/sysadmindoc/opentasker/core/storage/$fileName").readText()
 
     /**
      * The text between [start] and the first [end] after it, searching from [from].

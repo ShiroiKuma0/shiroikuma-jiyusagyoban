@@ -67,7 +67,7 @@ class BlueprintCatalogStore(context: Context) {
     }
 
     private companion object {
-        const val PREFERENCES = "ruledeck_blueprints"
+        const val PREFERENCES = "opentasker_blueprints"
         const val KEY_DEFINITIONS = "definitions"
     }
 }
@@ -100,7 +100,7 @@ class BlueprintInstallationStore(context: Context) {
     }
 
     private companion object {
-        const val PREFERENCES = "ruledeck_blueprint_installations"
+        const val PREFERENCES = "opentasker_blueprint_installations"
         const val KEY_INSTALLATIONS = "installations"
     }
 }

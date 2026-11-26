@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.sysadmindoc.ruledeck.core.engine.AutomationService
+import com.opentasker.core.engine.AutomationService
 import com.sysadmindoc.ruledeck.core.engine.EngineHeartbeat
 import com.sysadmindoc.ruledeck.core.engine.RuntimeInventory
 import com.sysadmindoc.ruledeck.core.engine.WidgetRefreshLog

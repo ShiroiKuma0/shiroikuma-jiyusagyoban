@@ -20,12 +20,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <permission
-        android:name="com.sysadmindoc.ruledeck.permission.AUTOMATION"
+        android:name="com.opentasker.permission.AUTOMATION"
         tools:node="remove" />
 
     <application>
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.external.AutomationTargetReceiver"
+            android:name="com.opentasker.core.external.AutomationTargetReceiver"
             android:permission=""
             tools:replace="android:permission" />
     </application>

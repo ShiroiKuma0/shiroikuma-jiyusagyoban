@@ -1,5 +1,9 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.QuickSettingsTileService
+import com.opentasker.core.contexts.QuickSettingsTileServiceSlot3
+import com.opentasker.core.contexts.QuickSettingsTileServiceSlot4
+import com.opentasker.core.contexts.tileState
 import android.service.quicksettings.Tile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -66,7 +70,7 @@ class QuickSettingsTileTest {
     @Test
     fun aTileRunIsDeferredUntilTheDeviceIsUnlocked() {
         val source = com.sysadmindoc.ruledeck.ProductionSources.block(
-            "com/sysadmindoc/ruledeck/core/contexts/QuickSettingsTileService.kt",
+            "com/opentasker/core/contexts/QuickSettingsTileService.kt",
             "override fun onClick()",
             "private fun updateTile(",
         )

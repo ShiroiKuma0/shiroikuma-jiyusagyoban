@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.gengoshima
 
+import com.opentasker.ui.gengoshima.queue
 import android.content.Context
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

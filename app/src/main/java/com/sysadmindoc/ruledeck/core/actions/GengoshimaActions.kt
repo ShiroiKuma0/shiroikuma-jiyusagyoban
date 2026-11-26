@@ -6,8 +6,8 @@ import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.gengoshima.GenerationRunner
 import com.sysadmindoc.ruledeck.core.gengoshima.GengoshimaSettings
-import com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaEntryActivity
-import com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaProgressActivity
+import com.opentasker.ui.gengoshima.GengoshimaEntryActivity
+import com.opentasker.ui.gengoshima.GengoshimaProgressActivity
 import kotlinx.coroutines.flow.first
 
 /**
@@ -39,9 +39,9 @@ class GengoshimaListenAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
         val raw = ctx.variables.expand(args["mode"].orEmpty()).trim()
-        val mode = com.sysadmindoc.ruledeck.ui.gengoshima.ListenMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+        val mode = com.opentasker.ui.gengoshima.ListenMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
         if (raw.isNotEmpty() && mode == null) return ActionResult.Failure("言語島: mode must be listen, shadow or recall, not '$raw'")
-        ctx.app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaPlayerActivity.intent(ctx.app, mode))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaPlayerActivity.intent(ctx.app, mode))
         return ActionResult.Success
     }
 }
@@ -56,7 +56,7 @@ class GengoshimaBoardAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
-        com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaBoardActivity.open(ctx.app)
+        com.opentasker.ui.gengoshima.GengoshimaBoardActivity.open(ctx.app)
         return ActionResult.Success
     }
 }
@@ -67,7 +67,7 @@ class GengoshimaStatsAction : Action {
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        ctx.app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaStatsActivity.intent(ctx.app))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaStatsActivity.intent(ctx.app))
         return ActionResult.Success
     }
 }
@@ -82,7 +82,7 @@ class GengoshimaVocabAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
-        ctx.app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaVocabActivity.intent(ctx.app))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaVocabActivity.intent(ctx.app))
         return ActionResult.Success
     }
 }
@@ -97,7 +97,7 @@ class GengoshimaImportAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
-        ctx.app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaImportActivity.intent(ctx.app, fromBoard = true))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaImportActivity.intent(ctx.app, fromBoard = true))
         return ActionResult.Success
     }
 }
@@ -109,7 +109,7 @@ class GengoshimaIslandsAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
-        ctx.app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaIslandsActivity.intent(ctx.app))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaIslandsActivity.intent(ctx.app))
         return ActionResult.Success
     }
 }
@@ -207,7 +207,7 @@ class GengoshimaInboxAction : Action {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
-        ctx.app.startActivity(com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaInboxActivity.intent(ctx.app))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaInboxActivity.intent(ctx.app))
         return ActionResult.Success
     }
 }

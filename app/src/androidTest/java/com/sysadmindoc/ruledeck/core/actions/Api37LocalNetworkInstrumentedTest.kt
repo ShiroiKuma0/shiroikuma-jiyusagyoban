@@ -12,7 +12,7 @@ import android.provider.Settings
 import android.service.notification.StatusBarNotification
 import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
-import com.sysadmindoc.ruledeck.core.engine.AutomationService
+import com.opentasker.core.engine.AutomationService
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.engine.VariableStore
@@ -20,7 +20,7 @@ import com.sysadmindoc.ruledeck.core.model.Scene
 import com.sysadmindoc.ruledeck.core.model.SceneElement
 import com.sysadmindoc.ruledeck.core.model.SceneElementType
 import com.sysadmindoc.ruledeck.core.platform.PromotedOngoingNotificationSupport
-import com.sysadmindoc.ruledeck.core.scenes.SceneOverlayService
+import com.opentasker.core.scenes.SceneOverlayService
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -149,7 +149,7 @@ class Api37LocalNetworkInstrumentedTest {
         )
         assertDumpContains("dumpsys activity services $packageName", "SceneOverlayService")
 
-        shell("am start -W -n $packageName/com.sysadmindoc.ruledeck.MainActivity")
+        shell("am start -W -n $packageName/com.opentasker.app.MainActivity")
         shell("input keyevent KEYCODE_BACK")
         val logcat = shell("logcat -d -t 200")
         assertTrue(

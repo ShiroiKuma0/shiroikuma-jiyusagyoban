@@ -24,7 +24,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
-import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.sysadmindoc.ruledeck.core.contexts.AppForegroundChangedContextEvents
 import com.sysadmindoc.ruledeck.core.engine.executeAndLogTask
 import com.sysadmindoc.ruledeck.core.engine.resolveTaskByName

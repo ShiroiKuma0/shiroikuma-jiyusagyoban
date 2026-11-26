@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
  * The "the user asked the app to stop" flag, and the gate every way back in has to pass.
  *
  * Stopping the engine service is not enough on its own to keep this app down: the per-minute exact
- * alarm resurrects it ([com.sysadmindoc.ruledeck.automation.receiver.TimeEventReceiver]), and the accessibility
+ * alarm resurrects it ([com.opentasker.automation.receiver.TimeEventReceiver]), and the accessibility
  * and notification-listener services are bound by the system, so the process is re-created within
  * seconds no matter how it is killed. "Exit app fully" therefore sets a **persisted** flag, and every
  * external entry point ([refuse]) declines while it is set instead of quietly waking everything up.

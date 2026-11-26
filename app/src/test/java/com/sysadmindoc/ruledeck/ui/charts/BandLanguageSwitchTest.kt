@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.charts
 
+import com.opentasker.ui.charts.BandChartsActivity
 import com.sysadmindoc.ruledeck.core.model.ActionSpec
 import com.sysadmindoc.ruledeck.core.model.Task
 import org.junit.Assert.assertEquals

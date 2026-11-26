@@ -11,7 +11,7 @@ import com.sysadmindoc.ruledeck.core.scripting.ShizukuScriptCoordinator
 import com.sysadmindoc.ruledeck.core.scripting.ShizukuScriptExecutionResult
 import com.sysadmindoc.ruledeck.core.scripting.ShizukuScriptInvocation
 import com.sysadmindoc.ruledeck.core.scripting.ShizukuScriptPolicy
-import com.sysadmindoc.ruledeck.core.scripting.TermuxCommandBroker
+import com.opentasker.core.scripting.TermuxCommandBroker
 import com.sysadmindoc.ruledeck.core.scripting.TermuxScriptBackend
 import com.sysadmindoc.ruledeck.core.scripting.TermuxScriptCoordinator
 import com.sysadmindoc.ruledeck.core.scripting.TermuxScriptExecutionResult

@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.gengoshima
 
+import com.opentasker.ui.gengoshima.ProgressPanelContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp

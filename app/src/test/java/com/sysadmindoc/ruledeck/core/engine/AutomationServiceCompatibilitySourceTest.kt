@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readText
@@ -15,7 +16,7 @@ class AutomationServiceCompatibilitySourceTest {
 
     @Test
     fun dynamicReceiversUseAndroidXCompatibilityRegistration() {
-        val source = sourceRoot.resolve("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt").readText()
+        val source = sourceRoot.resolve("com/opentasker/core/engine/AutomationService.kt").readText()
 
         assertTrue(
             "Dynamic receivers should use AndroidX compatibility registration for minSdk devices",

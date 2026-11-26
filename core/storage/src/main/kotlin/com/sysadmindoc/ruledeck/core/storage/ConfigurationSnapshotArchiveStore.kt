@@ -12,7 +12,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 internal const val CONFIGURATION_SNAPSHOT_MIME_TYPE = "application/octet-stream"
-internal const val CONFIGURATION_SNAPSHOT_PREFIX = "ruledeck_snapshot_"
+internal const val CONFIGURATION_SNAPSHOT_PREFIX = "opentasker_snapshot_"
 internal const val CONFIGURATION_SNAPSHOT_SUFFIX = ".rdbackup"
 
 internal fun configurationSnapshotArchiveName(atMs: Long): String =

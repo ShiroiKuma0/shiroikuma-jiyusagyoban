@@ -340,7 +340,7 @@ class HuaweiChizuInterimTest {
 class HuaweiCutoutAutoFetchTest {
 
     private val activity = com.sysadmindoc.ruledeck.ProductionSources
-        .read("com/sysadmindoc/ruledeck/ui/charts/huawei/HuaweiWalksActivity.kt")
+        .read("com/opentasker/ui/charts/huawei/HuaweiWalksActivity.kt")
     private val text = com.sysadmindoc.ruledeck.ProductionSources
         .read("com/sysadmindoc/ruledeck/ui/charts/huawei/HuaweiText.kt")
 

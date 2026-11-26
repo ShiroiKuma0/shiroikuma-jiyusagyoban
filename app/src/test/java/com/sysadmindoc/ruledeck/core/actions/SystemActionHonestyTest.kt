@@ -28,7 +28,8 @@ class SystemActionHonestyTest {
 
     @Test
     fun packageArchiveGuardsTheApi35CallInsteadOfSuppressingNewApi() {
-        val source = sourceRoot.resolve("core/actions/PackageArchiveActions.kt").readText()
+        // in the old package: it holds a receiver the manifest names (scripts/stored-names/components.txt)
+        val source = Path.of(sourceRoot.toString().replace("com/sysadmindoc/ruledeck", "com/opentasker")).resolve("core/actions/PackageArchiveActions.kt").readText()
         // A suppression cannot tell a real API-level mismatch from an accepted one, so the API 35
         // call is gated on a check lint can prove rather than silenced.
         assertFalse(

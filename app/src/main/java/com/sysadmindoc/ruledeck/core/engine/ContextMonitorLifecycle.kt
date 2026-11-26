@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import com.sysadmindoc.ruledeck.core.contexts.stateContextKey
 import com.sysadmindoc.ruledeck.core.contexts.stateSpecReadsWifiSsid
 import com.sysadmindoc.ruledeck.core.model.ContextSpec

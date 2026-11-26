@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.gengoshima
 
+import com.opentasker.ui.gengoshima.GengoshimaBoardActivity
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

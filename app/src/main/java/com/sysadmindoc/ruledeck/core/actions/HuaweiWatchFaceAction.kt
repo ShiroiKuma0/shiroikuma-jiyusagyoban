@@ -38,7 +38,7 @@ class HuaweiWatchFaceAction : Action {
         // this action rather than given its own id because it is the same job seen from the other
         // end — 白い熊 picking the face instead of a task naming it.
         args["browse"]?.trim()?.ifEmpty { null }?.let { dir ->
-            com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiFacesActivity.open(ctx.app, dir)
+            com.opentasker.ui.charts.huawei.HuaweiFacesActivity.open(ctx.app, dir)
             ctx.variables.set("${prefix}Summary", "opened the watch-face library")
             return ActionResult.Success
         }

@@ -1,6 +1,6 @@
 package com.sysadmindoc.ruledeck.core.actions
 
-import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext

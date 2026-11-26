@@ -202,8 +202,8 @@ internal object ShizukuScriptExecutor {
         val stdout = BoundedCapture()
         val stderr = BoundedCapture()
         val readers = listOf(
-            drainThread("ruledeck-shizuku-script-stdout") { stdout.drain(process.inputStream) },
-            drainThread("ruledeck-shizuku-script-stderr") { stderr.drain(process.errorStream) },
+            drainThread("opentasker-shizuku-script-stdout") { stdout.drain(process.inputStream) },
+            drainThread("opentasker-shizuku-script-stderr") { stderr.drain(process.errorStream) },
         )
         // A script that reads stdin gets end of file rather than waiting out its whole timeout.
         try {

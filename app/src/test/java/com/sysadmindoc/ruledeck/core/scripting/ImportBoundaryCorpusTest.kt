@@ -1,6 +1,6 @@
 package com.sysadmindoc.ruledeck.core.scripting
 
-import com.sysadmindoc.ruledeck.core.external.AutomationTargetContract
+import com.opentasker.core.external.AutomationTargetContract
 import android.content.Intent
 import com.sysadmindoc.ruledeck.core.contexts.ShareContextEvents
 import com.sysadmindoc.ruledeck.core.contexts.ShareInput
@@ -165,28 +165,28 @@ class ImportBoundaryCorpusTest {
     fun termuxCorpusFailsClosedWithoutCommandDispatch() {
         val invalid = listOf(
             TermuxScriptInvocation(
-                executable = "~/.termux/ruledeck/../escape.sh",
+                executable = "~/.termux/tasker/../escape.sh",
                 argumentText = null,
                 workingDirectory = null,
                 stdin = null,
                 timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
             ),
             TermuxScriptInvocation(
-                executable = "~/.termux/ruledeck/run.sh",
+                executable = "~/.termux/tasker/run.sh",
                 argumentText = "'unterminated",
                 workingDirectory = null,
                 stdin = null,
                 timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
             ),
             TermuxScriptInvocation(
-                executable = "~/.termux/ruledeck/run.sh",
+                executable = "~/.termux/tasker/run.sh",
                 argumentText = null,
                 workingDirectory = null,
                 stdin = "x".repeat(TermuxScriptPolicy.MAX_STDIN_BYTES + 1),
                 timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
             ),
             TermuxScriptInvocation(
-                executable = "~/.termux/ruledeck/run.sh",
+                executable = "~/.termux/tasker/run.sh",
                 argumentText = null,
                 workingDirectory = null,
                 stdin = null,

@@ -5,7 +5,7 @@ import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.band.BandSettings
-import com.sysadmindoc.ruledeck.ui.charts.BandChartsActivity
+import com.opentasker.ui.charts.BandChartsActivity
 
 /**
  * `Show Band Charts` — open 「健康」 in its own fullscreen window.

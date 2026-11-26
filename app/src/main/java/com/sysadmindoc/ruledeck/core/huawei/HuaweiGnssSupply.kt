@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.huawei
 
+import com.opentasker.core.huawei.GnssForecastReminder
+import com.opentasker.core.huawei.GnssRebuildSchedule
 import android.content.Context
 import com.sysadmindoc.ruledeck.core.actions.HuaweiGnssAction
 import okhttp3.OkHttpClient

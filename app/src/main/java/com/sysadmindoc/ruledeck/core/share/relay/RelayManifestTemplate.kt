@@ -18,7 +18,7 @@ import java.nio.ByteOrder
 object RelayManifestTemplate {
 
     /** The exact placeholder strings in the template that get substituted (must match the source manifest). */
-    private const val PLACEHOLDER_PACKAGE = "com.sysadmindoc.ruledeck.relay"
+    private const val PLACEHOLDER_PACKAGE = "com.opentasker.relay"
     private const val PLACEHOLDER_LABEL = "Relay Placeholder"
     private const val PLACEHOLDER_TARGET = "PLACEHOLDER_TARGET_PKG"
 

@@ -16,13 +16,13 @@ class DatabaseBackupManagerWalCheckpointTest {
     @Test
     fun busyCheckpointMessageIdentifiesWalRaceAndDatabasePath() {
         val message = walCheckpointIncompleteMessage(
-            databaseName = "ruledeck.db",
-            sourcePath = "/data/data/com.sysadmindoc.ruledeck/databases/ruledeck.db",
+            databaseName = "opentasker.db",
+            sourcePath = "/data/data/com.sysadmindoc.ruledeck/databases/opentasker.db",
             status = WalCheckpointStatus(busy = 1, logFrames = 12, checkpointedFrames = 7),
         )
 
         assertTrue(message.contains("WAL checkpoint did not complete"))
-        assertTrue(message.contains("ruledeck.db"))
+        assertTrue(message.contains("opentasker.db"))
         assertTrue(message.contains("copying the WAL with it"))
         assertTrue(message.contains("busy=1"))
     }

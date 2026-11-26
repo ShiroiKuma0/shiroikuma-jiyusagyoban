@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.ui.gengoshima
 
+import com.opentasker.ui.gengoshima.GengoshimaVocabActivity
+import com.opentasker.ui.gengoshima.hiragana
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

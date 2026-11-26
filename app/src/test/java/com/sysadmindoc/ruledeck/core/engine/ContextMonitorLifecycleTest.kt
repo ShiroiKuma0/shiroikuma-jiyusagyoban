@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import com.sysadmindoc.ruledeck.core.model.ContextSpec
 import com.sysadmindoc.ruledeck.core.model.ContextType
 import com.sysadmindoc.ruledeck.core.model.Profile

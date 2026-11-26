@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.ContactPickerCoordinator
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager

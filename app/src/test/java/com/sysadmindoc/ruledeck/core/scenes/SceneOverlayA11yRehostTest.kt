@@ -19,7 +19,7 @@ import org.junit.Test
 class SceneOverlayA11yRehostTest {
 
     private val manager = "com/sysadmindoc/ruledeck/scenes/SceneOverlayManager.kt"
-    private val service = "com/sysadmindoc/ruledeck/core/accessibility/ShiroiKumaAccessibilityService.kt"
+    private val service = "com/opentasker/core/accessibility/ShiroiKumaAccessibilityService.kt"
 
     @Test
     fun serviceTellsTheOverlayManagerWhenItBinds() {

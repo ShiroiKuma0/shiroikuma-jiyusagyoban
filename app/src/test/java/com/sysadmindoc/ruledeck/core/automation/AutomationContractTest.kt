@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.automation
 
+import com.opentasker.core.automation.AutomationProvider
 import com.sysadmindoc.ruledeck.ProductionSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,7 +17,7 @@ class AutomationContractTest {
 
     private val auth = ProductionSources.read("com/sysadmindoc/ruledeck/core/transfer/AutomationAuth.kt")
     private val callers = ProductionSources.read("com/sysadmindoc/ruledeck/core/automation/AutomationCallers.kt")
-    private val provider = ProductionSources.read("com/sysadmindoc/ruledeck/core/automation/AutomationProvider.kt")
+    private val provider = ProductionSources.read("com/opentasker/core/automation/AutomationProvider.kt")
 
     /** 白い熊's whole point: a clean phone has no token, so automation cannot need one. */
     @Test
@@ -119,7 +120,7 @@ class AutomationContractTest {
      */
     @Test
     fun `import exists only behind the verified door`() {
-        val receiver = ProductionSources.read("com/sysadmindoc/ruledeck/core/transfer/StateExportReceiver.kt")
+        val receiver = ProductionSources.read("com/opentasker/core/transfer/StateExportReceiver.kt")
         assertTrue("no import action on the receiver", !receiver.contains("IMPORT_STATE"))
         assertTrue("import is a provider method", provider.contains("METHOD_IMPORT"))
     }

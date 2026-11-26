@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.contexts
 
+import com.opentasker.core.contexts.SmsContextEvents
 import android.content.Context
 import com.sysadmindoc.ruledeck.core.plugins.locale.LocalePluginRequestQueryEvents
 import kotlinx.coroutines.CoroutineStart

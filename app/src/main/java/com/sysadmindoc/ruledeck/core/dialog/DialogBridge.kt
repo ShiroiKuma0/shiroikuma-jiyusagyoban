@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.dialog
 
+import com.opentasker.core.dialog.DialogActivity
 import android.os.Bundle
 import kotlinx.coroutines.CompletableDeferred
 import java.util.concurrent.ConcurrentHashMap

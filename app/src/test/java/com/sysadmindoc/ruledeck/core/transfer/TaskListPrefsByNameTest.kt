@@ -106,7 +106,7 @@ class TaskListPrefsByNameTest {
     @Test
     fun `an unresolved auto-start entry is logged rather than skipped in silence`() {
         val body = ProductionSources.block(
-            "com/sysadmindoc/ruledeck/core/engine/AutomationService.kt",
+            "com/opentasker/core/engine/AutomationService.kt",
             "private fun runAutoStartTasks(",
             "private fun applyContextSourceGating(",
         )
@@ -147,7 +147,7 @@ class TaskListPrefsByNameTest {
         // whose owner does not open the Monitor screen.
         assertTrue(
             "the auto-start path must convert before it reads",
-            ProductionSources.read("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt")
+            ProductionSources.read("com/opentasker/core/engine/AutomationService.kt")
                 .contains("AutoStartSettings.migrate("),
         )
         assertTrue(

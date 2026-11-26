@@ -14,7 +14,7 @@ import com.sysadmindoc.ruledeck.core.ocr.OcrImage
 import com.sysadmindoc.ruledeck.core.ocr.OcrScript
 import com.sysadmindoc.ruledeck.core.ocr.OcrTuning
 import com.sysadmindoc.ruledeck.core.model.VariableNamePolicy
-import com.sysadmindoc.ruledeck.ui.ocr.OcrReviewActivity
+import com.opentasker.ui.ocr.OcrReviewActivity
 import com.sysadmindoc.ruledeck.ui.theme.ThemeStore
 import java.io.File
 

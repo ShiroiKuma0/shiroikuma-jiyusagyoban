@@ -221,7 +221,7 @@ class SharedPreferencesExecutionCircuitStore(context: Context) : ExecutionCircui
     private fun keyPrefix(key: Long?): String = if (key == null) GLOBAL_PREFIX else "profile_${key}_"
 
     companion object {
-        private const val PREFS_NAME = "ruledeck_execution_admission"
+        private const val PREFS_NAME = "opentasker_execution_admission"
         private const val GLOBAL_PREFIX = "global_"
         private const val KEY_OPEN_UNTIL = "open_until_ms"
         private const val KEY_STRIKES = "strikes"

@@ -9,7 +9,7 @@ import android.os.Build
 import android.service.notification.Condition
 import android.service.notification.ZenDeviceEffects
 import androidx.annotation.RequiresApi
-import com.sysadmindoc.ruledeck.MainActivity
+import com.opentasker.app.MainActivity
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 
@@ -67,7 +67,7 @@ internal object ZenRuleActionSupport {
     fun conditionId(context: Context, id: String): Uri = Uri.Builder()
         .scheme(Condition.SCHEME)
         .authority(context.packageName)
-        .appendPath("ruledeck")
+        .appendPath("opentasker")
         .appendPath(id)
         .build()
 

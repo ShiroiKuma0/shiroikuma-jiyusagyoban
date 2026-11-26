@@ -497,7 +497,7 @@ class DatabaseBackupManager(
     }
 
     companion object {
-        const val DATABASE_NAME = "ruledeck.db"
+        const val DATABASE_NAME = "opentasker.db"
 
         /**
          * Applies a staged restore, if there is one.

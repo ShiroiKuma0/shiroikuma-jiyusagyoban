@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import com.sysadmindoc.ruledeck.core.model.AutomationMode
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors

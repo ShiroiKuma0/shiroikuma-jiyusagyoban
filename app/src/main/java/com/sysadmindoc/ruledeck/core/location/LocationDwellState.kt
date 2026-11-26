@@ -198,7 +198,7 @@ class LocationDwellStateStore internal constructor(
     }
 
     companion object {
-        private const val PREFS_NAME = "ruledeck_location_dwell_state"
+        private const val PREFS_NAME = "opentasker_location_dwell_state"
         private const val MISSING_INSIDE_SINCE = -1L
         private val preferenceLock = Any()
     }

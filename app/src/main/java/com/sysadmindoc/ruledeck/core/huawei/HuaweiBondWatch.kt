@@ -11,7 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.sysadmindoc.ruledeck.R
-import com.sysadmindoc.ruledeck.core.actions.NotificationActionReceiver
+import com.opentasker.core.actions.NotificationActionReceiver
 import com.sysadmindoc.ruledeck.core.logging.AppLogger
 import com.sysadmindoc.ruledeck.core.shizuku.ShizukuShell
 import com.sysadmindoc.ruledeck.i18n.tr
@@ -48,7 +48,7 @@ import java.util.Locale
  * - The last state is kept in preferences, so a bond lost while the engine was down is still caught
  *   at the first tick after, with the span it happened in.
  *
- * Driven by the engine's per-minute exact alarm ([com.sysadmindoc.ruledeck.automation.receiver.TimeEventReceiver]),
+ * Driven by the engine's per-minute exact alarm ([com.opentasker.automation.receiver.TimeEventReceiver]),
  * because the engine holds no wakelock and a timer loop would stall in Doze.
  */
 object HuaweiBondWatch {
@@ -70,7 +70,7 @@ object HuaweiBondWatch {
     private const val KEY_SEEN = "seen_ms"
     private const val KEY_LOST = "lost_ms"
     private const val NOTIFICATION_ID = 7312
-    private const val CHANNEL_ID = "ruledeck.urgent"
+    private const val CHANNEL_ID = "opentasker.urgent"
     private const val CHANNEL_NAME = "白い熊 自由作業盤 urgent"
     private const val REQUEST_TASK = 13131
 

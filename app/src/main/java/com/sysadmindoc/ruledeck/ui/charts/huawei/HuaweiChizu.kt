@@ -3,7 +3,7 @@ package com.sysadmindoc.ruledeck.ui.charts.huawei
 import com.sysadmindoc.ruledeck.ui.charts.BandLanguage
 import android.content.Context
 import android.content.Intent
-import com.sysadmindoc.ruledeck.core.actions.IntentReplyBridge
+import com.opentasker.core.actions.IntentReplyBridge
 import com.sysadmindoc.ruledeck.core.huawei.HuaweiSettings
 import com.sysadmindoc.ruledeck.core.huawei.maps.MapCutouts
 import com.sysadmindoc.ruledeck.core.huawei.maps.Mercator

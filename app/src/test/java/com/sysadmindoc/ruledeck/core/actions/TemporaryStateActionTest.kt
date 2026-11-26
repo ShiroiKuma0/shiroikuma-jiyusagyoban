@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.TemporaryStatePlan
+import com.opentasker.core.actions.TemporaryStateTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

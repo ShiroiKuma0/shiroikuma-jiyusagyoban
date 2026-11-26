@@ -47,17 +47,17 @@ data class LocaleConditionSnapshot(
 
 object LocaleConditionTarget {
     const val SCHEMA_VERSION = "1"
-    const val BUNDLE_KEY_SCHEMA = "com.sysadmindoc.ruledeck.locale.condition.SCHEMA"
-    const val BUNDLE_KEY_KIND = "com.sysadmindoc.ruledeck.locale.condition.KIND"
-    const val BUNDLE_KEY_PROFILE_ID = "com.sysadmindoc.ruledeck.locale.condition.PROFILE_ID"
-    const val BUNDLE_KEY_PROFILE_NAME = "com.sysadmindoc.ruledeck.locale.condition.PROFILE_NAME"
-    const val BUNDLE_KEY_CONTEXT_INDEX = "com.sysadmindoc.ruledeck.locale.condition.CONTEXT_INDEX"
-    const val BUNDLE_KEY_CONTEXT_LABEL = "com.sysadmindoc.ruledeck.locale.condition.CONTEXT_LABEL"
-    const val BUNDLE_KEY_VARIABLE_NAME = "com.sysadmindoc.ruledeck.locale.condition.VARIABLE_NAME"
-    const val BUNDLE_KEY_VARIABLE_PROJECT_ID = "com.sysadmindoc.ruledeck.locale.condition.VARIABLE_PROJECT_ID"
-    const val BUNDLE_KEY_OPERATOR = "com.sysadmindoc.ruledeck.locale.condition.OPERATOR"
-    const val BUNDLE_KEY_EXPECTED_VALUE = "com.sysadmindoc.ruledeck.locale.condition.EXPECTED_VALUE"
-    const val BUNDLE_KEY_GRANT = "com.sysadmindoc.ruledeck.locale.condition.GRANT"
+    const val BUNDLE_KEY_SCHEMA = "com.opentasker.locale.condition.SCHEMA"
+    const val BUNDLE_KEY_KIND = "com.opentasker.locale.condition.KIND"
+    const val BUNDLE_KEY_PROFILE_ID = "com.opentasker.locale.condition.PROFILE_ID"
+    const val BUNDLE_KEY_PROFILE_NAME = "com.opentasker.locale.condition.PROFILE_NAME"
+    const val BUNDLE_KEY_CONTEXT_INDEX = "com.opentasker.locale.condition.CONTEXT_INDEX"
+    const val BUNDLE_KEY_CONTEXT_LABEL = "com.opentasker.locale.condition.CONTEXT_LABEL"
+    const val BUNDLE_KEY_VARIABLE_NAME = "com.opentasker.locale.condition.VARIABLE_NAME"
+    const val BUNDLE_KEY_VARIABLE_PROJECT_ID = "com.opentasker.locale.condition.VARIABLE_PROJECT_ID"
+    const val BUNDLE_KEY_OPERATOR = "com.opentasker.locale.condition.OPERATOR"
+    const val BUNDLE_KEY_EXPECTED_VALUE = "com.opentasker.locale.condition.EXPECTED_VALUE"
+    const val BUNDLE_KEY_GRANT = "com.opentasker.locale.condition.GRANT"
     const val MAX_GRANT_CHARS = 128
     const val MAX_CONTEXT_INDEX = 1_024
     const val MAX_EXPECTED_VALUE_BYTES = 4 * 1_024

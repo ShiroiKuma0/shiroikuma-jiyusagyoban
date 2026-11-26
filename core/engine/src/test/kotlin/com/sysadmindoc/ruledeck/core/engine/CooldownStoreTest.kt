@@ -180,7 +180,7 @@ class CooldownStoreTest {
         val prefs = InMemoryPreferences()
 
         override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
-            assertEquals("ruledeck_cooldowns", name)
+            assertEquals("opentasker_cooldowns", name)
             assertEquals(Context.MODE_PRIVATE, mode)
             return prefs
         }

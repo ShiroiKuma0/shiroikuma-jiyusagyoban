@@ -16,7 +16,7 @@ import android.telephony.SmsManager
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.sysadmindoc.ruledeck.BuildConfig
-import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext

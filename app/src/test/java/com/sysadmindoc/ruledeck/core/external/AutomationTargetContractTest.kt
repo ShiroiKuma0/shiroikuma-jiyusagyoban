@@ -1,5 +1,8 @@
 package com.sysadmindoc.ruledeck.core.external
 
+import com.opentasker.core.external.AutomationTargetContract
+import com.opentasker.core.external.AutomationTargetReceiver
+import com.opentasker.core.external.InternalTaskRunSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,9 +26,9 @@ class AutomationTargetContractTest {
     fun readsOnlyVariableExtrasAsStrings() {
         val read = mutableListOf<String>()
         val extras = mapOf(
-            "com.sysadmindoc.ruledeck.extra.PROTOCOL_VERSION" to null,
-            "com.sysadmindoc.ruledeck.extra.TASK_NAME" to "Morning briefing",
-            "com.sysadmindoc.ruledeck.var.User" to "demo",
+            "com.opentasker.extra.PROTOCOL_VERSION" to null,
+            "com.opentasker.extra.TASK_NAME" to "Morning briefing",
+            "com.opentasker.var.User" to "demo",
         )
 
         val variables = AutomationTargetContract.extractVariableExtras(extras.keys) { key ->
@@ -34,13 +37,13 @@ class AutomationTargetContractTest {
         }
 
         assertEquals(mapOf("User" to "demo"), variables)
-        assertEquals(listOf("com.sysadmindoc.ruledeck.var.User"), read)
+        assertEquals(listOf("com.opentasker.var.User"), read)
     }
 
     @Test
     fun buildsDocumentedVariableExtraNames() {
         assertEquals(
-            "com.sysadmindoc.ruledeck.var.User",
+            "com.opentasker.var.User",
             AutomationTargetContract.variableExtraName("User"),
         )
     }
@@ -75,10 +78,10 @@ class AutomationTargetContractTest {
 
     @Test
     fun everyInternalRunTaskProducerUsesTheCanonicalProtocolBuilder() {
-        val receiver = loadMainSource("com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt")
-        val locale = loadMainSource("com/sysadmindoc/ruledeck/core/plugins/locale/LocalePluginTarget.kt")
-        val scene = loadMainSource("com/sysadmindoc/ruledeck/core/scenes/SceneOverlayService.kt")
-        val service = loadMainSource("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt")
+        val receiver = loadMainSource("com/opentasker/core/external/AutomationTargetReceiver.kt")
+        val locale = loadMainSource("com/opentasker/core/plugins/locale/LocalePluginTarget.kt")
+        val scene = loadMainSource("com/opentasker/core/scenes/SceneOverlayService.kt")
+        val service = loadMainSource("com/opentasker/core/engine/AutomationService.kt")
 
         assertTrue(receiver.contains("fun internalRunTaskIntent("))
         assertTrue(receiver.contains("putExtra(EXTRA_PROTOCOL_VERSION, PROTOCOL_VERSION)"))
@@ -97,15 +100,16 @@ class AutomationTargetContractTest {
         val rawProducers = ProductionSources.allKotlinFiles()
             .filter { sourceFile ->
                 val text = sourceFile.readText()
-                text.contains("\"com.sysadmindoc.ruledeck.action.RUN_TASK\"") ||
+                text.contains("\"com.opentasker.action.RUN_TASK\"") ||
                     text.contains("AutomationTargetContract.ACTION_RUN_TASK")
             }
-            .map { path -> "com/sysadmindoc/ruledeck/" + path.toUri().path.substringAfterLast("/com/sysadmindoc/ruledeck/") }
+            // Relative to the source root: the receiver sits in the old package here (the fork keeps its manifest names).
+            .map { path -> path.toUri().path.substringAfterLast("/src/main/java/").substringAfterLast("/src/main/kotlin/") }
             .sorted()
 
         assertEquals(
             "The RUN_TASK action literal must exist only beside its canonical builder/receiver",
-            listOf("com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
+            listOf("com/opentasker/core/external/AutomationTargetReceiver.kt"),
             rawProducers,
         )
     }
@@ -134,7 +138,7 @@ class AutomationTargetContractTest {
             .map { receivers.item(it) }
             .first {
                 it.attributes.getNamedItem("android:name").nodeValue ==
-                    "com.sysadmindoc.ruledeck.core.external.AutomationTargetReceiver"
+                    "com.opentasker.core.external.AutomationTargetReceiver"
             }
 
         assertEquals(
@@ -150,8 +154,8 @@ class AutomationTargetContractTest {
     @Test
     fun automationTargetReceiverAlwaysFinishesPendingResult() {
         val source = listOf(
-            File("src/main/java/com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
-            File("app/src/main/java/com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
+            File("src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+            File("app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
         ).first { it.exists() }.readText()
 
         assertTrue("goAsync result cleanup should be protected by finally", source.contains("finally"))
@@ -161,8 +165,8 @@ class AutomationTargetContractTest {
     @Test
     fun externalVariableExtrasAreCountBounded() {
         val source = listOf(
-            File("src/main/java/com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
-            File("app/src/main/java/com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt"),
+            File("src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
+            File("app/src/main/java/com/opentasker/core/external/AutomationTargetReceiver.kt"),
         ).first { it.exists() }.readText()
 
         assertTrue("supplied variable count must be capped", source.contains("MAX_SUPPLIED_VARIABLES"))

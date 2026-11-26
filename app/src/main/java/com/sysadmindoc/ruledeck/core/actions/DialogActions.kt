@@ -1,7 +1,7 @@
 package com.sysadmindoc.ruledeck.core.actions
 
 import android.content.Intent
-import com.sysadmindoc.ruledeck.core.dialog.DialogActivity
+import com.opentasker.core.dialog.DialogActivity
 import com.sysadmindoc.ruledeck.core.dialog.DialogBridge
 import com.sysadmindoc.ruledeck.core.dialog.DialogOutcome
 import com.sysadmindoc.ruledeck.core.engine.Action

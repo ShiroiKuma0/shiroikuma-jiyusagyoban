@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.widget
 
+import com.opentasker.widget.GetTaskTargetPackageReceiver
+import com.opentasker.widget.TaskRunActivity
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -369,8 +371,8 @@ object TaskShortcutHelper {
     private const val TAG = "TaskShortcuts"
 
     /** A [ShortcutKind] name. Shortcuts from before this was written carry none. */
-    private const val EXTRA_KIND = "com.sysadmindoc.ruledeck.widget.SHORTCUT_KIND"
+    private const val EXTRA_KIND = "com.opentasker.widget.SHORTCUT_KIND"
 
     /** The task name a shortcut was made or last updated for. */
-    private const val EXTRA_MADE_FOR = "com.sysadmindoc.ruledeck.widget.MADE_FOR"
+    private const val EXTRA_MADE_FOR = "com.opentasker.widget.MADE_FOR"
 }

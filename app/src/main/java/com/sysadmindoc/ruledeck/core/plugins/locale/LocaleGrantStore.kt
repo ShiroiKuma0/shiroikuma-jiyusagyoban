@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.plugins.locale
 
+import com.opentasker.core.plugins.locale.LocaleSettingEditActivity
 import android.content.Context
 import java.security.SecureRandom
 import java.util.Base64

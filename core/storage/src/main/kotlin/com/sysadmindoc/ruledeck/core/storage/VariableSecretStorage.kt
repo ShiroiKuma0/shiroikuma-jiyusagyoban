@@ -150,7 +150,7 @@ class AndroidKeystoreVariableSecretCodec : VariableSecretCodec {
     }
 
     companion object {
-        internal const val KEY_ALIAS = "ruledeck.variable-secrets.v1"
+        internal const val KEY_ALIAS = "opentasker.variable-secrets.v1"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     }
 }

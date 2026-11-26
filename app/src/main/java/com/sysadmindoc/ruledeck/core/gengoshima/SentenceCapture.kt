@@ -167,7 +167,7 @@ object SentenceCapture {
         if (on) {
             if (wake?.isHeld != true) {
                 wake = (app.getSystemService(Context.POWER_SERVICE) as PowerManager)
-                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RuleDeck:gengoshima-capture")
+                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OpenTasker:gengoshima-capture")
                     .apply { setReferenceCounted(false); acquire(MODE_WAKE_CAP_MS) }
             }
         } else {

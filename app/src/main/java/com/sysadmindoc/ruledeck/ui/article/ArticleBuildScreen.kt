@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.ui.article
 
+import com.opentasker.ui.article.ArticleEditActivity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

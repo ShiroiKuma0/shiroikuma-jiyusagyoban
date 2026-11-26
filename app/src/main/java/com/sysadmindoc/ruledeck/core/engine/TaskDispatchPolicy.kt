@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
 import com.sysadmindoc.ruledeck.core.model.AutomationMode
 
 /** What the service must do with a dispatch request, once the mode rules have been applied. */

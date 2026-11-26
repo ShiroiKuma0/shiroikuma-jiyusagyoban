@@ -233,7 +233,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                com.sysadmindoc.ruledeck.widget.TaskPickerScreen(
+                com.opentasker.widget.TaskPickerScreen(
                     onPick = { task ->
                         showTaskPicker = false
                         scope.launch {

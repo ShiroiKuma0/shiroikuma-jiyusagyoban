@@ -155,14 +155,14 @@
         android:required="false" />
 
     <permission
-        android:name="com.sysadmindoc.ruledeck.permission.AUTOMATION"
+        android:name="com.opentasker.permission.AUTOMATION"
         android:description="@string/permission_automation_description"
         android:label="@string/permission_automation_label"
         android:protectionLevel="signature" />
     <!-- Declaring a permission doesn't grant it. Scene buttons and Locale plugin fires send their
          run request with this as the receiver permission, and Android delivers such a broadcast
          only to a package that holds it, the sender's own included. -->
-    <uses-permission android:name="com.sysadmindoc.ruledeck.permission.AUTOMATION" />
+    <uses-permission android:name="com.opentasker.permission.AUTOMATION" />
 
     <queries>
         <!-- Sister apps: token-gated automation intents driven by the Send Intent action. -->
@@ -293,7 +293,7 @@
             the user could no longer see.
         -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.progress.ProgressPanelActivity"
+            android:name="com.opentasker.progress.ProgressPanelActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".progress"
@@ -307,7 +307,7 @@
             opening the charts from a launcher shortcut must not drag 自由作業盤's back stack along.
         -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.BandChartsActivity"
+            android:name="com.opentasker.ui.charts.BandChartsActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".band"
@@ -319,7 +319,7 @@
              shortcut to one band never resumes the other's, and retiring one later is a deletion
              rather than surgery on a live window. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiChartsActivity"
+            android:name="com.opentasker.ui.charts.huawei.HuaweiChartsActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".huawei"
@@ -334,7 +334,7 @@
              task affinity rather than being a tab of one of the two reports it judges. When the Hume
              side is eventually retired, this one is untouched. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.compare.BandCompareActivity"
+            android:name="com.opentasker.ui.charts.compare.BandCompareActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".bandcompare"
@@ -348,7 +348,7 @@
         <!-- 言語島's sentence entry. Its own task affinity, so it opens as a window of its own and
              closing it returns to wherever 白い熊 was; its 「訳して音声を作る」 button starts generation. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaEntryActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaEntryActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima"
@@ -361,7 +361,7 @@
              share target for plain text; it only shows what the text would add, and files nothing
              until 白い熊 presses its button. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaImportActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaImportActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima.import"
@@ -379,7 +379,7 @@
         <!-- 言語島's 未分類 page: walk-captured sentences reviewed in kxkb, filed into islands.
              Same window family as the entry. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaInboxActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaInboxActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima"
@@ -389,7 +389,7 @@
 
         <!-- 言語島's board: every 言語島 task as a picture tile. Its own affinity, like 健康's board. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaBoardActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaBoardActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshimaboard"
@@ -400,7 +400,7 @@
         <!-- The board's door for 白い熊 kxkb (contract §8): the way back from its walk-capture review.
              Exported, but it reads nothing from the intent and opens only the board. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaBoardDoorActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaBoardDoorActivity"
             android:exported="true"
             android:noHistory="true"
             android:excludeFromRecents="true"
@@ -416,7 +416,7 @@
              engine with it. Exported with the MediaSessionService filter because that is how a
              headset, the steering wheel and the lock screen reach it. -->
         <service
-            android:name="com.sysadmindoc.ruledeck.core.gengoshima.GengoshimaPlaybackService"
+            android:name="com.opentasker.core.gengoshima.GengoshimaPlaybackService"
             android:process=":gengoshima"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
@@ -427,7 +427,7 @@
 
         <!-- 言語島's statistics. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaStatsActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaStatsActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima.stats"
@@ -437,7 +437,7 @@
 
         <!-- 言語島's vocabulary reference. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaVocabActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaVocabActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima.vocab"
@@ -448,7 +448,7 @@
 
         <!-- 言語島's island editor. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaIslandsActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaIslandsActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima.islands"
@@ -459,7 +459,7 @@
 
         <!-- 言語島's listening screen: over the lock screen, the one on the car mount. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaPlayerActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaPlayerActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima.player"
@@ -471,7 +471,7 @@
         <!-- The list of setup items switched off behind the app's back (after a reboot, a force-stop):
              a translucent near page-size window in its own task, raised at boot and on app open. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.screens.SetupWarningActivity"
+            android:name="com.opentasker.ui.screens.SetupWarningActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".setup.warning"
@@ -483,7 +483,7 @@
              run's notification. Its own affinity, so returning to it never drags the entry screen or
              the main window along. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaProgressActivity"
+            android:name="com.opentasker.ui.gengoshima.GengoshimaProgressActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".gengoshima.progress"
@@ -492,7 +492,7 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden" />
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiWalksActivity"
+            android:name="com.opentasker.ui.charts.huawei.HuaweiWalksActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".walks"
@@ -503,7 +503,7 @@
         <!-- The board every other band window is reached from. Its own task affinity, so opening a
              card's window puts that window in front rather than inside the board's stack. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiBoardActivity"
+            android:name="com.opentasker.ui.charts.huawei.HuaweiBoardActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".huaweiboard"
@@ -514,7 +514,7 @@
         <!-- The band's clock, as a window: a calendar, a dial and a switch for the phone's own
              time. Opened by huawei.time with pick=true, so one task both sets and resets. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiBandClockActivity"
+            android:name="com.opentasker.ui.charts.huawei.HuaweiBandClockActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".bandclock"
@@ -523,7 +523,7 @@
             android:theme="@style/Theme.RuleDeck.Dialog" />
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.charts.huawei.HuaweiFacesActivity"
+            android:name="com.opentasker.ui.charts.huawei.HuaweiFacesActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".watchfaces"
@@ -534,7 +534,7 @@
         <!-- The appearance settings as their own window, so 「文字認識」 can send 白い熊 to its knobs
              and the system back stack brings them back to the screenshot. Not exported. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.screens.UiCustomizationActivity"
+            android:name="com.opentasker.ui.screens.UiCustomizationActivity"
             android:exported="false"
             android:label="白い熊 自由作業盤 UI"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
@@ -543,7 +543,7 @@
         <!-- 文字認識: the OCR review window. Opened by the share tile below, never exported — the only
              way in is a screenshot we have already copied into our own cache. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.ocr.OcrReviewActivity"
+            android:name="com.opentasker.ui.ocr.OcrReviewActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".ocr"
@@ -557,7 +557,7 @@
              Deliberately NOT given a Sharesheet tile: EMUI collapses the share grid to one tile per
              package, so a second one would compete with 文字認識 rather than sit beside it. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.article.ArticleBuildActivity"
+            android:name="com.opentasker.ui.article.ArticleBuildActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".article"
@@ -570,7 +570,7 @@
              actually resized by it — the screen translates itself instead, so the page strip keeps its
              scroll position while typing. Not exported. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.ui.article.ArticleEditActivity"
+            android:name="com.opentasker.ui.article.ArticleEditActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".article"
@@ -584,7 +584,7 @@
              here means "read the text in this", not "run a task". It copies the bytes and finishes —
              see the URI-grant note in OcrShareActivity. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.ocr.OcrShareActivity"
+            android:name="com.opentasker.core.ocr.OcrShareActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:grantUriPermissions="true"
@@ -601,7 +601,7 @@
         </activity>
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.opentasker.app.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
@@ -618,10 +618,10 @@
             NfcDeliveryGate ignores tag intents that didn't arrive through this alias.
         -->
         <activity-alias
-            android:name=".NfcTagDispatch"
+            android:name="com.opentasker.app.NfcTagDispatch"
             android:exported="true"
             android:permission="android.permission.DISPATCH_NFC_MESSAGE"
-            android:targetActivity=".MainActivity">
+            android:targetActivity="com.opentasker.app.MainActivity">
             <intent-filter>
                 <action android:name="android.nfc.action.TAG_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -629,7 +629,7 @@
         </activity-alias>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.contexts.ShareReceiverActivity"
+            android:name="com.opentasker.core.contexts.ShareReceiverActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:grantUriPermissions="true"
@@ -657,7 +657,7 @@
         </activity>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.actions.ContactPickerActivity"
+            android:name="com.opentasker.core.actions.ContactPickerActivity"
             android:exported="false"
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
@@ -667,7 +667,7 @@
              explicit component; it deliberately has NO SEND intent-filter, so the main app itself is
              not a share-sheet tile — only the per-target relays are. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.share.ShareForwardActivity"
+            android:name="com.opentasker.core.share.ShareForwardActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
@@ -676,14 +676,14 @@
 
         <!-- The "Share apps" screen (relay generator), opened by the share.relays action. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.share.ShareAppsActivity"
+            android:name="com.opentasker.core.share.ShareAppsActivity"
             android:exported="false"
             android:label="@string/app_name"
             android:excludeFromRecents="true"
             android:taskAffinity="" />
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.engine.AutomationService"
+            android:name="com.opentasker.core.engine.AutomationService"
             android:exported="false"
             android:foregroundServiceType="specialUse|location|microphone">
             <property
@@ -692,7 +692,7 @@
         </service>
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.NotificationTriggerService"
+            android:name="com.opentasker.core.contexts.NotificationTriggerService"
             android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
@@ -714,7 +714,7 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.CompanionPresenceService"
+            android:name="com.opentasker.core.contexts.CompanionPresenceService"
             android:exported="true"
             android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
             <intent-filter>
@@ -729,7 +729,7 @@
         -->
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.engine.BootReceiver"
+            android:name="com.opentasker.core.engine.BootReceiver"
             android:directBootAware="true"
             android:exported="false">
             <intent-filter>
@@ -742,7 +742,7 @@
         <!-- A new build replaced this app: restart the engine, and finish a remote self-update by
              running its report task (package.install). -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.actions.PackageReplacedReceiver"
+            android:name="com.opentasker.core.actions.PackageReplacedReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
@@ -751,20 +751,20 @@
 
         <!-- The alarm of one task.alarm.set order. Not exported: only our own PendingIntent reaches it. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.scheduling.TaskAlarmReceiver"
+            android:name="com.opentasker.core.scheduling.TaskAlarmReceiver"
             android:exported="false" />
 
         <!-- The installer's answer to a package.install session. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.actions.PackageInstallResultReceiver"
+            android:name="com.opentasker.core.actions.PackageInstallResultReceiver"
             android:exported="false" />
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.engine.DirectBootTimeReceiver"
+            android:name="com.opentasker.core.engine.DirectBootTimeReceiver"
             android:directBootAware="true"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.action.DIRECT_BOOT_TIME_TICK" />
+                <action android:name="com.opentasker.action.DIRECT_BOOT_TIME_TICK" />
             </intent-filter>
         </receiver>
 
@@ -774,33 +774,33 @@
         -->
         <!-- The almanac watch's own alarm. Not exported, like the forecast reminder beside it. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.huawei.AlmanacWatchReceiver"
+            android:name="com.opentasker.core.huawei.AlmanacWatchReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.huawei.ALMANAC_CHECK" />
-                <action android:name="com.sysadmindoc.ruledeck.huawei.ALMANAC_STOP" />
+                <action android:name="com.opentasker.huawei.ALMANAC_CHECK" />
+                <action android:name="com.opentasker.huawei.ALMANAC_STOP" />
             </intent-filter>
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.huawei.GnssRebuildReceiver"
+            android:name="com.opentasker.core.huawei.GnssRebuildReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.huawei.GNSS_REBUILD" />
+                <action android:name="com.opentasker.huawei.GNSS_REBUILD" />
             </intent-filter>
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.huawei.GnssForecastReminderReceiver"
+            android:name="com.opentasker.core.huawei.GnssForecastReminderReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.huawei.GNSS_FORECAST_WARN" />
-                <action android:name="com.sysadmindoc.ruledeck.huawei.GNSS_FORECAST_END" />
+                <action android:name="com.opentasker.huawei.GNSS_FORECAST_WARN" />
+                <action android:name="com.opentasker.huawei.GNSS_FORECAST_END" />
             </intent-filter>
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.contexts.SmsReceivedReceiver"
+            android:name="com.opentasker.core.contexts.SmsReceivedReceiver"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter>
@@ -818,7 +818,7 @@
             which only the system holds. Its policy set is force-lock alone.
         -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.admin.DeviceAdmin"
+            android:name="com.opentasker.core.admin.DeviceAdmin"
             android:description="@string/device_admin_description"
             android:label="@string/device_admin_label"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
@@ -832,16 +832,16 @@
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.automation.receiver.TimeEventReceiver"
+            android:name="com.opentasker.automation.receiver.TimeEventReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.automation.TIME_TICK" />
+                <action android:name="com.opentasker.automation.TIME_TICK" />
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.scenes.SceneOverlayService"
+            android:name="com.opentasker.core.scenes.SceneOverlayService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -850,7 +850,7 @@
         </service>
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileService"
+            android:name="com.opentasker.core.contexts.QuickSettingsTileService"
             android:exported="true"
             android:icon="@drawable/ic_notification"
             android:label="@string/app_name"
@@ -867,7 +867,7 @@
         </service>
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileServiceSlot2"
+            android:name="com.opentasker.core.contexts.QuickSettingsTileServiceSlot2"
             android:exported="true"
             android:icon="@drawable/ic_notification"
             android:label="@string/app_name"
@@ -884,7 +884,7 @@
         </service>
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileServiceSlot3"
+            android:name="com.opentasker.core.contexts.QuickSettingsTileServiceSlot3"
             android:exported="true"
             android:icon="@drawable/ic_notification"
             android:label="@string/app_name"
@@ -901,7 +901,7 @@
         </service>
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileServiceSlot4"
+            android:name="com.opentasker.core.contexts.QuickSettingsTileServiceSlot4"
             android:exported="true"
             android:icon="@drawable/ic_notification"
             android:label="@string/app_name"
@@ -918,7 +918,7 @@
         </service>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileConfigActivity"
+            android:name="com.opentasker.core.contexts.QuickSettingsTileConfigActivity"
             android:exported="true"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:theme="@style/Theme.RuleDeck">
@@ -930,7 +930,7 @@
         <!-- exported: a third-party launcher (e.g. 白い熊 雷起動盤) fires the raw shortcut intent itself,
              so the run-task trampoline must be startable from another app. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.widget.TaskRunActivity"
+            android:name="com.opentasker.widget.TaskRunActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
@@ -939,7 +939,7 @@
 
         <!-- Launcher "add a shortcut" entry: picks a task, returns a home-screen shortcut that runs it. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.widget.CreateTaskShortcutActivity"
+            android:name="com.opentasker.widget.CreateTaskShortcutActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
@@ -950,21 +950,21 @@
         </activity>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.scenes.SceneActivity"
+            android:name="com.opentasker.scenes.SceneActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
             android:taskAffinity="" />
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.scenes.WakedanceActivity"
+            android:name="com.opentasker.scenes.WakedanceActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
             android:excludeFromRecents="true"
             android:taskAffinity="" />
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.widget.TaskWidgetConfigActivity"
+            android:name="com.opentasker.widget.TaskWidgetConfigActivity"
             android:exported="true"
             android:theme="@style/Theme.RuleDeck">
             <intent-filter>
@@ -973,7 +973,7 @@
         </activity>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.widget.TaskWidgetProvider"
+            android:name="com.opentasker.widget.TaskWidgetProvider"
             android:exported="false"
             android:label="@string/widget_task_label">
             <intent-filter>
@@ -985,7 +985,7 @@
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.widget.StyledWidgetProvider"
+            android:name="com.opentasker.widget.StyledWidgetProvider"
             android:exported="false"
             android:label="@string/widget_styled_label">
             <intent-filter>
@@ -997,7 +997,7 @@
         </receiver>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.widget.StyledWidgetConfigActivity"
+            android:name="com.opentasker.widget.StyledWidgetConfigActivity"
             android:exported="true"
             android:theme="@style/Theme.RuleDeck">
             <intent-filter>
@@ -1008,7 +1008,7 @@
         <!-- External "name this widget" bridge for sister apps (e.g. the raikidoban launcher). Explicit
              ordered broadcast, no permission: senders may use a different signing key. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.widget.SetWidgetNameReceiver"
+            android:name="com.opentasker.widget.SetWidgetNameReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.SET_WIDGET_NAME" />
@@ -1016,7 +1016,7 @@
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.widget.GetWidgetBindingReceiver"
+            android:name="com.opentasker.widget.GetWidgetBindingReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.GET_WIDGET_BINDING" />
@@ -1026,7 +1026,7 @@
         <!-- External "which app does this task open?" bridge — lets a sister launcher point its
              "app info"/"uninstall" entries for our run-task shortcuts at the task's target app. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.widget.GetTaskTargetPackageReceiver"
+            android:name="com.opentasker.widget.GetTaskTargetPackageReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.GET_TASK_TARGET_PACKAGE" />
@@ -1045,7 +1045,7 @@
             WorkspaceTransferManifestTest fails the build when the two disagree.
         -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.transfer.WorkspaceTransferReceiver"
+            android:name="com.opentasker.core.transfer.WorkspaceTransferReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE" />
@@ -1074,7 +1074,7 @@
              category listing, gated by the automation token (AutomationAuth); replies ride a fresh
              broadcast back to the caller's reply receiver (renrakusaki shape). -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.transfer.StateExportReceiver"
+            android:name="com.opentasker.core.transfer.StateExportReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_STATE" />
@@ -1087,7 +1087,7 @@
              here (binder-free). Exported so the sister app can reach it; a fake reply would need the
              random per-call reply id, which is never disclosed to other apps. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.actions.IntentReplyReceiver"
+            android:name="com.opentasker.core.actions.IntentReplyReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.INTENT_REPLY" />
@@ -1096,14 +1096,14 @@
 
         <!-- The tap on the "recording" notification: stop and save. Explicit intents only. -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.actions.RecordingStopReceiver"
+            android:name="com.opentasker.core.actions.RecordingStopReceiver"
             android:exported="false" />
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.actions.NotificationActionReceiver"
+            android:name="com.opentasker.core.actions.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.action.NOTIFICATION_BUTTON" />
+                <action android:name="com.opentasker.action.NOTIFICATION_BUTTON" />
             </intent-filter>
         </receiver>
 
@@ -1113,11 +1113,11 @@
             token shown in Setup and is bounded/redacted by PushContextEvents.
         -->
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.contexts.PushEventReceiver"
+            android:name="com.opentasker.core.contexts.PushEventReceiver"
             android:exported="true"
             android:intentMatchingFlags="enforceIntentFilter">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.action.PUSH_EVENT" />
+                <action android:name="com.opentasker.action.PUSH_EVENT" />
             </intent-filter>
         </receiver>
 
@@ -1126,7 +1126,7 @@
             MESSAGE_ACK. This app service receives only the already-decrypted bytes message.
         -->
         <service
-            android:name="com.sysadmindoc.ruledeck.core.contexts.UnifiedPushService"
+            android:name="com.opentasker.core.contexts.UnifiedPushService"
             android:exported="false">
             <intent-filter>
                 <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
@@ -1134,29 +1134,29 @@
         </service>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.actions.PackageArchiveStatusReceiver"
+            android:name="com.opentasker.core.actions.PackageArchiveStatusReceiver"
             android:exported="false" />
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.scripting.TermuxResultReceiver"
+            android:name="com.opentasker.core.scripting.TermuxResultReceiver"
             android:exported="false" />
 
         <!-- Termux's answer to a RUN_COMMAND, as a service start: a broadcast would queue behind
              the broadcast that started the waiting task. -->
         <service
-            android:name="com.sysadmindoc.ruledeck.core.scripting.TermuxResultService"
+            android:name="com.opentasker.core.scripting.TermuxResultService"
             android:exported="false" />
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.external.AutomationTargetReceiver"
+            android:name="com.opentasker.core.external.AutomationTargetReceiver"
             android:exported="true"
             android:intentMatchingFlags="enforceIntentFilter"
-            android:permission="com.sysadmindoc.ruledeck.permission.AUTOMATION">
+            android:permission="com.opentasker.permission.AUTOMATION">
             <intent-filter>
-                <action android:name="com.sysadmindoc.ruledeck.action.RUN_TASK" />
-                <action android:name="com.sysadmindoc.ruledeck.action.SET_PROFILE_ENABLED" />
-                <action android:name="com.sysadmindoc.ruledeck.action.QUERY_STATUS" />
-                <action android:name="com.sysadmindoc.ruledeck.action.QUERY_EXECUTION" />
+                <action android:name="com.opentasker.action.RUN_TASK" />
+                <action android:name="com.opentasker.action.SET_PROFILE_ENABLED" />
+                <action android:name="com.opentasker.action.QUERY_STATUS" />
+                <action android:name="com.opentasker.action.QUERY_EXECUTION" />
             </intent-filter>
         </receiver>
 
@@ -1164,7 +1164,7 @@
              opens this one from the dialog on Android 13 and earlier, and through the alias below
              from its settings on Android 14 and later. -->
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.health.HealthPermissionsRationaleActivity"
+            android:name="com.opentasker.core.health.HealthPermissionsRationaleActivity"
             android:exported="true"
             android:label="@string/health_rationale_title"
             android:theme="@style/Theme.RuleDeck">
@@ -1174,10 +1174,10 @@
         </activity>
 
         <activity-alias
-            android:name="com.sysadmindoc.ruledeck.core.health.ViewPermissionUsageActivity"
+            android:name="com.opentasker.core.health.ViewPermissionUsageActivity"
             android:exported="true"
             android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
-            android:targetActivity="com.sysadmindoc.ruledeck.core.health.HealthPermissionsRationaleActivity">
+            android:targetActivity="com.opentasker.core.health.HealthPermissionsRationaleActivity">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
@@ -1185,7 +1185,7 @@
         </activity-alias>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.plugins.locale.LocaleSettingEditActivity"
+            android:name="com.opentasker.core.plugins.locale.LocaleSettingEditActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/locale_setting_edit_title"
@@ -1196,7 +1196,7 @@
         </activity>
 
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.plugins.locale.LocaleConditionEditActivity"
+            android:name="com.opentasker.core.plugins.locale.LocaleConditionEditActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/locale_condition_edit_title"
@@ -1207,7 +1207,7 @@
         </activity>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.plugins.locale.LocaleSettingFireReceiver"
+            android:name="com.opentasker.core.plugins.locale.LocaleSettingFireReceiver"
             android:exported="true"
             android:intentMatchingFlags="enforceIntentFilter">
             <intent-filter>
@@ -1216,7 +1216,7 @@
         </receiver>
 
         <receiver
-            android:name="com.sysadmindoc.ruledeck.core.plugins.locale.LocaleConditionQueryReceiver"
+            android:name="com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver"
             android:exported="true"
             android:intentMatchingFlags="enforceIntentFilter">
             <intent-filter>
@@ -1224,7 +1224,7 @@
             </intent-filter>
         </receiver>
         <activity
-            android:name="com.sysadmindoc.ruledeck.core.dialog.DialogActivity"
+            android:name="com.opentasker.core.dialog.DialogActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
@@ -1238,8 +1238,8 @@
           just the request id.
         -->
         <activity-alias
-            android:name="com.sysadmindoc.ruledeck.core.dialog.ShellDialogActivity"
-            android:targetActivity="com.sysadmindoc.ruledeck.core.dialog.DialogActivity"
+            android:name="com.opentasker.core.dialog.ShellDialogActivity"
+            android:targetActivity="com.opentasker.core.dialog.DialogActivity"
             android:exported="true"
             android:permission="android.permission.MANAGE_ACTIVITY_TASKS" />
 
@@ -1253,12 +1253,12 @@
           every app in this family has its own keystore), so neither buys anything here.
         -->
         <provider
-            android:name="com.sysadmindoc.ruledeck.core.automation.AutomationProvider"
+            android:name="com.opentasker.core.automation.AutomationProvider"
             android:authorities="${applicationId}.automation"
             android:exported="true" />
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.automation.AutomationDataService"
+            android:name="com.opentasker.core.automation.AutomationDataService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -1298,7 +1298,7 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <service
-            android:name="com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService"
+            android:name="com.opentasker.core.accessibility.ShiroiKumaAccessibilityService"
             android:exported="false"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.scripting
 
+import com.opentasker.core.scripting.TermuxCommandBroker
+import com.opentasker.core.scripting.TermuxResultReceiver
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.delay
@@ -14,7 +16,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class TermuxScriptBackendTest {
-    private val script = "~/.termux/ruledeck/backup.sh"
+    private val script = "~/.termux/tasker/backup.sh"
     private val approvedHash = "a".repeat(64)
 
     @Test
@@ -49,7 +51,7 @@ class TermuxScriptBackendTest {
     fun packageAndPermissionConstantsMatchTermuxContracts() {
         assertEquals("com.termux", TermuxScriptBackend.TERMUX_PACKAGE)
         assertEquals("com.termux.permission.RUN_COMMAND", TermuxScriptBackend.RUN_COMMAND_PERMISSION)
-        assertEquals("~/.termux/ruledeck", TermuxScriptBackend.SCRIPT_DIRECTORY)
+        assertEquals("~/.termux/tasker", TermuxScriptBackend.SCRIPT_DIRECTORY)
         assertFalse(TermuxScriptBackend.supportsResultProtocol("0.108.0"))
         assertTrue(TermuxScriptBackend.supportsResultProtocol("0.109.0-beta.1"))
         assertTrue(TermuxScriptBackend.supportsResultProtocol("0.118.3"))
@@ -86,7 +88,7 @@ class TermuxScriptBackendTest {
         )
         val traversal = coordinator().execute(
             ready = true,
-            invocation = invocation(executable = "~/.termux/ruledeck/../escape.sh"),
+            invocation = invocation(executable = "~/.termux/tasker/../escape.sh"),
             approvedHashFor = { approvedHash },
             commandRunner = {
                 calls++
@@ -123,7 +125,7 @@ class TermuxScriptBackendTest {
         assertTrue(requests[0].arguments[1].contains("\${1#\\~/}"))
         assertEquals(TermuxScriptPolicy.HASH_EXECUTABLE, requests[1].executable)
         assertTrue(requests[1].arguments[1].contains("\${2#\\~/}"))
-        assertEquals("ruledeck-run", requests[1].arguments[2])
+        assertEquals("opentasker-run", requests[1].arguments[2])
         assertEquals(approvedHash, requests[1].arguments[3])
         assertEquals(script, requests[1].arguments[4])
         assertEquals(listOf("--label", "daily backup"), requests[1].arguments.drop(5))
@@ -161,7 +163,7 @@ class TermuxScriptBackendTest {
             invocation = invocation(),
             approvedHashFor = { approvedHash },
             commandRunner = { request ->
-                if (request.arguments.getOrNull(2) == "ruledeck-hash") {
+                if (request.arguments.getOrNull(2) == "opentasker-hash") {
                     hashResult(errorCode = TermuxCommandResult.ERROR_CODE_ABSENT)
                 } else {
                     verifiedCommandResult(errorCode = TermuxCommandResult.ERROR_CODE_ABSENT)
@@ -323,7 +325,7 @@ class TermuxScriptBackendTest {
         var now = 10_000L
         val coordinator = coordinator { now }
         val runner: suspend (TermuxCommandRequest) -> TermuxCommandResult = { request ->
-            if (request.arguments.getOrNull(2) == "ruledeck-hash") hashResult() else verifiedCommandResult()
+            if (request.arguments.getOrNull(2) == "opentasker-hash") hashResult() else verifiedCommandResult()
         }
         val first = coordinator.execute(true, invocation(), { approvedHash }, runner)
         val second = coordinator.execute(true, invocation(), { approvedHash }, runner)
@@ -340,7 +342,7 @@ class TermuxScriptBackendTest {
         var now = 1_000L
         val limiter = TermuxDispatchLimiter(maxEntries = 128, clock = { now++ })
 
-        repeat(500) { index -> assertTrue(limiter.tryAcquire("~/.termux/ruledeck/script-$index")) }
+        repeat(500) { index -> assertTrue(limiter.tryAcquire("~/.termux/tasker/script-$index")) }
 
         assertEquals(128, limiter.size())
     }
@@ -390,7 +392,7 @@ class TermuxScriptBackendTest {
     fun sourceContractKeepsResultChannelPrivateAndLogsOutputAsRedacted() {
         val moduleRoot = listOf(Path.of("."), Path.of("app")).first { Files.isDirectory(it.resolve("src/main")) }
         val manifest = moduleRoot.resolve("src/main/AndroidManifest.xml").toFile().readText()
-        val broker = moduleRoot.resolve("src/main/java/com/sysadmindoc/ruledeck/core/scripting/TermuxCommandBroker.kt").toFile().readText()
+        val broker = moduleRoot.resolve("src/main/java/com/opentasker/core/scripting/TermuxCommandBroker.kt").toFile().readText()
         val action = moduleRoot.resolve("src/main/java/com/sysadmindoc/ruledeck/core/actions/ScriptActions.kt").toFile().readText()
 
         assertTrue("RUN_COMMAND permission must be declared", "com.termux.permission.RUN_COMMAND" in manifest)

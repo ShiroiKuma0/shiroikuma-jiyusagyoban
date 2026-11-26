@@ -126,7 +126,7 @@ class KeyGrabberService : IKeyGrabberService.Stub {
     private external fun nativeSetConsumeShort(consume: Boolean)
 
     companion object {
-        private const val TAG = "RuleDeckKeyGrab"
+        private const val TAG = "OpenTaskerKeyGrab"
         private const val LIB_NAME = "evgrab"
         private const val LIB_FILE = "libevgrab.so"
     }

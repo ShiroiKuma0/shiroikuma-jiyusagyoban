@@ -5,7 +5,7 @@ import com.sysadmindoc.ruledeck.core.engine.ActionCategory
 import com.sysadmindoc.ruledeck.core.engine.ActionContext
 import com.sysadmindoc.ruledeck.core.engine.ActionResult
 import com.sysadmindoc.ruledeck.core.widget.WidgetLayoutCodec
-import com.sysadmindoc.ruledeck.widget.StyledWidgetProvider
+import com.opentasker.widget.StyledWidgetProvider
 import com.sysadmindoc.ruledeck.widget.TemplateStore
 
 /**

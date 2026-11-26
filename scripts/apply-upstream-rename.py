@@ -32,7 +32,9 @@ RULES = [
 # Never touched: the fork's own records and tooling, which speak about the upstream project by its
 # old name on purpose (history), and this script and its sibling.
 SKIP_PREFIXES = (".git/", ".claude/", ".scratch/", "CLAUDE.md", "CHANGELOG.md", "README.md", "docs/gengoshima.md",
-                 "scripts/apply-upstream-rename.py", "scripts/keep-stored-names.py", "scripts/stored-names/")
+                 "scripts/apply-upstream-rename.py", "scripts/keep-stored-names.py", "scripts/stored-names/",
+                 # the share relay is a prebuilt dex under its own old package name; its source matches the dex
+                 "app/src/relay/", "app/src/main/assets/relay/")
 
 # Source files are text whatever they contain: a Kotlin file with a NUL character in a string literal
 # is not a binary (four of the fork's are like that, and the first run skipped them).

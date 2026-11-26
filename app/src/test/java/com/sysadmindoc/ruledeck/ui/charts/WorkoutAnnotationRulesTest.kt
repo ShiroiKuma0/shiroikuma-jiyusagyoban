@@ -137,7 +137,7 @@ class WorkoutAnnotationRulesTest {
      */
     @Test
     fun `an empty day is writable on every kind`() {
-        val activity = ProductionSources.read("com/sysadmindoc/ruledeck/ui/charts/huawei/HuaweiWalksActivity.kt")
+        val activity = ProductionSources.read("com/opentasker/ui/charts/huawei/HuaweiWalksActivity.kt")
         assertTrue(
             "a non-rehab empty day opens the note editor",
             "if (kind == HuaweiWorkoutStore.Kind.REHAB) tickDay = key" in activity &&

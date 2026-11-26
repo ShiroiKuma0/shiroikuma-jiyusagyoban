@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.external
 
+import com.opentasker.core.external.AutomationTargetReceiver
 import com.sysadmindoc.ruledeck.ProductionSources
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,7 +21,7 @@ import org.junit.Test
 class BridgeAnswersInTextTest {
 
     private val src by lazy {
-        ProductionSources.read("com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt")
+        ProductionSources.read("com/opentasker/core/external/AutomationTargetReceiver.kt")
     }
 
     @Test
@@ -34,7 +35,7 @@ class BridgeAnswersInTextTest {
     @Test
     fun `a refusal carries its reason in the text`() {
         val body = ProductionSources.block(
-            "com/sysadmindoc/ruledeck/core/external/AutomationTargetReceiver.kt",
+            "com/opentasker/core/external/AutomationTargetReceiver.kt",
             "private fun failure(",
             "companion object {",
         )

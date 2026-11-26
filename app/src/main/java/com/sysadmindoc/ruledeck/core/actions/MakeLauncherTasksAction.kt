@@ -2,7 +2,7 @@ package com.sysadmindoc.ruledeck.core.actions
 
 import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
 import com.sysadmindoc.ruledeck.core.bubbles.FreezeBubbleTarget
-import com.sysadmindoc.ruledeck.core.dialog.DialogActivity
+import com.opentasker.core.dialog.DialogActivity
 import com.sysadmindoc.ruledeck.core.dialog.DialogOutcome
 import com.sysadmindoc.ruledeck.core.engine.Action
 import com.sysadmindoc.ruledeck.core.engine.ActionCategory

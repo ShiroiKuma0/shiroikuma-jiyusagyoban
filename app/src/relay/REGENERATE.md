@@ -21,9 +21,9 @@ tmp=$(mktemp -d)
 
 # 1. classes.dex  (pure Java -> d8; no kotlin-stdlib, min-api 26)
 "$JAVAC" -source 8 -target 8 -bootclasspath "$JAR" -d "$tmp/classes" \
-    "$SRC/java/com/sysadmindoc/ruledeck/relay/RelayActivity.java"
+    "$SRC/java/com/opentasker/relay/RelayActivity.java"
 "$BT/d8" --min-api 26 --release --lib "$JAR" --output "$tmp/dex" \
-    "$tmp/classes/com/sysadmindoc/ruledeck/relay/RelayActivity.class"
+    "$tmp/classes/com/opentasker/relay/RelayActivity.class"
 cp "$tmp/dex/classes.dex" "$OUT/classes.dex"
 
 # 2 + 3 + 4. binary manifest template + resources.arsc + placeholder icon
@@ -37,7 +37,7 @@ rm -rf "$tmp"
 ```
 
 After regenerating, confirm the manifest template still carries the three placeholder strings
-`com.sysadmindoc.ruledeck.relay`, `Relay Placeholder`, `PLACEHOLDER_TARGET_PKG` (RelayManifestTemplate substitutes
+`com.opentasker.relay`, `Relay Placeholder`, `PLACEHOLDER_TARGET_PKG` (RelayManifestTemplate substitutes
 those exact values) and that the icon resource id in `resources.arsc` is still `0x7f010000`
 (`aapt2 dump resources` — hardcoded in `RelayManifestTemplate` as the icon ref). If the id changes,
 update `RelayManifestTemplate`.

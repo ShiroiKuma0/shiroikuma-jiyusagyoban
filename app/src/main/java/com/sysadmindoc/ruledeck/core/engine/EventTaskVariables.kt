@@ -6,7 +6,7 @@ import com.sysadmindoc.ruledeck.core.actions.ActionValueType
 import com.sysadmindoc.ruledeck.core.contexts.BroadcastContextEvents
 import com.sysadmindoc.ruledeck.core.contexts.CallContextEvents
 import com.sysadmindoc.ruledeck.core.contexts.ContextEvent
-import com.sysadmindoc.ruledeck.core.contexts.SmsContextEvents
+import com.opentasker.core.contexts.SmsContextEvents
 import java.util.Locale
 
 /**

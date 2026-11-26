@@ -1,5 +1,8 @@
 package com.sysadmindoc.ruledeck.scenes
 
+import com.opentasker.scenes.SceneActivity
+import com.opentasker.scenes.SceneOverlay
+import com.opentasker.scenes.sceneAlignment
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
@@ -24,7 +27,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
-import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.sysadmindoc.ruledeck.core.engine.executeAndLogTask
 import com.sysadmindoc.ruledeck.core.engine.resolveTaskByName
 import com.sysadmindoc.ruledeck.core.engine.variables.PersistentGlobalScope

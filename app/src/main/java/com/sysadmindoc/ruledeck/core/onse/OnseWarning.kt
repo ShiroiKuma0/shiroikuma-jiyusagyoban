@@ -27,7 +27,7 @@ import com.sysadmindoc.ruledeck.i18n.tr
 object OnseWarning {
 
     private const val TAG = "OnseWarning"
-    private const val CHANNEL_ID = "ruledeck.urgent"
+    private const val CHANNEL_ID = "opentasker.urgent"
     private const val CHANNEL_NAME = "白い熊 自由作業盤 urgent"
     private const val NOTIFICATION_ID = 0x0A5E
     private const val REQUEST_OPEN = 0x0A5E

@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.BootReceiver
 import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -7,7 +9,7 @@ import org.junit.Test
 class BootReceiverServiceStartContractTest {
     @Test
     fun bootReceiverRequestsBootTriggerActionThroughGuardedServiceStart() {
-        val source = repoFile("src/main/java/com/sysadmindoc/ruledeck/core/engine/BootReceiver.kt").readText()
+        val source = repoFile("src/main/java/com/opentasker/core/engine/BootReceiver.kt").readText()
 
         assertTrue("BootReceiver should guard boot service startup", "runCatching" in source)
         assertTrue("BootReceiver should use foreground service startup", "ContextCompat.startForegroundService" in source)
@@ -27,7 +29,7 @@ class BootReceiverServiceStartContractTest {
      */
     @Test
     fun aRunThatArrivesOnAColdProcessLoadsTheEngineFirst() {
-        val source = repoFile("src/main/java/com/sysadmindoc/ruledeck/core/engine/AutomationService.kt").readText()
+        val source = repoFile("src/main/java/com/opentasker/core/engine/AutomationService.kt").readText()
 
         val notificationBranch = source.substringAfter("if (intent?.action == ACTION_RUN_NOTIFICATION_TASK)")
             .substringBefore("return START_STICKY")
@@ -64,7 +66,7 @@ class BootReceiverServiceStartContractTest {
 
     @Test
     fun automationServicePublishesBootEventAfterReloadingProfiles() {
-        val source = repoFile("src/main/java/com/sysadmindoc/ruledeck/core/engine/AutomationService.kt").readText()
+        val source = repoFile("src/main/java/com/opentasker/core/engine/AutomationService.kt").readText()
 
         assertTrue("AutomationService should expose a boot trigger action", "ACTION_BOOT_COMPLETED_TRIGGER" in source)
         assertTrue("AutomationService should reload profiles on start", "reloadProfiles()" in source)

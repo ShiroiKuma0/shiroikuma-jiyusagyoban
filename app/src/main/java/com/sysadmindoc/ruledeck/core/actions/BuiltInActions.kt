@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.NotificationActionReceiver
 import android.Manifest
 import android.app.Activity
 import android.content.BroadcastReceiver
@@ -7,7 +8,7 @@ import android.content.ComponentName
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import com.sysadmindoc.ruledeck.core.contexts.NotificationTriggerService
+import com.opentasker.core.contexts.NotificationTriggerService
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
@@ -352,14 +353,14 @@ internal object NotificationChannels {
     )
 
     private val channels = mapOf(
-        "quiet" to ChannelDef("ruledeck.quiet", "白い熊 自由作業盤 quiet", NotificationManager.IMPORTANCE_LOW),
-        "default" to ChannelDef("ruledeck.actions", "白い熊 自由作業盤 actions", NotificationManager.IMPORTANCE_DEFAULT),
-        "urgent" to ChannelDef("ruledeck.urgent", "白い熊 自由作業盤 urgent", NotificationManager.IMPORTANCE_HIGH),
+        "quiet" to ChannelDef("opentasker.quiet", "白い熊 自由作業盤 quiet", NotificationManager.IMPORTANCE_LOW),
+        "default" to ChannelDef("opentasker.actions", "白い熊 自由作業盤 actions", NotificationManager.IMPORTANCE_DEFAULT),
+        "urgent" to ChannelDef("opentasker.urgent", "白い熊 自由作業盤 urgent", NotificationManager.IMPORTANCE_HIGH),
         // 白い熊, 2026-11-26: standing status notifications (携帯 生存, an open tunnel) were buried at the
         // bottom of the shade — a LOW channel is sorted into the silent section. Android sorts by
         // importance first, so "top" is HIGH; it is silenced on the channel and alerts only once, so a
         // rewrite every few minutes neither sounds nor pops up.
-        "top" to ChannelDef("ruledeck.top", "白い熊 自由作業盤 top", NotificationManager.IMPORTANCE_HIGH, silent = true),
+        "top" to ChannelDef("opentasker.top", "白い熊 自由作業盤 top", NotificationManager.IMPORTANCE_HIGH, silent = true),
     )
 
     fun resolve(key: String): ChannelDef =
@@ -506,7 +507,7 @@ class SayAction : DeclaredAction(ActionCatalog.require("tts.speak")) {
                 if (stream != AudioOutputStream.MUSIC) {
                     engine.setAudioAttributes(outputAudioAttributes(stream, android.media.AudioAttributes.CONTENT_TYPE_SPEECH))
                 }
-                val queued = engine.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "ruledeck_say")
+                val queued = engine.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "opentasker_say")
                 if (queued != android.speech.tts.TextToSpeech.SUCCESS) {
                     // No utterance callback will ever fire for a failed queue; fail fast
                     // instead of burning the whole action budget on a silent timeout.

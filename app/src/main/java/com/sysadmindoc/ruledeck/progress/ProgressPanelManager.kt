@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.progress
 
+import com.opentasker.progress.ProgressPanelActivity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager

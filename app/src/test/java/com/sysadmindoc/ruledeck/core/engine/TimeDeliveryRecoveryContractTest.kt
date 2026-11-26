@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.opentasker.core.engine.EngineWatchdogWorker
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readText
@@ -16,7 +17,7 @@ class TimeDeliveryRecoveryContractTest {
     @Test
     fun applicationInstallsPeriodicEngineWatchdog() {
         val source = source("com/sysadmindoc/ruledeck/RuleDeckApp_NoHilt.kt")
-        val worker = source("com/sysadmindoc/ruledeck/core/engine/EngineWatchdogWorker.kt")
+        val worker = source("com/opentasker/core/engine/EngineWatchdogWorker.kt")
 
         assertTrue(source.contains("EngineWatchdogWorker.enqueue(this)"))
         assertTrue(worker.contains("PeriodicWorkRequestBuilder<EngineWatchdogWorker>"))

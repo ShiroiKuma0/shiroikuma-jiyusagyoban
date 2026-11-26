@@ -1,5 +1,7 @@
 package com.sysadmindoc.ruledeck.core.actions
 
+import com.opentasker.core.actions.IntentReplyBridge
+import com.opentasker.core.actions.IntentReplyReceiver
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
