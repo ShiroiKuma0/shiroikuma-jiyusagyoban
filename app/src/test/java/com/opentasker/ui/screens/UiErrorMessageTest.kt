@@ -6,7 +6,6 @@ import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.StorageRecordType
 import com.opentasker.core.transfer.ImportBudgetExceededException
 import com.opentasker.core.transfer.MacroDroidImporter
-import com.opentasker.core.transfer.TaskerXmlImporter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -88,17 +87,7 @@ class UiErrorMessageTest {
     }
 
     @Test
-    fun aTaskerFileCutOffMidTagSaysItsDamagedAndStaysUp() {
-        val cutOff = failureOf { TaskerXmlImporter.parse(rawXml = "<TaskerData sr=\"\"><Task sr=\"task1\"><nme>Mor", appVersion = "test") }
-
-        val message = importPreviewFailureMessage(cutOff, R.string.ui_error_automation_import_preview)
-
-        assertEquals(R.string.ui_error_import_damaged, message.resId)
-        assertTrue(message.stayUntilDismissed)
-    }
-
-    @Test
-    fun aMacroDroidFileCutOffSaysItsDamagedToo() {
+    fun aMacroDroidFileCutOffSaysItsDamaged() {
         val cutOff = failureOf { MacroDroidImporter.parse(rawJson = "{\"macroList\":[{\"m_name\":\"Mor", appVersion = "test") }
 
         val message = importPreviewFailureMessage(cutOff, R.string.ui_error_automation_import_preview)

@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
-import org.xml.sax.SAXException
 
 data class UiMessage(
     // Deliberately unannotated: this is a string resource when [quantity] is null and a plurals
@@ -237,8 +236,7 @@ internal fun loggedUiErrorMessage(error: Throwable, @StringRes fallbackRes: Int)
  */
 internal fun importPreviewFailureMessage(error: Throwable, @StringRes fallbackRes: Int): UiMessage {
     val logged = loggedUiErrorMessage(error, fallbackRes)
-    // A malformed Tasker file reaches here as the XML preflight's IllegalArgumentException.
-    val damaged = error is SerializationException || error is SAXException || error.cause is SAXException
+    val damaged = error is SerializationException
     return (if (damaged) UiMessage(R.string.ui_error_import_damaged) else logged).copy(stayUntilDismissed = true)
 }
 

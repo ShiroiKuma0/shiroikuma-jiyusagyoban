@@ -6,13 +6,13 @@ import androidx.annotation.StringRes
 import com.opentasker.app.R
 import java.io.ByteArrayOutputStream
 
-/** Raw bytes, because a password-protected MacroDroid export doesn't survive decoding as text. */
-internal fun readBoundedTaskerOrMacroDroidBytes(context: Context, uri: Uri): ByteArray {
+/** Raw bytes, so a password-protected MacroDroid export can be told apart from text. */
+internal fun readBoundedMacroDroidBytes(context: Context, uri: Uri): ByteArray {
     return readBoundedDocumentBytes(
         context = context,
         uri = uri,
-        maxBytes = TASKER_MACRODROID_IMPORT_MAX_BYTES,
-        labelRes = R.string.import_document_tasker_macrodroid,
+        maxBytes = MACRODROID_IMPORT_MAX_BYTES,
+        labelRes = R.string.import_document_macrodroid,
     )
 }
 

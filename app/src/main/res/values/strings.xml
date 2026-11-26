@@ -67,7 +67,7 @@
     <string name="locale_condition_operator_contains">contains</string>
     <string name="locale_condition_operator_starts_with">starts with</string>
     <string name="locale_condition_operator_ends_with">ends with</string>
-    <!-- Blurbs: the summary a Locale host such as Tasker shows for the configured condition or setting. -->
+    <!-- Blurbs: the summary a Locale plugin host shows for the configured condition or setting. -->
     <string name="locale_condition_blurb_profile">Profile active: %1$s</string>
     <string name="locale_condition_blurb_context">Context satisfied: %1$s #%2$d</string>
     <string name="locale_condition_blurb_variable">%1$s %2$s the configured value</string>
@@ -230,7 +230,6 @@
     <string name="context_picker_clear_search">Clear context search</string>
     <string name="context_picker_no_results">No contexts match your search.</string>
     <string name="dialog_review_bundle">Review OpenTasker bundle</string>
-    <string name="dialog_review_tasker">Review Tasker import</string>
     <string name="dialog_review_macrodroid">Review MacroDroid import</string>
     <string name="dialog_profile_share_review">Review community share</string>
 
@@ -844,16 +843,15 @@
     <string name="import_mapped_actions">Mapped actions</string>
     <string name="import_for_review">Import for review</string>
     <string name="import_disabled">Import disabled</string>
-    <string name="import_tasker">Import Tasker or MacroDroid</string>
-    <string name="import_reading_xml">Reading import</string>
+    <string name="import_macrodroid">Import from MacroDroid</string>
+    <string name="import_reading_macrodroid">Reading import</string>
     <string name="import_export_json">Export JSON</string>
-    <string name="import_export_tasker_xml">Export Tasker XML</string>
     <string name="import_import_json">Import JSON</string>
     <string name="import_paste_json_action">Paste / scan</string>
     <string name="import_paste_json_title">Paste or scan an import</string>
-    <string name="import_paste_json_body">Paste an OpenTasker bundle or a Tasker XML task or profile here, or use a QR scanner that types the decoded text. Whichever it is opens the same review, and nothing is written until you confirm it.</string>
-    <string name="import_paste_json_hint">OpenTasker JSON or Tasker XML</string>
-    <string name="import_paste_too_long">Too long to paste, so the end was cut off. Save it as a file and use Import JSON or Import Tasker or MacroDroid instead.</string>
+    <string name="import_paste_json_body">Paste an OpenTasker bundle here, or use a QR scanner that types the decoded text. Nothing is written until you confirm it in the review.</string>
+    <string name="import_paste_json_hint">OpenTasker JSON</string>
+    <string name="import_paste_too_long">Too long to paste, so the end was cut off. Save it as a file and use Import JSON instead.</string>
     <string name="import_paste_json_review">Review import</string>
     <plurals name="import_paste_hidden">
         <item quantity="one">%1$s character pasted, too many to show here.</item>
@@ -930,7 +928,7 @@
     <string name="action_create_blank_profile">Create blank profile</string>
     <string name="action_browse_templates">Browse templates</string>
     <string name="action_create_for_review">Create for review</string>
-    <string name="action_import_tasker_xml">Import Tasker / MacroDroid</string>
+    <string name="action_import_macrodroid">Import from MacroDroid</string>
     <string name="action_create_task">Create task</string>
     <string name="action_add_step">Add step</string>
     <string name="action_choose_image">Choose image</string>
@@ -1742,7 +1740,7 @@
     <!-- A rejection that already explains itself; the reason comes from the validation that
          refused the change, so this carries it through without prefixing it with noise. -->
     <string name="ui_error_reason">%1$s</string>
-    <!-- Shown as the activity title inside Tasker/Locale host apps. -->
+    <!-- Shown as the activity title inside Locale plugin host apps. -->
     <string name="locale_setting_edit_title">OpenTasker task</string>
     <string name="task_name_duplicate_warning">Another task already uses this name. References that name a task become ambiguous.</string>
     <string name="run_log_load_failed_title">Run log could not be loaded</string>
@@ -1754,9 +1752,8 @@
     <string name="ui_error_corrupt_record">Saved data could not be read. Restore a backup or delete the affected item.</string>
     <string name="ui_error_diagnostics_refresh">Diagnostics could not be refreshed</string>
     <string name="ui_error_task_delete">The task couldn\'t be deleted. Diagnostics has the details.</string>
-    <string name="ui_error_tasker_xml_preview">Tasker XML import preview failed. Diagnostics has the details.</string>
-    <string name="ui_error_automation_import_preview">Tasker or MacroDroid import preview failed. Diagnostics has the details.</string>
-    <string name="ui_error_automation_import">The Tasker or MacroDroid import failed. Diagnostics has the details.</string>
+    <string name="ui_error_automation_import_preview">MacroDroid import preview failed. Diagnostics has the details.</string>
+    <string name="ui_error_automation_import">The MacroDroid import failed. Diagnostics has the details.</string>
     <string name="ui_error_bundle_export">The OpenTasker bundle couldn\'t be exported. Diagnostics has the details.</string>
     <string name="ui_error_bundle_preview">OpenTasker bundle preview failed. Diagnostics has the details.</string>
     <string name="ui_error_share_preview">The share preview couldn\'t be made. Diagnostics has the details.</string>
@@ -1781,19 +1778,16 @@
     <string name="ui_error_copy_diagnostics">Failed to copy diagnostic report</string>
     <string name="diagnostics_share_subject">OpenTasker diagnostic report</string>
     <string name="diagnostics_share_chooser">Share diagnostic report</string>
-    <string name="import_document_tasker_macrodroid">Tasker XML or MacroDroid file</string>
+    <string name="import_document_macrodroid">MacroDroid export</string>
     <string name="import_document_opentasker_bundle">OpenTasker bundle</string>
     <string name="ui_error_document_unreadable">Couldn\'t open the selected %1$s.</string>
     <string name="ui_error_document_too_large">The selected %1$s is larger than %2$d MB.</string>
     <string name="ui_error_import_budget">This file is too large to import. It goes over the limit for %1$s, which is %2$d.</string>
     <string name="ui_error_import_budget_items">This file is too large to import. Its tasks, profiles, variables and scenes together can\'t come to more than %1$d.</string>
-    <string name="ui_error_import_not_recognized">This isn\'t a Tasker XML file or a MacroDroid export.</string>
+    <string name="ui_error_import_not_recognized">This isn\'t a MacroDroid export.</string>
     <string name="ui_error_import_damaged">This export is damaged or cut off, so it can\'t be read. Export it again and import the new copy.</string>
-    <string name="dialog_macrodroid_password_title">Password-protected MacroDroid export</string>
-    <string name="dialog_macrodroid_password_body">MacroDroid encrypted this file when it was exported. Enter the password you chose then. OpenTasker doesn\'t save it.</string>
-    <string name="dialog_macrodroid_password_label">Export password</string>
-    <string name="dialog_macrodroid_password_wrong">That password doesn\'t open this file.</string>
-    <string name="dialog_macrodroid_password_open">Open</string>
+    <string name="ui_error_macrodroid_password_protected">This MacroDroid export has a password, so it can\'t be read here. Export the macros again in MacroDroid with the password left blank, then import that file.</string>
+    <string name="dialog_password_open">Open</string>
     <string name="dialog_backup_passphrase_title">Encrypted snapshot</string>
     <string name="dialog_backup_passphrase_body">This is an encrypted OpenTasker snapshot. Enter the passphrase you set for snapshots in Settings. OpenTasker doesn\'t save it.</string>
     <string name="dialog_backup_passphrase_label">Snapshot passphrase</string>
@@ -1816,7 +1810,6 @@
     <string name="run_log_source_unknown">Unknown</string>
     <string name="ui_error_backup">The database backup failed. Diagnostics has the details.</string>
     <string name="ui_error_backup_export">The database backup couldn\'t be exported. Diagnostics has the details.</string>
-    <string name="ui_error_tasker_xml_export">The Tasker XML couldn\'t be exported. Diagnostics has the details.</string>
     <string name="ui_error_backup_import">The database backup couldn\'t be imported. Diagnostics has the details.</string>
     <string name="ui_error_backup_legacy_too_large">This backup is in the old format, which restores only up to %1$d MB</string>
     <string name="ui_error_snapshot_destination">The snapshot folder couldn\'t be set up. Diagnostics has the details.</string>
@@ -1868,7 +1861,6 @@
         <item quantity="one">Task is still used by %1$d automation. Reassign or clear that reference first.</item>
         <item quantity="other">Task is still used by %1$d automations. Reassign or clear those references first.</item>
     </plurals>
-    <string name="ui_message_tasker_xml_ready">Tasker XML ready for review</string>
     <string name="ui_message_automation_import_ready">Automation import ready for review</string>
     <string name="ui_message_bundle_ready">OpenTasker bundle ready for review</string>
     <string name="ui_message_edit_undone">Edit undone</string>
@@ -1887,8 +1879,6 @@
     </plurals>
     <string name="ui_message_snapshots_disabled">Automatic snapshots off</string>
     <string name="ui_message_snapshot_destination_saved">Snapshot destination saved</string>
-    <string name="ui_message_tasker_xml_exported">Tasker XML exported: %1$s, %2$s, %3$s</string>
-    <string name="ui_message_tasker_xml_export_warnings">Check before using this file (%1$d): %2$s</string>
     <string name="ui_message_restore_staged">Restore staged. Restart OpenTasker to apply it.</string>
     <string name="ui_message_restore_cancelled">Staged restore canceled</string>
     <string name="ui_message_no_staged_restore">There is no staged restore to cancel</string>
@@ -1900,7 +1890,7 @@
     <string name="ui_run_status_skipped">skipped</string>
     <string name="ui_run_status_succeeded">succeeded</string>
     <string name="ui_run_status_failed">failed</string>
-    <string name="ui_message_tasker_imported">Imported %1$s, %2$s</string>
+    <string name="ui_message_automation_imported">Imported %1$s, %2$s</string>
     <string name="ui_message_bundle_exported">Exported %1$s, %2$s, %3$s</string>
     <string name="ui_message_bundle_imported">Imported %1$s, %2$s, %3$s</string>
     <!--

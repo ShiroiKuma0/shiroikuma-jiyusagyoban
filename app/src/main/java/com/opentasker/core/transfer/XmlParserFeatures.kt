@@ -7,7 +7,7 @@ import javax.xml.parsers.SAXParserFactory
  * Best-effort XXE / DOCTYPE hardening for Android XML factories.
  *
  * Android's Harmony/Expat factories throw [org.xml.sax.SAXNotRecognizedException] for the Apache
- * feature URIs. Making those throws fatal is what broke every on-device Tasker import (issue #5).
+ * feature URIs, so making those throws fatal would break every XML read on a device.
  * Text-level sanitizers remain the enforcement; these features are belt and braces on Xerces.
  */
 internal fun SAXParserFactory.applyImportHardening() {

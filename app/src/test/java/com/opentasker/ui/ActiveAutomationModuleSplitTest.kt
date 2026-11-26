@@ -63,8 +63,8 @@ class ActiveAutomationModuleSplitTest {
             "private" to "RunLogCard",
             "private" to "RunLogTraceRow",
             "internal" to "OpenTaskerBundleReviewDialog",
-            "internal" to "TaskerImportReviewDialog",
-            "private" to "TaskerImportListSection",
+            "internal" to "AutomationImportReviewDialog",
+            "private" to "ImportListSection",
         ).forEach { (visibility, functionName) ->
             assertFalse(
                 "$shellFileName should not own $functionName",

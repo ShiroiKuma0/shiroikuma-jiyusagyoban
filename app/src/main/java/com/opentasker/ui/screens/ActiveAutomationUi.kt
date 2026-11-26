@@ -161,10 +161,6 @@ import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
-import com.opentasker.core.transfer.TaskerImportPlanner
-import com.opentasker.core.transfer.TaskerImportPreview
-import com.opentasker.core.transfer.TaskerXmlImportReport
-import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.BlueprintCatalogStore
 import com.opentasker.core.templates.TemplateAvailability
@@ -297,22 +293,20 @@ fun ActiveAutomationUi(
     var contextLogicProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var pendingTaskDeleteId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var importedProfileReviewId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    val taskerImportReview by viewModel.taskerImportReview.collectAsState()
-    val macroDroidPasswordPrompt by viewModel.macroDroidPasswordPrompt.collectAsState()
-    val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
-    val taskerImportProgress by viewModel.taskerImportProgress.collectAsState()
+    val automationImportReview by viewModel.automationImportReview.collectAsState()
+    val automationImportBusy by viewModel.automationImportBusy.collectAsState()
+    val automationImportProgress by viewModel.automationImportProgress.collectAsState()
     val openTaskerBundleProgress by viewModel.openTaskerBundleProgress.collectAsState()
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState(); val highlightedFlowNodeKeys by viewModel.highlightedFlowNodeKeys.collectAsState(); val simulationProfile by viewModel.simulationProfile.collectAsState()
     val profileShareReview by viewModel.profileShareReview.collectAsState(); val preflightReview by viewModel.preflightReview.collectAsState()
     val preflightBusy by viewModel.preflightBusy.collectAsState()
-    val taskerXmlLauncher = rememberOpenDocumentLauncher {
-        viewModel.previewTaskerOrMacroDroid(it, BuildConfig.VERSION_NAME)
+    val macroDroidImportLauncher = rememberOpenDocumentLauncher {
+        viewModel.previewMacroDroid(it, BuildConfig.VERSION_NAME)
     }
     val openTaskerBundleExportLauncher = rememberCreateDocumentLauncher("application/json") {
         viewModel.exportOpenTaskerBundle(it, BuildConfig.VERSION_NAME)
     }
     val openTaskerBundleImportLauncher = rememberOpenDocumentLauncher { viewModel.previewOpenTaskerBundle(it) }
-    val taskerXmlExportLauncher = rememberCreateDocumentLauncher("text/xml") { viewModel.exportTaskerXml(it) }
     val profileShareScreenshotLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
@@ -758,9 +752,8 @@ fun ActiveAutomationUi(
                     showBundleTextImportDialog = true
                 },
                 openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_MACRODROID_MIME_TYPES) },
-                onExportTaskerXml = { taskerXmlExportLauncher.launch("opentasker-tasker-export.xml") },
-                taskerImportBusy = taskerImportBusy,
+                onImportMacroDroid = { macroDroidImportLauncher.launch(MACRODROID_MIME_TYPES) },
+                automationImportBusy = automationImportBusy,
                 onEditProfile = { openProfileDialog(it) },
                 onUndoProfileEdit = { viewModel.undoLastProfileEdit(it.id) },
                 onRedoProfileEdit = { viewModel.redoLastProfileEdit(it.id) },
@@ -1003,25 +996,14 @@ fun ActiveAutomationUi(
         )
     }
 
-    macroDroidPasswordPrompt?.let { prompt ->
-        MacroDroidPasswordDialog(
-            wrongPassword = prompt.wrongPassword,
-            busy = taskerImportBusy,
-            progress = taskerImportProgress,
-            onSubmit = { viewModel.openMacroDroidEncryptedExport(it, BuildConfig.VERSION_NAME) },
-            onDismiss = viewModel::clearMacroDroidPasswordPrompt,
-            onCancel = viewModel::cancelTransfers,
-        )
-    }
-
-    taskerImportReview?.let { state ->
-        TaskerImportReviewDialog(
+    automationImportReview?.let { state ->
+        AutomationImportReviewDialog(
             state = state,
-            busy = taskerImportBusy,
-            onDismiss = viewModel::clearTaskerImportReview,
-            progress = taskerImportProgress,
+            busy = automationImportBusy,
+            onDismiss = viewModel::clearAutomationImportReview,
+            progress = automationImportProgress,
             onCancel = viewModel::cancelTransfers,
-            onConfirm = { viewModel.confirmTaskerImport(state) },
+            onConfirm = { viewModel.confirmAutomationImport(state) },
         )
     }
 
@@ -1059,7 +1041,7 @@ fun ActiveAutomationUi(
             onCancel = viewModel::cancelTransfers,
             onConfirm = {
                 showBundleTextImportDialog = false
-                viewModel.previewPastedImport(bundleTextImportDraft, BuildConfig.VERSION_NAME)
+                viewModel.previewOpenTaskerBundleText(bundleTextImportDraft)
             },
         )
     }

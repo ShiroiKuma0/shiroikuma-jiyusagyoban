@@ -375,9 +375,8 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
                     onImportOpenTaskerBundle = {},
                     onImportOpenTaskerBundleText = {},
                     openTaskerBundleBusy = false,
-                    onImportTaskerXml = {},
-                    onExportTaskerXml = {},
-                    taskerImportBusy = false,
+                    onImportMacroDroid = {},
+                    automationImportBusy = false,
                     onEditProfile = {},
                     onDeleteProfile = {},
                     onToggleProfile = { _, _ -> },
@@ -864,14 +863,12 @@ class CriticalFlowComposeTest(private val fontScale: Float) {
                     onConfirm = {},
                 )
             },
-            DialogCase("MacroDroid password", aroundField) {
-                MacroDroidPasswordDialog(
-                    wrongPassword = false,
+            DialogCase("backup passphrase", aroundField) {
+                BackupPassphraseDialog(
+                    wrongPassphrase = false,
                     busy = false,
-                    progress = null,
                     onSubmit = {},
                     onDismiss = {},
-                    onCancel = {},
                 )
             },
             DialogCase("create scene", aroundField) {

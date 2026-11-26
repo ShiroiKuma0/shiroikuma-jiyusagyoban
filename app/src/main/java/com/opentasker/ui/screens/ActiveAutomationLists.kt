@@ -112,9 +112,8 @@ internal fun ProfilesScreen(
     onImportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundleText: () -> Unit,
     openTaskerBundleBusy: Boolean,
-    onImportTaskerXml: () -> Unit,
-    onExportTaskerXml: () -> Unit,
-    taskerImportBusy: Boolean,
+    onImportMacroDroid: () -> Unit,
+    automationImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
     onUndoProfileEdit: (Profile) -> Unit = {},
     onRedoProfileEdit: (Profile) -> Unit = {},
@@ -154,9 +153,9 @@ internal fun ProfilesScreen(
             quinaryActionLabel = stringResource(R.string.import_paste_json_action),
             onQuinaryAction = onImportOpenTaskerBundleText,
             quinaryActionEnabled = !openTaskerBundleBusy,
-            tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
-            onTertiaryAction = onImportTaskerXml,
-            tertiaryActionEnabled = !taskerImportBusy,
+            tertiaryActionLabel = if (automationImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.action_import_macrodroid),
+            onTertiaryAction = onImportMacroDroid,
+            tertiaryActionEnabled = !automationImportBusy,
             quaternaryActionLabel = stringResource(R.string.action_create_blank_task),
             onQuaternaryAction = onCreateTaskFirst,
             contentPadding = contentPadding,
@@ -175,9 +174,9 @@ internal fun ProfilesScreen(
             quinaryActionLabel = stringResource(R.string.import_paste_json_action),
             onQuinaryAction = onImportOpenTaskerBundleText,
             quinaryActionEnabled = !openTaskerBundleBusy,
-            tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
-            onTertiaryAction = onImportTaskerXml,
-            tertiaryActionEnabled = !taskerImportBusy,
+            tertiaryActionLabel = if (automationImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.action_import_macrodroid),
+            onTertiaryAction = onImportMacroDroid,
+            tertiaryActionEnabled = !automationImportBusy,
             quaternaryActionLabel = stringResource(R.string.action_create_blank_profile),
             onQuaternaryAction = onCreateProfile,
             contentPadding = contentPadding,
@@ -236,8 +235,7 @@ internal fun ProfilesScreen(
                     onExportOpenTaskerBundle = onExportOpenTaskerBundle,
                     onImportOpenTaskerBundle = onImportOpenTaskerBundle,
                     onImportOpenTaskerBundleText = onImportOpenTaskerBundleText,
-                    onImportTaskerXml = onImportTaskerXml,
-                    onExportTaskerXml = onExportTaskerXml,
+                    onImportMacroDroid = onImportMacroDroid,
                 )
             }
         }
@@ -312,8 +310,7 @@ private fun WorkspaceActionsButton(
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundleText: () -> Unit,
-    onImportTaskerXml: () -> Unit,
-    onExportTaskerXml: () -> Unit,
+    onImportMacroDroid: () -> Unit,
 ) {
     var actionsExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -323,10 +320,9 @@ private fun WorkspaceActionsButton(
         }
         DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
             WorkspaceActionMenuItem(R.string.workspace_templates) { actionsExpanded = false; onBrowseTemplates() }
-            WorkspaceActionMenuItem(R.string.import_tasker) { actionsExpanded = false; onImportTaskerXml() }
+            WorkspaceActionMenuItem(R.string.import_macrodroid) { actionsExpanded = false; onImportMacroDroid() }
             WorkspaceActionMenuItem(R.string.import_export_json) { actionsExpanded = false; onExportOpenTaskerBundle() }
             WorkspaceActionMenuItem(R.string.import_import_json) { actionsExpanded = false; onImportOpenTaskerBundle() }
-            WorkspaceActionMenuItem(R.string.import_export_tasker_xml) { actionsExpanded = false; onExportTaskerXml() }
             WorkspaceActionMenuItem(R.string.import_paste_json_action) { actionsExpanded = false; onImportOpenTaskerBundleText() }
             WorkspaceActionMenuItem(R.string.profile_share_preview_action) { actionsExpanded = false; onPreviewProfileShare() }
         }
@@ -996,7 +992,7 @@ internal fun ActionRow(
                     )
                 }
             }
-            // A step turned off is dimmed, the way it greys out in Tasker.
+            // A step turned off is dimmed so it reads as skipped.
             Column(Modifier.weight(1f).alpha(if (action.enabled) 1f else 0.55f)) {
                 Text(actionLabel, style = MaterialTheme.typography.titleSmall)
                 Text(

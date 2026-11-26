@@ -15,8 +15,6 @@ import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.references.TaskReferenceSite
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
-import com.opentasker.core.transfer.TaskerXmlExporter
-import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.validation.InputValidation
 import com.opentasker.ui.screens.profileEditorCanSave
 import org.junit.Assert.assertEquals
@@ -26,7 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A profile with an exit task and no enter task (Tasker lets you build one): nothing runs when it
+ * A profile with an exit task and no enter task: nothing runs when it
  * goes on, its exit task runs when it goes off. Every place that used to read enter task 0 as a
  * missing task 0 has to take it as "none" instead.
  */
@@ -77,65 +75,11 @@ class ExitOnlyProfileTest {
     }
 
     @Test
-    fun aTaskerProfileWithOnlyMid1ImportsWithNoEnterTask() {
-        val report = TaskerXmlImporter.parse(
-            rawXml = """
-                <TaskerData>
-                    <Task sr="task7"><id>7</id><nme>Lights off</nme></Task>
-                    <Profile sr="prof3">
-                        <id>3</id>
-                        <nme>Leaving home</nme>
-                        <mid1>7</mid1>
-                        <Time><from>08:00</from><to>09:00</to></Time>
-                    </Profile>
-                </TaskerData>
-            """.trimIndent(),
-            appVersion = "test",
-            importedAtEpochMs = 0L,
-        )
+    fun aBundleRoundTripKeepsTheProfileExitOnly() {
+        val bundle = OpenTaskerBundle(appVersion = "test", exportedAtEpochMs = 0L, tasks = listOf(lightsOff), profiles = listOf(exitOnly))
 
-        val profile = report.bundle.profiles.single()
-        assertNull(profile.enterTaskIdOrNull)
-        assertEquals(7L, profile.exitTaskId)
-        assertTrue(report.lossyWarnings.toString(), report.lossyWarnings.none { "skipped" in it })
-    }
+        val back = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle)).profiles.single()
 
-    @Test
-    fun aTaskerProfileWhoseOnlyTaskIsMissingIsStillSkipped() {
-        val report = TaskerXmlImporter.parse(
-            rawXml = """
-                <TaskerData>
-                    <Task sr="task7"><id>7</id><nme>Lights off</nme></Task>
-                    <Profile sr="prof3">
-                        <nme>Leaving home</nme>
-                        <mid1>99</mid1>
-                        <Time><from>08:00</from><to>09:00</to></Time>
-                    </Profile>
-                    <Profile sr="prof4">
-                        <nme>Enter task gone</nme>
-                        <mid0>98</mid0>
-                        <mid1>7</mid1>
-                        <Time><from>08:00</from><to>09:00</to></Time>
-                    </Profile>
-                </TaskerData>
-            """.trimIndent(),
-            appVersion = "test",
-            importedAtEpochMs = 0L,
-        )
-
-        assertTrue(report.bundle.profiles.isEmpty())
-        assertTrue(report.lossyWarnings.toString(), report.lossyWarnings.any { "'Leaving home'" in it && "exit task" in it })
-        // A missing enter task doesn't turn the profile into an exit-only one.
-        assertTrue(report.lossyWarnings.toString(), report.lossyWarnings.any { "'Enter task gone'" in it && "entry task" in it })
-    }
-
-    @Test
-    fun exportWritesNoMid0AndTheProfileComesBackTheSame() {
-        val xml = TaskerXmlExporter.export(listOf(exitOnly), listOf(lightsOff)).xml
-
-        assertFalse(xml, "<mid0>" in xml)
-        assertTrue(xml, "<mid1>7</mid1>" in xml)
-        val back = TaskerXmlImporter.parse(xml, appVersion = "test", importedAtEpochMs = 0L).bundle.profiles.single()
         assertNull(back.enterTaskIdOrNull)
         assertEquals(7L, back.exitTaskId)
     }
@@ -232,35 +176,6 @@ class ExitOnlyProfileTest {
         assertTrue(repeated(onState, guardedExit).isEmpty())
         // With an enter task a cooldown still counts.
         assertTrue(repeated(onState.copy(enterTaskId = lightsOff.id)).isEmpty())
-    }
-
-    @Test
-    fun aTaskerMid0ThatIsThereButUnreadableSkipsTheProfile() {
-        val report = TaskerXmlImporter.parse(
-            rawXml = """
-                <TaskerData>
-                    <Task sr="task7"><id>7</id><nme>Lights off</nme></Task>
-                    <Profile sr="prof3">
-                        <nme>Blank enter</nme>
-                        <mid0></mid0>
-                        <mid1>7</mid1>
-                        <Time><from>08:00</from><to>09:00</to></Time>
-                    </Profile>
-                    <Profile sr="prof4">
-                        <nme>Garbled enter</nme>
-                        <mid0>seven</mid0>
-                        <mid1>7</mid1>
-                        <Time><from>08:00</from><to>09:00</to></Time>
-                    </Profile>
-                </TaskerData>
-            """.trimIndent(),
-            appVersion = "test",
-            importedAtEpochMs = 0L,
-        )
-
-        assertTrue(report.bundle.profiles.toString(), report.bundle.profiles.isEmpty())
-        assertTrue(report.lossyWarnings.toString(), report.lossyWarnings.any { "'Blank enter'" in it && "entry task" in it })
-        assertTrue(report.lossyWarnings.toString(), report.lossyWarnings.any { "'Garbled enter'" in it && "entry task" in it })
     }
 
     @Test

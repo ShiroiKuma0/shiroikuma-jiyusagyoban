@@ -79,7 +79,6 @@ class SecretVariableUiSourceTest {
         val storage = ProductionSources.path("com/opentasker/core/storage/VariableSecretStorage.kt").readText()
         val runner = ProductionSources.path("com/opentasker/core/engine/TaskRunner.kt").readText()
         val bundle = ProductionSources.path("com/opentasker/core/transfer/OpenTaskerBundle.kt").readText()
-        val taskerExport = ProductionSources.path("com/opentasker/core/transfer/TaskerXmlExport.kt").readText()
 
         listOf("AndroidKeyStore", "AES/GCM/NoPadding", "updateAAD", "isSecret = true").forEach { marker ->
             assertTrue("Secret storage is missing $marker", storage.contains(marker))
@@ -89,6 +88,5 @@ class SecretVariableUiSourceTest {
         // rather than leaking it; the redactor replaced the old blanket SECRET_DERIVED_FAILURE.
         assertTrue(runner.contains("expansionReport.redactSensitiveValues(rawResult.message)"))
         assertTrue(bundle.contains("filterNot { it.isSecret }"))
-        assertTrue(taskerExport.contains("variables.filterNot { it.isSecret }"))
     }
 }

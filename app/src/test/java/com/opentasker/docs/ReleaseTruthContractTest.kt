@@ -271,11 +271,6 @@ class ReleaseTruthContractTest {
             "class LocalePluginConditionContextSource",
             "POLL_INTERVAL_MS = 30_000L",
         )
-        requireSourceEvidence(
-            "app/src/main/java/com/opentasker/core/transfer/TaskerXmlExport.kt",
-            "object TaskerXmlExporter",
-            "TaskerXmlExportReport",
-        )
 
         documentRules().forEach(::assertDocumentTruthWhenPresent)
     }

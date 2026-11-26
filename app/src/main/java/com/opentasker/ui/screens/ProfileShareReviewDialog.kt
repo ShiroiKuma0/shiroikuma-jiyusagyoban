@@ -223,7 +223,7 @@ internal fun ProfileShareReviewDialog(
                 }
                 if (planWarnings.isNotEmpty()) {
                     item {
-                        TaskerImportListSectionForShare(
+                        ShareListSection(
                             title = stringResource(R.string.import_warnings),
                             values = planWarnings,
                             color = if (state.plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
@@ -269,7 +269,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.findingsSection(
 ) {
     if (findings.isNotEmpty()) {
         item {
-            TaskerImportListSectionForShare(
+            ShareListSection(
                 title = title,
                 values = findings.map(ShareSafetyFinding::message),
                 color = color,
@@ -279,7 +279,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.findingsSection(
 }
 
 @Composable
-private fun TaskerImportListSectionForShare(
+private fun ShareListSection(
     title: String,
     values: List<String>,
     color: androidx.compose.ui.graphics.Color,

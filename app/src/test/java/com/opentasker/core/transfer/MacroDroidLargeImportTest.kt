@@ -1,14 +1,15 @@
 package com.opentasker.core.transfer
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.util.Base64
 
-/** Issue #30: whole-app backups went over the token budget, and `.emdr` was scanned as JSON. */
-class MacroDroidLargeAndEncryptedImportTest {
+/**
+ * Issue #30: whole-app backups went over the token budget, and a password-protected export was
+ * scanned as JSON. Now it's named for what it is, so the user can export again without one.
+ */
+class MacroDroidLargeImportTest {
     @Test
     fun aBackupOverTheDefaultTokenBudgetImportsAndItsBundleStillValidates() {
         val raw = backup(macroCount = 400, filler = 1_000)
@@ -61,47 +62,27 @@ class MacroDroidLargeAndEncryptedImportTest {
         }
     }
 
-    /** Both vectors were made outside this code, with hashlib's PBKDF2 and OpenSSL's AES. */
     @Test
-    fun decryptsAnExportMadeWithMacroDroidsParameters() {
-        assertEquals(VECTOR_PLAINTEXT, MacroDroidEncryptedExport.decrypt(HUNTER2_CIPHERTEXT, "hunter2".toCharArray()))
-        assertEquals(VECTOR_PLAINTEXT, MacroDroidEncryptedExport.decrypt(UMLAUT_CIPHERTEXT, "pässwörd".toCharArray()))
+    fun classifiesByContentBecauseAProtectedExportCanOpenWithAnyByte() {
+        fun classify(bytes: ByteArray) = MacroDroidDocument.classify(bytes)
 
-        val report = MacroDroidImporter.parse(rawJson = VECTOR_PLAINTEXT, appVersion = "test", importedAtEpochMs = 0)
-        assertEquals("Encrypted macro", report.bundle.tasks.single().name)
+        assertEquals(MacroDroidDocument.Text(PLAIN_EXPORT), classify(PLAIN_EXPORT.toByteArray()))
+        assertEquals(MacroDroidDocument.PasswordProtected, classify(BINARY_BLOCKS))
+
+        val opensLikeJson = BINARY_BLOCKS.copyOf().also { it[0] = '{'.code.toByte() }
+        assertEquals(MacroDroidDocument.PasswordProtected, classify(opensLikeJson))
+
+        val notBlocks = BINARY_BLOCKS.copyOf(BINARY_BLOCKS.size - 1)
+        assertEquals(MacroDroidDocument.Unrecognized, classify(notBlocks))
+        assertEquals(MacroDroidDocument.Unrecognized, classify("<root/>".toByteArray()))
     }
 
     @Test
-    fun aWrongPasswordIsAnAnswerNotACrash() {
-        assertNull(MacroDroidEncryptedExport.decrypt(HUNTER2_CIPHERTEXT, "hunter3".toCharArray()))
-        assertNull(MacroDroidEncryptedExport.decrypt(HUNTER2_CIPHERTEXT, CharArray(0)))
-    }
+    fun textInAnotherEncodingStillReachesTheParser() {
+        val latin1 = """{"macroList":[{"m_name":"café"}]}""".toByteArray(Charsets.ISO_8859_1)
+        assertTrue("A whole number of blocks would read as a protected export", latin1.size % 16 != 0)
 
-    @Test
-    fun classifiesByContentBecauseCiphertextCanOpenWithAnyByte() {
-        fun classify(bytes: ByteArray) = TaskerOrMacroDroidDocument.classify(bytes)
-
-        assertEquals(
-            TaskerOrMacroDroidDocument.Text(VECTOR_PLAINTEXT),
-            classify(VECTOR_PLAINTEXT.toByteArray()),
-        )
-        assertEquals(TaskerOrMacroDroidDocument.Text("<TaskerData/>"), classify("<TaskerData/>".toByteArray()))
-        assertEquals(TaskerOrMacroDroidDocument.MacroDroidEncrypted, classify(HUNTER2_CIPHERTEXT))
-
-        val opensLikeJson = HUNTER2_CIPHERTEXT.copyOf().also { it[0] = '{'.code.toByte() }
-        assertEquals(TaskerOrMacroDroidDocument.MacroDroidEncrypted, classify(opensLikeJson))
-
-        val notBlocks = HUNTER2_CIPHERTEXT.copyOf(HUNTER2_CIPHERTEXT.size - 1)
-        assertEquals(TaskerOrMacroDroidDocument.Unrecognized, classify(notBlocks))
-    }
-
-    @Test
-    fun textInAnotherEncodingStillReachesTheParsers() {
-        val latin1 = "<TaskerData name=\"café\"/>".toByteArray(Charsets.ISO_8859_1)
-        assertTrue("A whole number of blocks would read as ciphertext", latin1.size % 16 != 0)
-        val document = TaskerOrMacroDroidDocument.classify(latin1)
-
-        assertTrue(document is TaskerOrMacroDroidDocument.Text)
+        assertTrue(MacroDroidDocument.classify(latin1) is MacroDroidDocument.Text)
     }
 
     private fun backup(macroCount: Int, filler: Int): String = buildString {
@@ -125,13 +106,10 @@ class MacroDroidLargeAndEncryptedImportTest {
     }
 
     private companion object {
-        const val VECTOR_PLAINTEXT =
-            """{"macroList":[{"m_name":"Encrypted macro","m_GUID":1,"m_actionList":[],"m_triggerList":[]}]}"""
-        val HUNTER2_CIPHERTEXT: ByteArray = Base64.getDecoder().decode(
-            "F7qxRTzTW36aNWL64XRe6EHOVOOfM4XqAWkVukUkd7vLvcXRLZhOv4rguatMYA4OTrzL4qMtlTLP0bYjQUoGYF4kymosRbXOP5K6h7xJcxQffdGEz5YgLs3yfSTRVHbX",
-        )
-        val UMLAUT_CIPHERTEXT: ByteArray = Base64.getDecoder().decode(
-            "V3wzCGSqT3ZE2QTOdTJ51Cn3q+BQ7gutANV2+TMzo/5wINqyR4R/Z2UDTUadJSLWJhIsNabdtglshF+AfFB6U9LHkknW/CWkRwaHtD86UOC8di/45Ss3R8mzhhiWm8Fv",
-        )
+        const val PLAIN_EXPORT =
+            """{"macroList":[{"m_name":"Plain macro","m_GUID":1,"m_actionList":[],"m_triggerList":[]}]}"""
+
+        /** Four 16-byte blocks that can't be UTF-8: every one is a stray continuation byte. */
+        val BINARY_BLOCKS = ByteArray(64) { (0x80 + it).toByte() }
     }
 }

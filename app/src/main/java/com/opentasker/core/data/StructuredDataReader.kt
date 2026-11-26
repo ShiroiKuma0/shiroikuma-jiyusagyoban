@@ -163,7 +163,7 @@ object StructuredDataReader {
         // the throw happened inside runCatching every XML read failed on device while desktop
         // Xerces kept the JVM tests green. This is the same defect that broke Tasker XML import
         // (issue #5); the sanitizer is the enforcement, the feature is belt and braces.
-        val sanitized = runCatching { ImportResourceGuard.sanitizeTaskerXml(source) }.getOrNull()
+        val sanitized = runCatching { ImportResourceGuard.sanitizeXml(source) }.getOrNull()
             ?: return null
         val doc = runCatching {
             val factory = DocumentBuilderFactory.newInstance().apply {

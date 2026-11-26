@@ -38,10 +38,8 @@ class NotificationTaskEditorMigrationTest {
     fun importedFlowIfConditionPopulatesItsOwnRequiredEditorField() {
         // flow.if's "condition" catalog field is a required text field the editor prefills from
         // args["condition"] (see the `args[key] ?: ...` lookup at the top of
-        // existingActionArgValue). TaskerXmlImport writes the parsed Tasker <ConditionList> into
-        // both action.condition and args["condition"] for this action type specifically, so the
-        // field must come back non-blank -- a blank read here would mean an imported "if" opens
-        // in the editor with its required condition field looking empty despite already working.
+        // existingActionArgValue). An imported "if" carries its condition there, so the field
+        // must come back non-blank, or the step opens looking empty despite already working.
         val value = existingActionArgValue(
             actionId = "flow.if",
             key = "condition",

@@ -85,17 +85,12 @@ import com.opentasker.core.templates.BlueprintCatalogStore
 import com.opentasker.core.templates.BlueprintInstallation
 import com.opentasker.core.templates.BlueprintInstallationStore
 import com.opentasker.core.transfer.BundleImportPlan
-import com.opentasker.core.transfer.MacroDroidEncryptedExport
+import com.opentasker.core.transfer.MacroDroidDocument
 import com.opentasker.core.transfer.MacroDroidImporter
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.OpenTaskerBundleTextImport
-import com.opentasker.core.transfer.PastedImportKind
-import com.opentasker.core.transfer.PastedImportSource
-import com.opentasker.core.transfer.TaskerOrMacroDroidDocument
-import com.opentasker.core.transfer.TaskerXmlExporter
-import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.widget.TaskShortcutHelper
 import com.opentasker.widget.TaskWidgetProvider
@@ -119,13 +114,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-internal const val TASKER_MACRODROID_IMPORT_MAX_BYTES = 16 * 1024 * 1024
+internal const val MACRODROID_IMPORT_MAX_BYTES = 16 * 1024 * 1024
 internal const val OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES = 8 * 1024 * 1024
-internal val TASKER_MACRODROID_MIME_TYPES = arrayOf(
+internal val MACRODROID_MIME_TYPES = arrayOf(
     "application/json",
     "text/json",
-    "application/xml",
-    "text/xml",
     "application/octet-stream",
     "text/*",
     "*/*",
@@ -379,14 +372,12 @@ class ActiveAutomationViewModel(
     private val _globalFallbackTaskId = MutableStateFlow(fallbackTaskSettings.loadTaskId())
     val globalFallbackTaskId: StateFlow<Long?> = _globalFallbackTaskId.asStateFlow()
 
-    private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
-    internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
-    private val _macroDroidPasswordPrompt = MutableStateFlow<MacroDroidPasswordPrompt?>(null)
-    internal val macroDroidPasswordPrompt: StateFlow<MacroDroidPasswordPrompt?> = _macroDroidPasswordPrompt.asStateFlow()
+    private val _automationImportReview = MutableStateFlow<AutomationImportReviewState?>(null)
+    internal val automationImportReview: StateFlow<AutomationImportReviewState?> = _automationImportReview.asStateFlow()
 
     private val automationTransfer = ImportExportCoordinator(viewModelScope)
-    val taskerImportBusy: StateFlow<Boolean> = automationTransfer.busy
-    val taskerImportProgress: StateFlow<TransferProgress?> = automationTransfer.progress
+    val automationImportBusy: StateFlow<Boolean> = automationTransfer.busy
+    val automationImportProgress: StateFlow<TransferProgress?> = automationTransfer.progress
 
     private val _openTaskerBundleReview = MutableStateFlow<OpenTaskerBundleReviewState?>(null)
     internal val openTaskerBundleReview: StateFlow<OpenTaskerBundleReviewState?> = _openTaskerBundleReview.asStateFlow()
@@ -1124,78 +1115,38 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun previewTaskerOrMacroDroid(uri: Uri, appVersion: String) {
+    fun previewMacroDroid(uri: Uri, appVersion: String) {
         automationTransfer.launch(FILE_PREVIEW_STEPS) { report ->
             runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Preflight)
-                    val bytes = readBoundedTaskerOrMacroDroidBytes(appContext, uri)
+                    val bytes = readBoundedMacroDroidBytes(appContext, uri)
                     report(TransferStage.Decode)
-                    val raw = when (val document = TaskerOrMacroDroidDocument.classify(bytes)) {
-                        is TaskerOrMacroDroidDocument.Text -> document.text
-                        TaskerOrMacroDroidDocument.Unrecognized ->
+                    val raw = when (val document = MacroDroidDocument.classify(bytes)) {
+                        is MacroDroidDocument.Text -> document.text
+                        MacroDroidDocument.PasswordProtected ->
+                            throw UiRejection(R.string.ui_error_macrodroid_password_protected)
+                        MacroDroidDocument.Unrecognized ->
                             throw UiRejection(R.string.ui_error_import_not_recognized)
-                        TaskerOrMacroDroidDocument.MacroDroidEncrypted -> {
-                            _macroDroidPasswordPrompt.value = MacroDroidPasswordPrompt(bytes)
-                            return@withContext null
-                        }
                     }
-                    if (raw.removePrefix("\uFEFF").trimStart().startsWith("<")) {
-                        taskerImportReviewState(TaskerXmlImporter.parse(rawXml = raw, appVersion = appVersion))
-                    } else {
-                        macroDroidImportReviewState(MacroDroidImporter.parse(rawJson = raw, appVersion = appVersion))
-                    }
+                    macroDroidImportReviewState(MacroDroidImporter.parse(rawJson = raw, appVersion = appVersion))
                 }
             }
                 .onSuccess { review ->
-                    if (review != null) {
-                        _taskerImportReview.value = review
-                        events.send(message(R.string.ui_message_automation_import_ready))
-                    }
+                    _automationImportReview.value = review
+                    events.send(message(R.string.ui_message_automation_import_ready))
                 }
                 .onFailure { events.send(importPreviewFailureMessage(it, R.string.ui_error_automation_import_preview)) }
         }
     }
 
-    /** A wrong password leaves the prompt up to try again. The password goes no further than here. */
-    fun openMacroDroidEncryptedExport(password: String, appVersion: String) {
-        val prompt = _macroDroidPasswordPrompt.value ?: return
-        automationTransfer.launch(FILE_PREVIEW_STEPS) { report ->
-            runTransferCatching {
-                withContext(Dispatchers.IO) {
-                    report(TransferStage.Decode)
-                    MacroDroidEncryptedExport.decrypt(prompt.bytes, password.toCharArray())?.let { json ->
-                        macroDroidImportReviewState(MacroDroidImporter.parse(rawJson = json, appVersion = appVersion))
-                    }
-                }
-            }
-                .onSuccess { review ->
-                    if (review == null) {
-                        _macroDroidPasswordPrompt.value = prompt.copy(wrongPassword = true)
-                    } else {
-                        _macroDroidPasswordPrompt.value = null
-                        _taskerImportReview.value = review
-                        events.send(message(R.string.ui_message_automation_import_ready))
-                    }
-                }
-                .onFailure {
-                    _macroDroidPasswordPrompt.value = null
-                    events.send(importPreviewFailureMessage(it, R.string.ui_error_automation_import_preview))
-                }
+    fun clearAutomationImportReview() {
+        if (!automationImportBusy.value) {
+            _automationImportReview.value = null
         }
     }
 
-    fun clearMacroDroidPasswordPrompt() {
-        _macroDroidPasswordPrompt.value = null
-    }
-
-    fun clearTaskerImportReview() {
-        if (!taskerImportBusy.value) {
-            _taskerImportReview.value = null
-        }
-    }
-
-    internal fun confirmTaskerImport(state: TaskerImportReviewState) {
+    internal fun confirmAutomationImport(state: AutomationImportReviewState) {
         automationTransfer.launch { report ->
             runTransferCatching {
                 withContext(Dispatchers.IO) {
@@ -1204,10 +1155,10 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess { importReport ->
-                    _taskerImportReview.value = null
+                    _automationImportReview.value = null
                     events.send(
                         message(
-                            R.string.ui_message_tasker_imported,
+                            R.string.ui_message_automation_imported,
                             pluralMessage(R.plurals.count_tasks, importReport.insertedTasks, importReport.insertedTasks),
                             pluralMessage(R.plurals.count_disabled_profiles, importReport.insertedProfiles, importReport.insertedProfiles),
                         ),
@@ -1248,91 +1199,15 @@ class ActiveAutomationViewModel(
         }
     }
 
-    /**
-     * Writes the workspace as Tasker XML.
-     *
-     * The exporter shipped unreachable: nothing in the app called it, so the changelog claimed a
-     * feature users could not run and its redaction path - the only export path that can match a
-     * secret's literal plaintext - was never exercised outside tests.
-     */
-    fun exportTaskerXml(uri: Uri) {
-        automationTransfer.launch { reportStage ->
-            runTransferCatching {
-                withContext(Dispatchers.IO) {
-                    reportStage(TransferStage.Write)
-                    val report = TaskerXmlExporter.export(
-                        profiles = db.profileDao().getAll().map { it.toDomain() },
-                        tasks = db.taskDao().getAll().map { it.toDomain() },
-                        variables = variableRepository.decodedForExportRedaction(),
-                    )
-                    val stream = appContext.contentResolver.openOutputStream(uri)
-                        ?: error("Unable to open export destination")
-                    stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(report.xml) }
-                    report
-                }
-            }
-                .onSuccess { report ->
-                    events.send(
-                        message(
-                            R.string.ui_message_tasker_xml_exported,
-                            pluralMessage(R.plurals.count_profiles, report.exportedProfileCount, report.exportedProfileCount),
-                            pluralMessage(R.plurals.count_tasks, report.exportedTaskCount, report.exportedTaskCount),
-                            pluralMessage(R.plurals.count_skipped_actions, report.skippedActions.size, report.skippedActions.size),
-                        ),
-                    )
-                    if (report.warnings.isNotEmpty()) {
-                        events.send(
-                            message(
-                                R.string.ui_message_tasker_xml_export_warnings,
-                                report.warnings.size,
-                                report.warnings.take(MAX_EXPORT_WARNINGS_SHOWN).joinToString(" "),
-                            ).copy(longDuration = true),
-                        )
-                    }
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_export)) }
-        }
-    }
-
     fun previewOpenTaskerBundle(uri: Uri) {
         previewOpenTaskerBundleSource {
             OpenTaskerBundleCodec.decode(readBoundedOpenTaskerBundle(appContext, uri))
         }
     }
 
-    /**
-     * One paste box, two formats. Tasker XML opens the same review the document picker does, so a
-     * copied Tasker task and a Tasker file end up in the same place.
-     */
-    fun previewPastedImport(rawText: String, appVersion: String) {
-        when (PastedImportSource.classify(rawText)) {
-            PastedImportKind.TASKER_XML -> previewTaskerXmlText(rawText, appVersion)
-            PastedImportKind.OPEN_TASKER_JSON -> previewOpenTaskerBundleText(rawText)
-        }
-    }
-
     fun previewOpenTaskerBundleText(rawText: String) {
         previewOpenTaskerBundleSource {
             OpenTaskerBundleTextImport.decode(rawText)
-        }
-    }
-
-    private fun previewTaskerXmlText(rawText: String, appVersion: String) {
-        automationTransfer.launch(FILE_PREVIEW_STEPS) { reportStage ->
-            runTransferCatching {
-                withContext(Dispatchers.IO) {
-                    reportStage(TransferStage.Preflight)
-                    val rawXml = PastedImportSource.requireTaskerXmlWithinBudget(rawText)
-                    reportStage(TransferStage.Decode)
-                    val report = TaskerXmlImporter.parse(rawXml = rawXml, appVersion = appVersion)
-                    taskerImportReviewState(report)
-                }
-            }
-                .onSuccess {
-                    _taskerImportReview.value = it
-                    events.send(message(R.string.ui_message_tasker_xml_ready))
-                }
-                .onFailure { events.send(importPreviewFailureMessage(it, R.string.ui_error_tasker_xml_preview)) }
         }
     }
 
@@ -1945,7 +1820,6 @@ class ActiveAutomationViewModel(
     }
 }
 
-private const val MAX_EXPORT_WARNINGS_SHOWN = 3
 
 /** The feedback-loop review can switch a profile off as it saves, and "updated" alone hid that. */
 @StringRes

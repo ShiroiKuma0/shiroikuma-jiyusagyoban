@@ -16,7 +16,6 @@ import com.opentasker.core.transfer.ImportResourceBudget
 import com.opentasker.core.transfer.ImportResourceGuard
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
-import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
@@ -71,47 +70,22 @@ class ImportBoundaryCorpusTest {
     }
 
     @Test
-    fun taskerXmlCorpusRejectsMalformedAndOversizedInputsBeforeImport() {
-        val valid = """
-            <TaskerData>
-                <Task sr="task1"><id>1</id><nme>Notify</nme><Action><code>523</code><Str>Ready</Str></Action></Task>
-                <Profile sr="profile1"><id>2</id><nme>Morning</nme><mid0>1</mid0><Time><from>08:00</from><to>09:00</to></Time></Profile>
-            </TaskerData>
-        """.trimIndent()
-        val duplicateIds = valid.replace("</TaskerData>", "<Task><id>1</id><nme>Second</nme></Task></TaskerData>")
-        val duplicateReport = TaskerXmlImporter.parse(duplicateIds, "test", 0L)
-        assertEquals(2, duplicateReport.bundle.tasks.size)
-        assertEquals(2, duplicateReport.bundle.tasks.map { it.id }.distinct().size)
+    fun xmlSanitizerCorpusRejectsEntityAndExternalDoctypes() {
+        val valid = "<root><item>Notify</item></root>"
+        assertEquals(valid, ImportResourceGuard.sanitizeXml("<!DOCTYPE root>$valid"))
 
         listOf(
-            "truncated" to valid.dropLast(10),
-            "broken entity" to valid.replace("Notify", "&broken;"),
-            "external entity" to "<!DOCTYPE TaskerData SYSTEM \"file:///etc/passwd\">$valid",
-            // An internal subset is the branch the bracket scanner in
-            // ImportResourceGuard.sanitizeTaskerXml exists for: the '>' that closes the ENTITY sits
-            // inside '[' ... ']', so a naive scan ends the DOCTYPE early and lets the rest through.
-            // The external-SYSTEM case above is caught earlier by the preflight, so it never
-            // reaches that code.
-            "internal subset entity" to
-                "<!DOCTYPE TaskerData [ <!ENTITY xxe \"expanded\"> ]>$valid",
+            "external entity" to "<!DOCTYPE root SYSTEM \"file:///etc/passwd\">$valid",
+            // An internal subset is the branch the bracket scanner in ImportResourceGuard.sanitizeXml
+            // exists for: the '>' that closes the ENTITY sits inside '[' ... ']', so a naive scan
+            // ends the DOCTYPE early and lets the rest through.
+            "internal subset entity" to "<!DOCTYPE root [ <!ENTITY xxe \"expanded\"> ]>$valid",
             "internal subset with nested markup" to
-                "<!DOCTYPE TaskerData [ <!ELEMENT Task ANY> <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>$valid",
-            "doctype with no terminator" to "<!DOCTYPE TaskerData [ <!ENTITY xxe \"x\"> $valid",
+                "<!DOCTYPE root [ <!ELEMENT item ANY> <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>$valid",
+            "doctype with no terminator" to "<!DOCTYPE root [ <!ENTITY xxe \"x\"> $valid",
+            "two doctypes" to "<!DOCTYPE root><!DOCTYPE root>$valid",
         ).forEach { (label, raw) ->
-            assertBoundedFailure(label) { TaskerXmlImporter.parse(raw, "test", 0L) }
-        }
-        assertBoundedFailure("sanitizer sees the internal subset directly") {
-            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE TaskerData [ <!ENTITY xxe \"expanded\"> ]>$valid")
-        }
-
-        val manyTasks = "<Task><id>1</id><nme>Repeated</nme></Task>".repeat(32)
-        assertBoundedFailure("XML entity budget") {
-            TaskerXmlImporter.parse(
-                "<TaskerData>$manyTasks</TaskerData>",
-                "test",
-                0L,
-                ImportResourceBudget.Default.copy(maxEntities = 4),
-            )
+            assertBoundedFailure(label) { ImportResourceGuard.sanitizeXml(raw) }
         }
     }
 

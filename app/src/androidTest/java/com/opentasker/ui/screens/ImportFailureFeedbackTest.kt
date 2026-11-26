@@ -48,8 +48,8 @@ class ImportFailureFeedbackTest {
         composeTestRule.mainClock.advanceTimeBy(15_000)
         composeTestRule.onNodeWithText(string(R.string.ui_error_import_damaged)).assertIsDisplayed()
 
-        messages.trySend(UiMessage(R.string.ui_message_tasker_xml_ready))
-        composeTestRule.onNodeWithText(string(R.string.ui_message_tasker_xml_ready)).assertIsDisplayed()
+        messages.trySend(UiMessage(R.string.ui_message_automation_import_ready))
+        composeTestRule.onNodeWithText(string(R.string.ui_message_automation_import_ready)).assertIsDisplayed()
         composeTestRule.onNodeWithText(string(R.string.ui_error_import_damaged)).assertDoesNotExist()
     }
 
@@ -59,7 +59,7 @@ class ImportFailureFeedbackTest {
         val host = SnackbarHostState()
         // Both queued before the collector starts, as when two import lanes fail back to back.
         messages.trySend(UiMessage(R.string.ui_error_import_damaged, stayUntilDismissed = true))
-        messages.trySend(UiMessage(R.string.ui_message_tasker_xml_ready))
+        messages.trySend(UiMessage(R.string.ui_message_automation_import_ready))
         composeTestRule.setContent {
             val context = LocalContext.current
             LaunchedEffect(Unit) { host.showUiMessages(messages.receiveAsFlow(), context) {} }
@@ -69,7 +69,7 @@ class ImportFailureFeedbackTest {
         composeTestRule.onNodeWithText(string(R.string.ui_error_import_damaged)).assertIsDisplayed()
 
         composeTestRule.mainClock.advanceTimeBy(STICKY_MESSAGE_MINIMUM_MS + 1_000)
-        composeTestRule.onNodeWithText(string(R.string.ui_message_tasker_xml_ready)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.ui_message_automation_import_ready)).assertIsDisplayed()
         composeTestRule.onNodeWithText(string(R.string.ui_error_import_damaged)).assertDoesNotExist()
     }
 
@@ -97,8 +97,8 @@ class ImportFailureFeedbackTest {
         composeTestRule.onNodeWithText(undo).performClick()
         composeTestRule.runOnIdle { assertTrue(undone) }
         // The queue isn't left waiting on the reason that went away.
-        messages.trySend(UiMessage(R.string.ui_message_tasker_xml_ready))
-        composeTestRule.onNodeWithText(string(R.string.ui_message_tasker_xml_ready)).assertIsDisplayed()
+        messages.trySend(UiMessage(R.string.ui_message_automation_import_ready))
+        composeTestRule.onNodeWithText(string(R.string.ui_message_automation_import_ready)).assertIsDisplayed()
     }
 
     @Test
@@ -207,7 +207,7 @@ class ImportFailureFeedbackTest {
         }
         val reason = string(R.string.ui_error_import_damaged)
         val direct = string(R.string.ui_flow_target_missing)
-        val next = string(R.string.ui_message_tasker_xml_ready)
+        val next = string(R.string.ui_message_automation_import_ready)
         val undo = string(R.string.action_undo)
         var undone = false
 
@@ -215,7 +215,7 @@ class ImportFailureFeedbackTest {
         composeTestRule.onNodeWithText(direct).assertIsDisplayed()
         // The queue waits on the reason's time on screen while the reason waits behind the direct message.
         messages.trySend(UiMessage(R.string.ui_error_import_damaged, stayUntilDismissed = true))
-        messages.trySend(UiMessage(R.string.ui_message_tasker_xml_ready))
+        messages.trySend(UiMessage(R.string.ui_message_automation_import_ready))
         composeTestRule.waitForIdle()
         composeTestRule.runOnIdle { undoableMessages(scope, host, undo)("Deleted Morning routine") { undone = true } }
 
@@ -251,12 +251,12 @@ class ImportFailureFeedbackTest {
         }
         val reason = string(R.string.ui_error_import_damaged)
         val direct = string(R.string.ui_flow_target_missing)
-        val next = string(R.string.ui_message_tasker_xml_ready)
+        val next = string(R.string.ui_message_automation_import_ready)
 
         composeTestRule.runOnIdle { scope.launch { host.showSnackbarOverReason(direct) } }
         composeTestRule.onNodeWithText(direct).assertIsDisplayed()
         messages.trySend(UiMessage(R.string.ui_error_import_damaged, stayUntilDismissed = true))
-        messages.trySend(UiMessage(R.string.ui_message_tasker_xml_ready))
+        messages.trySend(UiMessage(R.string.ui_message_automation_import_ready))
 
         // The direct message's 4 seconds run out and the reason comes up.
         composeTestRule.mainClock.advanceTimeBy(4_500)
@@ -273,7 +273,7 @@ class ImportFailureFeedbackTest {
 
     @Test
     fun aPasteCutAtTheCapSaysSoAndWontGoToReview() {
-        var text by mutableStateOf("<TaskerData sr=\"\">")
+        var text by mutableStateOf("{\"tasks\":[]}")
         composeTestRule.setContent {
             OpenTaskerTheme {
                 OpenTaskerBundleTextImportDialog(

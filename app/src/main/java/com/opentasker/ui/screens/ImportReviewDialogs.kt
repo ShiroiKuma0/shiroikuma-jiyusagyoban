@@ -266,7 +266,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 }
                 if (!plan.canImport) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_incompatible),
                             values = plan.warnings.ifEmpty { listOf(stringResource(R.string.import_incompatible_body)) },
                             color = MaterialTheme.colorScheme.error,
@@ -295,7 +295,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 }
                 if (capabilityRequirements.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_capability_review),
                             values = capabilityRequirements.map { requirement ->
                                 val capability = ActionCapabilityRegistry.get(requirement.actionId)
@@ -320,7 +320,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 }
                 if (powerRequests.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_power_review),
                             values = powerRequests.map { request -> powerRequestSummary(request) },
                             color = MaterialTheme.colorScheme.error,
@@ -329,7 +329,7 @@ internal fun OpenTaskerBundleReviewDialog(
                 }
                 if (reviewWarnings.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_warnings),
                             values = reviewWarnings,
                             color = if (plan.canImport) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
@@ -427,8 +427,8 @@ private fun VariableConflictChoice(
 }
 
 @Composable
-internal fun TaskerImportReviewDialog(
-    state: TaskerImportReviewState,
+internal fun AutomationImportReviewDialog(
+    state: AutomationImportReviewState,
     busy: Boolean,
     onDismiss: () -> Unit,
     progress: TransferProgress? = null,
@@ -477,7 +477,7 @@ internal fun TaskerImportReviewDialog(
                 }
                 if (preview.capabilityWarnings.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_capability_review),
                             values = preview.capabilityWarnings,
                             color = MaterialTheme.colorScheme.primary,
@@ -486,7 +486,7 @@ internal fun TaskerImportReviewDialog(
                 }
                 if (preview.powerRequests.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_power_review),
                             values = preview.powerRequests.map { request -> powerRequestSummary(request) },
                             color = MaterialTheme.colorScheme.error,
@@ -495,7 +495,7 @@ internal fun TaskerImportReviewDialog(
                 }
                 if (migrationWarnings.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_migration_warnings),
                             values = migrationWarnings,
                             color = MaterialTheme.colorScheme.error,
@@ -504,7 +504,7 @@ internal fun TaskerImportReviewDialog(
                 }
                 if (state.unsupportedActionRows.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_unsupported_actions),
                             values = state.unsupportedActionRows,
                             color = MaterialTheme.colorScheme.error,
@@ -513,7 +513,7 @@ internal fun TaskerImportReviewDialog(
                 }
                 if (state.mappedActionRows.isNotEmpty()) {
                     item {
-                        TaskerImportListSection(
+                        ImportListSection(
                             title = stringResource(R.string.import_mapped_actions),
                             values = state.mappedActionRows,
                             color = MaterialTheme.colorScheme.tertiary,
@@ -572,28 +572,6 @@ internal fun automationPowerLabel(power: AutomationPower): String = stringResour
         AutomationPower.DEVICE_CONTROL -> R.string.automation_power_device_control
         AutomationPower.DESTRUCTIVE -> R.string.automation_power_destructive
     },
-)
-
-/** Asks for the password a MacroDroid `.emdr` was exported with. */
-@Composable
-internal fun MacroDroidPasswordDialog(
-    wrongPassword: Boolean,
-    busy: Boolean,
-    progress: TransferProgress?,
-    onSubmit: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onCancel: () -> Unit,
-) = FilePasswordDialog(
-    title = R.string.dialog_macrodroid_password_title,
-    body = R.string.dialog_macrodroid_password_body,
-    label = R.string.dialog_macrodroid_password_label,
-    wrongText = R.string.dialog_macrodroid_password_wrong,
-    wrongPassword = wrongPassword,
-    busy = busy,
-    progress = progress,
-    onSubmit = onSubmit,
-    onDismiss = onDismiss,
-    onCancel = onCancel,
 )
 
 /**
@@ -670,7 +648,7 @@ private fun FilePasswordDialog(
         },
         confirmButton = {
             Button(enabled = !busy && password.isNotEmpty(), onClick = { onSubmit(password) }) {
-                Text(stringResource(R.string.dialog_macrodroid_password_open))
+                Text(stringResource(R.string.dialog_password_open))
             }
         },
         dismissButton = {
@@ -683,7 +661,7 @@ private fun FilePasswordDialog(
 }
 
 @Composable
-private fun TaskerImportListSection(
+private fun ImportListSection(
     title: String,
     values: List<String>,
     color: Color,

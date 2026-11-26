@@ -5,7 +5,6 @@ import com.opentasker.core.expressions.TemplateExpressionEngine;
 import com.opentasker.core.expressions.TemplateScope;
 import com.opentasker.core.transfer.MacroDroidImporter;
 import com.opentasker.core.transfer.OpenTaskerBundleCodec;
-import com.opentasker.core.transfer.TaskerXmlImporter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -26,14 +25,13 @@ public final class ExternalDecoderFuzzHarness {
         int boundedLength = Math.min(input.length, MAX_INPUT_BYTES);
         byte[] bounded = input.length == boundedLength ? input : Arrays.copyOf(input, boundedLength);
         int selector = bounded[0] & 0xff;
-        int route = selector >= '@' && selector <= 'D' ? selector - '@' : selector % 5;
+        int route = selector >= '@' && selector <= 'C' ? selector - '@' : selector % 4;
         try {
             switch (route) {
                 case 0 -> OpenTaskerBundleCodec.INSTANCE.decode(text(bounded, 1));
-                case 1 -> TaskerXmlImporter.INSTANCE.parse(text(bounded, 1), "fuzz", 0L);
-                case 2 -> new TemplateExpressionEngine().expand(text(bounded, 1), new TemplateScope());
-                case 3 -> runStructured(bounded);
-                case 4 -> MacroDroidImporter.INSTANCE.parse(text(bounded, 1), "fuzz", 0L);
+                case 1 -> new TemplateExpressionEngine().expand(text(bounded, 1), new TemplateScope());
+                case 2 -> runStructured(bounded);
+                case 3 -> MacroDroidImporter.INSTANCE.parse(text(bounded, 1), "fuzz", 0L);
                 default -> throw new AssertionError("unreachable decoder route");
             }
         } catch (IllegalArgumentException | IllegalStateException ignored) {
