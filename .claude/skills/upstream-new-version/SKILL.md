@@ -66,7 +66,7 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
    holding the old database — a clean build, a fresh install and the whole JVM suite all pass while
    **every existing install crashes on start**. The script builds the previous schema in SQLite,
    applies our migrations, and diffs the result against what Room expects. Run it whenever
-   `OPEN_TASKER_DATABASE_SCHEMA_VERSION` changes; never ship a schema bump without it.
+   `RULEDECK_DATABASE_SCHEMA_VERSION` changes; never ship a schema bump without it.
 
    The trap upstream does not have: it declares its column additions as generated `AutoMigration`s,
    which emit the defaults for it. The fork registers every migration by hand, so any column whose
@@ -77,7 +77,8 @@ upstream (fast-forward only); `custom` carries our patches and is rebased onto e
    | What | Expected | Where |
    | --- | --- | --- |
    | Installed app id | `shiroikuma.jiyusagyoban` | `app/build.gradle.kts` → `defaultConfig.applicationId` |
-   | Code namespace | `com.opentasker.app` (unchanged from upstream) | `app/build.gradle.kts` → `namespace` |
+   | Code namespace | `com.sysadmindoc.ruledeck` (upstream's) | `app/build.gradle.kts` → `namespace` |
+   | Stored names | `python3 scripts/keep-stored-names.py --report` puts nothing back and finds every listed component; the new APK's manifest equals the installed one's | `scripts/stored-names/`, CLAUDE.md “Upstream is RuleDeck now” |
    | App label | `白い熊 自由作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
    | Fork version | `versionCode = forkVersionCode`, `versionName = forkVersionName` + the fork blocks | `app/build.gradle.kts` |
    | Signing | `keystore.properties` block + `useKeystoreProperties` | `app/build.gradle.kts` |

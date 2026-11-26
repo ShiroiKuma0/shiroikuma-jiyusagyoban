@@ -46,7 +46,7 @@ importable ZIP from any commit. The repo has no remote, ever. Canonical procedur
 | What | Value | Where |
 | --- | --- | --- |
 | applicationId | `shiroikuma.jiyusagyoban` | `app/build.gradle.kts` → `defaultConfig` |
-| namespace (R/BuildConfig pkg) | `com.opentasker.app` (**unchanged** from upstream) | `app/build.gradle.kts` |
+| namespace (R/BuildConfig pkg) | `com.sysadmindoc.ruledeck` (upstream's, since the 1.0.0 rename) | `app/build.gradle.kts` |
 | App label | `白い熊 自由作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
 | App icon | black-yellow (yellow foreground + black background) | `app/src/main/res/mipmap/*`, `values/colors.xml` |
 | Version tail | `versionName = "<base>+<base date>.<HH-MM>.g<sha8>+NNN"`, `versionCode = <base>*10000+N` | `app/build.gradle.kts` fork blocks |
@@ -97,7 +97,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew buildFork < /dev/null
 # Release APK only (no copy / no bump)
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleRelease
 ```
-Distribution profiles (`-PopenTaskerDistribution=standard|fdroid|play`) are upstream's; we ship the
+Distribution profiles (`-PruleDeckDistribution=standard|fdroid|play`) are upstream's; we ship the
 default **`standard`**.
 
 ### Seeing the UI without the phone — Compose screenshot previews
@@ -132,13 +132,37 @@ screenshot of the running app is possible.
   `buildToolsVersion 36.0.0`. Gradle wrapper 9.4.1.
 
 ## Architecture (upstream OpenTasker)
-- Compose UI; `MainActivity`. Engine in `app/src/main/java/com/opentasker/core/` — `engine/Action.kt`
+- Compose UI; `MainActivity`. Engine in `app/src/main/java/com/sysadmindoc/ruledeck/core/` (and, for the files that declare a manifest component or a worker, `…/com/opentasker/core/` — see the next section) — `engine/Action.kt`
   defines the trivial `Action` interface (`id`, `category`, `suspend run(ctx, args: Map<String,String>)`)
   plus `ActionRegistry`. `actions/*Actions.kt` hold the built-ins; `actions/ActionMetadata.kt` drives the
   editor form fields. Persistence via Room.
 - **Our feature work** (the "Send Intent" action) goes under `actions/` (impl + registration in the
   built-in bootstrap + an `ActionMetadata` entry), plus a `<queries>` entry in `AndroidManifest.xml` so
   the explicit intent to `shiroikuma.jami` resolves on Android 11+.
+
+## Upstream is RuleDeck now — which names follow it and which never do (1.0.0, 2026-11-26)
+Upstream renamed OpenTasker → RuleDeck in one commit (`15667b5f8`): packages `com.opentasker…` →
+`com.sysadmindoc.ruledeck…`, and every stored name with them. That is right for a new app id. This
+fork keeps its app id and is **updated in place**, so (白い熊's decision, 2026-11-26):
+
+- **Follows upstream:** packages, class names, the namespace, build tooling, Gradle property names,
+  wording. Later syncs then merge normally.
+- **Never follows:** what Android or another app has stored. (1) Every component the manifest
+  declares and every WorkManager worker keeps its old class name — its source file stays under
+  `com/opentasker/…` and the manifest names it in full. Renamed, the 21 home-screen widgets, the
+  pinned shortcuts, the accessibility service, the notification listener and the device admin would
+  be lost on each phone, and `scripts/bridge.py` would address nobody. (2) Stored text values —
+  `opentasker.db`, settings file names, intent actions and extras, permissions, channel ids,
+  `~/.termux/tasker` — keep their old spelling.
+- The two lists are `scripts/stored-names/components.txt` and `literals.txt`. After a sync that
+  brings renamed names in: `python3 scripts/keep-stored-names.py` (idempotent; `--report` to look).
+  `scripts/apply-upstream-rename.py` was the one-time mechanical half and is not run again.
+- **A new manifest component or worker of ours may live in the new package** — only what a phone
+  already holds is pinned. Never move a listed one.
+- **Check after every sync, before installing:** the new APK's manifest against the installed one,
+  component by component (`aapt2 dump xmltree`), and a workspace export before and after the update —
+  they must be equal apart from live variables.
+- The Tasker XML importer is gone (upstream removed it; 白い熊's decision was to drop it too).
 
 ## 言語島 (gengoshima) — the Japanese language-islands suite
 The suite in project `日本語 -- [227]`: 白い熊's English sentences in topic islands, translated by
