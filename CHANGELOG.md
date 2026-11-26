@@ -4,7 +4,7 @@
 
 ### Changed
 
-- OpenTasker is now RuleDeck. The new icon comes with a new app id, `com.sysadmindoc.ruledeck`, and Android sees that as a different app, so RuleDeck installs next to an older build rather than over it. To move your setup across, export an encrypted backup from the old app's Settings, restore it in RuleDeck, check your profiles, then uninstall the old copy.
+- OpenTasker is now RuleDeck. The new icon comes with a new app id, `com.sysadmindoc.ruledeck`, and Android sees that as a different app, so RuleDeck installs next to an older build rather than over it. To move your setup across, export an encrypted backup from the old app's Settings, restore it in RuleDeck, check your profiles, then uninstall the old copy. Secret variable values stay locked to the old app, so the Variables screen asks for each one again.
 - Apps and scripts that drive RuleDeck from outside need the new names. Intent actions, extras and the automation permission start with `com.sysadmindoc.ruledeck` now, where they used to start with `com.opentasker`, and the target package is `com.sysadmindoc.ruledeck`. [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md) lists every one.
 - Encrypted backups and automatic snapshots save as `.rdbackup`. A `.otbackup` from an older build still opens, since restore goes by what's inside the file.
 - If you build from source, the signing variables are `RULEDECK_RELEASE_KEYSTORE`, `RULEDECK_RELEASE_KEYSTORE_PASSWORD`, `RULEDECK_RELEASE_KEY_ALIAS` and `RULEDECK_RELEASE_KEY_PASSWORD`, and the Gradle properties are `-PruleDeckDistribution` and `-PruleDeckSignFdroid`.

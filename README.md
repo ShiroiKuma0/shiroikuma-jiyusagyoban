@@ -246,7 +246,7 @@ DB:A1:AA:88:E3:7B:90:15:5F:CA:31:35:CA:3B:78:1D:E9:2C:22:51:07:E4:7C:98:06:E7:5B
 
 To check a downloaded APK on a computer, `apksigner verify --print-certs RuleDeck-v<version>.apk` prints the same SHA-256 digest in lowercase without the colons.
 
-**Coming from an older build?** Builds before the rename used a different package name, so Android installs this one next to an old copy instead of over it. In the old copy, open Settings and export an encrypted backup to a folder you control. Install the current release, restore that backup from its Settings, check that your profiles came across, then uninstall the old copy. Backups from older builds restore as they are.
+**Coming from an older build?** Builds before the rename used a different package name, so Android installs this one next to an old copy instead of over it. In the old copy, open Settings and export an encrypted backup to a folder you control. Install the current release, restore that backup from its Settings, check that your profiles came across, then uninstall the old copy. Backups from older builds restore as they are. Secret variables are the exception, because their values are locked to the app that saved them. The Variables screen marks each one so you can type it in again.
 
 ---
 
