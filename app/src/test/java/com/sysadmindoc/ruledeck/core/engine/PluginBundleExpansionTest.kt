@@ -5,6 +5,7 @@ import com.sysadmindoc.ruledeck.core.actions.LocalePluginConditionQueryAction
 import com.sysadmindoc.ruledeck.core.actions.LocalePluginSettingAction
 import com.sysadmindoc.ruledeck.core.actions.registerActionMetadata
 import com.sysadmindoc.ruledeck.core.model.ActionSpec
+import com.sysadmindoc.ruledeck.core.plugins.locale.LocalePluginContract
 import com.sysadmindoc.ruledeck.core.model.Task
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -72,12 +73,12 @@ class PluginBundleExpansionTest {
     @Test
     fun onlyTheKeysNamedForReplacementAreFilledIn() {
         val sent = run(
-            """{"name":"%TITLE","pattern":"100%TITLE","net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS":"name "}""",
+            """{"name":"%TITLE","pattern":"100%TITLE","${LocalePluginContract.EXTRA_VARIABLE_REPLACE_KEYS}":"name "}""",
             mapOf("TITLE" to "Hello"),
         )
 
         assertEquals(
-            json("""{"name":"Hello","pattern":"100%TITLE","net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS":"name "}"""),
+            json("""{"name":"Hello","pattern":"100%TITLE","${LocalePluginContract.EXTRA_VARIABLE_REPLACE_KEYS}":"name "}"""),
             json(sent),
         )
     }
@@ -104,7 +105,7 @@ class PluginBundleExpansionTest {
 
     @Test
     fun theHostsOwnKeysAreNotFilledIn() {
-        val relevant = """"net.dinglisch.android.tasker.RELEVANT_VARIABLES":{"stringArray":["%SCREEN\nScreen text\nWhat's on it"]}"""
+        val relevant = """"${LocalePluginContract.EXTRA_RELEVANT_VARIABLES}":{"stringArray":["%SCREEN\nScreen text\nWhat's on it"]}"""
         val sent = run("""{"text":"%SCREEN",$relevant}""", mapOf("SCREEN" to "Home"))
 
         assertEquals(json("""{"text":"Home",$relevant}"""), json(sent))
@@ -147,12 +148,12 @@ class PluginBundleExpansionTest {
     fun aKeyNamedForReplacementIsFilledInEvenUnderTheLocalePrefix() {
         val key = "com.twofortyfouram.locale.intent.extra.MESSAGE"
         val named = run(
-            """{"$key":"%MSG","net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS":"$key"}""",
+            """{"$key":"%MSG","${LocalePluginContract.EXTRA_VARIABLE_REPLACE_KEYS}":"$key"}""",
             mapOf("MSG" to "Hello"),
         )
         val unnamed = run("""{"$key":"%MSG"}""", mapOf("MSG" to "Hello"))
 
-        assertEquals(json("""{"$key":"Hello","net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS":"$key"}"""), json(named))
+        assertEquals(json("""{"$key":"Hello","${LocalePluginContract.EXTRA_VARIABLE_REPLACE_KEYS}":"$key"}"""), json(named))
         assertEquals(json("""{"$key":"%MSG"}"""), json(unnamed))
     }
 
@@ -186,7 +187,7 @@ class PluginBundleExpansionTest {
         val step = PreflightRunner.preflightTask(
             task = fire(
                 """{"name":"{{ global.MISSINGNAME }}","other":"{{ global.MISSINGOTHER }}",""" +
-                    """"net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS":"name"}""",
+                    """"${LocalePluginContract.EXTRA_VARIABLE_REPLACE_KEYS}":"name"}""",
             ),
             inputs = PreflightInputs(),
         ).tasks.single().steps.single()

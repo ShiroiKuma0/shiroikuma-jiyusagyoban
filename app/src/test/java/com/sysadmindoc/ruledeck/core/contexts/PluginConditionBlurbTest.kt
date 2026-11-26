@@ -92,16 +92,16 @@ class PluginConditionBlurbTest {
     @Test
     fun aRequestQueryReachesOnlyThePluginWhoseConditionScreenItNames() {
         val screens = mapOf(
-            "org.primftpd" to listOf("org.primftpd.remotecontrol.TaskerEditConditionActivity"),
+            "com.example.ftpd" to listOf("com.example.ftpd.EditConditionActivity"),
             "com.example.other" to listOf("com.example.other.EditCondition"),
         )
 
         val asking = packagesAskingForQuery(
-            "org.primftpd.remotecontrol.TaskerEditConditionActivity",
-            listOf("org.primftpd", "com.example.other", "com.example.gone"),
+            "com.example.ftpd.EditConditionActivity",
+            listOf("com.example.ftpd", "com.example.other", "com.example.gone"),
         ) { screens[it].orEmpty() }
 
-        assertEquals(setOf("org.primftpd"), asking)
-        assertEquals(emptySet<String>(), packagesAskingForQuery("org.primftpd.Unknown", screens.keys) { screens[it].orEmpty() })
+        assertEquals(setOf("com.example.ftpd"), asking)
+        assertEquals(emptySet<String>(), packagesAskingForQuery("com.example.ftpd.Unknown", screens.keys) { screens[it].orEmpty() })
     }
 }

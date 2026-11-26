@@ -13,13 +13,15 @@ import java.net.URISyntaxException;
 /**
  * A setting plugin that answers by the synchronous setting protocol. It runs in this test package's own
  * process, the way an installed plugin does, so it's Java: the app's classes and the Kotlin runtime
- * aren't on the classpath there. The "mode" string in its bundle picks how it answers.
+ * aren't on the classpath there. The "mode" string in its bundle picks how it answers. The extension
+ * extra names come from LocalePluginContract's constants, which javac copies in at compile time, so
+ * nothing from the app loads at run time; PluginExtensionExtraNamesTest pins their values.
  */
 public final class SyncSettingFixtureReceiver extends BroadcastReceiver {
     private static final String EXTRA_BUNDLE = "com.twofortyfouram.locale.intent.extra.BUNDLE";
-    private static final String EXTRA_COMPLETION_INTENT = "net.dinglisch.android.tasker.extras.COMPLETION_INTENT";
-    private static final String EXTRA_RESULT_CODE = "net.dinglisch.android.tasker.extras.RESULT_CODE";
-    private static final String EXTRA_VARIABLES = "net.dinglisch.android.tasker.extras.VARIABLES";
+    private static final String EXTRA_COMPLETION_INTENT = LocalePluginContract.EXTRA_COMPLETION_INTENT;
+    private static final String EXTRA_RESULT_CODE = LocalePluginContract.EXTRA_RESULT_CODE;
+    private static final String EXTRA_VARIABLES = LocalePluginContract.EXTRA_VARIABLES;
     private static final int RESULT_OK = -1;
     private static final int RESULT_FAILED = 2;
     private static final int RESULT_PENDING = 3;
