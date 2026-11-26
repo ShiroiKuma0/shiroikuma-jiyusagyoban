@@ -427,7 +427,7 @@
     <string name="catalog_action_script_termux_run_description" formatted="false">运行一个已批准的Termux脚本并可选择捕获受限输出</string>
     <string name="catalog_category_script" formatted="false">脚本</string>
     <string name="catalog_action_script_termux_run_field_executable_label" formatted="false">可执行文件</string>
-    <string name="catalog_action_script_termux_run_field_executable_hint" formatted="false">~/.termux/tasker/my_script</string>
+    <string name="catalog_action_script_termux_run_field_executable_hint" formatted="false">~/.termux/ruledeck/my_script</string>
     <string name="catalog_action_script_termux_run_field_arguments_label" formatted="false">参数</string>
     <string name="catalog_action_script_termux_run_field_arguments_hint" formatted="false">可选的shell风格参数</string>
     <string name="catalog_action_script_termux_run_field_workingdirectory_label" formatted="false">工作目录</string>
