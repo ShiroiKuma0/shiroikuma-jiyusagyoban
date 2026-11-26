@@ -30,7 +30,7 @@ class ImportExportCoordinatorTest {
                 report(TransferStage.Preflight)
                 report(TransferStage.Decode)
                 reachedDecode.complete(Unit)
-                // Stands in for a large Tasker or MacroDroid backup still being decoded.
+                // Stands in for a large MacroDroid backup still being decoded.
                 delay(30_000)
                 report(TransferStage.Write)
                 wrote = true
@@ -157,7 +157,7 @@ class ImportExportCoordinatorTest {
         ).first { it.exists() }.readText()
         val lanes = Regex("""Transfer\.launch(?:\([^)]*\))? \{[^\n]*\n\s+(\w+) \{""").findAll(source).toList()
 
-        assertTrue("expected the transfer lanes in the view model", lanes.size >= 9)
+        assertTrue("expected the transfer lanes in the view model", lanes.size >= 7)
         lanes.forEach { lane ->
             assertEquals("a lane catches Stop as a failure: ${lane.value.trim()}", "runTransferCatching", lane.groupValues[1])
         }

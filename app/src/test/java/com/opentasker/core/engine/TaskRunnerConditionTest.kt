@@ -268,8 +268,7 @@ class TaskRunnerConditionTest {
         assertTrue(trace.toSummaryLine().contains("template warnings: 1"))
     }
 
-    // Covers the condition syntax now emitted by TaskerXmlImport for imported Tasker
-    // <ConditionList> Is Set/Not Set/Matches conditions (op codes 12/13/2/3).
+    // Covers the Is Set, Not Set and Matches condition operators.
 
     @Test
     fun runsActionWhenIsSetConditionMatchesNonEmptyVariable() = runBlocking {

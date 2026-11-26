@@ -3,7 +3,6 @@ package com.opentasker.core.engine
 import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.platform.VOLUME_BUILT_IN_STREAMS
 import com.opentasker.core.platform.latLonText
-import com.opentasker.core.transfer.TaskerXmlImporter
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,12 +12,11 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * The next most-read built-ins in imported tasks: `%PACTIVE`, `%PENABLED` and `%TRUN` list profile
- * and task names the way Tasker 6.7.8 does (decompiled `MonitorService.L7`, `M7` and `aa`,
- * `ExecuteService.M4`), the `%VOL` ones read the streams Tasker's `dq` reads, and `%LOC`/`%LOCN`
- * show a fix as `m7.g1` does.
+ * The list built-ins: `%PACTIVE`, `%PENABLED` and `%TRUN` list profile and task names between
+ * commas, the `%VOL` ones each read one audio stream, and `%LOC`/`%LOCN` show a fix as
+ * latitude,longitude.
  */
-class TaskerBuiltInListsTest {
+class BuiltInListsTest {
     @Before
     fun setUp() {
         BuiltInVariables.resetForTests()
@@ -65,14 +63,14 @@ class TaskerBuiltInListsTest {
     }
 
     @Test
-    fun anEmptyListLeavesTheVariableUnsetAsTaskerDoes() {
+    fun anEmptyListLeavesTheVariableUnset() {
         listOf("PACTIVE", "PENABLED", "TRUN").forEach { name -> assertNull(name, BuiltInVariables.value(name)) }
         assertTrue(VariableStore().evaluateCondition("%TRUN not_set"))
     }
 
     @Test
-    fun eachVolumeReadsTheStreamTaskerReads() {
-        // Tasker's dq: VOLA 4, VOLC 0, VOLD 8, VOLM 3, VOLN 5, VOLR 2, VOLS 1.
+    fun eachVolumeReadsItsOwnStream() {
+        // AudioManager stream numbers: alarm 4, call 0, DTMF 8, music 3, notification 5, ring 2, system 1.
         assertEquals(
             mapOf("VOLA" to 4, "VOLC" to 0, "VOLD" to 8, "VOLM" to 3, "VOLN" to 5, "VOLR" to 2, "VOLS" to 1),
             VOLUME_BUILT_IN_STREAMS,
@@ -84,19 +82,5 @@ class TaskerBuiltInListsTest {
     fun aFixReadsAsLatitudeCommaLongitude() {
         assertEquals("37.4219983,-122.084", latLonText(37.4219983, -122.084))
         assertEquals("40.0,-74.0", latLonText(40.0, -74.0))
-    }
-
-    @Test
-    fun theImporterNoLongerNamesTheBuiltInsThatFillIn() {
-        val action = """<Action sr="act0"><code>548</code><Str sr="arg0" ve="3">%VOLM %PACTIVE %PENABLED %TRUN %LOC %LOCN %LIGHT</Str></Action>"""
-        val report = TaskerXmlImporter.parse(
-            rawXml = "<TaskerData><Task sr=\"task1\"><id>1</id><nme>Readings</nme>$action</Task></TaskerData>",
-            appVersion = "test",
-            importedAtEpochMs = 0L,
-        )
-
-        val note = report.lossyWarnings.single { "built-in" in it }
-        assertTrue(note, "%LIGHT" in note)
-        listOf("%VOLM", "%PACTIVE", "%PENABLED", "%TRUN", "%LOC").forEach { assertFalse("$it in $note", it in note) }
     }
 }

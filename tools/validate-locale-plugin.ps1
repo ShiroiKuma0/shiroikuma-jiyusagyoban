@@ -26,7 +26,7 @@ $Extras = [ordered]@{
 
 if ($Help) {
     @"
-Validate an installed Locale/Tasker-compatible plugin against OpenTasker's host contract.
+Validate an installed Locale-compatible plugin against OpenTasker's host contract.
 
 Examples:
   powershell -File tools/validate-locale-plugin.ps1 -PluginPackage com.example.plugin -RequireConditionSupport

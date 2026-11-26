@@ -18850,7 +18850,6 @@ SPLcom/opentasker/core/actions/ActionCatalog$all$101;->invoke()Ljava/lang/Object
 Lcom/opentasker/core/actions/ActionCatalog$all$102;
 SPLcom/opentasker/core/actions/ActionCatalog$all$102;-><clinit>()V
 SPLcom/opentasker/core/actions/ActionCatalog$all$102;-><init>()V
-SPLcom/opentasker/core/actions/ActionCatalog$all$102;->invoke()Lcom/opentasker/core/actions/TaskerUnsupportedAction;
 SPLcom/opentasker/core/actions/ActionCatalog$all$102;->invoke()Ljava/lang/Object;
 Lcom/opentasker/core/actions/ActionCatalog$all$103;
 SPLcom/opentasker/core/actions/ActionCatalog$all$103;-><clinit>()V
@@ -19807,9 +19806,6 @@ SPLcom/opentasker/core/actions/SunTimesAction$4;-><init>()V
 Lcom/opentasker/core/actions/SunTimesAction$Companion;
 SPLcom/opentasker/core/actions/SunTimesAction$Companion;-><init>()V
 SPLcom/opentasker/core/actions/SunTimesAction$Companion;-><init>(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-Lcom/opentasker/core/actions/TaskerUnsupportedAction;
-SPLcom/opentasker/core/actions/TaskerUnsupportedAction;-><clinit>()V
-SPLcom/opentasker/core/actions/TaskerUnsupportedAction;-><init>()V
 Lcom/opentasker/core/actions/TemporaryStateAction;
 SPLcom/opentasker/core/actions/TemporaryStateAction;-><clinit>()V
 SPLcom/opentasker/core/actions/TemporaryStateAction;-><init>()V
@@ -20751,11 +20747,11 @@ Lcom/opentasker/core/engine/SharedPreferencesExecutionCircuitStore$Companion;
 SPLcom/opentasker/core/engine/SharedPreferencesExecutionCircuitStore$Companion;-><init>()V
 SPLcom/opentasker/core/engine/SharedPreferencesExecutionCircuitStore$Companion;-><init>(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 Lcom/opentasker/core/engine/VariableOnlyAction;
-Lcom/opentasker/core/engine/variables/TaskerBuiltIns;
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;-><clinit>()V
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;-><init>()V
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;->installDevice(Lkotlin/jvm/functions/Function1;)V
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;->watchProfiles(Ljava/util/Map;Lkotlinx/coroutines/Job;)V
+Lcom/opentasker/core/engine/variables/BuiltInVariables;
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;-><clinit>()V
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;-><init>()V
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;->installDevice(Lkotlin/jvm/functions/Function1;)V
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;->watchProfiles(Ljava/util/Map;Lkotlinx/coroutines/Job;)V
 Lcom/opentasker/core/engine/variables/VariableExpander;
 SPLcom/opentasker/core/engine/variables/VariableExpander;-><clinit>()V
 SPLcom/opentasker/core/engine/variables/VariableExpander;-><init>()V

@@ -39,7 +39,7 @@
 - **Profiles, contexts, tasks, actions**. A complete Room-backed automation pipeline with a Compose UI
 - **Companion presence triggers**. User-confirmed CompanionDeviceManager associations emit low-power present/absent events without a scanning loop, with setup-time revocation
 - **7 context families**. Application, Time, Day, Location, State, Event, and Plugin (Locale condition)
-- **103 built-in actions** plus engine-handled flow control (`task.run` with named inputs, `task.stop`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`, `go to` and `anchor`)
+- **102 built-in actions** plus engine-handled flow control (`task.run` with named inputs, `task.stop`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`, `go to` and `anchor`)
 - **USB device contexts**. Attach/detach event pulses expose bounded device, vendor, product, and class fields for local input-device automations
 - **Template expressions**. Bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews**. Preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
@@ -83,7 +83,7 @@
 - Locale condition plugins, polled as first-class context predicates with last-known-state caching, and asked again early when a plugin says its answer changed
 - Home Assistant bridge proof of concept, with bounded outbound JSON webhooks, HTTPS by default, redacted webhook secrets and retries with backoff
 
-### Actions (103 registered + 13 engine-handled)
+### Actions (102 registered + 13 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
@@ -98,7 +98,7 @@
 | Flow | 2+13 | wait, profile status; engine: task.run, task.stop, if/else/end if, for each/end for, try/catch/end try, stop, go to, anchor |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 2 | SHA-256-pinned Termux `RUN_COMMAND` and Shizuku shell scripts, both with bounded result capture |
-| Import | 2 | unsupported Tasker and MacroDroid action placeholders |
+| Import | 1 | unsupported MacroDroid action placeholder |
 
 Every action carries an explicit capability contract. An action with no reviewed contract resolves to unsupported rather than defaulting to available. Privileged actions (airplane, mobile data, always-on display, screenshot, reboot, screen off, kill app) are gated to fail honestly. Always-on display reads the setting back after writing it, so a build that accepts the write and ignores it reports a failure rather than a success. Set brightness and set screen timeout require the **Modify system settings** special access granted from Setup, and Wake-on-LAN requires local network access on Android 17+. Lock device needs the **Lock screen admin**, also turned on from Setup: Android only lets an app lock the screen through a device admin, and OpenTasker's asks for `force-lock` and nothing else, so it cannot wipe the device, set a password policy, or read anything. Turning it on means Android will not let you uninstall OpenTasker until you turn it back off, which the same Setup row does. No root, Shizuku, or accessibility service is involved, so it keeps working under Android 17 Advanced Protection. SMS works in both the standard and F-Droid builds.
 

@@ -306,7 +306,7 @@ class ReleaseTruthContractTest {
                 "persisted default-on kill switch",
                 "eight elevated actions run through a separately bound AIDL user service",
                 "Termux 0.109+ `RUN_COMMAND` integration",
-                "Locale/Tasker condition context",
+                "Locale condition context",
             ),
             forbidden = listOf(
                 "gated Termux script run (not yet wired)",
@@ -332,7 +332,6 @@ class ReleaseTruthContractTest {
                 "Termux scripting boundary dispatches",
                 "ContextType.PLUGIN",
                 "every 30 seconds",
-                "Tasker XML import and bounded best-effort export",
             ),
             forbidden = listOf(
                 "Optional Shizuku manager readiness detection",
@@ -342,7 +341,6 @@ class ReleaseTruthContractTest {
                 "The Shizuku readiness baseline",
                 "does not link the Shizuku API",
                 "first-class condition-context picker row",
-                "Tasker XML export remains roadmap work",
                 "zoom/pan",
             ),
         ),
