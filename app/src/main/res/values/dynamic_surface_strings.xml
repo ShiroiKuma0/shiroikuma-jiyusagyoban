@@ -14,7 +14,7 @@
     <string name="context_type_event_title" formatted="false">Event</string>
     <string name="context_type_event_description" formatted="false">Matches a one-shot event such as boot, notification, NFC, Bluetooth connect/disconnect/security, calendar, sun, shake, or Locale plugin queries.</string>
     <string name="context_type_plugin_title" formatted="false">Plugin</string>
-    <string name="context_type_plugin_description" formatted="false">Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.</string>
+    <string name="context_type_plugin_description" formatted="false">Matches when a Locale condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.</string>
 
     <string name="context_field_application_package_label" formatted="false">Package name</string>
     <string name="context_field_application_package_hint" formatted="false">com.example.app (work-profile apps are not visible)</string>
