@@ -140,7 +140,6 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "plugin.locale.query",
     "script.termux.run",
     "script.shizuku.run",
-    "tasker.unsupported",
     "macrodroid.unsupported",
     "wifi.toggle",
     "bluetooth.toggle",
@@ -955,19 +954,6 @@ fun registerActionMetadata() {
                 ActionField("stdin", R.string.catalog_action_script_termux_run_field_stdin_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_script_termux_run_field_stdin_hint, sensitive = true),
                 ActionField("capturePrefix", R.string.catalog_action_script_termux_run_field_captureprefix_label, hintRes = R.string.catalog_action_script_termux_run_field_captureprefix_hint),
                 ActionField("timeoutMs", R.string.catalog_action_script_termux_run_field_timeoutms_label, FieldType.NUMBER, hintRes = R.string.catalog_action_script_termux_run_field_timeoutms_hint, numberRule = integerRule(1_000, 120_000)),
-            )
-        )
-    )
-
-    ActionMetadataRegistry.register(
-        ActionMetadata(
-            id = "tasker.unsupported",
-            nameRes = R.string.catalog_action_tasker_unsupported_name,
-            descriptionRes = R.string.catalog_action_tasker_unsupported_description,
-            categoryRes = R.string.catalog_category_import,
-            fields = listOf(
-                ActionField("taskerCode", R.string.catalog_action_tasker_unsupported_field_taskercode_label, required = true),
-                ActionField("summary", R.string.catalog_action_tasker_unsupported_field_summary_label, FieldType.MULTILINE),
             )
         )
     )

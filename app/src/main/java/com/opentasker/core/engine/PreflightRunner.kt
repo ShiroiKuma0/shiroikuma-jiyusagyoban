@@ -139,7 +139,7 @@ object PreflightRunner {
     private const val MAX_STEPS = 512
     private const val MAX_SUBTASK_DEPTH = 8
     private const val MAX_DISPLAY_VALUE_LENGTH = 256
-    private val IMPORT_PLACEHOLDER_TYPES = setOf("tasker.unsupported", "macrodroid.unsupported")
+    private val IMPORT_PLACEHOLDER_TYPES = setOf("macrodroid.unsupported")
     private val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
 
     // The actions that write Tasker's numbered elements (%arr1, %arr2, ...), text.replace through

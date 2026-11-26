@@ -156,7 +156,6 @@ object ActionCatalog {
         define("vpn.tunnel", ActionCategory.NET, ActionRetrySafety.IDEMPOTENT, ::VpnTunnelAction),
         define("script.termux.run", ActionCategory.PLUGIN, ActionRetrySafety.NEVER, ::TermuxScriptAction),
         define("script.shizuku.run", ActionCategory.PLUGIN, ActionRetrySafety.NEVER, ::ShizukuScriptAction),
-        define("tasker.unsupported", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::TaskerUnsupportedAction),
         define("macrodroid.unsupported", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::MacroDroidUnsupportedAction),
     )
 

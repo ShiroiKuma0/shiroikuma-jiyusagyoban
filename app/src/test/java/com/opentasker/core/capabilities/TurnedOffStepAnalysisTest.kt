@@ -34,12 +34,12 @@ class TurnedOffStepAnalysisTest {
             listOf(Task(id = 1, name = "Imported", actions = listOf(step, ActionSpec(type = "var.set", args = mapOf("name" to "%a", "value" to "1"))))),
         )
 
-        val off = review(ActionSpec(type = "tasker.unsupported").off())
+        val off = review(ActionSpec(type = "macrodroid.unsupported").off())
         assertTrue(off.unsupportedActionIds.isEmpty())
         assertTrue(off.canAcknowledge)
 
-        val on = review(ActionSpec(type = "tasker.unsupported"))
-        assertEquals(setOf("tasker.unsupported"), on.unsupportedActionIds)
+        val on = review(ActionSpec(type = "macrodroid.unsupported"))
+        assertEquals(setOf("macrodroid.unsupported"), on.unsupportedActionIds)
         assertFalse(on.canAcknowledge)
     }
 

@@ -32,11 +32,6 @@ class ImportPlaceholderPreflightTest {
     }
 
     @Test
-    fun aTaskerPlaceholdersNoteKeepsItsVariableNames() {
-        assertEquals("Steps after it read %where", placeholderArgs("tasker.unsupported")["summary"])
-    }
-
-    @Test
     fun aMacroDroidPlaceholdersNoteKeepsItsVariableNames() {
         assertEquals("Steps after it read %where", placeholderArgs("macrodroid.unsupported")["summary"])
     }
@@ -48,8 +43,8 @@ class ImportPlaceholderPreflightTest {
             name = "Imported",
             actions = listOf(
                 ActionSpec(type = "var.set", args = mapOf("name" to "%where", "value" to "home")),
-                // Tasker's Run only if is kept on the placeholder. Read, this one would skip the step.
-                ActionSpec(type = "tasker.unsupported", args = mapOf("summary" to "Get Location"), condition = "%where ~ away"),
+                // The import keeps the original step's Run only if on the placeholder. Read, this one would skip the step.
+                ActionSpec(type = "macrodroid.unsupported", args = mapOf("summary" to "Get Location"), condition = "%where ~ away"),
             ),
         )
 

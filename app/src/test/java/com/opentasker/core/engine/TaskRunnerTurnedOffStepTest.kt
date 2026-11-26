@@ -118,7 +118,7 @@ class TaskRunnerTurnedOffStepTest {
 
     @Test
     fun aStepTurnedOffThatCantRunHereDoesntHoldTheTaskBack() {
-        listOf("tasker.unsupported", "no.such.action").forEach { type ->
+        listOf("macrodroid.unsupported", "no.such.action").forEach { type ->
             recorded.clear()
             val off = run(VariableStore(), ActionSpec(type = type).off(), record("ran"))
             assertTrue(off.failures().toString(), off.success)
@@ -172,7 +172,7 @@ class TaskRunnerTurnedOffStepTest {
                 name = "Partly off",
                 actions = listOf(
                     set("%a"),
-                    ActionSpec(type = "tasker.unsupported").off(),
+                    ActionSpec(type = "macrodroid.unsupported").off(),
                     ctrl(FlowControl.STOP).off(),
                     set("%b"),
                     ctrl(FlowControl.STOP),

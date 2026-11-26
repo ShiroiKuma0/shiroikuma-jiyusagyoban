@@ -75,7 +75,6 @@ object AutomationSensitivityRegistry {
         "flow.stop",
         "flow.goto",
         "flow.anchor",
-        "tasker.unsupported",
         "macrodroid.unsupported",
         "log",
     )

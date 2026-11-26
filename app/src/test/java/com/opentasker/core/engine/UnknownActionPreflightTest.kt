@@ -62,7 +62,7 @@ class UnknownActionPreflightTest {
                 name = "Unsupported action",
                 actions = listOf(
                     ActionSpec(type = sideEffectActionId),
-                    ActionSpec(type = "tasker.unsupported"),
+                    ActionSpec(type = "macrodroid.unsupported"),
                 ),
             ),
         )

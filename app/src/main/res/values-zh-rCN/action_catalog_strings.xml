@@ -438,11 +438,7 @@
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">超时毫秒</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000（1000到120000）</string>
-    <string name="catalog_action_tasker_unsupported_name" formatted="false">不支持的Tasker操作</string>
-    <string name="catalog_action_tasker_unsupported_description" formatted="false">导入期间无法安全映射的Tasker操作的占位符</string>
     <string name="catalog_category_import" formatted="false">导入</string>
-    <string name="catalog_action_tasker_unsupported_field_taskercode_label" formatted="false">Tasker操作代码</string>
-    <string name="catalog_action_tasker_unsupported_field_summary_label" formatted="false">导入说明</string>
 
     <string name="catalog_action_macrodroid_unsupported_name" formatted="false">不支持的MacroDroid操作</string>
     <string name="catalog_action_macrodroid_unsupported_description" formatted="false">导入期间无法安全映射的MacroDroid操作的占位符</string>

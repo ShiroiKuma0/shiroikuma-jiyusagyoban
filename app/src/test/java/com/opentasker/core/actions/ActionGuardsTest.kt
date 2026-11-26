@@ -713,15 +713,6 @@ class ActionGuardsTest {
         assertTrue("log with no message should succeed", result is ActionResult.Success)
     }
 
-    // --- TaskerUnsupportedAction fail-closed ---
-
-    @Test
-    fun taskerUnsupportedActionFailsClosed() = runBlocking {
-        val action = TaskerUnsupportedAction()
-        val result = action.run(ctx(), mapOf("taskerCode" to "999"))
-        assertTrue("unsupported action should fail", result is ActionResult.Failure)
-    }
-
     // --- File action guards ---
 
     @Test
