@@ -8,6 +8,42 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.97+2026-11-23.00-46.g014a87d5+033 — 2026-11-26
+
+Built on upstream `014a87d5` — OpenTasker **0.2.97**, the same base as `+030`. The database stays
+at version 41. Builds `+031` and `+032` were steps on the way and were not released.
+
+### Task alarms
+
+- **Set Task Alarm** (`task.alarm.set`) runs a task at one moment by an exact alarm of its own. The
+  alarm wakes a sleeping phone at the second, in Doze too, and costs nothing until then.
+- **One alarm per name.** Setting a name again replaces its alarm; **Cancel Task Alarm**
+  (`task.alarm.cancel`) forgets it.
+- **It survives a restart.** The orders are kept on the phone; after a restart of the app, a
+  force-stop, an update or a reboot the per-minute tick sets them again and runs whatever is
+  overdue.
+- **The task gets its parameters** (`param:<name>`) as local variables, plus `%alarm_key`,
+  `%alarm_due` and `%alarm_late`, so a task can set its own next alarm from the due time and never
+  drift.
+- **Why:** the engine holds no wakelock, so on an unplugged phone with its screen off a `Wait`
+  stands still, and the minute pulse can miss a boundary. A relay phone that has to speak every
+  half hour needs a clock that does not.
+
+### SIMs
+
+- **Wait for Ring** (`sim.ring.wait`) waits until one of the phone's SIMs rings and says which one
+  it was — the sure way to tell apart two cards of one operator that carry no number.
+
+### Notifications
+
+- **A new channel, `top`**: high importance, so Android sorts it into the upper part of the shade,
+  yet silent — no sound, no vibration, and a rewrite does not pop up again. For a standing status
+  notification that is rewritten every few minutes and should not be buried at the bottom.
+
+### Translation
+
+- Every new text has its Japanese.
+
 ## 0.2.97+2026-11-23.00-46.g014a87d5+030 — 2026-11-26
 
 Built on upstream `014a87d5` — OpenTasker **0.2.97**, the same base as `+004`. The database stays
