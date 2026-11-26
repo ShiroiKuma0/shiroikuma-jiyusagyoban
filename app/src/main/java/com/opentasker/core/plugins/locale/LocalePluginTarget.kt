@@ -11,8 +11,8 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.platform.ForeignParcels
 
 /**
- * Exposes OpenTasker as a Locale-compatible setting plugin so Tasker, MacroDroid,
- * and other Locale hosts can invoke approved OpenTasker tasks.
+ * Exposes OpenTasker as a Locale-compatible setting plugin so MacroDroid and other Locale hosts
+ * can invoke approved OpenTasker tasks.
  *
  * Protocol:
  * - Host starts [LocaleSettingEditActivity] with ACTION_EDIT_SETTING

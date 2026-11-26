@@ -3,7 +3,7 @@ package com.opentasker.core.model
 import kotlinx.serialization.Serializable
 
 /**
- * A Context is a trigger condition. Mirrors Tasker's six context families.
+ * A Context is a trigger condition of one of the [ContextType] families.
  * The [config] map is type-specific; each ContextType.handler knows how to interpret it.
  */
 @Serializable
@@ -135,5 +135,5 @@ enum class ContextType {
     LOCATION,      // geofence
     STATE,         // device state (battery, headphones, charging, screen, ...)
     EVENT,         // one-shot triggers (boot, notification, NFC, calendar, ...)
-    PLUGIN,        // Locale/Tasker condition plugin (polled state)
+    PLUGIN,        // Locale condition plugin (polled state)
 }

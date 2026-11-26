@@ -1,8 +1,8 @@
 package com.opentasker.core.engine
 
-import com.opentasker.core.engine.variables.TaskerBuiltIns
-import com.opentasker.core.platform.TASKER_VOLUME_STREAMS
-import com.opentasker.core.platform.taskerLatLon
+import com.opentasker.core.engine.variables.BuiltInVariables
+import com.opentasker.core.platform.VOLUME_BUILT_IN_STREAMS
+import com.opentasker.core.platform.latLonText
 import com.opentasker.core.transfer.TaskerXmlImporter
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -21,28 +21,28 @@ import org.junit.Test
 class TaskerBuiltInListsTest {
     @Before
     fun setUp() {
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         AutomationLiveConditionState.clear()
         ActiveExecutionRegistry.reset()
     }
 
     @After
     fun tearDown() {
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         AutomationLiveConditionState.clear()
         ActiveExecutionRegistry.reset()
     }
 
     @Test
     fun enabledProfilesAreListedOnceEachInTheOrderTheyWereMade() {
-        TaskerBuiltIns.watchProfiles(mapOf(7L to "Night", 2L to "Home", 5L to "Car", 9L to "Home", 11L to " "))
+        BuiltInVariables.watchProfiles(mapOf(7L to "Night", 2L to "Home", 5L to "Car", 9L to "Home", 11L to " "))
 
-        assertEquals(",Home,Car,Night,", TaskerBuiltIns.value("PENABLED"))
+        assertEquals(",Home,Car,Night,", BuiltInVariables.value("PENABLED"))
     }
 
     @Test
     fun activeProfilesAreListedInTheOrderTheyWentOn() {
-        TaskerBuiltIns.watchProfiles(mapOf(1L to "Home", 2L to "Car", 3L to "Night"))
+        BuiltInVariables.watchProfiles(mapOf(1L to "Home", 2L to "Car", 3L to "Night"))
         AutomationLiveConditionState.updateProfile(3, true)
         AutomationLiveConditionState.updateProfile(1, true)
         AutomationLiveConditionState.updateProfile(2, true)
@@ -50,7 +50,7 @@ class TaskerBuiltInListsTest {
         // On, but not one the engine watches any more.
         AutomationLiveConditionState.updateProfile(40, true)
 
-        assertEquals(",Night,Home,", TaskerBuiltIns.value("PACTIVE"))
+        assertEquals(",Night,Home,", BuiltInVariables.value("PACTIVE"))
         assertTrue(VariableStore().evaluateCondition("%PACTIVE ~ *Home*"))
         assertFalse(VariableStore().evaluateCondition("%PACTIVE ~ *Car*"))
     }
@@ -61,12 +61,12 @@ class TaskerBuiltInListsTest {
         ActiveExecutionRegistry.register(2, "Backup", "Profile: Home", null, 0L)
         ActiveExecutionRegistry.register(1, "Morning", "Manual", null, 0L)
 
-        assertEquals(",Morning,Backup,", TaskerBuiltIns.value("TRUN"))
+        assertEquals(",Morning,Backup,", BuiltInVariables.value("TRUN"))
     }
 
     @Test
     fun anEmptyListLeavesTheVariableUnsetAsTaskerDoes() {
-        listOf("PACTIVE", "PENABLED", "TRUN").forEach { name -> assertNull(name, TaskerBuiltIns.value(name)) }
+        listOf("PACTIVE", "PENABLED", "TRUN").forEach { name -> assertNull(name, BuiltInVariables.value(name)) }
         assertTrue(VariableStore().evaluateCondition("%TRUN not_set"))
     }
 
@@ -75,15 +75,15 @@ class TaskerBuiltInListsTest {
         // Tasker's dq: VOLA 4, VOLC 0, VOLD 8, VOLM 3, VOLN 5, VOLR 2, VOLS 1.
         assertEquals(
             mapOf("VOLA" to 4, "VOLC" to 0, "VOLD" to 8, "VOLM" to 3, "VOLN" to 5, "VOLR" to 2, "VOLS" to 1),
-            TASKER_VOLUME_STREAMS,
+            VOLUME_BUILT_IN_STREAMS,
         )
-        assertTrue(TASKER_VOLUME_STREAMS.keys.all { it in TaskerBuiltIns.SUPPORTED })
+        assertTrue(VOLUME_BUILT_IN_STREAMS.keys.all { it in BuiltInVariables.SUPPORTED })
     }
 
     @Test
     fun aFixReadsAsLatitudeCommaLongitude() {
-        assertEquals("37.4219983,-122.084", taskerLatLon(37.4219983, -122.084))
-        assertEquals("40.0,-74.0", taskerLatLon(40.0, -74.0))
+        assertEquals("37.4219983,-122.084", latLonText(37.4219983, -122.084))
+        assertEquals("40.0,-74.0", latLonText(40.0, -74.0))
     }
 
     @Test

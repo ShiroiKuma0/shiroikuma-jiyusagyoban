@@ -3,16 +3,16 @@ package com.opentasker.core.engine
 import com.opentasker.core.model.VariableNamePolicy
 
 /**
- * Tasker's For items: a comma-separated mix of values, `%var`, array parts like `%arr()` or
+ * A For's own items: a comma-separated mix of values, `%var`, array parts like `%arr()` or
  * `%arr(1:2)`, and number ranges `a:b` or `a:b:jump` (`4:0` counts down, `8:2:-2` is 8, 6, 4, 2,
  * `2:%end:%skip` and `1:%arr(#)` read their ends from variables).
  *
  * A whole array (`%arr()` or `{{ array.arr }}`) gives its elements as they are, and nothing when
  * there's no such array, the way a For Each naming it does. Any other piece has its variables and
- * `{{ }}` references filled in by [resolve]'s `expand` and is then split on commas, as Tasker does,
- * so a variable holding `a,b` gives two items. A range's direction comes from its ends and the jump
- * only sets the size of each step. The items are worked out once, when the loop starts; Tasker works
- * them out again on each pass, which only differs when the body changes what they read.
+ * `{{ }}` references filled in by [resolve]'s `expand` and is then split on commas, so a variable
+ * holding `a,b` gives two items. A range's direction comes from its ends and the jump only sets the
+ * size of each step. The items are worked out once, when the loop starts, so a body that changes
+ * what they read doesn't change the items still to come.
  */
 internal object ForItems {
 

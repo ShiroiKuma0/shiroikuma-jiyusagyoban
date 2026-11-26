@@ -7,7 +7,7 @@ import java.security.MessageDigest
 /**
  * Issues and validates revocable read grants for the exported Locale condition receiver.
  *
- * `QUERY_CONDITION` is exported without a permission because the Locale/Tasker contract requires
+ * `QUERY_CONDITION` is exported without a permission because the Locale plugin contract requires
  * it, and its bundle is entirely attacker-controlled. Without a grant, any app with no permissions
  * at all could name an arbitrary variable and an expected value, read Satisfied/Unsatisfied off the
  * ordered-broadcast result code, and extract the variable's contents a comparison at a time.

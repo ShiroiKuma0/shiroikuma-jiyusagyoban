@@ -16,13 +16,13 @@ object FlowControl {
     const val STOP = "flow.stop"
     const val GOTO = "flow.goto"
 
-    /** Does nothing. Tasker's Anchor, a step that only exists to carry a label a goto can jump to. */
+    /** Does nothing. An Anchor, a step that only exists to carry a label a goto can jump to. */
     const val ANCHOR = "flow.anchor"
 
     val ALL = setOf(IF, ELSE, ENDIF, FOREACH, ENDFOR, TRY, CATCH, ENDTRY, STOP, GOTO, ANCHOR)
 
     /**
-     * A goto's `to` values, Tasker's Top of Loop ("continue"), End of Loop ("break") and End of If.
+     * A goto's special `to` values: Top of Loop ("continue"), End of Loop ("break") and End of If.
      * Each acts on the innermost For Each or If holding the goto, and wins over a step or label.
      */
     const val GOTO_LOOP_TOP = "loop_top"

@@ -5,8 +5,8 @@ import com.opentasker.core.engine.variables.VariableExpander
 /**
  * Array Push and Array Pop take a blank position as 1. A position written as a variable that
  * turns out empty would quietly use the first element, and one that's unset stays as written,
- * so runs and Preflight stop the step on either, the way Tasker stops on a position that isn't
- * a number.
+ * so runs and Preflight stop the step on either, the way they stop on a position that isn't a
+ * number.
  */
 internal object ArrayPositionArguments {
     private val actions = setOf("array.push", "array.pop")

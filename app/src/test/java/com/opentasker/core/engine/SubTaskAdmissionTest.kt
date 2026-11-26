@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import android.content.ContextWrapper
 import com.opentasker.core.actions.registerActionMetadata
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
@@ -23,7 +23,7 @@ import org.junit.Test
  * A sub-task shows in `%TRUN` from when its collision rule lets it run, not while it's still
  * waiting its turn, and it drops off however its run ends, cancelled or thrown out included.
  */
-class TaskerSubTaskAdmissionTest {
+class SubTaskAdmissionTest {
     private val started = CompletableDeferred<Unit>()
     private val release = CompletableDeferred<Unit>()
 
@@ -31,7 +31,7 @@ class TaskerSubTaskAdmissionTest {
     fun setUp() {
         registerActionMetadata()
         registerCoreRuntime()
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         ActiveExecutionRegistry.reset()
         ActionRegistry.register(object : Action {
             override val id = "test.trun.gate"
@@ -60,7 +60,7 @@ class TaskerSubTaskAdmissionTest {
 
     @After
     fun tearDown() {
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         ActiveExecutionRegistry.reset()
     }
 
@@ -92,7 +92,7 @@ class TaskerSubTaskAdmissionTest {
         // Caller reaches its Run Task step and queues behind the run holding Busy.
         delay(300)
 
-        assertNull(TaskerBuiltIns.value("TRUN"))
+        assertNull(BuiltInVariables.value("TRUN"))
 
         release.complete(Unit)
         withTimeout(10_000) {
@@ -100,7 +100,7 @@ class TaskerSubTaskAdmissionTest {
             queued.await()
         }
         assertEquals(",Busy,", callerStore.get("SEEN"))
-        assertNull(TaskerBuiltIns.value("TRUN"))
+        assertNull(BuiltInVariables.value("TRUN"))
     }
 
     @Test
@@ -111,11 +111,11 @@ class TaskerSubTaskAdmissionTest {
 
         val run = async { coordinator.execute(outer) { runner(VariableStore(), coordinator, inner, outer).run(outer) } }
         started.await()
-        assertEquals(",Inner,", TaskerBuiltIns.value("TRUN"))
+        assertEquals(",Inner,", BuiltInVariables.value("TRUN"))
 
         run.cancel()
         withTimeout(10_000) { run.join() }
-        assertNull(TaskerBuiltIns.value("TRUN"))
+        assertNull(BuiltInVariables.value("TRUN"))
     }
 
     @Test
@@ -126,6 +126,6 @@ class TaskerSubTaskAdmissionTest {
 
         runCatching { coordinator.execute(outer) { runner(VariableStore(), coordinator, inner, outer).run(outer) } }
 
-        assertNull(TaskerBuiltIns.value("TRUN"))
+        assertNull(BuiltInVariables.value("TRUN"))
     }
 }

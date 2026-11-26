@@ -10,7 +10,7 @@ import com.opentasker.core.actions.multipleVariablesShownChanges
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.diagnostics.ExportRedactionPolicy
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateScope
@@ -86,7 +86,7 @@ class TaskRunner(
     /** Set when a Stop Task step names [runningTask], which ends the run like `flow.stop`. */
     private var stopThisRun = false
 
-    /** What a Stop with a value handed back, for the Run Task step that ran this task (Tasker's Return). */
+    /** What a Stop with a value handed back, for the Run Task step that ran this task. */
     internal class ReturnedValue(val text: String, val sensitive: Boolean)
 
     internal var returnedValue: ReturnedValue? = null
@@ -337,10 +337,10 @@ class TaskRunner(
             nextPc = nextPc,
         )
 
-        // The generic "Run only if" guard (ActionSpec.condition — what a Tasker <ConditionList>
-        // imports to). Non-control actions evaluate it in runOne via shouldRun, but control
+        // The generic "Run only if" guard (ActionSpec.condition, which an imported step's own
+        // condition list lands in). Non-control actions evaluate it in runOne via shouldRun, but control
         // actions are dispatched here before runOne is ever reached, so each branch with real
-        // behavior applies it explicitly. Tasker semantics: an unmet guard skips the action, it
+        // behavior applies it explicitly. An unmet guard skips the action, it
         // never aborts the task. For the block-opening markers (foreach, try) the whole block is
         // the action, so skipping the marker skips its block — falling through into the body
         // would execute it with no active frame and abort at the closing marker. flow.if handles
@@ -378,11 +378,11 @@ class TaskRunner(
             }
             FlowControl.ELSE -> {
                 val openedByIf = armedElseIndices.remove(pc)
-                // Tasker skips an else only when its If was found true, so a goto from outside the
-                // block into the if branch runs on into the else, as it does there.
+                // An else is skipped only when its If was found true, so a goto from outside the
+                // block into the if branch runs on into the else.
                 if (openedByIf || structure.ifForElse(pc)?.let(ifResults::get) != true) {
-                    // Reached from a false if: this marker opens the else branch. A guard here is
-                    // Tasker's "Else If" — unmet means the branch is skipped, not run.
+                    // Reached from a false if: this marker opens the else branch. A guard here
+                    // makes it an "Else If": unmet means the branch is skipped, not run.
                     if (guardMet()) {
                         outcome(if (guard == null) "else" else "else if ($guard) -> true", pc + 1)
                     } else {
@@ -404,7 +404,7 @@ class TaskRunner(
                         }
                     }
                 val itemVar = spec.args["var"]?.trim()?.takeIf { it.isNotBlank() } ?: "item"
-                // Values (Tasker's For items) apply only when no array is named.
+                // Values (a For's own item list) apply only when no array is named.
                 val values = spec.args["values"]?.trim()?.takeIf { listName == null && it.isNotBlank() }
                 val loop = values?.let { raw ->
                     val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
@@ -439,8 +439,8 @@ class TaskRunner(
                         halt = true,
                     )
                 } else if (!guardMet()) {
-                    // Tasker semantics for a skipped End For: no jump back happens, so the loop
-                    // exits and execution continues after the marker.
+                    // A skipped End For doesn't jump back, so the loop exits and execution
+                    // continues after the marker.
                     loopStack.removeLast()
                     skipped("endfor skipped: condition ($guard) -> false; loop exited", pc + 1)
                 } else {
@@ -509,7 +509,7 @@ class TaskRunner(
             FlowControl.STOP -> if (!guardMet()) {
                 skipped("stop skipped: condition ($guard) -> false", pc + 1)
             } else if (!spec.args["value"].isNullOrBlank()) {
-                // Tasker's Return: the value goes back to the Run Task step that called this task, if any.
+                // Stop with a value returns it to the Run Task step that called this task, if any.
                 val expansion = expandArgs(spec.type, mapOf("value" to spec.args.getValue("value")))
                 val value = expansion.args["value"].orEmpty()
                 val sensitive = expansion.isArgumentSensitive("value")
@@ -604,7 +604,7 @@ class TaskRunner(
         val endfor = structure.foreachToEndfor.getValue(open)
         if (to == FlowControl.GOTO_LOOP_END) return jump("goto out of loop -> after step ${endfor + 1}", endfor + 1)
 
-        // Tasker's "continue": end whatever the loop body opened, then take the next item the way
+        // A "continue": end whatever the loop body opened, then take the next item the way
         // the End For would, without that marker's own condition.
         while (loopStack.size > frameAt + 1) loopStack.removeLast()
         while (tryStack.lastOrNull()?.let { it.tryIndex > open } == true) tryStack.removeLast()
@@ -889,7 +889,7 @@ class TaskRunner(
             originatingProfileName = originatingProfileName,
             now = now,
         )
-        // Like Tasker, cleared once the task is found and before it runs, so a task that returns
+        // Cleared once the task is found and before it runs, so a task that returns
         // nothing leaves the variable unset instead of holding an earlier call's value.
         if (returnVariable != null && resetsReturnVariable(args)) ctx.variables.clearForTask(returnVariable)
         ctx.variables.pushScope(holdsInputs = true)
@@ -958,22 +958,22 @@ class TaskRunner(
     }
 
     /**
-     * Tasker's %TRUN lists a task run by another one too, from when its collision rule lets it run,
+     * %TRUN lists a task run by another one too, from when its collision rule lets it run,
      * so one still waiting its turn or skipped isn't listed. Its card says Running for the same span.
      */
     private suspend fun runListed(child: TaskRunner, target: Task): TaskRunReport {
-        val running = TaskerBuiltIns.subTaskStarted(target.name)
+        val running = BuiltInVariables.subTaskStarted(target.name)
         ActiveExecutionRegistry.nestedStarted(target.id)
         try {
             return child.run(target)
         } finally {
             ActiveExecutionRegistry.nestedEnded(target.id)
-            TaskerBuiltIns.subTaskEnded(running)
+            BuiltInVariables.subTaskEnded(running)
         }
     }
 
     /**
-     * Stops every running copy of the task the step names, Tasker's Stop with a task given.
+     * Stops every running copy of the task the step names: a Stop that names a task.
      *
      * Naming the task this step runs in ends this run the way `flow.stop` does and cancels its other
      * runs. Naming a task that called this one, directly or further up, stops that caller and this
@@ -998,7 +998,7 @@ class TaskRunner(
         val running = runningTask
         val reason = "Stopped by a Stop Task step in '${running?.name.orEmpty()}'"
         if (target.id > 0L && target.id == running?.id) {
-            // Tasker stops every copy of the task, so the other runs of this one end as well.
+            // Every copy of the task stops, so the other runs of this one end as well.
             val others = collisionCoordinator?.cancelRunning(target.id, reason, sparing = currentCoroutineContext()[Job]) ?: 0
             if (others > 0) ctx.logger("Stopped '${target.name}'")
             stopThisRun = true
@@ -1233,7 +1233,7 @@ class TaskRunner(
  * "%count" in an argument that names an action's output is the variable to write, the way the
  * editor reads it. Expanded like other text, it named whatever count held, so a second run wrote
  * to a different variable. A name built from parts, like "item_%slot", still expands. Variable
- * Clear's name is never filled in, since it can be a pattern like "%item*", as in Tasker. Join
+ * Clear's name is never filled in, since it can be a pattern like "%item*". Join
  * Text's "%parts" names the array to join, the way an output name does: filled in, it was the
  * first part's text, so the step joined nothing. Multiple Variables Set fills in each of its names
  * itself, one at a time, since the whole list is never one variable.
@@ -1331,9 +1331,9 @@ const val STOP_TASK_ACTION_ID = "task.stop"
 const val MAX_SUBTASK_DEPTH = 8
 /** Argument keys `task.run` accepts as its target, in precedence order. */
 val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
-/** The `task.run` argument naming the caller's variable for the value a Stop hands back, Tasker's Return Value Variable. */
+/** The `task.run` argument naming the caller's variable for the value a Stop hands back (Return Value Variable). */
 const val SUB_TASK_RETURN_KEY = "returnVariable"
-/** The `task.run` switch that clears that variable before the task runs, Tasker's Reset Return Variable. */
+/** The `task.run` switch that clears that variable before the task runs (Reset Return Variable). */
 const val SUB_TASK_RESET_RETURN_KEY = "resetReturnVariable"
 /** `task.run` arguments that set up the step itself, so they never reach the sub-task as inputs. */
 val SUB_TASK_SETTING_KEYS = setOf(SUB_TASK_RETURN_KEY, SUB_TASK_RESET_RETURN_KEY)

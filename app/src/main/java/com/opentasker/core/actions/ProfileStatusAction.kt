@@ -8,7 +8,7 @@ import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.storage.ProfileEntity
 
 /**
- * Tasker's Profile Status: turns a profile on or off, or flips it, picked by name.
+ * Profile Status: turns a profile on or off, or flips it, picked by name.
  *
  * It won't turn on a profile the app wouldn't turn on from its list ([ProfileTurnOnChecks]), since
  * those checks are where the user sees what a profile can do before it runs. Turning one off is

@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import android.content.ContextWrapper
 import com.opentasker.core.actions.registerActionMetadata
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.registerCoreRuntime
@@ -16,21 +16,21 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker's `%TRUN` lists a task another task runs (decompiled `ExecuteService.M4` walks every task
- * in its queue), so a sub-task shows there while it's going and drops off when it ends.
+ * `%TRUN` lists a task another task runs as well as one a profile runs, so a sub-task shows there
+ * while it's going and drops off when it ends.
  */
-class TaskerSubTaskRunningListTest {
+class SubTaskRunningListTest {
     @Before
     fun setUp() {
         registerActionMetadata()
         registerCoreRuntime()
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         ActiveExecutionRegistry.reset()
     }
 
     @After
     fun tearDown() {
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         ActiveExecutionRegistry.reset()
     }
 
@@ -53,7 +53,7 @@ class TaskerSubTaskRunningListTest {
 
         assertEquals(",Middle,Inner,", store.get("SEEN"))
         assertEquals("[%TRUN]", store.get("AFTER"))
-        assertNull(TaskerBuiltIns.value("TRUN"))
+        assertNull(BuiltInVariables.value("TRUN"))
     }
 
     @Test
@@ -63,7 +63,7 @@ class TaskerSubTaskRunningListTest {
             Task(id = 2, name = "Broken", actions = listOf(ActionSpec(type = "no.such.action"))),
         )
 
-        assertNull(TaskerBuiltIns.value("TRUN"))
+        assertNull(BuiltInVariables.value("TRUN"))
     }
 
     @Test

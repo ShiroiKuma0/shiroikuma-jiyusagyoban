@@ -7,7 +7,7 @@ import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
 
 /**
- * Tasker's Variable Convert. Args: `name`, `function` (one of [VariableConvert.FUNCTIONS]), `var`,
+ * Variable Convert. Args: `name`, `function` (one of [VariableConvert.FUNCTIONS]), `var`,
  * `url_safe`. Converts %name's value and stores it in `var`, or back in %name when `var` is blank.
  * The result keeps %name's secret flag, since a digest or a decode of a secret is still one.
  */

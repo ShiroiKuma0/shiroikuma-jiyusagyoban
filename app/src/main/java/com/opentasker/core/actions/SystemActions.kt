@@ -52,7 +52,7 @@ class VibrateAction : DeclaredAction(ActionCatalog.require("vibrate")) {
  * Reboot device.
  *
  * The Shizuku allowlist only admits a normal reboot. Metadata exposes no mode field, and
- * imported leftover `mode` args are ignored rather than failing a mapped Tasker reboot.
+ * leftover `mode` args from an import are ignored rather than failing the reboot.
  */
 class RebootAction : DeclaredAction(ActionCatalog.require("reboot")) {
 

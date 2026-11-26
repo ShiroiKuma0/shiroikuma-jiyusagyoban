@@ -13,13 +13,13 @@ import java.util.TimeZone
 import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * Tasker's built-in variables, read-only values like `%TIME` and `%BATT` that Tasker works out
- * when a task reads them. Tasker won't let a task or its Variables tab make a variable with one of
- * these names, so imported tasks only ever read them. Here a value stored under the name is still
- * what a read gets (that's how it worked before these existed), and Preflight names the clash.
+ * Built-in variables, read-only values like `%TIME` and `%BATT` worked out when a task reads them.
+ * Tasks are meant to read these names, never set them. A value stored under one of the names is
+ * still what a read gets (that's how it worked before these existed), and Preflight names the
+ * clash.
  */
-object TaskerBuiltIns {
-    /** Every built-in Tasker 6.7 knows, without the `%`. */
+object BuiltInVariables {
+    /** Every reserved built-in name, without the `%`, whether or not this app fills it in yet. */
     val NAMES: Set<String> = setOf(
         "AIR", "AIRR", "BATT", "BLUE", "CALS", "CALTITLE", "CALDESCR", "CALLOC", "CDATE", "CNAME", "CNUM", "CTIME",
         "CODATE", "CODUR", "CONAME", "CONUM", "COTIME", "CELLID", "CELLSIG", "CELLSRV", "CLIP", "CPUFREQ", "CPUGOV",
@@ -118,7 +118,7 @@ object TaskerBuiltIns {
 
     /**
      * The built-in's value right now, or null when [name] isn't one this app fills in or the device
-     * can't say. Names are case-sensitive, as in Tasker.
+     * can't say. Names are case-sensitive.
      */
     fun value(name: String): String? = when (name) {
         in CLOCK_NAMES -> clockValue(name)
@@ -132,17 +132,17 @@ object TaskerBuiltIns {
         REFERENCE.findAll(text).map { it.groupValues[1] }.filter { it in NAMES && it !in SUPPORTED }.distinct().toList()
 
     private fun engineValue(name: String): String? = when (name) {
-        // Tasker sorts these by when each profile was made, and ids here count up the same way.
-        "PENABLED" -> taskerList(watchedProfiles.toSortedMap().values)
-        "PACTIVE" -> watchedProfiles.let { names -> taskerList(AutomationLiveConditionState.activeProfileIds().mapNotNull(names::get)) }
-        else -> taskerList(ActiveExecutionRegistry.active.value.map { it.taskName } + runningSubTasks.map { it.name })
+        // In the order the profiles were made, which is the order their ids count up in.
+        "PENABLED" -> commaList(watchedProfiles.toSortedMap().values)
+        "PACTIVE" -> watchedProfiles.let { names -> commaList(AutomationLiveConditionState.activeProfileIds().mapNotNull(names::get)) }
+        else -> commaList(ActiveExecutionRegistry.active.value.map { it.taskName } + runningSubTasks.map { it.name })
     }
 
     /**
-     * Tasker's list form, `,a,b,` with each name once, or null when there's none, since Tasker
-     * leaves the variable unset then.
+     * The list form these built-ins use, `,a,b,` with each name once, or null when there's none,
+     * so the variable reads as unset then.
      */
-    private fun taskerList(names: Collection<String>): String? =
+    private fun commaList(names: Collection<String>): String? =
         names.filter { it.isNotBlank() }.distinct().takeIf { it.isNotEmpty() }?.joinToString(",", prefix = ",", postfix = ",")
 
     private fun clockValue(name: String): String {
@@ -152,7 +152,7 @@ object TaskerBuiltIns {
         val millis = clock.millis()
         val calendar = Calendar.getInstance(zone, locale).apply { timeInMillis = millis }
         return when (name) {
-            // Tasker pads both: 09.05.
+            // Both padded: 09.05.
             "TIME" -> String.format(Locale.ROOT, "%02d.%02d", calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE))
             "TIMES" -> (millis / 1000).toString()
             "TIMEMS" -> millis.toString()

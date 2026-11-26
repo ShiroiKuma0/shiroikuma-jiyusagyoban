@@ -55,7 +55,7 @@ import com.opentasker.core.contexts.ScreenRecordingContextEvents
 import com.opentasker.core.contexts.TimeContextEvents
 import com.opentasker.core.contexts.UsbDeviceContextEvents
 import com.opentasker.core.diagnostics.EngineHealthReader
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecyclePolicy
@@ -418,7 +418,7 @@ class AutomationService : Service() {
         PluginConditionSubscriptions.clear()
         job.cancel()
         // After the cancel, so a reload still finishing can't list the profiles again.
-        TaskerBuiltIns.stopWatching(job)
+        BuiltInVariables.stopWatching(job)
         logContextMonitorTransition(contextMonitorLifecycle.stopAll())
         BroadcastContextEvents.sync(this, emptySet())
         CallContextEvents.sync(this, false)
@@ -476,7 +476,7 @@ class AutomationService : Service() {
             registeredProfiles.clear()
             profiles.associateByTo(registeredProfiles) { it.id }
         }
-        TaskerBuiltIns.watchProfiles(profiles.associate { it.id to it.name }, owner = job)
+        BuiltInVariables.watchProfiles(profiles.associate { it.id to it.name }, owner = job)
         AutomationLiveConditionState.retainProfiles(activeIds)
         synchronized(pulseContinuities) {
             pulseContinuities.keys.removeAll { it !in activeIds }

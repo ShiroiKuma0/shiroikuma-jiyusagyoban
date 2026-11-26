@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.data.JsonNesting
 import com.opentasker.core.engine.variables.ArrayStore
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
@@ -34,7 +34,7 @@ data class TrackedExpansion(
  * In-memory variable store with a global scope and stack of local scopes.
  * Thread-safe for concurrent read/write access.
  *
- * Naming convention (matches Tasker):
+ * Naming convention:
  *   - a name containing any uppercase letter → global, persistent
  *   - an all-lowercase name → local to the current task invocation
  *
@@ -116,13 +116,13 @@ class VariableStore {
         synchronized(localStack) {
             for (i in localStack.indices.reversed()) {
                 localStack[i][normalizedName]?.let { return it }
-                if (normalizedName in hiddenStack[i]) return TaskerBuiltIns.value(normalizedName)
+                if (normalizedName in hiddenStack[i]) return BuiltInVariables.value(normalizedName)
             }
         }
-        // A Tasker built-in fills in when nothing is stored under its name, or only an empty value
-        // is (a Variable Set to nothing).
+        // A built-in fills in when nothing is stored under its name, or only an empty value is (a
+        // Variable Set to nothing).
         val stored = rootLocals[normalizedName] ?: globals[normalizedName]
-        return if (stored.isNullOrEmpty()) TaskerBuiltIns.value(normalizedName) ?: stored else stored
+        return if (stored.isNullOrEmpty()) BuiltInVariables.value(normalizedName) ?: stored else stored
     }
 
     /**
@@ -147,7 +147,7 @@ class VariableStore {
     }
 
     /**
-     * Unsets [name] for the running task only, the way Tasker's Reset Return Variable clears it: a
+     * Unsets [name] for the running task only, the way Run Task's Reset Return Variable clears it: a
      * local goes from that task's own scopes (the innermost input scope and every one above it, or
      * all of them in a task nothing called), and a caller's variable of that name stays as it is
      * but reads as unset here until the task ends. A global is unset everywhere, as in [remove].
@@ -174,8 +174,8 @@ class VariableStore {
     }
 
     /**
-     * Tasker's Variable Clear of a pattern, or of everything: unsets each variable the running task
-     * sees whose name, written with its `%`, matches [pattern] (Tasker's Matches, so `%item*` or
+     * Variable Clear of a pattern, or of everything: unsets each variable the running task sees
+     * whose name, written with its `%`, matches [pattern] (a Matches pattern, so `%item*` or
      * `%a/%b`), or each one when [pattern] is null. Locals go the way [clearForTask] clears them,
      * globals only with [includeGlobals], and so do the arrays [setArray] keeps under a matching
      * name (see [removeArray]). Built-ins aren't stored, so they stay. Returns how many.
@@ -212,17 +212,17 @@ class VariableStore {
     }
 
     /**
-     * Tasker's array elements: the variables named [base] plus a whole number from 1 (`arr1`,
+     * A numbered array's elements: the variables named [base] plus a whole number from 1 (`arr1`,
      * `arr2`, ...), in the scope [base] belongs to, by index. Each one reads the way [get] reads it.
      */
     fun numberedItems(base: String): java.util.NavigableMap<Int, String> = itemsNumbered(base, ::numberedIndex)
 
     /**
-     * The elements set under [base] the way Tasker's Variable Clear and array searches find them
-     * (`dq.V`, `dq.c0`), in number order: whatever follows the base read as a whole number, so
-     * `arr0` is 0 and `arr07` is 7, and with `arr7` set too there are two numbered 7.
+     * The elements set under [base] as Variable Clear and the array searches find them, in number
+     * order: whatever follows the base read as a whole number, so `arr0` is 0 and `arr07` is 7, and
+     * with `arr7` set too there are two numbered 7.
      */
-    fun taskerElements(base: String): List<Pair<Int, String>> =
+    fun elementsByNumber(base: String): List<Pair<Int, String>> =
         numberedNames(base) { normalizedBase, name ->
             name.takeIf { it.length > normalizedBase.length && it.startsWith(normalizedBase) }?.substring(normalizedBase.length)?.toIntOrNull()
         }.mapNotNull { (number, name) -> get(name)?.let { number to it } }.sortedBy { it.first }
@@ -380,7 +380,7 @@ class VariableStore {
     }
 
     /**
-     * Returns the elements of a stored array by name, or else Tasker's numbered elements (`arr1`,
+     * Returns the elements of a stored array by name, or else the numbered elements (`arr1`,
      * `arr2`, ...) in index order, or null when neither exists. Used by the `flow.foreach` control
      * action to iterate over array variables. [name] may carry its percent sign, as a For list does.
      */
@@ -515,7 +515,7 @@ class VariableStore {
             },
             sensitiveArrays = sensitiveArrayNames.toSet(),
             sensitiveEvent = event.keys.filterTo(mutableSetOf(), EventTaskVariables::isSensitive),
-            builtIns = TaskerBuiltIns::value,
+            builtIns = BuiltInVariables::value,
             numberedArray = { base -> numberedItems(base).values.toList().ifEmpty { null }?.let { it to anyNumberedItemSensitive(base) } },
         )
     }
@@ -587,8 +587,8 @@ class VariableStore {
 
     /**
      * Removes the field or list item [fullPath] names (`base.key`, `base.list[0]`) from the JSON its
-     * base holds and stores the rest, as Tasker's Variable Clear does with a path (decompiled 6.7.8,
-     * `TaskerJsonWriter.d`), so a removed list item moves the later ones down. Returns null when it
+     * base holds and stores the rest, for Variable Clear given a path, so a removed list item moves
+     * the later ones down. Returns null when it
      * did, else why not, for the step to fail with: the base is unset or isn't a JSON object or list,
      * or a field or item on the way isn't there. The base keeps its secret flag.
      */
@@ -599,7 +599,7 @@ class VariableStore {
         val trimmed = current.trim()
         val depth = JsonNesting.depth(trimmed)
         if (depth != JsonNesting.NOT_JSON && depth > JsonNesting.MAX_DATA_DEPTH) return "%${parsed.base} is nested too deep to change"
-        // Tasker only reads it as JSON when, trimmed, it starts with { or [. Text kotlinx refuses
+        // It's only read as JSON when, trimmed, it starts with { or [. Text kotlinx refuses
         // isn't parsed at all, since kotlinx can overflow the stack reading into it first.
         val root = if (depth != JsonNesting.NOT_JSON && (trimmed.startsWith('{') || trimmed.startsWith('['))) {
             try { jsonCodec.parseToJsonElement(trimmed) } catch (_: SerializationException) { null }
@@ -707,7 +707,7 @@ class VariableStore {
                 '[' -> {
                     val close = fullPath.indexOf(']', startIndex = cursor + 1)
                     if (close == -1) return null
-                    // Digits 0 to 9 only, so the export writes the same position out as Tasker's (n+1).
+                    // Digits 0 to 9 only: a digit from another script isn't a list position.
                     val body = fullPath.substring(cursor + 1, close).trim(' ', '\t')
                     if (body.isEmpty() || body.any { it !in '0'..'9' }) return null
                     val index = body.toIntOrNull() ?: return null

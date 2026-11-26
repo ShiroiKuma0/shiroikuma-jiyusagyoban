@@ -20,7 +20,7 @@ import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.diagnostics.ExportRedactionPolicy
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpansionResult
 import com.opentasker.core.expressions.TemplateExpressionEngine
@@ -142,7 +142,7 @@ object PreflightRunner {
     private val IMPORT_PLACEHOLDER_TYPES = setOf("macrodroid.unsupported")
     private val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
 
-    // The actions that write Tasker's numbered elements (%arr1, %arr2, ...), text.replace through
+    // The actions that write numbered elements (%arr1, %arr2, ...), text.replace through
     // its matches array. text.split and text.match keep their parts in a stored array instead, so
     // they never set %Pos1.
     private val NUMBERED_ELEMENT_WRITERS = setOf("var.split", "array.push", "array.pop", "array.process", "text.replace")
@@ -604,17 +604,17 @@ object PreflightRunner {
     )
 
     /**
-     * Tasker won't let a task set one of its built-ins, and a value stored here hides the one this
-     * app fills in. A built-in this app doesn't fill in has nothing to hide, and some of those are
-     * Tasker's own outputs (HTTP Request writes `%HTTPD`). Splitting one into numbered elements is
+     * A task isn't meant to set a built-in, and a value stored here hides the one this app fills
+     * in. A built-in this app doesn't fill in has nothing to hide, and some of those name another
+     * action's outputs (HTTP Request writes `%HTTPD`). Splitting one into numbered elements is
      * fine, since that leaves the built-in alone. A skipped step still gets this, since it runs when
      * its condition holds.
      */
     private fun builtInWriteWarnings(type: String, rawValues: Map<String, String>): List<String> =
         writtenScalarVariables(type, rawValues)
-            .filter { it in TaskerBuiltIns.SUPPORTED }
+            .filter { it in BuiltInVariables.SUPPORTED }
             .distinct()
-            .map { "%$it is a Tasker built-in, which Tasker won't let a task set. Here the value this step sets replaces it until the variable is set to nothing." }
+            .map { "%$it is a built-in variable, which a task isn't meant to set. Here the value this step sets replaces it until the variable is set to nothing." }
 
     private data class PreflightLoopFrame(
         val foreachIndex: Int,

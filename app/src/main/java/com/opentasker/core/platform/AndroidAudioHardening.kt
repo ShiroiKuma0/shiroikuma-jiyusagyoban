@@ -20,8 +20,8 @@ enum class AudioUsageEligibility {
 /**
  * Where a played or spoken sound goes, and so which volume it follows. Alarm audio is the one kind
  * Android 17 lets a task started from the background make, so it's offered as a choice. Ringer and
- * Notifications are the streams Tasker's sounds most often use besides Music, and they go quiet
- * with the phone's ringer the way those sounds do.
+ * Notifications are the streams automation sounds most often use besides Music, and they go quiet
+ * with the phone's ringer the way a ringtone or notification sound does.
  */
 internal enum class AudioOutputStream(
     val value: String,

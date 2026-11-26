@@ -80,7 +80,7 @@ data class SyntheticTriggerSimulation(
 object SyntheticTriggerSimulator {
     private const val ASSUMED_GLOBAL_START = 6 * 60
     private const val ASSUMED_GLOBAL_END = 18 * 60
-    private val taskerPatternMatcher = VariableExpander()
+    private val matchesPatternMatcher = VariableExpander()
 
     fun simulate(
         profile: Profile,
@@ -291,7 +291,7 @@ object SyntheticTriggerSimulator {
         val normalizedKey = parsed?.first?.let(::normalizeStateKey).orEmpty()
         val expected = parsed?.third.orEmpty()
         val namePattern = normalizedKey == "wifi" && parsed?.second == "~"
-        val patternExample = if (namePattern) taskerPatternExample(expected) else null
+        val patternExample = if (namePattern) matchesPatternExample(expected) else null
         val actual = stateSyntheticValue(normalizedKey, parsed?.second.orEmpty(), expected)
         val metadata = mutableMapOf<String, String>()
         if (normalizedKey.isNotBlank()) metadata[normalizedKey] = actual
@@ -340,15 +340,15 @@ object SyntheticTriggerSimulator {
         first(spec.config, "topic", "topics").takeIf(String::isNotBlank)?.let { metadata["topic"] = csvFirst(it) }
         spec.config["eventId"]?.trim()?.takeIf(String::isNotBlank)?.let { metadata["eventId"] = it }
         first(spec.config, "tagId", "tagIds", "tag").takeIf(String::isNotBlank)?.let { metadata["tagId"] = csvFirst(it) }
-        // A Tasker import's title and text are Tasker patterns, so each gets a made-up value it matches.
-        val taskerPatterns = spec.config["patterns"] == ContextMatchEvaluator.TASKER_PATTERNS
-        val patternExamples = if (taskerPatterns) {
+        // A title and text written as Matches patterns each get a made-up value the pattern matches.
+        val matchesPatterns = spec.config["patterns"] == ContextMatchEvaluator.MATCHES_PATTERNS
+        val patternExamples = if (matchesPatterns) {
             listOf("title", "body").filter { spec.config[it].orEmpty().isNotEmpty() }
-                .associateWith { taskerPatternExample(spec.config[it].orEmpty()) }
+                .associateWith { matchesPatternExample(spec.config[it].orEmpty()) }
         } else {
             emptyMap()
         }
-        if (taskerPatterns) {
+        if (matchesPatterns) {
             patternExamples.forEach { (field, example) -> metadata[field] = example.orEmpty() }
         } else {
             spec.config["title"]?.trim()?.takeIf(String::isNotBlank)?.let { metadata["title"] = it }
@@ -510,15 +510,15 @@ object SyntheticTriggerSimulator {
     }
 
     /**
-     * A value the Tasker pattern [pattern] matches: its first alternative with the wildcards filled
+     * A value the Matches pattern [pattern] matches: its first alternative with the wildcards filled
      * in, or a plain word for a pattern that only says what to leave out. Null when neither matches,
      * as for most regexes.
      */
-    private fun taskerPatternExample(pattern: String): String? {
+    private fun matchesPatternExample(pattern: String): String? {
         val alternative = pattern.takeUnless { it.startsWith("!") || it.startsWith("~R") }
             ?.trim('/')?.split('/')?.firstOrNull(String::isNotEmpty)
             ?.replace("*", "")?.replace("+", "x")?.ifEmpty { "x" }
-        return listOfNotNull(alternative, "x").firstOrNull { taskerPatternMatcher.matches(it, pattern) }
+        return listOfNotNull(alternative, "x").firstOrNull { matchesPatternMatcher.matches(it, pattern) }
     }
 
     private fun normalizeStateKey(key: String): String = when (key.trim().lowercase(Locale.US)) {

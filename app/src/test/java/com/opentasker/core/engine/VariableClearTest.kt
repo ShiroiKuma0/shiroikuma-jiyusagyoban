@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import android.content.ContextWrapper
 import com.opentasker.core.actions.registerActionMetadata
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.registerCoreRuntime
@@ -15,7 +15,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker's Variable Clear unsets one variable, every variable whose name matches a pattern (globals
+ * Variable Clear unsets one variable, every variable whose name matches a pattern (globals
  * too unless Local Variables Only), or every local, plus every global with Clear All Variables. A
  * cleared variable reads as never set, so `%name` stays as written.
  */
@@ -38,7 +38,7 @@ class VariableClearTest {
 
     @After
     fun tearDown() {
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
     }
 
     private fun record(text: String) = ActionSpec(type = "test.varclear.record", args = mapOf("v" to text))
@@ -120,7 +120,7 @@ class VariableClearTest {
     }
 
     @Test
-    fun theSwitchesOnlyCountWhereTaskerReadsThem() {
+    fun eachSwitchOnlyCountsInTheCaseItNames() {
         val store = VariableStore().apply { seedGlobals(mapOf("Kept" to "g", "Other" to "o")) }
 
         // Local Variables Only needs Pattern Matching, and Clear All Variables needs no name.
@@ -165,7 +165,7 @@ class VariableClearTest {
 
     @Test
     fun aBuiltInFillsInAgainOnceItsStoredValueIsCleared() {
-        TaskerBuiltIns.installDevice { name -> mapOf("BATT" to "15")[name] }
+        BuiltInVariables.installDevice { name -> mapOf("BATT" to "15")[name] }
 
         assertEquals(listOf("full", "15"), run(set("%BATT", "full"), record("%BATT"), clear("%BATT"), record("%BATT")))
     }

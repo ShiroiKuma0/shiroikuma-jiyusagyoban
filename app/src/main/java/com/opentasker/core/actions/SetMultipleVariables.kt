@@ -11,10 +11,10 @@ import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.text.countOf
 
 /**
- * Tasker's Multiple Variables Set. Args: `names` and `values`, each split on its own splitter
+ * Multiple Variables Set. Args: `names` and `values`, each split on its own splitter
  * (`names_splitter`, `values_splitter`), and `keep_existing`. A blank splitter means a new line when
- * the text has one, else a comma, as in Tasker. The first name gets the first value and so on, and a
- * name past the last value is unset, the way Tasker unsets it. With no values at all, a name can
+ * the text has one, else a comma. The first name gets the first value and so on, and a name past
+ * the last value is unset. With no values at all, a name can
  * carry its own after the Values splitter, so a line `%a,1` among names on their own lines sets %a
  * to 1. Names are read as written, so `%Sunrise` stays the name once
  * it's set; one built from other variables (`%item%n`) is filled in first. Keep Existing leaves a
@@ -129,23 +129,26 @@ private fun VariableStore.expandInlineValue(raw: String, eventVariables: Map<Str
 }
 
 /**
- * What ends a name and starts its value in the names field, which Tasker reads only while Values is
- * empty: the Values splitter, a comma unless one is written, so `%count,0` on a line of its own sets
- * `%count` to 0. A single line is split into names on its commas first. Null when Values has text,
- * or when the splitter is only letters, digits and `_`, which Tasker reads as part of the name.
+ * What ends a name and starts its value in the names field, read only while Values is empty: the
+ * Values splitter, a comma unless one is written, so `%count,0` on a line of its own sets `%count`
+ * to 0. A single line is split into names on its commas first. Null when Values has text, or when
+ * the splitter is only letters, digits and `_`, which would read as part of the name.
  */
 internal fun multipleVariablesInlineSplitter(args: Map<String, String>): String? {
     if (!args["values"].isNullOrEmpty()) return null
-    return multipleVariablesSplitter(args["values_splitter"], "").takeIf { !TASKER_NAME_PATTERN.matches("%aaa${it}aaa") }
+    return multipleVariablesSplitter(args["values_splitter"], "").takeIf { !INLINE_NAME_PATTERN.matches("%aaa${it}aaa") }
 }
 
-/** The name pattern Tasker checks a splitter against, so `-` splits a value off where OpenTasker would keep it in a name. */
-private val TASKER_NAME_PATTERN = Regex("%+[A-Za-z0-9][A-Za-z0-9_]+[A-Za-z0-9]")
+/**
+ * The name a splitter is checked against: one that could sit inside a name doesn't split. A name
+ * here takes no `-`, so `-` splits a value off even though a variable name may hold one.
+ */
+private val INLINE_NAME_PATTERN = Regex("%+[A-Za-z0-9][A-Za-z0-9_]+[A-Za-z0-9]")
 
 /**
  * Each entry of the names field: the name as written and the value it carries, if any, or null for
- * a blank entry. The value keeps its spaces, as in Tasker; only the name is trimmed. It also keeps a
- * later splitter, where Tasker stops at it and cuts a link like `?q=1` short.
+ * a blank entry. The value keeps its spaces; only the name is trimmed. It also keeps a later
+ * splitter, so with `=` as the splitter a link like `?q=1` keeps its own `=`.
  */
 private fun multipleVariablesEntries(args: Map<String, String>): List<Pair<String, String?>?> {
     val names = args["names"].orEmpty()
@@ -234,6 +237,6 @@ internal fun multipleVariablesTargets(args: Map<String, String>, writtenAsVariab
 
 private val VALUE_REFERENCE = Regex("%[A-Za-z]")
 
-/** The splitter as written, or Tasker's default: a new line when [text] has one, else a comma. */
+/** The splitter as written, or by default a new line when [text] has one, else a comma. */
 private fun multipleVariablesSplitter(written: String?, text: String): String =
     written?.takeIf(String::isNotEmpty) ?: if ('\n' in text) "\n" else ","

@@ -95,10 +95,10 @@ class SettingsWriteInstrumentedTest {
     }
 
     @Test
-    fun taskersToggleFlipsASettingAtZeroOrOneAndLeavesAnyOtherAlone() = runBlocking {
+    fun theToggleValueFlipsASettingAtZeroOrOneAndLeavesAnyOtherAlone() = runBlocking {
         grantSecureSettings()
         val resolver = context.contentResolver
-        val toggle = mapOf("table" to "global", "key" to PROBE_KEY, "value" to TASKER_TOGGLE_VALUE)
+        val toggle = mapOf("table" to "global", "key" to PROBE_KEY, "value" to SETTING_TOGGLE_VALUE)
         Settings.Global.putString(resolver, PROBE_KEY, "0")
 
         assertEquals(ActionResult.Success, action.run(actionContext(), toggle))

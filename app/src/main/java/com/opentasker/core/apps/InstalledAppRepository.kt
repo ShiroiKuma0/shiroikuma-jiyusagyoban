@@ -18,7 +18,7 @@ object PackageNamePolicy {
 
     fun isValid(packageName: String): Boolean = packagePattern.matches(packageName.trim())
 
-    /** An App context can watch several apps, comma-separated, which is how a Tasker import stores them. */
+    /** An App context can watch several apps, comma-separated, which is how an import stores them. */
     fun isValidList(packageNames: String): Boolean {
         val entries = packageNames.split(',').map(String::trim).filter(String::isNotEmpty)
         return entries.isNotEmpty() && entries.all(::isValid)

@@ -24,7 +24,7 @@ data class TemplateScope(
     val sensitiveTask: Set<String> = emptySet(),
     val sensitiveArrays: Set<String> = emptySet(),
     val sensitiveEvent: Set<String> = emptySet(),
-    /** Read last, and in place of an empty stored value: Tasker's built-ins like `TIMES`. */
+    /** Read last, and in place of an empty stored value: built-in variables like `TIMES`. */
     val builtIns: (String) -> String? = NoBuiltIns,
     /**
      * Read for `{{ array.x }}` when [arrays] keeps no list named x: the numbered elements Variable
@@ -271,7 +271,7 @@ class TemplateExpressionEngine(
     }
 
     /**
-     * A Tasker built-in fills in when nothing is stored under its name, or only an empty value is
+     * A built-in variable fills in when nothing is stored under its name, or only an empty value is
      * (a Variable Set to nothing).
      */
     private fun ResolvedValue.orBuiltIn(name: String, scope: TemplateScope): ResolvedValue {

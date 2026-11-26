@@ -12,7 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Locale/Tasker condition-plugin endpoint for OpenTasker's own condition selections. */
+/** Locale condition-plugin endpoint for OpenTasker's own condition selections. */
 class LocaleConditionQueryReceiver : BroadcastReceiver() {
     private val queryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

@@ -7,12 +7,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tasker matches a Wi-Fi Connected network name and a Notification title or text against the
- * whole value as a Tasker pattern (decompiled 6.7.8 `Expr.l`, through `Expr.n` for the name), so
- * those filters go through the same matcher as a `~` condition when they say `~` or
- * `patterns=tasker`.
+ * A Wi-Fi Connected network name and a Notification title or text can match the whole value as a
+ * Matches pattern, so those filters go through the same matcher as a `~` condition when they say
+ * `~` or carry [ContextMatchEvaluator.MATCHES_PATTERNS].
  */
-class TaskerFilterPatternTest {
+class FilterMatchesPatternTest {
 
     @Test
     fun aWifiNamePatternMatchesTheWholeName() {
@@ -51,7 +50,7 @@ class TaskerFilterPatternTest {
     }
 
     @Test
-    fun aNotificationTitleAndTextMatchAsTaskerPatterns() {
+    fun aNotificationTitleAndTextMatchAsMatchesPatterns() {
         val door = notification("title" to "Door*", "body" to "*open*")
 
         assertTrue(door.matches(posted("Doorbell", "Front door is open now")))

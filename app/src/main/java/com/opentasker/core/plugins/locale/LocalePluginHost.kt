@@ -56,17 +56,18 @@ object LocalePluginContract {
     const val EXTRA_BLURB = EXTRA_STRING_BLURB
     const val EXTRA_ACTIVITY_CLASS_NAME = EXTRA_STRING_ACTIVITY_CLASS_NAME
 
-    /** Tasker's extension: the bundle keys, space-separated, whose values the host fills variables into. */
+    /** The protocol's extension: the bundle keys, space-separated, whose values the host fills variables into. */
     const val EXTRA_VARIABLE_REPLACE_KEYS = "net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS"
 
-    /** Tasker's extension: the variables a plugin sets once it finishes, each as `%name\nLabel\nDescription`. */
+    /** The protocol's extension: the variables a plugin sets once it finishes, each as `%name\nLabel\nDescription`. */
     const val EXTRA_RELEVANT_VARIABLES = "net.dinglisch.android.tasker.RELEVANT_VARIABLES"
 
     /**
-     * Tasker's synchronous setting protocol. The host says what it supports in HOST_CAPABILITIES on
-     * the edit and fire intents. A plugin that waits for something answers the ordered fire broadcast
-     * with RESULT_CODE_PENDING and later sends the COMPLETION_INTENT back with its RESULT_CODE and a
-     * VARIABLES bundle; one that finishes at once sets both on the ordered broadcast's result.
+     * The protocol's synchronous setting extension. The host says what it supports in
+     * HOST_CAPABILITIES on the edit and fire intents. A plugin that waits for something answers the
+     * ordered fire broadcast with RESULT_CODE_PENDING and later sends the COMPLETION_INTENT back with
+     * its RESULT_CODE and a VARIABLES bundle; one that finishes at once sets both on the ordered
+     * broadcast's result.
      */
     const val EXTRA_HOST_CAPABILITIES = "net.dinglisch.android.tasker.extras.HOST_CAPABILITIES"
     const val EXTRA_REQUESTED_TIMEOUT = "net.dinglisch.android.tasker.extras.REQUESTED_TIMEOUT"
@@ -84,7 +85,7 @@ object LocalePluginContract {
     const val RESULT_CODE_PENDING = 3
     const val RESULT_CODE_UNKNOWN = 4
 
-    /** Tasker's "wait forever"; the longest wait here is [MAX_SETTING_WAIT_MS], as long as a Wait step. */
+    /** A plugin's "wait forever"; the longest wait here is [MAX_SETTING_WAIT_MS], as long as a Wait step. */
     const val REQUESTED_TIMEOUT_NEVER = 3_600_000
     const val MAX_SETTING_WAIT_MS = 1_800_000L
     const val MAX_RETURNED_VARIABLES = 64
@@ -127,7 +128,7 @@ data class LocalePluginSettingReply(
 )
 
 /**
- * The variables a plugin sent back, kept to what Tasker accepts: local names (`%name`, all lower
+ * The variables a plugin sent back, kept to what the protocol allows: local names (`%name`, all lower
  * case), a String, a String[] or an ArrayList<String> each, and no more than the caps below in
  * all. Anything else is left out and named in [refused] for the run log.
  */
@@ -183,7 +184,7 @@ data class LocalePluginReturnedVariables(
         /** The run-log line names this many left-out keys and counts the rest. */
         private const val MAX_REFUSED_NAMED = 16
 
-        /** Tasker sends `%name`; a global name or one without its `%` isn't the plugin's to set. */
+        /** A plugin sends `%name`; a global name or one without its `%` isn't the plugin's to set. */
         private fun localName(key: String): String? =
             key.takeIf { it.startsWith('%') }
                 ?.let(VariableNamePolicy::normalize)
@@ -256,7 +257,7 @@ interface LocalePluginTransport {
     suspend fun queryCondition(intent: Intent): Int
 
     /**
-     * Fires a setting the way Tasker does when it waits: an ordered broadcast carrying a completion
+     * Fires a setting and waits for it: an ordered broadcast carrying a completion
      * intent, then the plugin's answer, or null when none came within [timeoutMs]. A transport with
      * no plugin behind it sends it plainly and reports no answer, which reads as a plain Locale plugin.
      */
@@ -444,10 +445,10 @@ internal object LocalePluginCompletion {
 }
 
 /**
- * What a waited-for fire means for the step, by Tasker's result codes: OK and OK with minor
+ * What a waited-for fire means for the step, by the protocol's result codes: OK and OK with minor
  * failures finish it, UNKNOWN is a plugin that never touched the code (a plain Locale plugin, sent
  * its settings and done), and anything else is the plugin saying it failed, with `%errmsg` if it
- * sent one. No answer within the wait is a failure too, as Tasker times a plugin step out.
+ * sent one. No answer within the wait is a failure too: the plugin step timed out.
  */
 internal object LocalePluginSettingOutcome {
     fun of(reply: LocalePluginSettingReply?, target: String, timeoutMs: Long): LocalePluginResult {
@@ -979,15 +980,15 @@ class LocalePluginHost private constructor(
         if (saved.isNotEmpty()) intent.putExtra(LocalePluginContract.EXTRA_BUNDLE, LocalePluginBundleCodec.toTypedBundle(saved))
         if (blurb.isNotBlank()) intent.putExtra(LocalePluginContract.EXTRA_BLURB, blurb.take(120))
         intent.putExtra(LocalePluginContract.EXTRA_STRING_BREADCRUMB, "OpenTasker")
-        // Tells a Tasker plugin it may ask for a wait and return variables, as it would with Tasker.
+        // Tells a plugin it may ask for a wait and return variables.
         if (!condition) intent.putExtra(LocalePluginContract.EXTRA_HOST_CAPABILITIES, LocalePluginContract.HOST_CAPABILITIES)
         return edit
     }
 
     /**
      * Sends the plugin its settings and, unless [LocalePluginRequest.timeoutMs] is 0, waits up to
-     * that long for it to finish, by Tasker's synchronous protocol. 0 sends and goes on, as Tasker
-     * does for a plugin step with no timeout; a plugin that needs the wait, like iBeacon Tasker,
+     * that long for it to finish, by the protocol's synchronous extension. 0 sends and goes on, as
+     * for a plugin step with no timeout; a plugin that needs the wait, like some beacon scanners,
      * refuses that.
      */
     suspend fun fireSetting(request: LocalePluginRequest): LocalePluginResult {
@@ -1082,8 +1083,8 @@ class LocalePluginHost private constructor(
         (signerGuard?.check(packageName) as? TargetSignerCheck.Mismatch)?.message
 
     /**
-     * The bundle goes in [LocalePluginContract.EXTRA_BUNDLE] and, as Tasker sends it, on the intent
-     * itself too: plugins written against Tasker, Termux:Tasker among them, read some settings with
+     * The bundle goes in [LocalePluginContract.EXTRA_BUNDLE] and on the intent itself too, since
+     * plugins written against the extended protocol, Termux's among them, read some settings with
      * `intent.getStringExtra`. The host's own extras go on last so a bundle key can't replace them.
      */
     private fun pluginBroadcastIntent(

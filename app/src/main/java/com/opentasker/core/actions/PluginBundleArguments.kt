@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * write the JSON back, with the keys as written. A value is only text, so a leading `(a) ? b : c` in it
  * isn't run as a conditional. A value written without quotes, like `{"n": %n}`, fills in as a number,
  * true, false or null when that's what the variable holds, and as text otherwise, never as more JSON.
- * A bundle that names Tasker's VARIABLE_REPLACE_KEYS gets only those keys filled in, as Tasker does, so
+ * A bundle that names the plugin protocol's VARIABLE_REPLACE_KEYS gets only those keys filled in, so
  * a `%` the plugin meant literally in another key stays as it is. Without that list every key but the
  * host's own, like the `%name` lines of RELEVANT_VARIABLES, is filled in. A bundle that isn't a JSON
  * object as written, is past the bundle size limit or nests deeper than a typed array returns null and
@@ -53,6 +53,7 @@ internal object PluginBundleArguments {
         ).toString()
     }
 
+    /** The prefixes of the keys the plugin protocol itself sets, which are never filled in. */
     private val HOST_KEY_PREFIXES = listOf("net.dinglisch.android.tasker.", "com.twofortyfouram.locale.intent.extra.")
     private val JSON_KEYWORDS = setOf("true", "false", "null")
     private val JSON_NUMBER = Regex("""-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?""")

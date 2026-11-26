@@ -88,11 +88,11 @@ class SettingsWriteTest {
     }
 
     @Test
-    fun taskersToggleFlipsZeroAndOneAndNothingElse() {
-        assertEquals(TASKER_TOGGLE_VALUE, valid("table" to "system", "key" to "screen_buttons_turn_on", "value" to TASKER_TOGGLE_VALUE).value)
+    fun theToggleValueFlipsZeroAndOneAndNothingElse() {
+        assertEquals(SETTING_TOGGLE_VALUE, valid("table" to "system", "key" to "screen_buttons_turn_on", "value" to SETTING_TOGGLE_VALUE).value)
         assertEquals("1", toggledSettingValue("0"))
         assertEquals("0", toggledSettingValue("1"))
-        // Tasker compares the whole text, so a missing setting or a padded 1 can't be toggled either.
+        // The whole text is compared, so a missing setting or a padded 1 can't be toggled either.
         listOf(null, "", "2", " 1", "1 ", "01", "true", "on").forEach { current ->
             assertNull("\"$current\" can't be toggled", toggledSettingValue(current))
         }
@@ -102,7 +102,7 @@ class SettingsWriteTest {
     fun aToggleIsNeverRetriedSinceASecondOneUndoesTheFirst() {
         fun safety(value: String) = SettingsWriteAction().retrySafetyFor(mapOf("table" to "system", "key" to "accelerometer_rotation", "value" to value))
 
-        assertEquals(ActionRetrySafety.NEVER, safety(TASKER_TOGGLE_VALUE))
+        assertEquals(ActionRetrySafety.NEVER, safety(SETTING_TOGGLE_VALUE))
         assertEquals(ActionRetrySafety.IDEMPOTENT, safety("1"))
     }
 

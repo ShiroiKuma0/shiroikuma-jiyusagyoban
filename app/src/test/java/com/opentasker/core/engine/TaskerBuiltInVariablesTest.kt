@@ -1,7 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.ContextWrapper
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.registerCoreRuntime
@@ -40,14 +40,14 @@ class TaskerBuiltInVariablesTest {
                 return ActionResult.Success
             }
         })
-        TaskerBuiltIns.clockForTests = Clock.fixed(now, ZoneId.of("America/New_York"))
-        TaskerBuiltIns.localeForTests = Locale.US
-        TaskerBuiltIns.installDevice { name -> mapOf("BATT" to "15", "SCREEN" to "on")[name] }
+        BuiltInVariables.clockForTests = Clock.fixed(now, ZoneId.of("America/New_York"))
+        BuiltInVariables.localeForTests = Locale.US
+        BuiltInVariables.installDevice { name -> mapOf("BATT" to "15", "SCREEN" to "on")[name] }
     }
 
     @After
     fun tearDown() {
-        TaskerBuiltIns.resetForTests()
+        BuiltInVariables.resetForTests()
         registerCoreRuntime()
     }
 

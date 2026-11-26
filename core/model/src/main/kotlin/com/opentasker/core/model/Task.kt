@@ -8,8 +8,7 @@ import kotlinx.serialization.Serializable
  * A Task is an ordered list of Actions executed top-to-bottom with flow control.
  *
  * collisionMode controls what happens if a task is asked to run while a previous
- * invocation is still in flight (matches Tasker's behavior: Abort New / Abort Existing /
- * Run Both / Wait).
+ * invocation is still in flight: Abort New / Abort Existing / Run Both / Wait.
  */
 @Serializable
 data class Task(
@@ -34,8 +33,8 @@ data class ActionSpec(
     val continueOnError: Boolean = false,
     val condition: String? = null,          // optional %var-based condition
     /**
-     * A step turned off stays in the task, keeps its number and is passed over by a run, like a
-     * Tasker step switched off. Left out of saved JSON while on, so older builds still read a bundle.
+     * A step turned off stays in the task, keeps its number and is passed over by a run. Left out
+     * of saved JSON while on, so older builds still read a bundle.
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val enabled: Boolean = true,

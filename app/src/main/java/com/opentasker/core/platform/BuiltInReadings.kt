@@ -13,8 +13,8 @@ import android.os.SystemClock
 import android.provider.Settings
 import com.opentasker.core.contexts.batteryPercent
 
-/** The audio stream each of Tasker's `%VOL` built-ins reads. */
-internal val TASKER_VOLUME_STREAMS: Map<String, Int> = mapOf(
+/** The audio stream each `%VOL` built-in reads. */
+internal val VOLUME_BUILT_IN_STREAMS: Map<String, Int> = mapOf(
     "VOLA" to AudioManager.STREAM_ALARM,
     "VOLC" to AudioManager.STREAM_VOICE_CALL,
     "VOLD" to AudioManager.STREAM_DTMF,
@@ -24,17 +24,17 @@ internal val TASKER_VOLUME_STREAMS: Map<String, Int> = mapOf(
     "VOLS" to AudioManager.STREAM_SYSTEM,
 )
 
-/** A fix as Tasker's `%LOC` and `%LOCN` show it, Java's own text for each number. */
-internal fun taskerLatLon(latitude: Double, longitude: Double): String = "$latitude,$longitude"
+/** A fix as `%LOC` and `%LOCN` show it: latitude, a comma and longitude, each in Java's own text for a double. */
+internal fun latLonText(latitude: Double, longitude: Double): String = "$latitude,$longitude"
 
 /**
- * The device side of Tasker's built-ins, read the way Tasker reads them: `%BATT` from the sticky
+ * The device side of the built-in variables: `%BATT` from the sticky
  * battery broadcast (-1 when there's none), `%SCREEN` from whether the device is interactive,
  * `%UPS` and `%DTOUT` in seconds, a `%VOL` as the stream's volume step, and `%LOC` and `%LOCN`
  * from the GPS and network providers' last fix. Null for a name this doesn't read or a setting,
  * stream or fix that isn't there.
  */
-internal fun taskerBuiltInReading(context: Context, name: String): String? = when (name) {
+internal fun builtInReading(context: Context, name: String): String? = when (name) {
     "BATT" -> {
         val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val percent = battery?.let {
@@ -53,11 +53,11 @@ internal fun taskerBuiltInReading(context: Context, name: String): String? = whe
     "DEVMAN" -> Build.MANUFACTURER
     "DEVMOD" -> Build.MODEL
     "DEVPROD" -> Build.PRODUCT
-    in TASKER_VOLUME_STREAMS -> context.getSystemService(AudioManager::class.java)?.let { audio ->
+    in VOLUME_BUILT_IN_STREAMS -> context.getSystemService(AudioManager::class.java)?.let { audio ->
         try {
-            audio.getStreamVolume(TASKER_VOLUME_STREAMS.getValue(name)).toString()
+            audio.getStreamVolume(VOLUME_BUILT_IN_STREAMS.getValue(name)).toString()
         } catch (_: IllegalArgumentException) {
-            // A stream this device doesn't have, which Tasker leaves unset too.
+            // A stream this device doesn't have, so the variable stays unset.
             null
         }
     }
@@ -77,5 +77,5 @@ private fun lastFix(context: Context, provider: String): String? {
     } catch (_: IllegalArgumentException) {
         null
     }
-    return fix?.let { taskerLatLon(it.latitude, it.longitude) }
+    return fix?.let { latLonText(it.latitude, it.longitude) }
 }

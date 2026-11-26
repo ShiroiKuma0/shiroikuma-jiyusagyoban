@@ -161,7 +161,7 @@ object StructuredDataReader {
         // DOCTYPE is rejected in text first, because the Apache feature below cannot be relied on:
         // Android's Harmony/Expat factory throws SAXNotRecognizedException for that URI, and since
         // the throw happened inside runCatching every XML read failed on device while desktop
-        // Xerces kept the JVM tests green. This is the same defect that broke Tasker XML import
+        // Xerces kept the JVM tests green. This is the same defect that once broke XML import
         // (issue #5); the sanitizer is the enforcement, the feature is belt and braces.
         val sanitized = runCatching { ImportResourceGuard.sanitizeXml(source) }.getOrNull()
             ?: return null

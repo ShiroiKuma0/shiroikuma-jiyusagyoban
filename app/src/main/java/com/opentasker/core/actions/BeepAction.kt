@@ -14,8 +14,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Tasker's Beep tone: a sine wave whose first and last twentieth fade in and out, so it starts and
- * stops without a click. The peak is the amplitude percent times 327, as in Tasker.
+ * The Beep tone: a sine wave whose first and last twentieth fade in and out, so it starts and
+ * stops without a click. The peak is the amplitude percent times 327, so 100% is just under the
+ * loudest a 16-bit sample holds.
  */
 internal object BeepTone {
     const val SAMPLE_RATE = 22_050
@@ -41,7 +42,7 @@ internal object BeepTone {
 
 /**
  * Plays a tone. Args: `frequency` in Hz, `duration` in ms, `amplitude` 0-100 (50 when blank),
- * `stream` music, alarm, ring or notification. The step ends once the tone has played, as Tasker's Beep does.
+ * `stream` music, alarm, ring or notification. The step ends once the tone has played.
  */
 class BeepAction : DeclaredAction(ActionCatalog.require("sound.beep")) {
 
