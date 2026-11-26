@@ -1,0 +1,38 @@
+Categories:
+  - Connectivity
+  - System
+License: MIT
+AuthorName: RuleDeck contributors
+SourceCode: https://github.com/SysAdminDoc/RuleDeck
+IssueTracker: https://github.com/SysAdminDoc/RuleDeck/issues
+Changelog: https://github.com/SysAdminDoc/RuleDeck/releases
+Donate: https://ko-fi.com/X8K126YVER
+
+AutoName: RuleDeck
+
+RepoType: git
+Repo: https://github.com/SysAdminDoc/RuleDeck.git
+Binaries: 
+  https://github.com/SysAdminDoc/RuleDeck/releases/download/v%v/RuleDeck-v%v-fdroid.apk
+
+Builds:
+  - versionName: 0.2.97
+    versionCode: 99
+    commit: v0.2.97
+    subdir: .
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    preassemble:
+      - :app:verifyFdroidReadiness
+    gradleprops:
+      - ruleDeckDistribution=fdroid
+
+AllowedAPKSigningKeys: dba1aa88e37b90155fca3135ca3b781de92c225107e47c9806e75bf88055fdd8
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+UpdateCheckData: 
+  app/build.gradle.kts|appVersionCode\s*=\s*(\d+)|app/build.gradle.kts|appVersionName\s*=\s*"(.*)"
+CurrentVersion: 0.2.97
+CurrentVersionCode: 99

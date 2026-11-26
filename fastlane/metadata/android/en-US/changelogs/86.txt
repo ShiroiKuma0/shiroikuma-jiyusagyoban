@@ -1,4 +1,4 @@
-Exported backups now restore on another device and after a reinstall, and upgrading a database created before OpenTasker encrypted its storage no longer discards it.
+Exported backups now restore on another device and after a reinstall, and upgrading a database created before RuleDeck encrypted its storage no longer discards it.
 
 Automatic local snapshots, reachable XML export, and a read grant before the exported Locale receiver will report on a variable.
 

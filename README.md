@@ -1,10 +1,10 @@
-# OpenTasker
+# RuleDeck
 
-[![Version](https://img.shields.io/badge/version-0.2.97-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.97-blue.svg)](https://github.com/SysAdminDoc/RuleDeck/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.20-7f52ff.svg)](https://kotlinlang.org)
-[![Obtainium](https://img.shields.io/badge/Obtainium-add%20app-1c1c1c.svg)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.opentasker.app%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSysAdminDoc%2FOpenTasker%22%2C%22author%22%3A%22SysAdminDoc%22%2C%22name%22%3A%22OpenTasker%22%7D)
+[![Obtainium](https://img.shields.io/badge/Obtainium-add%20app-1c1c1c.svg)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.sysadmindoc.ruledeck%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSysAdminDoc%2FRuleDeck%22%2C%22author%22%3A%22SysAdminDoc%22%2C%22name%22%3A%22RuleDeck%22%7D)
 
 <p align="center">
   <a href="https://ko-fi.com/X8K126YVER">
@@ -13,10 +13,10 @@
 </p>
 
 <p align="center">
-  <sub><em>If OpenTasker runs useful automations for you, a coffee helps me keep building and testing it.</em></sub>
+  <sub><em>If RuleDeck runs useful automations for you, a coffee helps me keep building and testing it.</em></sub>
 </p>
 
-**OpenTasker** is an open-source Android automation app that runs entirely on your phone. Profiles watch for things like a time, a place, a Wi-Fi network or an incoming message, and run your tasks when they match. It doesn't use an accessibility service, so Android's [Advanced Protection limit on accessibility services](https://support.google.com/android/answer/16339980) doesn't touch it.
+**RuleDeck** is an open-source Android automation app that runs entirely on your phone. Profiles watch for things like a time, a place, a Wi-Fi network or an incoming message, and run your tasks when they match. It doesn't use an accessibility service, so Android's [Advanced Protection limit on accessibility services](https://support.google.com/android/answer/16339980) doesn't touch it.
 
 ---
 
@@ -100,9 +100,9 @@
 | Script | 2 | SHA-256-pinned Termux `RUN_COMMAND` and Shizuku shell scripts, both with bounded result capture |
 | Import | 1 | unsupported MacroDroid action placeholder |
 
-Every action carries an explicit capability contract. An action with no reviewed contract resolves to unsupported rather than defaulting to available. Privileged actions (airplane, mobile data, always-on display, screenshot, reboot, screen off, kill app) are gated to fail honestly. Always-on display reads the setting back after writing it, so a build that accepts the write and ignores it reports a failure rather than a success. Set brightness and set screen timeout require the **Modify system settings** special access granted from Setup, and Wake-on-LAN requires local network access on Android 17+. Lock device needs the **Lock screen admin**, also turned on from Setup: Android only lets an app lock the screen through a device admin, and OpenTasker's asks for `force-lock` and nothing else, so it cannot wipe the device, set a password policy, or read anything. Turning it on means Android will not let you uninstall OpenTasker until you turn it back off, which the same Setup row does. No root, Shizuku, or accessibility service is involved, so it keeps working under Android 17 Advanced Protection. SMS works in both the standard and F-Droid builds.
+Every action carries an explicit capability contract. An action with no reviewed contract resolves to unsupported rather than defaulting to available. Privileged actions (airplane, mobile data, always-on display, screenshot, reboot, screen off, kill app) are gated to fail honestly. Always-on display reads the setting back after writing it, so a build that accepts the write and ignores it reports a failure rather than a success. Set brightness and set screen timeout require the **Modify system settings** special access granted from Setup, and Wake-on-LAN requires local network access on Android 17+. Lock device needs the **Lock screen admin**, also turned on from Setup: Android only lets an app lock the screen through a device admin, and RuleDeck's asks for `force-lock` and nothing else, so it cannot wipe the device, set a password policy, or read anything. Turning it on means Android will not let you uninstall RuleDeck until you turn it back off, which the same Setup row does. No root, Shizuku, or accessibility service is involved, so it keeps working under Android 17 Advanced Protection. SMS works in both the standard and F-Droid builds.
 
-New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, and OPTIONS. It accepts structured query/header lines, inline or OpenTasker-file request bodies, per-stage timeouts, status/header/body variables, and atomic file output. Redirects default off and can be enabled only for the same origin. TLS verification cannot be disabled, cleartext remains private-LAN-only, and response/request sizes are bounded. Stored `http.get` and `http.post` actions continue to execute through compatibility aliases. Put credentials in Keystore-backed secret variables and reference them from Authorization or header fields so traces remain redacted.
+New automations use **HTTP Request** for GET, HEAD, POST, PUT, PATCH, DELETE, and OPTIONS. It accepts structured query/header lines, inline or RuleDeck-file request bodies, per-stage timeouts, status/header/body variables, and atomic file output. Redirects default off and can be enabled only for the same origin. TLS verification cannot be disabled, cleartext remains private-LAN-only, and response/request sizes are bounded. Stored `http.get` and `http.post` actions continue to execute through compatibility aliases. Put credentials in Keystore-backed secret variables and reference them from Authorization or header fields so traces remain redacted.
 
 The **Intent Dispatch** action supports bounded activity, explicit broadcast, and explicit service delivery. It accepts allowlisted URI/MIME data, six activity/URI flags, capped string/int/bool extras, and optional ordered-broadcast result-code capture. Every configured data URI must carry an explicit `grant_read_uri` or `grant_write_uri` flag. External activity actions with arbitrary actions require a chosen component. Broadcasts and services always require one. `file://` URIs, parcelable/serialization-style extras, unknown flags, ambiguous targets, and non-exported external components fail closed.
 
@@ -116,9 +116,9 @@ The **Temporary State** action applies a bounded reversible setting (brightness,
 
 The **Keyboard** actions report the current/enabled IMEs into bounded variables. `ime.set` validates the requested component or package and opens Android's picker. Normal applications cannot silently select another keyboard, so it fails with an explicit user-selection message rather than pretending the switch happened.
 
-The **push trigger** uses the official distributor-neutral UnifiedPush connector. Setup can discover a distributor through `unifiedpush://link`, register/unregister the default instance, and retain the latest endpoint for inspection or copying. The connector chooses the SDK 34+ shared-identity registration path and the immutable `PendingIntent` fallback on older Android versions, decrypts RFC 8291 bytes messages, and acknowledges deliveries. OpenTasker consumes the standard ntfy JSON fields (`id`, `topic`, `title`, and `message`) as `event=push`. Payloads are bounded, duplicate topic/event-ID deliveries are suppressed for 30 seconds, and message content is redacted before event matching and logs. `VAPID_REQUIRED`, network, action-required, and internal failures remain visible in Setup. The legacy token-authenticated `com.opentasker.action.PUSH_EVENT` broadcast remains available for existing adapters.
+The **push trigger** uses the official distributor-neutral UnifiedPush connector. Setup can discover a distributor through `unifiedpush://link`, register/unregister the default instance, and retain the latest endpoint for inspection or copying. The connector chooses the SDK 34+ shared-identity registration path and the immutable `PendingIntent` fallback on older Android versions, decrypts RFC 8291 bytes messages, and acknowledges deliveries. RuleDeck consumes the standard ntfy JSON fields (`id`, `topic`, `title`, and `message`) as `event=push`. Payloads are bounded, duplicate topic/event-ID deliveries are suppressed for 30 seconds, and message content is redacted before event matching and logs. `VAPID_REQUIRED`, network, action-required, and internal failures remain visible in Setup. The legacy token-authenticated `com.sysadmindoc.ruledeck.action.PUSH_EVENT` broadcast remains available for existing adapters.
 
-The **Received Share trigger** registers OpenTasker in Android's Sharesheet for text, URLs, MIME-typed content, and one or more file/content URIs. It sanitizes and bounds every value before matching, rejects arbitrary Parcelable or oversized extras, checks content-URI readability using the temporary grant without reading file contents, and shows an in-app error when access is missing. Matching share tasks receive `share_text`, `share_uri`, `share_uris`, `share_mime`, `share_count`, and `share_multiple` as run-scoped variables, plus `share_event`, which is always true. An Event context's editor lists what its trigger hands the task under **Variables this trigger provides**, one line per variable, for share, SMS, notification, incoming call and broadcast events. The action editor's variable chips follow the profiles that start the task. A task a share profile starts is offered the `share_*` names and nothing from other triggers, while a task another task runs keeps every event's chips, since it can read its caller's event fields.
+The **Received Share trigger** registers RuleDeck in Android's Sharesheet for text, URLs, MIME-typed content, and one or more file/content URIs. It sanitizes and bounds every value before matching, rejects arbitrary Parcelable or oversized extras, checks content-URI readability using the temporary grant without reading file contents, and shows an in-app error when access is missing. Matching share tasks receive `share_text`, `share_uri`, `share_uris`, `share_mime`, `share_count`, and `share_multiple` as run-scoped variables, plus `share_event`, which is always true. An Event context's editor lists what its trigger hands the task under **Variables this trigger provides**, one line per variable, for share, SMS, notification, incoming call and broadcast events. The action editor's variable chips follow the profiles that start the task. A task a share profile starts is offered the `share_*` names and nothing from other triggers, while a task another task runs keeps every event's chips, since it can read its caller's event fields.
 
 A variable's case sets its scope: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization. Concurrent runs merge changes to different globals. If two stale snapshots change the same global, the first committed value is kept and the later conflict is recorded in the run log.
 
@@ -139,15 +139,15 @@ A variable's case sets its scope: an all-lowercase name is local to the current 
 ### Interoperability
 
 - **Locale plugin host**. Setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback. `Set up in the plugin` opens the plugin's own settings screen and saves what it returns. Bundle values keep their types, so a plugin that reads an int or a boolean gets one: plain JSON values are sent as strings, and a typed value looks like `{"int":3}`, `{"boolean":true}`, `{"long":5}`, `{"double":0.5}`, `{"stringArray":["a","b"]}` or `{"null":true}`. Variables fill in one value at a time, so a quote in one can't change the bundle around it, and a bundle that lists `VARIABLE_REPLACE_KEYS` only gets those keys filled in
-- **Locale condition plugin target**. Third-party hosts can configure OpenTasker profile-active, context-satisfied, and non-secret variable-comparison conditions. The exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
+- **Locale condition plugin target**. Third-party hosts can configure RuleDeck profile-active, context-satisfied, and non-secret variable-comparison conditions. The exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
 - **Locale condition context**. Condition plugins as first-class profile predicates polled every 30 seconds, with the blurb their setup saved. A plugin that sends a query request is asked again as soon as any check already under way is done, instead of at the next poll
 - **External automation target**. Signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`. See [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
-- **Home Assistant / ntfy interoperability**. The Home Assistant webhook action accepts the Companion `message`/`data` envelope, including documented `command_*` values such as `command_broadcast_intent`. The push bridge accepts ntfy's `id`, `topic`, `title`, `time`, `tags`, `priority`, and other bounded metadata names. An ntfy `broadcast` action can target `com.opentasker.action.PUSH_EVENT` directly with the per-install token and needs no relay app. Message bodies and remote URLs stay out of event metadata and logs.
-- **OpenTasker JSON bundles**. Schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
+- **Home Assistant / ntfy interoperability**. The Home Assistant webhook action accepts the Companion `message`/`data` envelope, including documented `command_*` values such as `command_broadcast_intent`. The push bridge accepts ntfy's `id`, `topic`, `title`, `time`, `tags`, `priority`, and other bounded metadata names. An ntfy `broadcast` action can target `com.sysadmindoc.ruledeck.action.PUSH_EVENT` directly with the per-install token and needs no relay app. Message bodies and remote URLs stay out of event metadata and logs.
+- **RuleDeck JSON bundles**. Schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
 - **MacroDroid JSON import**. Full `.mdr` backups and single `.macro` shares use the same review gate, with safe trigger/action conversions (If, Else If and Else blocks that check variables among them), explicit placeholders, and disabled-by-default profiles. A password-protected export can't be read here, so the import says so and asks for one saved without a password
 - **Profile sharing**. Offline share manifests with editable local preview, screenshot attachments, safety findings, import-plan review, and GitHub Discussions submission text. Unverified shares stay blocked until the existing import review passes
 
-Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64. A MacroDroid source file gets 3 million tokens and depth 256 because a whole-app backup passes the ordinary limit at about 1.5 MB, and what it converts into still has to fit the ordinary limits. Every format shares decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
+Untrusted imports are preflighted before object/DOM allocation. RuleDeck JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64. A MacroDroid source file gets 3 million tokens and depth 256 because a whole-app backup passes the ordinary limit at about 1.5 MB, and what it converts into still has to fit the ordinary limits. Every format shares decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
 
 ### UI and theming
 
@@ -185,21 +185,21 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Termux 0.109+ `RUN_COMMAND` integration with a user-managed SHA-256 allowlist, pre-run hash verification, timeouts, and bounded output variables
 - **Run Shizuku Script** runs your own shell script as the Android shell user, gated by its own SHA-256 allowlist and the same kill switch
 
-To run a Termux script, place it below `~/.termux/tasker/`, enable Termux's external-app access, and grant OpenTasker `RUN_COMMAND` permission from Setup. Add the script path and the expected 64-character SHA-256 under **Approved Termux scripts** in More > Settings. OpenTasker performs a hash preflight and rechecks inside the fixed execution wrapper before the script can run. A capture prefix such as `%script` writes bounded `%script_stdout`, `%script_stderr`, `%script_exit_code`, and original-length variables. Captured content is never written to the run log.
+To run a Termux script, place it below `~/.termux/tasker/`, enable Termux's external-app access, and grant RuleDeck `RUN_COMMAND` permission from Setup. Add the script path and the expected 64-character SHA-256 under **Approved Termux scripts** in More > Settings. RuleDeck performs a hash preflight and rechecks inside the fixed execution wrapper before the script can run. A capture prefix such as `%script` writes bounded `%script_stdout`, `%script_stderr`, `%script_exit_code`, and original-length variables. Captured content is never written to the run log.
 
 To run a script through Shizuku, put it where the shell user can read it (`/data/local/tmp` or shared storage), add its path and SHA-256 under **Approved Shizuku scripts** in More > Settings, and point a **Run Shizuku Script** action at it. It runs with `/system/bin/sh` as the shell user, so it doesn't need `rish` inside it and a `#!` line is ignored. Scripts can be up to 64 KB, and an edited script refuses to run until you approve its new hash. The capture prefix works the same way as above.
 
-On Android 17 the original Shizuku app may not start, and it hasn't been updated since June 2025. The [thedjchi fork](https://github.com/thedjchi/Shizuku/releases/tag/v13.7.0-thedjchi) adds Android 17 support and keeps the same package name, so Setup finds it like the original. Its author calls v13.7.0 the last release for now, and its home screen shows server version 13.6 while About says 13.7.0. That's expected. Some phones turn wireless debugging off when they restart (people report it on Samsung's One UI 8.5), and Shizuku can't start until it's back on. OpenTasker can't turn wireless debugging on by itself, so after a reboot switch it on in Developer options and start Shizuku again. Setup says the same thing on Android 17 while Shizuku isn't running.
+On Android 17 the original Shizuku app may not start, and it hasn't been updated since June 2025. The [thedjchi fork](https://github.com/thedjchi/Shizuku/releases/tag/v13.7.0-thedjchi) adds Android 17 support and keeps the same package name, so Setup finds it like the original. Its author calls v13.7.0 the last release for now, and its home screen shows server version 13.6 while About says 13.7.0. That's expected. Some phones turn wireless debugging off when they restart (people report it on Samsung's One UI 8.5), and Shizuku can't start until it's back on. RuleDeck can't turn wireless debugging on by itself, so after a reboot switch it on in Developer options and start Shizuku again. Setup says the same thing on Android 17 while Shizuku isn't running.
 
 ### Bluetooth devices nearby
 
-Add a state context with the **Bluetooth device nearby** preset and type the device's name or address. OpenTasker looks for it about once a minute, and it can take a few minutes after a device leaves for the context to turn off. Open the Inspector to see what's around and how each device names itself.
+Add a state context with the **Bluetooth device nearby** preset and type the device's name or address. RuleDeck looks for it about once a minute, and it can take a few minutes after a device leaves for the context to turn off. Open the Inspector to see what's around and how each device names itself.
 
 A phone only shows up while it's advertising, and most change their address every few minutes. Pairing the phone once fixes that, because Android can then recognize it under its paired name. Anyone can give a device any name, so don't use this to unlock or disarm anything.
 
 ### Health Connect
 
-State contexts can compare four Health Connect readings: `health_steps` (steps since midnight), `health_heart_rate` (the newest reading from the last hour), `health_sleep_minutes` (minutes asleep in sleep sessions that ended in the last 24 hours) and `health_exercise_minutes` (since midnight). The presets cover the common ones, like 10,000 steps today. OpenTasker reads them in the background on a schedule, every 15 minutes by default, and **Check every (minutes)** on the context stretches that out to as much as a day. With several health contexts, the shortest schedule wins. Steps and exercise get one more read just after midnight, so they start over on time. Heart rate and sleep stay blank when there's nothing recent, so a comparison like `< 60` won't match on an empty reading. It only reads, and never asks for more than 30 days of history.
+State contexts can compare four Health Connect readings: `health_steps` (steps since midnight), `health_heart_rate` (the newest reading from the last hour), `health_sleep_minutes` (minutes asleep in sleep sessions that ended in the last 24 hours) and `health_exercise_minutes` (since midnight). The presets cover the common ones, like 10,000 steps today. RuleDeck reads them in the background on a schedule, every 15 minutes by default, and **Check every (minutes)** on the context stretches that out to as much as a day. With several health contexts, the shortest schedule wins. Steps and exercise get one more read just after midnight, so they start over on time. Heart rate and sleep stay blank when there's nothing recent, so a comparison like `< 60` won't match on an empty reading. It only reads, and never asks for more than 30 days of history.
 
 Allow it under **Read Health Connect** in Setup, which asks for background reading along with the readings your profiles use. Android 14 and later have Health Connect built in. On Android 9 to 13 it's a separate app from Google, and Setup links to it. If Health Connect refuses a reading, the context stays off (an inverted one too) and the Inspector says which reading it won't share.
 
@@ -225,7 +225,7 @@ ActionRegistry (built-ins + capability gates + Locale plugin dispatch)
 Room DB (persistent storage + StateFlow live queries)
 ```
 
-No Hilt. Dependencies are wired by hand in `OpenTaskerApp_NoHilt`. MVVM with Compose, Room, coroutines, DataStore, and WorkManager.
+No Hilt. Dependencies are wired by hand in `RuleDeckApp_NoHilt`. MVVM with Compose, Room, coroutines, DataStore, and WorkManager.
 
 ---
 
@@ -233,18 +233,18 @@ No Hilt. Dependencies are wired by hand in `OpenTaskerApp_NoHilt`. MVVM with Com
 
 Releases come from this repository.
 
-**With [Obtainium](https://github.com/ImranR98/Obtainium)** (recommended, it tracks new releases for you): tap the Obtainium badge above on the device, or add `https://github.com/SysAdminDoc/OpenTasker` as a GitHub source. Default settings are correct, nothing needs configuring.
+**With [Obtainium](https://github.com/ImranR98/Obtainium)** (recommended, it tracks new releases for you): tap the Obtainium badge above on the device, or add `https://github.com/SysAdminDoc/RuleDeck` as a GitHub source. Default settings are correct, nothing needs configuring.
 
-**By hand:** download `OpenTasker-v<version>.apk` from the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. Each release also attaches `OpenTasker-v<version>-fdroid.apk`. That's the F-Droid flavor (no GitHub update check) under the same key, and it's there so F-Droid can confirm its own build matches.
+**By hand:** download `RuleDeck-v<version>.apk` from the [latest release](https://github.com/SysAdminDoc/RuleDeck/releases/latest) and install it. Each release also attaches `RuleDeck-v<version>-fdroid.apk`. That's the F-Droid flavor (no GitHub update check) under the same key, and it's there so F-Droid can confirm its own build matches.
 
 **Checking the signature.** Every release since `v0.2.93` is signed with the same certificate. [AppVerifier](https://github.com/soupslurpr/AppVerifier) reads it in this form, package name first:
 
 ```
-com.opentasker.app
+com.sysadmindoc.ruledeck
 DB:A1:AA:88:E3:7B:90:15:5F:CA:31:35:CA:3B:78:1D:E9:2C:22:51:07:E4:7C:98:06:E7:5B:F8:80:55:FD:D8
 ```
 
-To check a downloaded APK on a computer, `apksigner verify --print-certs OpenTasker-v<version>.apk` prints the same SHA-256 digest in lowercase without the colons.
+To check a downloaded APK on a computer, `apksigner verify --print-certs RuleDeck-v<version>.apk` prints the same SHA-256 digest in lowercase without the colons.
 
 **Coming from an older build?** Builds before the rename used a different package name, so Android installs this one next to an old copy instead of over it. In the old copy, open Settings and export an encrypted backup to a folder you control. Install the current release, restore that backup from its Settings, check that your profiles came across, then uninstall the old copy. Backups from older builds restore as they are.
 
@@ -253,8 +253,8 @@ To check a downloaded APK on a computer, `apksigner verify --print-certs OpenTas
 ## Build & Run
 
 ```bash
-git clone https://github.com/SysAdminDoc/OpenTasker
-cd OpenTasker
+git clone https://github.com/SysAdminDoc/RuleDeck
+cd RuleDeck
 ./gradlew :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -272,9 +272,9 @@ Compose screenshot references are generated and validated headlessly. Run
 references, then run `./gradlew :app:validateDebugScreenshotTest` to compare every theme, font-scale,
 and RTL case.
 
-Release builds require `OPEN_TASKER_RELEASE_KEYSTORE`,
-`OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD`, `OPEN_TASKER_RELEASE_KEY_ALIAS`, and
-`OPEN_TASKER_RELEASE_KEY_PASSWORD`. The key file stays outside this repository,
+Release builds require `RULEDECK_RELEASE_KEYSTORE`,
+`RULEDECK_RELEASE_KEYSTORE_PASSWORD`, `RULEDECK_RELEASE_KEY_ALIAS`, and
+`RULEDECK_RELEASE_KEY_PASSWORD`. The key file stays outside this repository,
 and it has to: Android ties an app's identity to its signing key, so a key that
 leaks or gets lost costs every installed copy an uninstall before it can
 upgrade. That has happened twice here. `SigningMaterialCustodyTest` fails the
@@ -285,7 +285,7 @@ including through `git add -f`.
 ./gradlew :app:assembleRelease
 ```
 
-Published release assets are named `OpenTasker-v<versionName>.apk`. Stage and check the name before
+Published release assets are named `RuleDeck-v<versionName>.apk`. Stage and check the name before
 uploading anything to a GitHub release:
 ```bash
 ./gradlew :app:verifyReleaseAssetName
@@ -297,18 +297,18 @@ not from `app/build/outputs/apk/release/`.
 
 F-Droid profile:
 ```bash
-./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata
+./gradlew -PruleDeckDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata
 ```
 
 That build is unsigned, which is what F-Droid's server runs. Each release also attaches the same
 build signed with the release key. F-Droid copies that signature onto its own rebuild of the tag and
 publishes our APK when the two match, so F-Droid, GitHub and Obtainium installs share one key:
 ```bash
-./gradlew -PopenTaskerDistribution=fdroid -PopenTaskerSignFdroid=true :app:verifyReleaseAssetName
+./gradlew -PruleDeckDistribution=fdroid -PruleDeckSignFdroid=true :app:verifyReleaseAssetName
 ```
-It stages `OpenTasker-v<versionName>-fdroid.apk` to `app/build/outputs/release-assets-fdroid/` with
+It stages `RuleDeck-v<versionName>-fdroid.apk` to `app/build/outputs/release-assets-fdroid/` with
 the same name and certificate checks as the standard asset. Upload it next to the standard APK. The
-`Binaries:` URL in `fdroid/metadata/com.opentasker.app.yml` expects that exact name.
+`Binaries:` URL in `fdroid/metadata/com.sysadmindoc.ruledeck.yml` expects that exact name.
 
 Full local release gate (pinned Gradle bootstrap verification, blocking lint, the configured JVM test floor, JaCoCo coverage floors for scheduling, engine variable expansion, receivers and UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus an F-Droid release build):
 
@@ -324,7 +324,7 @@ The gate writes the debug JaCoCo XML report to `app/build/reports/jacoco/debugCo
 .\tools\verify-local-release.ps1
 ```
 
-Before it executes Gradle, the gate checks that `distributionSha256Sum` matches the configured binary distribution and that the checked-in `gradle-wrapper.jar` matches Gradle's published SHA-256. It also independently checks every dependency checksum against its recorded upstream Maven evidence, requires signature verification with an explicit trusted-key set, and rejects Gradle-generated or blanket-trust metadata. Use `.\tools\verify-dependency-verification.ps1 -UpdateOrigins` only after deliberately reviewing a dependency change. The normal verifier must pass without that switch. Use `.\tools\verify-local-release.ps1 -BootstrapOnly` for the fast bootstrap preflight alone. The gate's connected tests install and run on one device. When adb sees more than one, name it with `-Serial <adb serial>` or set `ANDROID_SERIAL`, or the gate stops before Gradle starts. The full gate writes those verified hashes into the machine-readable report under `build/reports/opentasker/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`. Success is a nonzero exit with `Seeded local quality-gate failure`.
+Before it executes Gradle, the gate checks that `distributionSha256Sum` matches the configured binary distribution and that the checked-in `gradle-wrapper.jar` matches Gradle's published SHA-256. It also independently checks every dependency checksum against its recorded upstream Maven evidence, requires signature verification with an explicit trusted-key set, and rejects Gradle-generated or blanket-trust metadata. Use `.\tools\verify-dependency-verification.ps1 -UpdateOrigins` only after deliberately reviewing a dependency change. The normal verifier must pass without that switch. Use `.\tools\verify-local-release.ps1 -BootstrapOnly` for the fast bootstrap preflight alone. The gate's connected tests install and run on one device. When adb sees more than one, name it with `-Serial <adb serial>` or set `ANDROID_SERIAL`, or the gate stops before Gradle starts. The full gate writes those verified hashes into the machine-readable report under `build/reports/ruledeck/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`. Success is a nonzero exit with `Seeded local quality-gate failure`.
 
 The repository uses Gradle's local build cache only. Don't configure a remote build cache. Kotlin 2.4.20 fixed the cache-metadata flaw in [GHSA-r937-wjx7-w2jp](https://github.com/advisories/GHSA-r937-wjx7-w2jp), and keeping the cache local means the next flaw of that kind has nothing to reach.
 
@@ -388,7 +388,7 @@ Issues and pull requests welcome. Open an issue to discuss a feature before buil
 
 ### Translations
 
-OpenTasker supports localization. English is the source language, and Simplified Chinese (`values-zh-rCN`, contributed by coolLitterBear) arrives with the next release. English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`. The app uses AGP's generated per-app language configuration with `en-US` as the default. An alternate locale is included in a release only after at least 80% of the default `<string>` resources are translated. Incomplete or empty locale directories are rejected by the release gate. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
+RuleDeck supports localization. English is the source language, and Simplified Chinese (`values-zh-rCN`, contributed by coolLitterBear) arrives with the next release. English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`. The app uses AGP's generated per-app language configuration with `en-US` as the default. An alternate locale is included in a release only after at least 80% of the default `<string>` resources are translated. Incomplete or empty locale directories are rejected by the release gate. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
 
 1. Copy the three translatable XML files from `app/src/main/res/values/` to `app/src/main/res/values-<locale>/`
 2. Translate only the string values (not the `name` attributes)

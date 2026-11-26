@@ -1,0 +1,149 @@
+package com.sysadmindoc.ruledeck.core.engine
+
+import android.content.Context
+import com.sysadmindoc.ruledeck.core.actions.ActionCatalog
+import com.sysadmindoc.ruledeck.core.actions.ActionDefinition
+import com.sysadmindoc.ruledeck.core.platform.AudioRuntimeEligibility
+import java.util.Collections
+
+/**
+ * Runtime context handed to every Action.run() invocation.
+ * Provides the application context, the active variable store, and a logger.
+ */
+class ActionContext(
+    val app: Context,
+    val variables: VariableStore,
+    val eventVariables: Map<String, String> = emptyMap(),
+    val audioEligibility: AudioRuntimeEligibility = AudioRuntimeEligibility(),
+    val sensitiveArgumentNames: Set<String> = emptySet(),
+    /**
+     * Names a step adds as it writes them when the name itself gives a secret away, like
+     * `cache_1234` built from `%cache_%Pin`, so the run log only counts their changes. A task run
+     * hands each step its own set; null elsewhere. Ahead of [logger], which callers pass as a
+     * trailing lambda.
+     */
+    val hiddenChangeNames: MutableSet<String>? = null,
+    val logger: (String) -> Unit = {},
+)
+
+fun ActionContext.forAction(
+    sensitiveArgumentNames: Set<String>,
+    hiddenChangeNames: MutableSet<String>? = null,
+): ActionContext {
+    if (sensitiveArgumentNames.isEmpty() && hiddenChangeNames == null) return this
+    return ActionContext(
+        app = app,
+        variables = variables,
+        eventVariables = eventVariables,
+        audioEligibility = audioEligibility,
+        logger = if (sensitiveArgumentNames.isEmpty()) logger else { _ -> logger(SECRET_DERIVED_ACTION_LOG) },
+        sensitiveArgumentNames = sensitiveArgumentNames,
+        hiddenChangeNames = hiddenChangeNames ?: this.hiddenChangeNames,
+    )
+}
+
+fun ActionContext.isArgumentSensitive(name: String): Boolean = name in sensitiveArgumentNames
+
+/**
+ * An action whose whole effect is on variables. Preflight plays it on its own snapshot, so a later
+ * step there reads what the run would leave, like a `%arr(2)` after an Array Push. [play] is the
+ * action's run without the run around it, and it touches nothing but [VariableWork.variables].
+ */
+interface VariableOnlyAction {
+    fun play(ctx: VariableWork, args: Map<String, String>): ActionResult
+}
+
+/** What a [VariableOnlyAction] gets from a run, or from Preflight. */
+class VariableWork(
+    val variables: VariableStore,
+    val sensitiveArgumentNames: Set<String> = emptySet(),
+    val logger: (String) -> Unit = {},
+) {
+    fun isArgumentSensitive(name: String): Boolean = name in sensitiveArgumentNames
+}
+
+fun ActionContext.variableWork(): VariableWork = VariableWork(variables, sensitiveArgumentNames, logger)
+
+internal const val SECRET_DERIVED_ACTION_LOG = "<redacted: action output depends on a secret>"
+
+/** Result of executing a single Action. */
+sealed class ActionResult {
+    data object Success : ActionResult()
+    data class Failure(
+        val message: String,
+        val cause: Throwable? = null,
+        /** Child task failures retain their original structured location when they bubble up. */
+        val structuredError: StructuredTaskError? = null,
+    ) : ActionResult()
+    data object Skip : ActionResult()
+}
+
+/**
+ * Atomic unit of automation work. Implementations live in [com.sysadmindoc.ruledeck.core.actions]
+ * for built-ins; Locale-compatible plugins are invoked by host actions in that package.
+ */
+interface Action {
+    val id: String                 // stable, e.g. "wifi.toggle"
+    val category: ActionCategory
+    /** The shared catalogue entry for a built-in implementation, when one exists. */
+    val definition: ActionDefinition?
+        get() = null
+    /** Whether the engine may repeat this action after a transient failure. */
+    val retrySafety: ActionRetrySafety get() = ActionRetrySafety.NEVER
+
+    /** Allows an action whose safety depends on its arguments to refine its classification. */
+    fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety = retrySafety
+    suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult
+}
+
+enum class ActionRetrySafety {
+    NEVER,
+    IDEMPOTENT,
+}
+
+enum class ActionCategory {
+    SETTINGS, NOTIFICATION, FILE, NET, MEDIA, APP, VARIABLE, FLOW, SYSTEM, PLUGIN
+}
+
+/** Registry of all known Action implementations, keyed by [Action.id]. */
+object ActionRegistry {
+    private val byId = Collections.synchronizedMap(mutableMapOf<String, Action>())
+
+    fun register(action: Action) {
+        val declaration = action.definition ?: ActionCatalog.get(action.id)
+        if (action.definition != null) {
+            require(ActionCatalog.get(action.id) === action.definition) {
+                "Action ${action.id} does not use its canonical ActionCatalog declaration"
+            }
+        }
+        // No category/retry-safety comparison here: since every built-in extends DeclaredAction,
+        // both sides of such a check read from the same ActionDefinition, so it could only ever
+        // compare the declaration to itself. The invariant that matters is enforced where the two
+        // are declared independently - ActionCatalog against the editor metadata registry.
+        byId[declaration?.id ?: action.id] = action
+    }
+
+    fun registerAll() {
+        ActionCatalog.all.map { it.factory() }.forEach(::register)
+    }
+    fun clear() = byId.clear()
+    fun get(id: String): Action? = byId[id]
+    fun all(): Collection<Action> = byId.values.toList()
+    fun allIds(): Set<String> = byId.keys.toSet()
+}
+
+/**
+ * Base class for built-in actions. Requiring the canonical definition in the constructor makes
+ * omitting an action declaration a compile-time choice instead of another hand-maintained field
+ * triplet that can drift from the runtime registry.
+ */
+abstract class DeclaredAction(
+    final override val definition: ActionDefinition,
+) : Action {
+    final override val id: String
+        get() = definition.id
+    final override val category: ActionCategory
+        get() = definition.category
+    final override val retrySafety: ActionRetrySafety
+        get() = definition.retrySafety
+}

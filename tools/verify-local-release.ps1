@@ -15,7 +15,7 @@ $Gradlew = Join-Path $Root "gradlew.bat"
 $GradleWrapperProperties = Join-Path $Root "gradle\wrapper\gradle-wrapper.properties"
 $GradleWrapperJar = Join-Path $Root "gradle\wrapper\gradle-wrapper.jar"
 $DependencyVerificationScript = Join-Path $Root "tools\verify-dependency-verification.ps1"
-$ReportDirectory = Join-Path $Root "build\reports\opentasker"
+$ReportDirectory = Join-Path $Root "build\reports\ruledeck"
 $SbomPath = Join-Path $ReportDirectory "sbom.cdx.json"
 $OsvReportPath = Join-Path $ReportDirectory "osv-advisories.json"
 $SummaryPath = Join-Path $ReportDirectory "local-release-gate.json"
@@ -167,7 +167,7 @@ $CommonGradleArguments = @(
 if ($SeedFailure) {
     Invoke-Gradle -Arguments (@(
         ":app:verifyQualityGateSeed",
-        "-PopenTaskerQualityGateSeedFailure=true"
+        "-PruleDeckQualityGateSeedFailure=true"
     ) + $CommonGradleArguments)
     throw "Seeded failure unexpectedly passed."
 }
@@ -215,7 +215,7 @@ if ($untrackedSchemas.Count -gt 0) {
 }
 
 Invoke-Gradle -Arguments (@(
-    "-PopenTaskerDistribution=fdroid",
+    "-PruleDeckDistribution=fdroid",
     ":app:assembleRelease",
     ":app:verifyFdroidReadiness",
     ":app:verifyFdroidMetadata"
@@ -308,15 +308,15 @@ $summary = [ordered]@{
         floor = $jvmTestFloor
         failures = [int]$jvmTestReport.failures
         errors = [int]$jvmTestReport.errors
-        report = "build/reports/opentasker/jvm-test-count.json"
+        report = "build/reports/ruledeck/jvm-test-count.json"
     }
     configurationCacheReused = $true
     resolvedComponentCount = $components.Count
     advisoryCount = $findings.Count
     reports = @(
-        "build/reports/opentasker/sbom.cdx.json",
-        "build/reports/opentasker/osv-advisories.json",
-        "build/reports/opentasker/jvm-test-count.json",
+        "build/reports/ruledeck/sbom.cdx.json",
+        "build/reports/ruledeck/osv-advisories.json",
+        "build/reports/ruledeck/jvm-test-count.json",
         "app/build/reports/lint-results-debug.html"
     )
 }

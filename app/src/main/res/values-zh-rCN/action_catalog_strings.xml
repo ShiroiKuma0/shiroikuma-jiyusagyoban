@@ -549,7 +549,7 @@
     <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">调暗壁纸</string>
     <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">夜间模式</string>
     <string name="catalog_action_zen_rule_clear_name" formatted="false">清除勿扰规则</string>
-    <string name="catalog_action_zen_rule_clear_description" formatted="false">移除OpenTasker专有的DND规则</string>
+    <string name="catalog_action_zen_rule_clear_description" formatted="false">移除RuleDeck专有的DND规则</string>
     <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">规则ID</string>
     <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">由“设置Zen规则”使用的稳定键</string>
     <string name="catalog_action_ringer_set_name" formatted="false">设置铃声模式</string>
@@ -647,7 +647,7 @@
     <string name="catalog_action_http_request_field_authorization_hint" formatted="false">例如 Bearer %SECRET_TOKEN；始终从日志中隐去</string>
     <string name="catalog_action_http_request_field_body_label" formatted="false">内联请求体</string>
     <string name="catalog_action_http_request_field_body_file_label" formatted="false">请求体文件</string>
-    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">OpenTasker文件中的相对路径；不能与内联请求体同时使用</string>
+    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">RuleDeck文件中的相对路径；不能与内联请求体同时使用</string>
     <string name="catalog_action_http_request_field_content_type_label" formatted="false">内容类型</string>
     <string name="catalog_action_http_request_field_content_type_hint" formatted="false">例如 application/json</string>
     <string name="catalog_action_http_request_field_response_var_label" formatted="false">存储响应体到</string>
@@ -657,7 +657,7 @@
     <string name="catalog_action_http_request_field_headers_var_label" formatted="false">存储响应头到</string>
     <string name="catalog_action_http_request_field_headers_var_hint" formatted="false">可选变量；每行一个 Name: Value</string>
     <string name="catalog_action_http_request_field_output_file_label" formatted="false">响应输出文件</string>
-    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">OpenTasker文件中的相对路径；以原子方式发布</string>
+    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">RuleDeck文件中的相对路径；以原子方式发布</string>
     <string name="catalog_action_http_request_field_max_response_bytes_label" formatted="false">最大响应字节数</string>
     <string name="catalog_action_http_request_field_max_response_bytes_hint" formatted="false">变量最多1 MiB，文件最多50 MiB</string>
     <string name="catalog_action_http_request_field_redirects_label" formatted="false">重定向策略</string>

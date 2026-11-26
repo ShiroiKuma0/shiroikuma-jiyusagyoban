@@ -21,11 +21,11 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.testing.jacoco.tasks.JacocoReport
-import com.opentasker.build.ReleaseTruthSources
-import com.opentasker.build.VerifyLocaleResourcesTask
-import com.opentasker.build.VerifyReleaseTruthTask
-import com.opentasker.build.VerifyRoomSchemaTask
-import com.opentasker.build.publishedCertificateSha256
+import com.sysadmindoc.ruledeck.build.ReleaseTruthSources
+import com.sysadmindoc.ruledeck.build.VerifyLocaleResourcesTask
+import com.sysadmindoc.ruledeck.build.VerifyReleaseTruthTask
+import com.sysadmindoc.ruledeck.build.VerifyRoomSchemaTask
+import com.sysadmindoc.ruledeck.build.publishedCertificateSha256
 
 // Kept close under the current count. A floor far below it lets a large batch of tests be
 // deleted silently; the headroom only absorbs intentional consolidation. The count spans the core
@@ -132,10 +132,10 @@ jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
 
-val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
-val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
-val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
-val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
+val releaseKeystorePath = System.getenv("RULEDECK_RELEASE_KEYSTORE")
+val releaseKeystorePassword = System.getenv("RULEDECK_RELEASE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("RULEDECK_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("RULEDECK_RELEASE_KEY_PASSWORD")
 val appVersionCode = 99
 val appVersionName = "0.2.97"
 // F-Droid store listing limits, from the F-Droid build metadata reference.
@@ -145,18 +145,18 @@ val FDROID_MIN_SCREENSHOTS = 4
 /** Store metadata files are LF regardless of the build host. */
 val NEWLINE = 10.toChar().toString()
 val allowedDistributions = setOf("standard", "fdroid")
-val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
+val selectedDistribution = providers.gradleProperty("ruleDeckDistribution")
     .orElse("standard")
     .get()
     .lowercase()
 require(selectedDistribution in allowedDistributions) {
-    "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}." +
+    "Unsupported RuleDeck distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}." +
         if (selectedDistribution == "play") " The Play profile was retired on 2026-08-31, when Play distribution was dropped." else ""
 }
 /**
  * F-Droid's build server has no signing material, so the F-Droid distribution packages unsigned by
  * default. The release flow builds the same distribution once more with the release key
- * (`-PopenTaskerSignFdroid=true`) and publishes it next to the standard APK. F-Droid rebuilds it from
+ * (`-PruleDeckSignFdroid=true`) and publishes it next to the standard APK. F-Droid rebuilds it from
  * the tag, copies that signature onto its own unsigned build, and ships our signed APK when the two
  * match byte for byte (`Binaries:` and `AllowedAPKSigningKeys:` in the metadata). That keeps one
  * signing identity across GitHub, Obtainium and F-Droid installs.
@@ -164,12 +164,12 @@ require(selectedDistribution in allowedDistributions) {
  * This also decides the artifact filename AGP produces, which the build recipe and reproducibility
  * harness both name, so the signing config and the expected output path derive from this one value.
  */
-val signFdroidBuild = providers.gradleProperty("openTaskerSignFdroid")
+val signFdroidBuild = providers.gradleProperty("ruleDeckSignFdroid")
     .orElse("false")
     .get()
     .toBoolean()
 require(!signFdroidBuild || selectedDistribution == "fdroid") {
-    "-PopenTaskerSignFdroid=true only applies to -PopenTaskerDistribution=fdroid."
+    "-PruleDeckSignFdroid=true only applies to -PruleDeckDistribution=fdroid."
 }
 val releaseBuildIsUnsigned = selectedDistribution == "fdroid" && !signFdroidBuild
 /** What F-Droid's server builds (unsigned); the metadata recipe's `output:` must name this path. */
@@ -181,9 +181,9 @@ val expectedReleaseApkPath = if (releaseBuildIsUnsigned) {
 }
 /** Both published APKs sit on one release page, so the F-Droid build carries a suffix. */
 val releaseAssetFileName = if (selectedDistribution == "fdroid") {
-    "OpenTasker-v$appVersionName-fdroid.apk"
+    "RuleDeck-v$appVersionName-fdroid.apk"
 } else {
-    "OpenTasker-v$appVersionName.apk"
+    "RuleDeck-v$appVersionName.apk"
 }
 val releaseAssetDirectoryName = if (selectedDistribution == "fdroid") {
     "outputs/release-assets-fdroid"
@@ -197,13 +197,13 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword
 ).all { !it.isNullOrBlank() }
 android {
-    namespace = "com.opentasker.app"
+    namespace = "com.sysadmindoc.ruledeck"
     compileSdk = 37
     buildToolsVersion = "36.0.0"
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
     defaultConfig {
-        applicationId = "com.opentasker.app"
+        applicationId = "com.sysadmindoc.ruledeck"
         minSdk = 26
         targetSdk = 37
         versionCode = appVersionCode
@@ -478,8 +478,8 @@ tasks.register<JavaExec>("fuzzExternalDecoders") {
     }
     workingDir = rootProject.projectDir
     args(
-        "--target_class=com.opentasker.fuzz.ExternalDecoderFuzzTarget",
-        "--instrumentation_includes=com.opentasker.**",
+        "--target_class=com.sysadmindoc.ruledeck.fuzz.ExternalDecoderFuzzTarget",
+        "--instrumentation_includes=com.sysadmindoc.ruledeck.**",
         "-max_total_time=${fuzzSeconds.get()}",
         "-artifact_prefix=${fuzzArtifactsDirectory.get().asFile.absolutePath}${File.separator}",
         fuzzWorkingCorpusDirectory.get().asFile.absolutePath,
@@ -502,7 +502,7 @@ tasks.register<JavaExec>("fuzzExternalDecoderRegression") {
         )
     }
     workingDir = rootProject.projectDir
-    args("com.opentasker.fuzz.ExternalDecoderRegressionTest")
+    args("com.sysadmindoc.ruledeck.fuzz.ExternalDecoderRegressionTest")
 }
 
 abstract class VerifyResolvedDependencyPolicyTask : org.gradle.api.DefaultTask() {
@@ -629,7 +629,7 @@ abstract class GenerateCycloneDxSbomTask : org.gradle.api.DefaultTask() {
                 """    {"type":"library","bom-ref":${purl.json()},"group":${group.json()},"name":${name.json()},"version":${version.json()},"purl":${purl.json()}}"""
             }
         val version = applicationVersion.get()
-        val appPurl = "pkg:generic/OpenTasker@$version"
+        val appPurl = "pkg:generic/RuleDeck@$version"
         val output = outputFile.get().asFile
         output.parentFile.mkdirs()
         output.writeText(
@@ -639,7 +639,7 @@ abstract class GenerateCycloneDxSbomTask : org.gradle.api.DefaultTask() {
                 appendLine("  \"bomFormat\": \"CycloneDX\",")
                 appendLine("  \"specVersion\": \"1.6\",")
                 appendLine("  \"version\": 1,")
-                appendLine("  \"metadata\": {\"component\": {\"type\":\"application\",\"bom-ref\":${appPurl.json()},\"group\":\"com.opentasker\",\"name\":\"OpenTasker\",\"version\":${version.json()},\"purl\":${appPurl.json()}}},")
+                appendLine("  \"metadata\": {\"component\": {\"type\":\"application\",\"bom-ref\":${appPurl.json()},\"group\":\"com.sysadmindoc.ruledeck\",\"name\":\"RuleDeck\",\"version\":${version.json()},\"purl\":${appPurl.json()}}},")
                 appendLine("  \"components\": [")
                 appendLine(entries.joinToString(",\n"))
                 appendLine("  ]")
@@ -838,14 +838,14 @@ abstract class VerifyPackagedTypeCompletenessTask : DefaultTask() {
             val missing = (referenced - defined).sorted()
             check(missing.isEmpty()) {
                 buildString {
-                    appendLine("${apkFile.name} references OpenTasker types that it does not define:")
+                    appendLine("${apkFile.name} references RuleDeck types that it does not define:")
                     missing.forEach { descriptor -> appendLine("  $descriptor") }
-                    append("Every Lcom/opentasker/ reference must be packaged in the same APK.")
+                    append("Every Lcom/sysadmindoc/ruledeck/ reference must be packaged in the same APK.")
                 }
             }
             println(
                 "Packaged-type completeness passed for ${apkFile.name}: " +
-                    "$dexCount dex file(s), ${defined.size} OpenTasker type(s) defined.",
+                    "$dexCount dex file(s), ${defined.size} RuleDeck type(s) defined.",
             )
         }
     }
@@ -910,19 +910,19 @@ abstract class VerifyPackagedTypeCompletenessTask : DefaultTask() {
             check(descriptorIndex <= Int.MAX_VALUE) { "$source has an oversized descriptor index." }
             typeDescriptors += stringAt(descriptorIndex.toInt())
         }
-        val referenced = typeDescriptors.mapNotNullTo(linkedSetOf(), ::openTaskerDescriptor)
+        val referenced = typeDescriptors.mapNotNullTo(linkedSetOf(), ::ruleDeckDescriptor)
         val defined = linkedSetOf<String>()
         repeat(classCount) { index ->
             val classIndex = uint(classOffset + index * 32)
             check(classIndex < typeDescriptors.size) { "$source has an invalid class type index." }
-            openTaskerDescriptor(typeDescriptors[classIndex.toInt()])?.let(defined::add)
+            ruleDeckDescriptor(typeDescriptors[classIndex.toInt()])?.let(defined::add)
         }
         return DexTypeInventory(referenced = referenced, defined = defined)
     }
 
-    private fun openTaskerDescriptor(descriptor: String): String? {
+    private fun ruleDeckDescriptor(descriptor: String): String? {
         val component = descriptor.dropWhile { character -> character == '[' }
-        return component.takeIf { value -> value.startsWith(OPEN_TASKER_DESCRIPTOR_PREFIX) }
+        return component.takeIf { value -> value.startsWith(RULEDECK_DESCRIPTOR_PREFIX) }
     }
 
     private data class DexTypeInventory(
@@ -934,7 +934,7 @@ abstract class VerifyPackagedTypeCompletenessTask : DefaultTask() {
         val DEX_ENTRY_PATTERN = Regex("classes(?:\\d+)?\\.dex")
         const val DEX_HEADER_BYTES = 112
         const val MAX_DEX_BYTES = 256L * 1024 * 1024
-        const val OPEN_TASKER_DESCRIPTOR_PREFIX = "Lcom/opentasker/"
+        const val RULEDECK_DESCRIPTOR_PREFIX = "Lcom/sysadmindoc/ruledeck/"
     }
 }
 
@@ -1104,7 +1104,7 @@ abstract class VerifyReleaseAssetNameTask : org.gradle.api.DefaultTask() {
         }
 
         val expectedName = assetFileName.get()
-        check(expectedName.startsWith("OpenTasker-v${versionName.get()}")) {
+        check(expectedName.startsWith("RuleDeck-v${versionName.get()}")) {
             "Release asset name '$expectedName' does not carry version ${versionName.get()}."
         }
         val staged = stagingDirectory.get().asFile.listFiles().orEmpty()
@@ -1265,10 +1265,10 @@ abstract class VerifyPerformanceEvidenceTask : DefaultTask() {
     @TaskAction
     fun verify() {
         val profile = profileFile.get().asFile.readLines().map(String::trim).filter(String::isNotEmpty)
-        check(profile.any { it == "Lcom/opentasker/app/MainActivity;" }) {
+        check(profile.any { it == "Lcom/sysadmindoc/ruledeck/MainActivity;" }) {
             "Baseline profile must include the launcher activity class rule."
         }
-        check(profile.any { it == "Lcom/opentasker/app/OpenTaskerApp_NoHilt;" }) {
+        check(profile.any { it == "Lcom/sysadmindoc/ruledeck/RuleDeckApp_NoHilt;" }) {
             "Baseline profile must include the application class rule."
         }
 
@@ -1307,14 +1307,14 @@ abstract class StageReleaseAssetTask : DefaultTask() {
     @get:OutputDirectory
     abstract val stagingDirectory: DirectoryProperty
 
-    /** `OpenTasker-v<versionName>.apk`, or `OpenTasker-v<versionName>-fdroid.apk` for F-Droid. */
+    /** `RuleDeck-v<versionName>.apk`, or `RuleDeck-v<versionName>-fdroid.apk` for F-Droid. */
     @get:Input
     abstract val assetFileName: Property<String>
 
     /**
      * False for F-Droid's own unsigned build. Staging exists to publish a signed GitHub release
      * asset, so the unsigned lane has nothing to stage; the signed F-Droid lane
-     * (`-PopenTaskerSignFdroid=true`) does. This refuses the whole task rather than relaxing the
+     * (`-PruleDeckSignFdroid=true`) does. This refuses the whole task rather than relaxing the
      * signature check, which would otherwise copy `app-release-unsigned.apk` to a published name.
      */
     @get:Input
@@ -1336,7 +1336,7 @@ abstract class StageReleaseAssetTask : DefaultTask() {
     fun stage() {
         check(stagingIsSupported.get()) {
             "stageReleaseAsset publishes a signed GitHub release asset, and this F-Droid build is " +
-                "unsigned, so it has nothing to stage. Add -PopenTaskerSignFdroid=true to build the " +
+                "unsigned, so it has nothing to stage. Add -PruleDeckSignFdroid=true to build the " +
                 "signed F-Droid asset, or build the standard distribution."
         }
         val source = sourceApk.get().asFile
@@ -1352,9 +1352,9 @@ abstract class StageReleaseAssetTask : DefaultTask() {
         // name check downstream cannot see this: it only reads the name this task chose.
         check(apkIsSigned(source)) {
             "Release APK ${source.name} carries no APK signing block and no v1 signature, so it " +
-                "is unsigned. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
-                "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
-                "OPEN_TASKER_RELEASE_KEY_PASSWORD and rebuild before staging anything."
+                "is unsigned. Set RULEDECK_RELEASE_KEYSTORE, " +
+                "RULEDECK_RELEASE_KEYSTORE_PASSWORD, RULEDECK_RELEASE_KEY_ALIAS and " +
+                "RULEDECK_RELEASE_KEY_PASSWORD and rebuild before staging anything."
         }
         val signers = signerCertificateDigests(source)
         check(signers == listOf(expectedCertificateSha256.get())) {
@@ -1449,7 +1449,7 @@ val generateCycloneDxSbom = tasks.register<GenerateCycloneDxSbomTask>("generateC
     description = "Writes a deterministic CycloneDX SBOM from the resolved release runtime graph."
     components.set(releaseRuntimeCoordinates)
     applicationVersion.set(appVersionName)
-    outputFile.set(rootProject.layout.buildDirectory.file("reports/opentasker/sbom.cdx.json"))
+    outputFile.set(rootProject.layout.buildDirectory.file("reports/ruledeck/sbom.cdx.json"))
 }
 
 val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCount") {
@@ -1461,7 +1461,7 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     JVM_TEST_MODULES.forEach { module ->
         resultsDirectories.from(project(module).layout.buildDirectory.dir("test-results/testDebugUnitTest"))
     }
-    reportFile.set(rootProject.layout.buildDirectory.file("reports/opentasker/jvm-test-count.json"))
+    reportFile.set(rootProject.layout.buildDirectory.file("reports/ruledeck/jvm-test-count.json"))
     minimumTests.set(JVM_TEST_FLOOR)
 }
 
@@ -1501,12 +1501,12 @@ val verifyCoverageFloor = tasks.register<VerifyCoverageFloorTask>("verifyCoverag
     reportFile.set(debugCoverageXml)
     areaFloors.set(
         mapOf(
-            "com/opentasker/core/scheduling" to 50.0,
+            "com/sysadmindoc/ruledeck/core/scheduling" to 50.0,
             // VariableExpander feeds runtime action arguments through VariableStore; silent
             // regressions here can corrupt every profile that composes or transforms variables.
-            "com/opentasker/core/engine/variables" to 70.0,
-            "com/opentasker/automation/receiver" to 15.0,
-            "com/opentasker/ui/utils" to 15.0,
+            "com/sysadmindoc/ruledeck/core/engine/variables" to 70.0,
+            "com/sysadmindoc/ruledeck/automation/receiver" to 15.0,
+            "com/sysadmindoc/ruledeck/ui/utils" to 15.0,
         ),
     )
 }
@@ -1518,7 +1518,7 @@ val verifyLocaleResources = tasks.register<VerifyLocaleResourcesTask>("verifyLoc
     completionThreshold.set(LOCALE_COMPLETION_THRESHOLD)
 }
 
-val qualityGateSeedFailure = providers.gradleProperty("openTaskerQualityGateSeedFailure")
+val qualityGateSeedFailure = providers.gradleProperty("ruleDeckQualityGateSeedFailure")
     .map(String::toBoolean)
     .orElse(false)
 val verifyQualityGateSeed = tasks.register<VerifyQualityGateSeedTask>("verifyQualityGateSeed") {
@@ -1534,9 +1534,9 @@ tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     // core:storage owns the entities now, so its KSP run is what exports the schema. It still
     // writes into app/schemas, which is where the androidTest migration assets are read from.
     dependsOn(":core:storage:kspDebugKotlin")
-    schemaDirectory.set(layout.projectDirectory.dir("schemas/com.opentasker.core.storage.AppDatabase"))
+    schemaDirectory.set(layout.projectDirectory.dir("schemas/com.sysadmindoc.ruledeck.core.storage.AppDatabase"))
     databaseFile.set(rootProject.layout.projectDirectory.file(
-        "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt",
+        "core/storage/src/main/kotlin/com/sysadmindoc/ruledeck/core/storage/AppDatabase.kt",
     ))
 }
 
@@ -1547,14 +1547,14 @@ val verifyPerformanceEvidence = tasks.register<VerifyPerformanceEvidenceTask>("v
 
     profileFile.set(layout.projectDirectory.file("src/main/baseline-prof.txt"))
     baselineSource.set(rootProject.layout.projectDirectory.file(
-        "baselineprofile/src/main/java/com/opentasker/baselineprofile/OpenTaskerBaselineProfile.kt",
+        "baselineprofile/src/main/java/com/sysadmindoc/ruledeck/baselineprofile/RuleDeckBaselineProfile.kt",
     ))
     macrobenchmarkSource.set(rootProject.layout.projectDirectory.file(
-        "baselineprofile/src/main/java/com/opentasker/baselineprofile/OpenTaskerMacrobenchmark.kt",
+        "baselineprofile/src/main/java/com/sysadmindoc/ruledeck/baselineprofile/RuleDeckMacrobenchmark.kt",
     ))
     versionCode.set(appVersionCode)
 
-    if (providers.gradleProperty("openTaskerRequirePerformanceRun").orNull?.toBoolean() == true) {
+    if (providers.gradleProperty("ruleDeckRequirePerformanceRun").orNull?.toBoolean() == true) {
         dependsOn("generateBaselineProfile")
     }
 }
@@ -1565,9 +1565,9 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
 
     val repositoryRootPath = rootProject.layout.projectDirectory.asFile
     val readmeFilePath = repositoryRootPath.resolve("README.md")
-    val actionCatalogFilePath = projectDir.resolve("src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
+    val actionCatalogFilePath = projectDir.resolve("src/main/java/com/sysadmindoc/ruledeck/core/actions/ActionCatalog.kt")
     val contextSpecFilePath = rootProject.layout.projectDirectory.asFile
-        .resolve("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
+        .resolve("core/model/src/main/kotlin/com/sysadmindoc/ruledeck/core/model/ContextSpec.kt")
     val currentDocumentationPaths = listOf(
         readmeFilePath,
         repositoryRootPath.resolve("CHANGELOG.md"),
@@ -1584,16 +1584,16 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
 tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))
     readmeFile.set(rootProject.layout.projectDirectory.file("README.md"))
-    metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.opentasker.app.yml"))
+    metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.sysadmindoc.ruledeck.yml"))
     moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
-    actionCatalogFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/actions/ActionCatalog.kt"))
-    contextSpecFile.set(rootProject.layout.projectDirectory.file("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt"))
-    bundleFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"))
+    actionCatalogFile.set(layout.projectDirectory.file("src/main/java/com/sysadmindoc/ruledeck/core/actions/ActionCatalog.kt"))
+    contextSpecFile.set(rootProject.layout.projectDirectory.file("core/model/src/main/kotlin/com/sysadmindoc/ruledeck/core/model/ContextSpec.kt"))
+    bundleFile.set(layout.projectDirectory.file("src/main/java/com/sysadmindoc/ruledeck/core/transfer/RuleDeckBundle.kt"))
     versionCatalogFile.set(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
     wrapperFile.set(rootProject.layout.projectDirectory.file("gradle/wrapper/gradle-wrapper.properties"))
-    flowControlFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/FlowStructure.kt"))
-    taskRunnerFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/TaskRunner.kt"))
-    databaseFile.set(rootProject.layout.projectDirectory.file("core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt"))
+    flowControlFile.set(layout.projectDirectory.file("src/main/java/com/sysadmindoc/ruledeck/core/engine/FlowStructure.kt"))
+    taskRunnerFile.set(layout.projectDirectory.file("src/main/java/com/sysadmindoc/ruledeck/core/engine/TaskRunner.kt"))
+    databaseFile.set(rootProject.layout.projectDirectory.file("core/storage/src/main/kotlin/com/sysadmindoc/ruledeck/core/storage/AppDatabase.kt"))
     changelogFile.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
     repositoryDirectory.set(rootProject.layout.projectDirectory)
 }
@@ -1641,7 +1641,7 @@ tasks.register("verifyFdroidMetadata") {
     description = "Checks that draft fdroiddata metadata matches the current release contract."
     dependsOn("verifyReleaseTruth")
 
-    val metadataFile = rootProject.file("fdroid/metadata/com.opentasker.app.yml")
+    val metadataFile = rootProject.file("fdroid/metadata/com.sysadmindoc.ruledeck.yml")
     val readmeFile = rootProject.file("README.md")
     val listing = rootProject.file("fastlane/metadata/android/en-US")
     val sourceRoot = rootProject.rootDir
@@ -1663,7 +1663,7 @@ tasks.register("verifyFdroidMetadata") {
     doLast {
         val publishedReleaseCertificate = publishedCertificateSha256(readmeFile.readText())
         check(metadataFile.isFile) {
-            "Missing F-Droid metadata at fdroid/metadata/com.opentasker.app.yml"
+            "Missing F-Droid metadata at fdroid/metadata/com.sysadmindoc.ruledeck.yml"
         }
 
         // This task describes the artifact the F-Droid distribution produces, so running it against
@@ -1671,7 +1671,7 @@ tasks.register("verifyFdroidMetadata") {
         // whose output does not match the recipe at all.
         check(distribution == "fdroid") {
             "verifyFdroidMetadata checks the F-Droid build recipe; run it with " +
-                "-PopenTaskerDistribution=fdroid (current distribution: $distribution)"
+                "-PruleDeckDistribution=fdroid (current distribution: $distribution)"
         }
 
         val metadata = metadataFile.readText()
@@ -1692,7 +1692,7 @@ tasks.register("verifyFdroidMetadata") {
         requireValue("versionCode", versionCode.toString())
         requireValue("CurrentVersion", versionName)
         requireValue("CurrentVersionCode", versionCode.toString())
-        requireValue("Changelog", "https://github.com/SysAdminDoc/OpenTasker/releases")
+        requireValue("Changelog", "https://github.com/SysAdminDoc/RuleDeck/releases")
 
         val commits = valuesFor("commit")
         check(commits.size == 1) {
@@ -1705,8 +1705,8 @@ tasks.register("verifyFdroidMetadata") {
         check(releaseCommit == "v$versionName") {
             "F-Droid metadata commit must be the release tag v$versionName, found '$releaseCommit'"
         }
-        check("openTaskerDistribution=fdroid" in metadata) {
-            "F-Droid metadata must build with gradleprops openTaskerDistribution=fdroid"
+        check("ruleDeckDistribution=fdroid" in metadata) {
+            "F-Droid metadata must build with gradleprops ruleDeckDistribution=fdroid"
         }
         check(":app:verifyFdroidReadiness" in metadata) {
             "F-Droid metadata must run :app:verifyFdroidReadiness before assembly"
@@ -1724,10 +1724,10 @@ tasks.register("verifyFdroidMetadata") {
         // makes F-Droid refuse every build.
         requireValue(
             "Binaries",
-            "https://github.com/SysAdminDoc/OpenTasker/releases/download/v%v/OpenTasker-v%v-fdroid.apk",
+            "https://github.com/SysAdminDoc/RuleDeck/releases/download/v%v/RuleDeck-v%v-fdroid.apk",
         )
-        check(assetFileName == "OpenTasker-v$versionName-fdroid.apk") {
-            "The Binaries URL names OpenTasker-v%v-fdroid.apk but this lane stages $assetFileName"
+        check(assetFileName == "RuleDeck-v$versionName-fdroid.apk") {
+            "The Binaries URL names RuleDeck-v%v-fdroid.apk but this lane stages $assetFileName"
         }
         requireValue("AllowedAPKSigningKeys", publishedReleaseCertificate)
         // checkupdates can't read versionCode = appVersionCode, so UpdateCheckData points it at the
@@ -1829,7 +1829,7 @@ val verifyPackagedTypeCompleteness = tasks.register<VerifyPackagedTypeCompletene
     "verifyPackagedTypeCompleteness",
 ) {
     group = "verification"
-    description = "Checks debug and release DEX files for referenced OpenTasker types missing from the APK."
+    description = "Checks debug and release DEX files for referenced RuleDeck types missing from the APK."
     dependsOn("packageDebug", "packageRelease")
     apks.from(
         layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"),
@@ -1885,17 +1885,17 @@ tasks.matching { it.name == "packageRelease" }.configureEach {
     doFirst {
         check(!signingRequired || signingConfigured) {
             "Release signing is not configured for distribution=$distribution, so this build would " +
-                "produce an unsigned APK. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
-                "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
-                "OPEN_TASKER_RELEASE_KEY_PASSWORD, or build the F-Droid profile with " +
-                "-PopenTaskerDistribution=fdroid, which is unsigned because F-Droid signs it."
+                "produce an unsigned APK. Set RULEDECK_RELEASE_KEYSTORE, " +
+                "RULEDECK_RELEASE_KEYSTORE_PASSWORD, RULEDECK_RELEASE_KEY_ALIAS and " +
+                "RULEDECK_RELEASE_KEY_PASSWORD, or build the F-Droid profile with " +
+                "-PruleDeckDistribution=fdroid, which is unsigned because F-Droid signs it."
         }
     }
 }
 
 val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyReleaseAssetName") {
     group = "verification"
-    description = "Checks the staged release asset matches OpenTasker-v<versionName>.apk."
+    description = "Checks the staged release asset matches RuleDeck-v<versionName>.apk."
     dependsOn(stageReleaseAsset)
     stagingDirectory.set(releaseAssetStagingDirectory)
     truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))

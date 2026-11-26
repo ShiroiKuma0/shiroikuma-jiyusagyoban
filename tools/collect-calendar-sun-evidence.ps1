@@ -1,7 +1,7 @@
 param(
     [string]$Serial = $env:ANDROID_SERIAL,
-    [string]$Package = "com.opentasker.app",
-    [string]$Activity = "com.opentasker.app.MainActivity",
+    [string]$Package = "com.sysadmindoc.ruledeck",
+    [string]$Activity = "com.sysadmindoc.ruledeck.MainActivity",
     [int]$SampleSeconds = 10,
     [string]$OutputRoot = "build/device-evidence/calendar-sun",
     [switch]$GrantCalendarPermission,

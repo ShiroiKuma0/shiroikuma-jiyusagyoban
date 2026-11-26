@@ -95,9 +95,9 @@
     <string name="context_field_plugin_bundle_label" formatted="false">插件配置JSON</string>
     <string name="context_field_plugin_bundle_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
     <string name="locale_plugin_configure">在插件中设置</string>
-    <string name="locale_plugin_configure_missing">该应用没有 OpenTasker 可以打开的插件设置界面。</string>
+    <string name="locale_plugin_configure_missing">该应用没有 RuleDeck 可以打开的插件设置界面。</string>
     <string name="locale_plugin_configure_failed">无法保存插件设置：%1$s</string>
-    <string name="locale_plugin_configure_refused">OpenTasker 没有打开插件设置：%1$s</string>
+    <string name="locale_plugin_configure_refused">RuleDeck 没有打开插件设置：%1$s</string>
     <string name="context_field_plugin_blurb_label" formatted="false">描述</string>
     <string name="context_field_plugin_blurb_hint" formatted="false">来自插件配置的可选标签</string>
     <string name="context_field_plugin_timeout_label" formatted="false">查询超时毫秒</string>
@@ -136,7 +136,7 @@
     <string name="widget_choose_task_subtitle" formatted="false">点击一个任务以将其分配到此主屏幕小部件</string>
     <string name="widget_setup_required" formatted="false">需要设置</string>
     <string name="widget_empty_title" formatted="false">请先创建任务</string>
-    <string name="widget_empty_body" formatted="false">小部件运行保存在主屏幕上的OpenTasker任务。先在应用中构建一个任务，然后返回这里分配它。</string>
+    <string name="widget_empty_body" formatted="false">小部件运行保存在主屏幕上的RuleDeck任务。先在应用中构建一个任务，然后返回这里分配它。</string>
     <string name="widget_selectable_task" formatted="false">可选择的任务</string>
     <string name="widget_assign" formatted="false">分配</string>
     <string name="widget_action_title" formatted="false">小部件操作</string>
@@ -179,7 +179,7 @@
     <string name="capability_write_settings" formatted="false">需要“修改系统设置”特殊访问权限。</string>
     <string name="capability_settings_write_setup" formatted="false">写入Global或Secure设置需要在设置中通过数据线从计算机授予一次性访问权限。System表改用“修改系统设置”。</string>
     <string name="capability_app_kill_unsupported" formatted="false">强制停止另一个应用需要特权应用管理访问权限，任何普通应用都无法获得。</string>
-    <string name="capability_app_archive_ready" formatted="false">使用Android 15及以上版本的PackageInstaller归档请求。OpenTasker不是记录的安装者，因此Android会在屏幕上要求你确认每个请求；请在OpenTasker打开的状态下运行此操作。</string>
+    <string name="capability_app_archive_ready" formatted="false">使用Android 15及以上版本的PackageInstaller归档请求。RuleDeck不是记录的安装者，因此Android会在屏幕上要求你确认每个请求；请在RuleDeck打开的状态下运行此操作。</string>
     <string name="capability_app_archive_unsupported" formatted="false">应用归档请求需要Android 15（API 35）或更高版本。</string>
     <string name="capability_local_network_setup" formatted="false">Android 17及以上要求局域网广播具备局域网访问权限；请在设置中授予。</string>
     <string name="capability_dnd_access" formatted="false">需要勿扰模式访问权限。</string>
@@ -189,14 +189,14 @@
     <string name="capability_sun_times_setup" formatted="false">仅当纬度或经度留空时需要位置访问权限，用于读取手机位置。</string>
     <string name="capability_location_get_setup" formatted="false">需要设置中“前台位置”一行的位置权限；由配置文件运行时，还需要“后台位置”一行。</string>
     <string name="capability_wifi_scan_setup" formatted="false">扫描需要位置访问权限，以及Android 13及以上版本的“附近Wi-Fi设备”权限。Android会限制扫描频率，因此结果可能是最近一次缓存扫描而非全新扫描。</string>
-    <string name="capability_airplane_unsupported" formatted="false">更改飞行模式需要Shizuku，或在设置中将OpenTasker设为数字助理应用。开启后，通话、移动数据和（通常）Wi-Fi 会中断，直到有操作将其关闭。</string>
+    <string name="capability_airplane_unsupported" formatted="false">更改飞行模式需要Shizuku，或在设置中将RuleDeck设为数字助理应用。开启后，通话、移动数据和（通常）Wi-Fi 会中断，直到有操作将其关闭。</string>
     <string name="capability_mobile_data_unsupported" formatted="false">更改移动数据需要Shizuku权限及其特权用户服务传输。关闭后，依赖数据的功能都会停止，包括对这台手机的远程访问。</string>
     <string name="capability_hotspot_unsupported" formatted="false">Wi-Fi热点需要Android 11或更高版本以及Shizuku。知道已保存密码的任何人都能连接，已连接的设备会使用你的移动数据。</string>
     <string name="capability_hotspot_android_version" formatted="false">Wi-Fi热点操作需要Android 11或更高版本。</string>
-    <string name="capability_screenshot_unsupported" formatted="false">屏幕截图需要Shizuku权限及其特权用户服务传输。会把屏幕上的所有内容（包括密码和消息）保存到 OpenTasker 的存储空间。</string>
+    <string name="capability_screenshot_unsupported" formatted="false">屏幕截图需要Shizuku权限及其特权用户服务传输。会把屏幕上的所有内容（包括密码和消息）保存到 RuleDeck 的存储空间。</string>
     <string name="capability_reboot_unsupported" formatted="false">重启需要Shizuku权限及其特权用户服务传输。手机会立即重启，不作提醒，未保存的内容会丢失。在开机触发器上运行重启任务可能导致循环重启。</string>
     <string name="capability_lock_setup" formatted="false">需要锁屏设备管理员权限，请在设置中开启。</string>
-    <string name="capability_tile_ready" formatted="false">更新已配置的OpenTasker快捷设置磁贴。</string>
+    <string name="capability_tile_ready" formatted="false">更新已配置的RuleDeck快捷设置磁贴。</string>
     <string name="capability_temporary_state_ready" formatted="false">应用一个可逆的设置并安排一个持久恢复。</string>
     <string name="capability_ime_info_ready" formatted="false">报告当前和已启用的输入法。</string>
     <string name="capability_ime_set_unsupported" formatted="false">Android要求普通应用切换活动输入法前必须先由用户选择。</string>
@@ -205,15 +205,15 @@
     <string name="capability_vpn_tunnel_setup" formatted="false">需要WireGuard或Tailscale。WireGuard还需要其控制权限，并开启“允许远程控制应用”。</string>
     <string name="capability_shizuku_script_setup" formatted="false">需要Shizuku权限和已批准的脚本哈希。</string>
     <string name="capability_termux_setup" formatted="false">需要Termux 0.109或更高版本、RUN_COMMAND权限以及已批准的脚本哈希。</string>
-    <string name="capability_macrodroid_import_unsupported" formatted="false">导入的MacroDroid操作无法映射到受支持的OpenTasker操作。</string>
+    <string name="capability_macrodroid_import_unsupported" formatted="false">导入的MacroDroid操作无法映射到受支持的RuleDeck操作。</string>
     <string name="capability_sms_permission" formatted="false">需要短信权限。</string>
     <string name="capability_calendar_event_add_setup" formatted="false">需要设置中的日历编辑，以及一个可以添加新事件的日历。</string>
     <string name="capability_calendar_event_query_setup" formatted="false">需要设置中的日历访问。</string>
     <string name="capability_contacts_permission" formatted="false">无人值守查找需要显式的联系人权限；Android 17及以上还支持按字段划分的系统选择器模式。</string>
-    <string name="capability_audio_output_restricted" formatted="false">除非OpenTasker具有使用中合格的前台服务路径，否则Android 17会限制音频输出。</string>
+    <string name="capability_audio_output_restricted" formatted="false">除非RuleDeck具有使用中合格的前台服务路径，否则Android 17会限制音频输出。</string>
     <string name="capability_audio_output_ready" formatted="false">音频输出可用。</string>
-    <string name="capability_media_key_restricted" formatted="false">除非OpenTasker具有使用中合格的前台服务路径，否则Android 17会限制媒体键派发。</string>
+    <string name="capability_media_key_restricted" formatted="false">除非RuleDeck具有使用中合格的前台服务路径，否则Android 17会限制媒体键派发。</string>
     <string name="capability_media_key_ready" formatted="false">媒体键派发可用。</string>
-    <string name="capability_volume_restricted" formatted="false">除非OpenTasker具有使用中合格的前台服务路径，否则Android 17会限制音量更改。</string>
+    <string name="capability_volume_restricted" formatted="false">除非RuleDeck具有使用中合格的前台服务路径，否则Android 17会限制音量更改。</string>
     <string name="capability_volume_policy" formatted="false">可能需要勿扰模式策略访问权限。</string>
 </resources>

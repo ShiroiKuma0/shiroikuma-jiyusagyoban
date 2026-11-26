@@ -1,0 +1,146 @@
+package com.sysadmindoc.ruledeck.core.engine
+
+import com.sysadmindoc.ruledeck.core.model.RunLogEntry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class RunLogDiagnosticsTest {
+    @Test
+    fun taskPowerMetadataLabelsSensitiveExecution() {
+        val metadata = taskPowerRunLogMetadata(
+            com.sysadmindoc.ruledeck.core.model.Task(
+                name = "Upload",
+                actions = listOf(
+                    com.sysadmindoc.ruledeck.core.model.ActionSpec(type = "file.read"),
+                    com.sysadmindoc.ruledeck.core.model.ActionSpec(type = "http.post"),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf("Powers: data access, external transmission"),
+            metadata,
+        )
+    }
+
+    @Test
+    fun runLogMessageIncludesSourceMetadataAndTraceDetails() {
+        val message = runLogMessage(
+            source = "Profile: Morning",
+            metadata = listOf("Mode: single", "Cooldown: 30s"),
+            traces = listOf(
+                ActionExecutionTrace(
+                    index = 0,
+                    actionType = "notify.show",
+                    label = "Notify",
+                    durationMs = 12,
+                    status = ActionTraceStatus.SUCCESS,
+                    message = "Completed",
+                )
+            ),
+        )
+
+        val diagnostics = message.toRunLogDiagnostics()
+
+        assertEquals("Profile: Morning", diagnostics.source)
+        assertEquals(listOf("Mode: single", "Cooldown: 30s"), diagnostics.detailLines)
+        assertEquals(1, diagnostics.traces.size)
+        assertEquals("Notify", diagnostics.traces.single().label)
+        assertEquals(ActionTraceStatus.SUCCESS, diagnostics.traces.single().status)
+    }
+
+    @Test
+    fun skippedRunLogMessageClassifiesOutcomeAsSkipped() {
+        val entry = RunLogEntry(
+            taskId = 1,
+            taskName = "Morning",
+            durationMs = 0,
+            success = false,
+            message = skippedRunLogMessage(
+                source = "Profile: Work",
+                reason = "Cooldown active for 15 seconds.",
+            ),
+        )
+
+        val diagnostics = entry.message.toRunLogDiagnostics()
+
+        assertTrue(diagnostics.isSkipped)
+        assertEquals("Cooldown active for 15 seconds.", diagnostics.reason)
+        assertEquals(RunLogOutcome.Skipped, entry.outcome())
+    }
+
+    @Test
+    fun heldRunLogMessageClassifiesOutcomeAsHeld() {
+        val entry = RunLogEntry(
+            taskId = 1,
+            taskName = "Held task",
+            durationMs = 0,
+            success = false,
+            held = true,
+            message = heldRunLogMessage(
+                source = "Profile: Work",
+                reason = "Global admission limit reached.",
+            ),
+        )
+
+        val diagnostics = entry.message.toRunLogDiagnostics()
+
+        assertTrue(diagnostics.isHeld)
+        assertEquals("Global admission limit reached.", diagnostics.reason)
+        assertEquals(RunLogOutcome.Held, entry.outcome())
+    }
+
+    @Test
+    fun interruptedRecoveryMessageClassifiesOutcomeAsInterrupted() {
+        val entry = RunLogEntry(
+            taskId = 7,
+            taskName = "Interrupted task",
+            durationMs = 42,
+            success = false,
+            message = """
+                Source: Profile: Night
+                Decision: Interrupted
+                Reason: ENGINE_RESTARTED: Process ended before a terminal execution record was written.
+                Execution ID: execution-7
+                Parent execution ID: parent-1
+                Last known step: 3. Upload
+                Recovery: no automatic retry was attempted.
+            """.trimIndent(),
+        )
+
+        val diagnostics = entry.message.toRunLogDiagnostics()
+
+        assertTrue(diagnostics.isInterrupted)
+        assertEquals("parent-1", diagnostics.parentExecutionId)
+        assertEquals(RunLogOutcome.Interrupted, entry.outcome())
+    }
+
+    @Test
+    fun traceParserExtractsTemplateArgumentDetails() {
+        val diagnostics = (
+            "Source: Profile: Morning\n" +
+                "1. success: Notify [notify.show] 5ms - Completed (args: message=Hi Ada, token=<redacted>; template warnings: 1)\n" +
+                "Template:\tmessage\tglobal\tname | upper\tADA\t"
+            ).toRunLogDiagnostics()
+
+        val trace = diagnostics.traces.single()
+        assertEquals("Completed", trace.message)
+        assertEquals("message=Hi Ada, token=<redacted>", trace.argumentSummary)
+        assertEquals(1, trace.templateWarningCount)
+        assertEquals("message", trace.templateExpressions.single().argName)
+        assertEquals("global", trace.templateExpressions.single().source)
+        assertEquals("name | upper", trace.templateExpressions.single().expression)
+        assertEquals("ADA", trace.templateExpressions.single().value)
+    }
+
+    @Test
+    fun traceParserLeavesNormalParenthesesInMessagesAlone() {
+        val diagnostics = "1. failure: Notify [notify.show] 5ms - Failed (permission denied)".toRunLogDiagnostics()
+
+        val trace = diagnostics.traces.single()
+        assertEquals("Failed (permission denied)", trace.message)
+        assertEquals(null, trace.argumentSummary)
+        assertEquals(0, trace.templateWarningCount)
+    }
+}

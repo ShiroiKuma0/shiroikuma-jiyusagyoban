@@ -5,7 +5,7 @@
         meant every Light-mode launch flashed black before Compose drew the cream surface. The
         night variant keeps black; see values-night/themes.xml.
     -->
-    <style name="Theme.OpenTasker" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.RuleDeck" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
 </resources>

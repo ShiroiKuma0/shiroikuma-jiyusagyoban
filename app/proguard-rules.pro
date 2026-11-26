@@ -1,10 +1,10 @@
--keep class com.opentasker.core.model.** { *; }
+-keep class com.sysadmindoc.ruledeck.core.model.** { *; }
 -keepclassmembers class **$$serializer { *; }
 -keepclasseswithmembers class * { @kotlinx.serialization.Serializable <fields>; }
 
 # Keep manifest-declared entry points
--keep class com.opentasker.app.OpenTaskerApp_NoHilt
--keep class com.opentasker.app.MainActivity
+-keep class com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
+-keep class com.sysadmindoc.ruledeck.MainActivity
 
 # Room generated code
 -keep class * extends androidx.room.RoomDatabase
@@ -15,8 +15,8 @@
 -keep class moe.shizuku.** { *; }
 -keep class rikka.shizuku.** { *; }
 -keep class rikka.sui.** { *; }
--keep class com.opentasker.core.power.ShizukuCommandUserService { *; }
--keep interface com.opentasker.core.power.IShizukuCommandService { *; }
+-keep class com.sysadmindoc.ruledeck.core.power.ShizukuCommandUserService { *; }
+-keep interface com.sysadmindoc.ruledeck.core.power.IShizukuCommandService { *; }
 
 # RE2J internals (uses sun.misc.Unsafe fallback)
 -dontwarn com.google.re2j.**

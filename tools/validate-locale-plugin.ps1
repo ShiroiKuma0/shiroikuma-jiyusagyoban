@@ -1,7 +1,7 @@
 param(
     [string]$Serial = $env:ANDROID_SERIAL,
     [string]$PluginPackage,
-    [string]$OpenTaskerPackage = "com.opentasker.app",
+    [string]$RuleDeckPackage = "com.sysadmindoc.ruledeck",
     [string]$ConditionActivityClass,
     [string]$OutputRoot = "build/device-evidence/locale-plugin",
     [switch]$RequireSettingSupport,
@@ -26,7 +26,7 @@ $Extras = [ordered]@{
 
 if ($Help) {
     @"
-Validate an installed Locale-compatible plugin against OpenTasker's host contract.
+Validate an installed Locale-compatible plugin against RuleDeck's host contract.
 
 Examples:
   powershell -File tools/validate-locale-plugin.ps1 -PluginPackage com.example.plugin -RequireConditionSupport
@@ -175,7 +175,7 @@ if ($SendRequestQuery) {
     $requestQueryResult = Invoke-Adb -AdbArgs @(
         "shell", "am", "broadcast",
         "-a", $Actions.RequestQuery,
-        "-p", $OpenTaskerPackage,
+        "-p", $RuleDeckPackage,
         "--es", $Extras.Activity, $ConditionActivityClass.Trim()
     ) -AllowFailure
     Save-Text -Path (Join-Path $outputDir "request-query-broadcast.txt") -Value (($requestQueryResult.StdOut, $requestQueryResult.StdErr) -join "`n")
@@ -197,7 +197,7 @@ if ($SendRequestQuery -and $requestQueryResult.ExitCode -ne 0) {
 $summary = [ordered]@{
     generatedAt = (Get-Date).ToString("o")
     pluginPackage = $PluginPackage
-    openTaskerPackage = $OpenTaskerPackage
+    ruleDeckPackage = $RuleDeckPackage
     outputDir = (Resolve-Path $outputDir).Path
     checks = $checks
     queryCommands = $queryResults

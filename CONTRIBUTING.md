@@ -1,4 +1,4 @@
-# Contributing to OpenTasker
+# Contributing to RuleDeck
 
 Thanks for taking a look. This file covers what you need to get a build running, where things live, and how to avoid duplicating someone else's work.
 
@@ -11,8 +11,8 @@ Open an issue, or comment on an existing one, before writing anything substantia
 You need JDK 17 or 21 and the Android SDK. Use the checked-in Gradle wrapper rather than a system Gradle install. The wrapper pins the distribution and its checksum on purpose.
 
 ```bash
-git clone https://github.com/SysAdminDoc/OpenTasker
-cd OpenTasker
+git clone https://github.com/SysAdminDoc/RuleDeck
+cd RuleDeck
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -46,8 +46,8 @@ Without one, still compile them. Nothing else in the everyday lane touches `src/
 If instrumented tests fail with `NoSuchMethodError` on a method name ending in `$app()`, the app APK on the device is older than the test APK. Uninstall both packages and run again:
 
 ```bash
-adb uninstall com.opentasker.app
-adb uninstall com.opentasker.app.test
+adb uninstall com.sysadmindoc.ruledeck
+adb uninstall com.sysadmindoc.ruledeck.test
 ```
 
 UI changes need their Compose screenshot references regenerated, or `validateDebugScreenshotTest` will fail on a diff you meant to make:
@@ -63,7 +63,7 @@ The JVM suite above only covers `:app`. The `core/*` modules carry their own tes
 ./gradlew :core:storage:testDebugUnitTest :core:engine:testDebugUnitTest :core:common:testDebugUnitTest
 ```
 
-There's also an aggregate gate, `./gradlew localQualityGate`, which runs lint, coverage floors, dependency policy, schema checks and the connected tests together. **You cannot run it on a clone.** It reaches `packageRelease` through `verifyReleaseAssetName` and `verifyPackagedTypeCompleteness`, and release packaging fails closed unless the four `OPEN_TASKER_RELEASE_*` signing variables are set, which only the maintainer has. It also pulls in `connectedDebugAndroidTest`, which needs a device. A pull request needs neither. The JVM suites, `lintDebug`, `compileDebugAndroidTestKotlin` and `assembleDebug` are the lane to run.
+There's also an aggregate gate, `./gradlew localQualityGate`, which runs lint, coverage floors, dependency policy, schema checks and the connected tests together. **You cannot run it on a clone.** It reaches `packageRelease` through `verifyReleaseAssetName` and `verifyPackagedTypeCompleteness`, and release packaging fails closed unless the four `RULEDECK_RELEASE_*` signing variables are set, which only the maintainer has. It also pulls in `connectedDebugAndroidTest`, which needs a device. A pull request needs neither. The JVM suites, `lintDebug`, `compileDebugAndroidTestKotlin` and `assembleDebug` are the lane to run.
 
 Note that this repository does not use GitHub Actions. Builds, tests and releases all happen locally, so nothing will run automatically against your branch. Please say which commands you ran in the pull request description.
 
@@ -73,11 +73,11 @@ Most of the code is in `:app`, but the `core/*` modules now own their own source
 
 | Path | What's in it |
 | --- | --- |
-| `app/src/main/java/com/opentasker/core/engine/` | Task execution, profile matching, the variable store, the foreground service |
-| `app/src/main/java/com/opentasker/core/actions/` | The action catalog and every built-in action implementation |
-| `app/src/main/java/com/opentasker/core/contexts/` | Trigger sources: time, location, app, network, NFC, notifications, calendar |
-| `app/src/main/java/com/opentasker/core/transfer/` | OpenTasker bundle import and export, MacroDroid import |
-| `app/src/main/java/com/opentasker/ui/screens/` | All Compose UI |
+| `app/src/main/java/com/sysadmindoc/ruledeck/core/engine/` | Task execution, profile matching, the variable store, the foreground service |
+| `app/src/main/java/com/sysadmindoc/ruledeck/core/actions/` | The action catalog and every built-in action implementation |
+| `app/src/main/java/com/sysadmindoc/ruledeck/core/contexts/` | Trigger sources: time, location, app, network, NFC, notifications, calendar |
+| `app/src/main/java/com/sysadmindoc/ruledeck/core/transfer/` | RuleDeck bundle import and export, MacroDroid import |
+| `app/src/main/java/com/sysadmindoc/ruledeck/ui/screens/` | All Compose UI |
 | `app/src/main/res/values/strings.xml` | User-visible copy. Everything on a screen resolves through here |
 | `core/storage/src/main/kotlin/` | Room entities, DAOs, migrations, the encrypted database setup, backup and restore |
 | `core/model/src/main/kotlin/` | The profile, task, action and context data model |

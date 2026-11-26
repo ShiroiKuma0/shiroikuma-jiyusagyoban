@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <string name="app_name">OpenTasker</string>
+    <string name="app_name">RuleDeck</string>
     <string name="qs_tile_subtitle_default">Tap to run task</string>
     <string name="qs_tile_subtitle_no_task">Tap to choose a task</string>
     <string name="qs_tile_config_title">Configure Quick Settings tile</string>
@@ -14,9 +14,9 @@
     <string name="qs_tile_subtitle_hint">Short supporting text</string>
     <string name="qs_tile_icon">Icon</string>
     <string name="qs_tile_save">Save tile</string>
-    <string name="permission_automation_label">Control OpenTasker automations</string>
-    <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
-    <string name="widget_task_description">Run an OpenTasker task with one tap</string>
+    <string name="permission_automation_label">Control RuleDeck automations</string>
+    <string name="permission_automation_description">Allows same-signer integrations to run RuleDeck tasks, toggle profiles, and query automation status through documented intents.</string>
+    <string name="widget_task_description">Run an RuleDeck task with one tap</string>
     <string name="widget_task_already_running">That task is already running</string>
     <string name="widget_task_missing">Task deleted. Tap to choose another.</string>
     <string name="widget_task_invalid">This widget or shortcut doesn\'t point to a task.</string>
@@ -35,17 +35,17 @@
     <string name="nfc_write_read_only">This NFC tag is read-only.</string>
     <string name="nfc_write_too_small">This NFC tag is too small for a %1$d-byte record.</string>
     <string name="nfc_write_no_ndef">This NFC tag doesn\'t support NDEF writes.</string>
-    <string name="nfc_write_written">NFC tag written with OpenTasker helper text.</string>
-    <string name="nfc_write_formatted">NFC tag formatted and written with OpenTasker helper text.</string>
-    <string name="share_draft_default_name">OpenTasker community share</string>
-    <string name="share_draft_default_title">OpenTasker share</string>
-    <string name="share_draft_default_description">A local OpenTasker profile share draft.</string>
-    <string name="workspace_export_name">OpenTasker workspace export</string>
-    <string name="workspace_export_description">Profiles, tasks, variables, and scenes exported from OpenTasker.</string>
+    <string name="nfc_write_written">NFC tag written with RuleDeck helper text.</string>
+    <string name="nfc_write_formatted">NFC tag formatted and written with RuleDeck helper text.</string>
+    <string name="share_draft_default_name">RuleDeck community share</string>
+    <string name="share_draft_default_title">RuleDeck share</string>
+    <string name="share_draft_default_description">A local RuleDeck profile share draft.</string>
+    <string name="workspace_export_name">RuleDeck workspace export</string>
+    <string name="workspace_export_description">Profiles, tasks, variables, and scenes exported from RuleDeck.</string>
 
     <!-- Navigation -->
     <string name="locale_select_task_title">Select task for Locale plugin</string>
-    <string name="locale_condition_edit_title">Select OpenTasker condition</string>
+    <string name="locale_condition_edit_title">Select RuleDeck condition</string>
     <string name="locale_condition_profiles">Profile state</string>
     <string name="locale_condition_profile_active">Profile is currently active</string>
     <string name="locale_condition_no_profiles">No profiles are available.</string>
@@ -72,7 +72,7 @@
     <string name="locale_condition_blurb_context">Context satisfied: %1$s #%2$d</string>
     <string name="locale_condition_blurb_variable">%1$s %2$s the configured value</string>
     <string name="locale_setting_blurb">Run task: %1$s</string>
-    <string name="locale_setting_no_tasks">No tasks available. Create a task in OpenTasker first.</string>
+    <string name="locale_setting_no_tasks">No tasks available. Create a task in RuleDeck first.</string>
     <string name="locale_setting_task_id">Task #%1$d</string>
     <string name="nav_profiles">Profiles</string>
     <string name="nav_tasks">Tasks</string>
@@ -85,7 +85,7 @@
     <string name="nav_inspector">Inspector</string>
     <string name="nav_diagnostics">Diagnostics</string>
     <string name="global_search_content_description">Search all automations</string>
-    <string name="global_search_title">Search OpenTasker</string>
+    <string name="global_search_title">Search RuleDeck</string>
     <string name="global_search_label">Search profiles, tasks, actions, variables, and scenes</string>
     <string name="global_search_hint">Try a name, action type, or variable reference</string>
     <string name="global_search_clear">Clear global search</string>
@@ -192,7 +192,7 @@
     <string name="settings_engine_notification_action">Open</string>
     <string name="settings_section_data_recovery">Data and recovery</string>
     <string name="settings_section_integrations">Integrations</string>
-    <string name="settings_section_about">About OpenTasker</string>
+    <string name="settings_section_about">About RuleDeck</string>
     <string name="about_version">Version %1$s (build %2$d, %3$s)</string>
     <string name="about_body">Free and open source, MIT licensed. Everything runs on this device. There is no account, and nothing is uploaded anywhere.</string>
     <string name="about_source">Source code</string>
@@ -229,7 +229,7 @@
     <string name="context_picker_search_hint">Name, description, or context type</string>
     <string name="context_picker_clear_search">Clear context search</string>
     <string name="context_picker_no_results">No contexts match your search.</string>
-    <string name="dialog_review_bundle">Review OpenTasker bundle</string>
+    <string name="dialog_review_bundle">Review RuleDeck bundle</string>
     <string name="dialog_review_macrodroid">Review MacroDroid import</string>
     <string name="dialog_profile_share_review">Review community share</string>
 
@@ -366,22 +366,22 @@
     <string name="setup_backup_restore_staged">Restore staged</string>
     <string name="setup_backup_available">Backup available</string>
     <string name="setup_backup_none">No backup yet</string>
-    <string name="setup_checklist_body">OpenTasker can run with missing access, but affected automations stay gated until setup is complete.</string>
+    <string name="setup_checklist_body">RuleDeck can run with missing access, but affected automations stay gated until setup is complete.</string>
     <string name="setup_item_already_ready">%1$s is already ready.</string>
     <string name="setup_direct_boot_title">Pre-unlock time triggers</string>
-    <string name="setup_direct_boot_body">Optional and off by default. When it is on, the only thing OpenTasker starts before you first unlock the phone is its own once-a-minute clock, and it remembers a single tick in storage the lock screen can reach. Your profiles, tasks, saved data, secrets, and every other kind of trigger wait until you unlock.</string>
+    <string name="setup_direct_boot_body">Optional and off by default. When it is on, the only thing RuleDeck starts before you first unlock the phone is its own once-a-minute clock, and it remembers a single tick in storage the lock screen can reach. Your profiles, tasks, saved data, secrets, and every other kind of trigger wait until you unlock.</string>
     <string name="setup_direct_boot_enabled">On: one clock tick may be remembered before you unlock.</string>
     <string name="setup_direct_boot_disabled">Off: all triggers wait until unlock.</string>
     <string name="setup_backup_helper_full">Create a local database backup, export a copy, or keep encrypted snapshots in a folder you control. Secret variable values remain device-bound and must be re-entered after a transfer.</string>
     <string name="setup_backup_working">Working…</string>
-    <string name="setup_backup_restore_body">Restart OpenTasker to apply the staged restore before the database opens.</string>
-    <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$s, %4$s, %5$s. Restart OpenTasker to apply it.</string>
+    <string name="setup_backup_restore_body">Restart RuleDeck to apply the staged restore before the database opens.</string>
+    <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$s, %4$s, %5$s. Restart RuleDeck to apply it.</string>
     <string name="setup_backup_restore_unreadable">The staged restore can no longer be read (%1$s). Cancel it so the next start is not blocked.</string>
     <string name="setup_backup_restore_cancel">Cancel staged restore</string>
     <string name="setup_backup_rollback_kept">The database from before your restore on %1$s is still here if you need to go back to it.</string>
     <string name="setup_backup_rollback_action">Roll back</string>
     <string name="setup_snapshots_label">Automatic off-device snapshots</string>
-    <string name="setup_snapshots_helper">Write encrypted recovery archives to a folder you choose. OpenTasker never uploads them, and a restore is applied only after review.</string>
+    <string name="setup_snapshots_helper">Write encrypted recovery archives to a folder you choose. RuleDeck never uploads them, and a restore is applied only after review.</string>
     <string name="setup_snapshots_retention">Keeping up to %1$s for %2$s.</string>
     <string name="setup_snapshots_choice">%1$d · %2$d days</string>
     <string name="setup_snapshots_status_ok">Last snapshot %1$s · %2$d stored · %3$s</string>
@@ -393,11 +393,11 @@
         <item quantity="other">The folder wouldn\'t delete %1$d old snapshots. Delete them there yourself.</item>
     </plurals>
     <string name="setup_snapshots_destination_missing">A destination folder is required before snapshots can run.</string>
-    <string name="setup_snapshots_destination_ready">Off-device destination ready. OpenTasker can access only the folder you selected.</string>
+    <string name="setup_snapshots_destination_ready">Off-device destination ready. RuleDeck can access only the folder you selected.</string>
     <string name="setup_snapshots_destination_choose">Choose snapshot folder</string>
     <string name="setup_snapshots_destination_change">Change snapshot folder or passphrase</string>
     <string name="setup_snapshots_passphrase_title">Protect snapshot archives</string>
-    <string name="setup_snapshots_passphrase_body">Choose a recovery passphrase and save it in your password manager. You will need it after uninstall or on another device; OpenTasker cannot recover it for you.</string>
+    <string name="setup_snapshots_passphrase_body">Choose a recovery passphrase and save it in your password manager. You will need it after uninstall or on another device; RuleDeck cannot recover it for you.</string>
     <string name="setup_snapshots_passphrase_label">Recovery passphrase</string>
     <string name="setup_snapshots_passphrase_confirm">Confirm passphrase</string>
     <plurals name="setup_snapshots_passphrase_error">
@@ -429,19 +429,19 @@
     <string name="setup_action_open_dontkillmyapp">Open dontkillmyapp.com</string>
     <string name="setup_shizuku_permission_requested">Shizuku permission requested.</string>
     <string name="setup_shizuku_permission_failed">Shizuku permission could not be requested; confirm the service is running.</string>
-    <string name="setup_shizuku_permission_granted">Shizuku gave OpenTasker permission.</string>
-    <string name="setup_shizuku_permission_denied">Shizuku said no. If it stopped asking, allow OpenTasker in the list of authorized apps inside Shizuku.</string>
+    <string name="setup_shizuku_permission_granted">Shizuku gave RuleDeck permission.</string>
+    <string name="setup_shizuku_permission_denied">Shizuku said no. If it stopped asking, allow RuleDeck in the list of authorized apps inside Shizuku.</string>
     <string name="setup_shizuku_mode_disabled">Shizuku power mode is off.</string>
     <string name="setup_shizuku_mode_enabled">Shizuku power mode is on.</string>
 
     <string name="setup_notifications_card_title">Notifications</string>
-    <string name="setup_notifications_card_body">Needed on Android 13 and newer so OpenTasker can show its running notification and the notifications your tasks post.</string>
+    <string name="setup_notifications_card_body">Needed on Android 13 and newer so RuleDeck can show its running notification and the notifications your tasks post.</string>
     <string name="setup_notifications_required_for">Foreground service, notification actions</string>
     <string name="setup_promoted_notifications_title">Promoted running-task notifications</string>
     <string name="setup_promoted_notifications_body">Optional on Android 16 and newer. When enabled, an active task can appear as a status-bar live update; the standard foreground notification remains available when promotion is unavailable or disabled.</string>
     <string name="setup_promoted_notifications_required_for">Optional live update for active tasks</string>
-    <string name="service_notification_channel_name">OpenTasker automation</string>
-    <string name="service_notification_idle_title">OpenTasker is running</string>
+    <string name="service_notification_channel_name">RuleDeck automation</string>
+    <string name="service_notification_idle_title">RuleDeck is running</string>
     <string name="service_notification_active_title">Task running: %1$s</string>
     <string name="service_notification_open_status">Tap to open automation status</string>
     <plurals name="service_notification_multiple_tasks">
@@ -449,9 +449,9 @@
         <item quantity="other">%1$d other tasks running</item>
     </plurals>
     <string name="setup_exact_alarm_card_title">Exact alarms</string>
-    <string name="setup_exact_alarm_card_body">Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.</string>
+    <string name="setup_exact_alarm_card_body">Allows precise scheduled automations. If denied, RuleDeck falls back to inexact delivery windows.</string>
     <string name="setup_exact_alarm_required_for">Time triggers, schedules</string>
-    <string name="setup_battery_card_body">OEM and Android battery managers can stop background automation. Exempting OpenTasker improves reliability. %1$s</string>
+    <string name="setup_battery_card_body">OEM and Android battery managers can stop background automation. Exempting RuleDeck improves reliability. %1$s</string>
     <string name="setup_battery_required_for">Long-running automation service</string>
     <string name="setup_oem_guidance_title">%1$s background guidance</string>
     <string name="setup_oem_guidance_body">Detected %1$s (reliability risk: %2$s). Battery-optimization exemption alone is often not enough on this OEM.\n\n%3$s\n\nIf the button cannot open the right screen, see %4$s</string>
@@ -476,35 +476,35 @@
     <string name="setup_contacts_access_body">Needed for unattended contact lookup actions. Contact values are written as sensitive variables and never copied into the run log. On Android 17 and later, picker mode can grant only the fields you pick instead.</string>
     <string name="setup_contacts_access_required_for">Unattended contact lookup and telling a stranger\'s call from a contact\'s</string>
     <string name="setup_nfc_tags_title">Read NFC tags</string>
-    <string name="setup_nfc_tags_body">Android 16 and later only hand a scanned tag to apps you\'ve allowed. Until OpenTasker is allowed, scanning a tag does nothing and NFC profiles never run.</string>
+    <string name="setup_nfc_tags_body">Android 16 and later only hand a scanned tag to apps you\'ve allowed. Until RuleDeck is allowed, scanning a tag does nothing and NFC profiles never run.</string>
     <string name="setup_nfc_tags_required_for">NFC tag contexts</string>
     <string name="setup_health_title">Read Health Connect</string>
-    <string name="setup_health_body">Lets health contexts read steps, heart rate, sleep and exercise from Health Connect. The readings are checked on a schedule while OpenTasker is in the background, so background reading has to be allowed too. OpenTasker only reads, and never writes health data.</string>
+    <string name="setup_health_body">Lets health contexts read steps, heart rate, sleep and exercise from Health Connect. The readings are checked on a schedule while RuleDeck is in the background, so background reading has to be allowed too. RuleDeck only reads, and never writes health data.</string>
     <string name="setup_health_required_for">Health contexts</string>
     <string name="setup_health_install">Get Health Connect</string>
     <string name="setup_health_note_unavailable">Health Connect isn\'t on this phone. Android 14 and later have it built in, and on Android 9 to 13 it\'s an app from Google. It doesn\'t run on Android 8.</string>
-    <string name="setup_health_note_update">Health Connect needs an update before OpenTasker can read it in the background.</string>
-    <string name="setup_health_note_system_update">Health Connect is part of Android here and updates with Google Play system updates. Install the latest one so OpenTasker can read it in the background.</string>
+    <string name="setup_health_note_update">Health Connect needs an update before RuleDeck can read it in the background.</string>
+    <string name="setup_health_note_system_update">Health Connect is part of Android here and updates with Google Play system updates. Install the latest one so RuleDeck can read it in the background.</string>
     <string name="setup_health_denied">Health Connect didn\'t allow every reading. Tap the row again to open its settings.</string>
     <string name="health_metric_steps">steps</string>
     <string name="health_metric_heart_rate">heart rate</string>
     <string name="health_metric_sleep">sleep</string>
     <string name="health_metric_exercise">exercise</string>
-    <string name="health_setup_denied_detail">Health Connect isn\'t letting OpenTasker read %1$s in the background, so this context can\'t match. Allow it in Setup under Read Health Connect.</string>
+    <string name="health_setup_denied_detail">Health Connect isn\'t letting RuleDeck read %1$s in the background, so this context can\'t match. Allow it in Setup under Read Health Connect.</string>
     <string name="health_setup_unavailable_detail">Health Connect is missing, needs an update, or can\'t be read in the background on this phone, so this context can\'t match. Setup under Read Health Connect says which.</string>
     <string name="health_setup_failed_detail">Reading %1$s from Health Connect failed twice in a row, so this context can\'t match until a read works. The app log has the error.</string>
-    <string name="health_rationale_title">OpenTasker and your health data</string>
-    <string name="health_rationale_body">OpenTasker reads Health Connect only for profiles you set up with a health context, like steps today or your latest heart rate.\n\nIt can read steps, heart rate, sleep and exercise, and only the ones your profiles use. Readings are checked on the shortest schedule any of your health contexts asks for, at most every 15 minutes. That happens in the background, so a profile can run while OpenTasker isn\'t open.\n\nOpenTasker never writes to Health Connect and doesn\'t send your readings anywhere. You can take the access back at any time in Health Connect.</string>
+    <string name="health_rationale_title">RuleDeck and your health data</string>
+    <string name="health_rationale_body">RuleDeck reads Health Connect only for profiles you set up with a health context, like steps today or your latest heart rate.\n\nIt can read steps, heart rate, sleep and exercise, and only the ones your profiles use. Readings are checked on the shortest schedule any of your health contexts asks for, at most every 15 minutes. That happens in the background, so a profile can run while RuleDeck isn\'t open.\n\nRuleDeck never writes to Health Connect and doesn\'t send your readings anywhere. You can take the access back at any time in Health Connect.</string>
     <string name="setup_overlay_access_title">Overlay access</string>
-    <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps, and for a trigger to open an app, a link or the home screen while OpenTasker is in the background. Android calls this Display over other apps.</string>
+    <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps, and for a trigger to open an app, a link or the home screen while RuleDeck is in the background. Android calls this Display over other apps.</string>
     <string name="setup_overlay_access_required_for">Scenes, overlay UI, opening apps and links from a trigger</string>
     <string name="ui_message_run_busy">Something is already running. Wait for it to finish.</string>
     <string name="action_run_alone_busy">Running…</string>
     <string name="device_admin_label">Lock screen</string>
-    <string name="device_admin_description">Lets a task lock the screen. This is the only thing OpenTasker asks for here.</string>
+    <string name="device_admin_description">Lets a task lock the screen. This is the only thing RuleDeck asks for here.</string>
     <string name="setup_device_admin_title">Lock screen admin</string>
-    <string name="setup_device_admin_body">Android only lets an app lock the screen if you make it a device admin. OpenTasker asks for one permission in that role, force-lock, and for nothing else. It cannot wipe your device, set a password policy, or read anything. One catch worth knowing before you turn it on: Android will not let you uninstall OpenTasker until you turn this back off, and you can do that here.</string>
-    <string name="setup_device_admin_explanation">OpenTasker uses this to lock the screen when a task asks it to. It requests no other admin permission.</string>
+    <string name="setup_device_admin_body">Android only lets an app lock the screen if you make it a device admin. RuleDeck asks for one permission in that role, force-lock, and for nothing else. It cannot wipe your device, set a password policy, or read anything. One catch worth knowing before you turn it on: Android will not let you uninstall RuleDeck until you turn this back off, and you can do that here.</string>
+    <string name="setup_device_admin_explanation">RuleDeck uses this to lock the screen when a task asks it to. It requests no other admin permission.</string>
     <string name="setup_device_admin_required_for">Lock device</string>
     <string name="setup_device_admin_turn_on">Turn on</string>
     <string name="setup_device_admin_turn_off">Turn off</string>
@@ -523,14 +523,14 @@
     <string name="setup_foreground_location_body_approximate">Only approximate location is allowed right now. Wi-Fi network names and small geofences need precise location, so tap Request and choose Precise.</string>
     <string name="setup_foreground_location_required_for">Location and Wi-Fi contexts</string>
     <string name="setup_activity_recognition_title">Physical activity</string>
-    <string name="setup_activity_recognition_body">Needed for Activity context values. OpenTasker uses Android’s step detector or accelerometer and does not record microphone audio or movement history.</string>
+    <string name="setup_activity_recognition_body">Needed for Activity context values. RuleDeck uses Android’s step detector or accelerometer and does not record microphone audio or movement history.</string>
     <string name="setup_activity_recognition_required_for">Activity contexts</string>
     <string name="setup_nearby_wifi_title">Nearby Wi-Fi devices</string>
     <string name="setup_nearby_wifi_body">Needed on Android 13 and newer for Wi-Fi-aware automations. SSID visibility can still require location access.</string>
     <string name="setup_nearby_wifi_required_for">Wi-Fi contexts</string>
     <string name="setup_background_location_title">Background location</string>
-    <string name="setup_background_location_body_modern">Needed only when geofence automations must keep evaluating after OpenTasker is no longer visible. Android 11+ grants background location from app settings instead of the foreground permission dialog. Users can decline and keep using foreground-only automations. Public reliability still needs device verification.</string>
-    <string name="setup_background_location_body_legacy">Needed only when geofence automations must keep evaluating after OpenTasker is no longer visible. Android 10 can route users from the permission flow to the app location settings. Users can decline and keep using foreground-only automations. Public reliability still needs device verification.</string>
+    <string name="setup_background_location_body_modern">Needed only when geofence automations must keep evaluating after RuleDeck is no longer visible. Android 11+ grants background location from app settings instead of the foreground permission dialog. Users can decline and keep using foreground-only automations. Public reliability still needs device verification.</string>
+    <string name="setup_background_location_body_legacy">Needed only when geofence automations must keep evaluating after RuleDeck is no longer visible. Android 10 can route users from the permission flow to the app location settings. Users can decline and keep using foreground-only automations. Public reliability still needs device verification.</string>
     <string name="setup_background_location_required_for">Background location radius evaluation</string>
     <string name="setup_bluetooth_title">Bluetooth connect</string>
     <string name="setup_bluetooth_body">Needed on Android 12 and newer for Bluetooth device actions and context checks, including Android 16 bond-loss and encryption events. A Bluetooth device nearby context also uses it to spot a paired device that\'s connected, like a car or headphones, which often doesn\'t show up in a scan.</string>
@@ -539,7 +539,7 @@
     <string name="setup_bluetooth_scan_body">Lets a Bluetooth device nearby context look for the device you named. Android 11 and older ask for location instead and need location turned on. A phone only shows up while it is advertising, and pairing it once helps Android recognize it.</string>
     <string name="setup_bluetooth_scan_required_for">Bluetooth device nearby contexts</string>
     <string name="setup_screen_recording_title">Screen recording detection</string>
-    <string name="setup_screen_recording_body">On Android 15 and newer, OpenTasker can react when this app becomes visible or invisible in a screen recording. No screen contents are captured by this trigger.</string>
+    <string name="setup_screen_recording_body">On Android 15 and newer, RuleDeck can react when this app becomes visible or invisible in a screen recording. No screen contents are captured by this trigger.</string>
     <string name="setup_screen_recording_required_for">Screen recording event contexts</string>
     <string name="setup_platform_blocked_title">Some triggers can\'t fire on this phone</string>
     <string name="setup_platform_blocked_body">This phone runs Android %1$s. The profiles below wait on something Android added later, so they won\'t run here until the phone updates.</string>
@@ -550,7 +550,7 @@
     <string name="platform_family_advanced_protection">an Advanced Protection change</string>
     <string name="platform_family_bluetooth_security">a Bluetooth key or encryption change</string>
     <string name="setup_advanced_protection_title">Advanced Protection is on</string>
-    <string name="setup_advanced_protection_body">Android Advanced Protection can restrict what automation apps may do. OpenTasker doesn\'t use Accessibility, but Shizuku power actions may be limited while it\'s on.</string>
+    <string name="setup_advanced_protection_body">Android Advanced Protection can restrict what automation apps may do. RuleDeck doesn\'t use Accessibility, but Shizuku power actions may be limited while it\'s on.</string>
     <string name="setup_local_network_required_for">LAN network actions</string>
     <string name="setup_sms_title">SMS send</string>
     <string name="setup_sms_body">Needed before SMS actions can send messages. Keep SMS automations explicit and user-authored.</string>
@@ -559,46 +559,46 @@
     <string name="setup_sms_receive_body">Lets an Event context of type sms_received read a cleaned-up copy of the sender and message. On Android 17, texts with one-time codes can be held back for up to three hours unless the app is exempt.</string>
     <string name="setup_sms_receive_required_for">SMS/MMS-received event contexts</string>
     <string name="setup_phone_state_title">Phone state</string>
-    <string name="setup_phone_state_body">Needed for roaming and phone-call state contexts and the incoming call trigger. OpenTasker reads only the current state needed for matching and does not store phone numbers or call history.</string>
+    <string name="setup_phone_state_body">Needed for roaming and phone-call state contexts and the incoming call trigger. RuleDeck reads only the current state needed for matching and does not store phone numbers or call history.</string>
     <string name="setup_phone_state_required_for">Roaming, phone-call contexts and incoming calls</string>
     <string name="setup_call_log_title">Caller number</string>
-    <string name="setup_call_log_body">Android tells an app who is calling only if it holds the Call log permission. OpenTasker uses the number while the phone rings, and doesn\'t read or store your call history.</string>
+    <string name="setup_call_log_body">Android tells an app who is calling only if it holds the Call log permission. RuleDeck uses the number while the phone rings, and doesn\'t read or store your call history.</string>
     <string name="setup_call_log_required_for">The incoming call trigger\'s number</string>
     <string name="setup_dnd_title">Do Not Disturb access</string>
-    <string name="setup_dnd_body">Needed before OpenTasker can change Do Not Disturb mode or add, change and remove its own Do Not Disturb rules.</string>
+    <string name="setup_dnd_body">Needed before RuleDeck can change Do Not Disturb mode or add, change and remove its own Do Not Disturb rules.</string>
     <string name="setup_dnd_required_for">Do Not Disturb actions</string>
     <string name="setup_shizuku_title">Shizuku power mode</string>
     <string name="setup_shizuku_required_for">Elevated actions</string>
     <string name="setup_shizuku_status_not_installed">Shizuku is not running and no Shizuku manager is installed. Sui and Shizuku forks show up here once their service is running.</string>
     <string name="setup_shizuku_status_disabled">Shizuku power mode is off. Turn it on here to use elevated actions.</string>
     <string name="setup_shizuku_status_manager_stopped">Shizuku is installed but its service is not running. Start it in the Shizuku app.</string>
-    <string name="setup_shizuku_status_permission_needed">Shizuku is running but OpenTasker needs permission.</string>
-    <string name="setup_shizuku_status_transport_unavailable">Shizuku has given permission, but OpenTasker cannot reach its helper service. Actions that need elevated access refuse to run until that connection comes back.</string>
-    <string name="setup_shizuku_status_ready">Shizuku is running, it has given permission, and OpenTasker can reach its helper service.</string>
-    <string name="setup_shizuku_android17_note">On Android 17 the original Shizuku may not start. The thedjchi fork of Shizuku on GitHub supports it, and its home screen showing version 13.6 is expected. Some phones turn wireless debugging off when they restart, and OpenTasker can\'t turn it back on, so after a reboot turn it on in Developer options and start Shizuku again.</string>
+    <string name="setup_shizuku_status_permission_needed">Shizuku is running but RuleDeck needs permission.</string>
+    <string name="setup_shizuku_status_transport_unavailable">Shizuku has given permission, but RuleDeck cannot reach its helper service. Actions that need elevated access refuse to run until that connection comes back.</string>
+    <string name="setup_shizuku_status_ready">Shizuku is running, it has given permission, and RuleDeck can reach its helper service.</string>
+    <string name="setup_shizuku_android17_note">On Android 17 the original Shizuku may not start. The thedjchi fork of Shizuku on GitHub supports it, and its home screen showing version 13.6 is expected. Some phones turn wireless debugging off when they restart, and RuleDeck can\'t turn it back on, so after a reboot turn it on in Developer options and start Shizuku again.</string>
     <string name="setup_assistant_title">Digital assistant app</string>
     <string name="setup_assistant_required_for">Airplane mode without Shizuku</string>
-    <string name="setup_assistant_status_active">OpenTasker is the digital assistant app, so Airplane Mode works even when Shizuku isn\'t running.</string>
-    <string name="setup_assistant_status_inactive">Android lets the digital assistant app switch airplane mode. Pick OpenTasker under Digital assistant app in Default apps if you can\'t use Shizuku.</string>
-    <string name="setup_assistant_status_disconnected">OpenTasker is the digital assistant app, but Android hasn\'t connected it. That happens after OpenTasker is force stopped. Pick another assistant in Default apps, then OpenTasker again.</string>
-    <string name="setup_assistant_note">This replaces your current assistant, so long pressing home or power opens OpenTasker instead. Switch back in the same screen any time.</string>
+    <string name="setup_assistant_status_active">RuleDeck is the digital assistant app, so Airplane Mode works even when Shizuku isn\'t running.</string>
+    <string name="setup_assistant_status_inactive">Android lets the digital assistant app switch airplane mode. Pick RuleDeck under Digital assistant app in Default apps if you can\'t use Shizuku.</string>
+    <string name="setup_assistant_status_disconnected">RuleDeck is the digital assistant app, but Android hasn\'t connected it. That happens after RuleDeck is force stopped. Pick another assistant in Default apps, then RuleDeck again.</string>
+    <string name="setup_assistant_note">This replaces your current assistant, so long pressing home or power opens RuleDeck instead. Switch back in the same screen any time.</string>
     <string name="setup_wireguard_title">WireGuard tunnel control</string>
     <string name="setup_wireguard_body">Lets a profile turn your WireGuard tunnels on and off. Also turn on Allow remote control apps in the WireGuard settings, or it ignores the request.</string>
     <string name="setup_wireguard_required_for">Connect or Disconnect VPN with WireGuard</string>
     <string name="setup_shizuku_allowlist_title">Approved Shizuku scripts</string>
-    <string name="setup_shizuku_allowlist_body">These run as the Android shell user, with the same reach as adb. Keep the script where that user can read it, like /data/local/tmp or shared storage, and enter the SHA-256 from a trusted copy (sha256sum prints it). OpenTasker reads the file, checks the hash and runs exactly what it checked, so an edited script refuses to run until you approve it again.</string>
+    <string name="setup_shizuku_allowlist_body">These run as the Android shell user, with the same reach as adb. Keep the script where that user can read it, like /data/local/tmp or shared storage, and enter the SHA-256 from a trusted copy (sha256sum prints it). RuleDeck reads the file, checks the hash and runs exactly what it checked, so an edited script refuses to run until you approve it again.</string>
     <string name="setup_shizuku_script_path_hint">/data/local/tmp/my_script.sh</string>
     <string name="setup_shizuku_script_path_error">Use a full path that starts with / and has no . or .. segments.</string>
     <string name="setup_shizuku_allowlist_empty">No scripts are approved yet, so Run Shizuku Script refuses to run.</string>
     <string name="setup_termux_title">Termux script bridge</string>
     <string name="setup_termux_status_missing">Termux is not installed.</string>
     <string name="setup_termux_status_version_unsupported">Termux 0.109 or newer is required for bounded command results.</string>
-    <string name="setup_termux_status_permission_needed">Termux is installed, but OpenTasker needs the Run commands in Termux environment permission.</string>
-    <string name="setup_termux_status_ready">Termux is installed and OpenTasker may run its commands.</string>
+    <string name="setup_termux_status_permission_needed">Termux is installed, but RuleDeck needs the Run commands in Termux environment permission.</string>
+    <string name="setup_termux_status_ready">Termux is installed and RuleDeck may run its commands.</string>
     <string name="setup_termux_body">%1$s Only approved scripts with a matching SHA-256 hash can run.</string>
     <string name="setup_termux_required_for">Script actions</string>
     <string name="setup_termux_allowlist_title">Approved Termux scripts</string>
-    <string name="setup_termux_allowlist_body">Enter the expected SHA-256 from a trusted copy. OpenTasker verifies the script in Termux immediately before every run. Termux also needs allow-external-apps=true in ~/.termux/termux.properties, or it returns no result and the check cannot run. Scripts run without your .bashrc or .profile, so call commands by their full path.</string>
+    <string name="setup_termux_allowlist_body">Enter the expected SHA-256 from a trusted copy. RuleDeck verifies the script in Termux immediately before every run. Termux also needs allow-external-apps=true in ~/.termux/termux.properties, or it returns no result and the check cannot run. Scripts run without your .bashrc or .profile, so call commands by their full path.</string>
     <string name="setup_termux_script_path_label">Script path</string>
     <string name="setup_termux_script_path_hint">~/.termux/tasker/my_script</string>
     <string name="setup_termux_script_path_error">Use a script inside ~/.termux/tasker without path traversal.</string>
@@ -654,8 +654,8 @@
     <string name="run_log_hide_filters">Hide filters</string>
     <string name="run_log_share_diagnostic">Share diagnostic report</string>
     <string name="run_log_share_short">Share</string>
-    <string name="share_uri_unreadable">OpenTasker could not read the shared file. Re-share it with read access.</string>
-    <string name="share_invalid">OpenTasker could not read that share.</string>
+    <string name="share_uri_unreadable">RuleDeck could not read the shared file. Re-share it with read access.</string>
+    <string name="share_invalid">RuleDeck could not read that share.</string>
     <string name="run_log_loading">Loading the run log…</string>
     <string name="run_log_load_more">Load more</string>
     <string name="run_log_refresh">Refresh</string>
@@ -769,7 +769,7 @@
     <string name="automation_lint_invariant_violation_detail">Your rule %1$s (%2$s) watches a setting that %3$s may change by writing %4$s.</string>
     <string name="automation_lint_invariant_violation_fix">Turn that profile off or narrow when it runs. If the change is deliberate, edit the rule instead.</string>
     <string name="automation_invariant_panel_title">Settings to warn about</string>
-    <string name="automation_invariant_panel_body">Name the device settings you do not expect your automations to change. Nothing is blocked. OpenTasker checks the rules and warns you when an enabled profile looks like it would change one.</string>
+    <string name="automation_invariant_panel_body">Name the device settings you do not expect your automations to change. Nothing is blocked. RuleDeck checks the rules and warns you when an enabled profile looks like it would change one.</string>
     <string name="automation_invariant_empty">No settings are being watched yet.</string>
     <string name="automation_invariant_limit">%1$d is the limit. Stop watching a setting to add another.</string>
     <string name="automation_invariant_add">Watch a setting</string>
@@ -791,7 +791,7 @@
     <string name="automation_invariant_validation_name">Enter a name of at most 64 characters.</string>
     <string name="automation_invariant_validation_guard_key">Start with a letter, then use letters, numbers, dots, underscores, colons, or hyphens.</string>
     <string name="automation_invariant_validation_guard_value">Enter a value of at most 96 characters.</string>
-    <string name="automation_invariant_validation_write_key">Enter a setting name OpenTasker recognizes.</string>
+    <string name="automation_invariant_validation_write_key">Enter a setting name RuleDeck recognizes.</string>
     <string name="automation_invariant_validation_generic">Fill in every field with a valid value.</string>
     <string name="automation_invariant_save">Save rule</string>
     <string name="automation_invariant_cancel">Cancel</string>
@@ -834,7 +834,7 @@
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
     <string name="import_schema_app">Schema %1$d · exported by app %2$s</string>
     <string name="import_incompatible">Cannot import</string>
-    <string name="import_incompatible_body">Bundle schema is not compatible with this version of OpenTasker.</string>
+    <string name="import_incompatible_body">Bundle schema is not compatible with this version of RuleDeck.</string>
     <string name="import_capability_review">Capability review</string>
     <string name="import_capability_item">%1$s · %2$s: %3$s</string>
     <string name="import_warnings">Import warnings</string>
@@ -849,15 +849,15 @@
     <string name="import_import_json">Import JSON</string>
     <string name="import_paste_json_action">Paste / scan</string>
     <string name="import_paste_json_title">Paste or scan an import</string>
-    <string name="import_paste_json_body">Paste an OpenTasker bundle here, or use a QR scanner that types the decoded text. Nothing is written until you confirm it in the review.</string>
-    <string name="import_paste_json_hint">OpenTasker JSON</string>
+    <string name="import_paste_json_body">Paste an RuleDeck bundle here, or use a QR scanner that types the decoded text. Nothing is written until you confirm it in the review.</string>
+    <string name="import_paste_json_hint">RuleDeck JSON</string>
     <string name="import_paste_too_long">Too long to paste, so the end was cut off. Save it as a file and use Import JSON instead.</string>
     <string name="import_paste_json_review">Review import</string>
     <plurals name="import_paste_hidden">
         <item quantity="one">%1$s character pasted, too many to show here.</item>
         <item quantity="other">%1$s characters pasted, too many to show here.</item>
     </plurals>
-    <string name="import_opentasker_bundle">OpenTasker bundle</string>
+    <string name="import_ruledeck_bundle">RuleDeck bundle</string>
     <string name="import_count_tasks">Tasks</string>
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
@@ -878,7 +878,7 @@
     <string name="import_count_src_profiles">Source profiles</string>
     <string name="import_mapped">mapped</string>
     <string name="import_unsupported">unsupported</string>
-    <string name="profile_share_unverified_notice">This is an unverified local draft. Review the manifest and import plan before anything is written to OpenTasker.</string>
+    <string name="profile_share_unverified_notice">This is an unverified local draft. Review the manifest and import plan before anything is written to RuleDeck.</string>
     <string name="profile_share_slug">Share slug</string>
     <string name="profile_share_slug_hint">3-64 lowercase letters, numbers, and hyphens</string>
     <string name="profile_share_title">Title</string>
@@ -887,7 +887,7 @@
     <string name="profile_share_source_url">Source URL (optional)</string>
     <string name="profile_share_invalid_details">Share details need attention</string>
     <string name="profile_share_trust_title">Trust and submission</string>
-    <string name="profile_share_trust_body">Trust: %1$s. Submission channel: %2$s. OpenTasker does not treat this draft as verified.</string>
+    <string name="profile_share_trust_body">Trust: %1$s. Submission channel: %2$s. RuleDeck does not treat this draft as verified.</string>
     <string name="profile_share_trust_local_draft">Local draft</string>
     <string name="profile_share_trust_community_unverified">Community draft, not verified</string>
     <string name="profile_share_invalid_details_body">Review the share fields and try again.</string>
@@ -1090,7 +1090,7 @@
     <string name="context_preset_incoming_call">Incoming call</string>
     <string name="context_preset_incoming_call_not_in_contacts">Incoming call, not in contacts</string>
     <string name="context_incoming_call_note">A task reads the caller as {{ event.incoming_number }}. Android shares the number only with Call log allowed, and telling a stranger from a contact takes Contacts access. A hidden caller, or one nobody could check, never counts as a stranger.</string>
-    <string name="context_broadcast_platform_action_note">This looks like a system action. Apps cannot send those, so a profile on one may never fire. OpenTasker has purpose-built triggers for the common system events.</string>
+    <string name="context_broadcast_platform_action_note">This looks like a system action. Apps cannot send those, so a profile on one may never fire. RuleDeck has purpose-built triggers for the common system events.</string>
     <string name="context_broadcast_sender_unavailable_note">Android 13 and older never report who sent a broadcast, so this filter will not match anything on this device.</string>
     <string name="context_broadcast_sender_optin_note">Android names the sender only when the sending app opts in to sharing its identity. Most apps do not, and neither does adb. A broadcast whose sender is unknown is refused by this filter, so leave it blank unless you know your sender shares its identity.</string>
     <string name="context_event_variables_title">Variables this trigger provides</string>
@@ -1157,7 +1157,7 @@
     <string name="import_reading_bundle">Reading bundle…</string>
 
     <string name="workspace_stored_data_review">Stored data needs review</string>
-    <string name="workspace_stored_data_review_body">OpenTasker blocked affected records from execution and editing. %1$s%2$s. Restore a database backup before continuing; the raw stored data remains untouched.</string>
+    <string name="workspace_stored_data_review_body">RuleDeck blocked affected records from execution and editing. %1$s%2$s. Restore a database backup before continuing; the raw stored data remains untouched.</string>
     <string name="workspace_runs_task">Runs: %1$s</string>
     <string name="workspace_missing_task">Missing task #%1$d</string>
     <string name="workspace_exit_task_only">%1$s, when it stops matching</string>
@@ -1374,8 +1374,8 @@
     <string name="context_invert_helper">Run when this context is not true.</string>
     <string name="context_days_select_one">Select at least one day.</string>
     <string name="context_days_invalid_helper">Use weekdays, weekends, every day, or day tokens/ranges.</string>
-    <string name="context_nfc_trigger_label">OpenTasker NFC trigger</string>
-    <string name="context_nfc_trigger_label_with_tag">OpenTasker NFC trigger %1$s</string>
+    <string name="context_nfc_trigger_label">RuleDeck NFC trigger</string>
+    <string name="context_nfc_trigger_label_with_tag">RuleDeck NFC trigger %1$s</string>
     <string name="context_nfc_write_helper_body">Arms a one-time NDEF text write for the next scanned tag.</string>
 
     <string name="label_min">Min</string>
@@ -1458,11 +1458,11 @@
     <string name="diagnostics_process_exit_matched">%1$s, %3$s. Android\'s note: %2$s. The engine was quiet for %4$s.</string>
     <string name="diagnostics_fgs_types">Foreground service types</string>
     <string name="diagnostics_standby_consequence">Standby delivery consequence</string>
-    <string name="diagnostics_standby_throttled">This bucket throttles the per-minute trigger alarm and background workers, so time and polling triggers may fire late. Add OpenTasker to the battery-optimization exemption list in Setup to keep it responsive.</string>
+    <string name="diagnostics_standby_throttled">This bucket throttles the per-minute trigger alarm and background workers, so time and polling triggers may fire late. Add RuleDeck to the battery-optimization exemption list in Setup to keep it responsive.</string>
     <string name="diagnostics_advanced_protection">Advanced Protection</string>
     <string name="diagnostics_advanced_protection_on">On</string>
     <string name="diagnostics_advanced_protection_off">Off</string>
-    <string name="diagnostics_advanced_protection_warning">Android Advanced Protection Mode is on. It can revoke Accessibility from apps not registered as an accessibility tool and restrict some automation capabilities. OpenTasker does not use Accessibility, so its triggers keep working, but Shizuku power actions may be limited until you turn Advanced Protection off.</string>
+    <string name="diagnostics_advanced_protection_warning">Android Advanced Protection Mode is on. It can revoke Accessibility from apps not registered as an accessibility tool and restrict some automation capabilities. RuleDeck does not use Accessibility, so its triggers keep working, but Shizuku power actions may be limited until you turn Advanced Protection off.</string>
     <string name="diagnostics_exact_alarm">Time alarm delivery</string>
     <string name="diagnostics_matcher_error">Last context matching error</string>
     <string name="diagnostics_worker_stop">Watchdog stop reason</string>
@@ -1483,7 +1483,7 @@
     <!-- %1$s is why Android stopped an earlier run, %2$s when. Appended after the latest outcome. -->
     <string name="diagnostics_work_outcome_also_stopped">\nEarlier run stopped by Android: %1$s · %2$s</string>
     <string name="diagnostics_stop_reason_not_stopped">not stopped</string>
-    <string name="diagnostics_stop_reason_cancelled_by_app">canceled by OpenTasker</string>
+    <string name="diagnostics_stop_reason_cancelled_by_app">canceled by RuleDeck</string>
     <string name="diagnostics_stop_reason_preempt">preempted by a higher-priority job</string>
     <string name="diagnostics_stop_reason_timeout">ran out of time</string>
     <string name="diagnostics_stop_reason_timeout_abandoned">abandoned after running too long</string>
@@ -1525,12 +1525,12 @@
     <string name="diagnostics_signal_engine_stale">The engine last checked in %1$s ago.</string>
     <string name="diagnostics_signal_engine_ready">The engine checked in recently.</string>
     <string name="diagnostics_signal_matchers_ready">Profiles are being checked normally.</string>
-    <string name="diagnostics_signal_exact_alarm_ready">Android lets OpenTasker set exact alarms.</string>
+    <string name="diagnostics_signal_exact_alarm_ready">Android lets RuleDeck set exact alarms.</string>
     <string name="diagnostics_signal_exact_alarm_inexact">Android doesn\'t allow exact alarms, so time triggers can run a few minutes late.</string>
     <string name="diagnostics_signal_watchdog_none">No stop recorded.</string>
     <string name="diagnostics_signal_scheduled_jobs_blocked">Some scheduled jobs are waiting on a condition.</string>
     <string name="diagnostics_signal_advanced_protection_on">Advanced Protection is on and may limit some features.</string>
-    <string name="diagnostics_signal_advanced_protection_off">Advanced Protection isn\'t limiting OpenTasker.</string>
+    <string name="diagnostics_signal_advanced_protection_off">Advanced Protection isn\'t limiting RuleDeck.</string>
     <string name="diagnostics_signal_executions_count">%1$d waiting on other apps, %2$d running</string>
     <string name="diagnostics_exact_alarm_exact">Exact</string>
     <string name="diagnostics_exact_alarm_inexact">Can run a few minutes late</string>
@@ -1613,7 +1613,7 @@
     <string name="action_field_error_body_not_allowed">The selected HTTP method does not accept a request body.</string>
     <string name="action_field_error_invalid_definition">This field is not configured correctly.</string>
     <string name="action_field_unknown_option">Unsupported saved value: %1$s</string>
-    <string name="action_file_picker_saved_files">OpenTasker files</string>
+    <string name="action_file_picker_saved_files">RuleDeck files</string>
     <string name="action_file_picker_empty">No saved files yet. You can enter a new relative path.</string>
 
     <string name="action_option_toggle">Toggle</string>
@@ -1741,7 +1741,7 @@
          refused the change, so this carries it through without prefixing it with noise. -->
     <string name="ui_error_reason">%1$s</string>
     <!-- Shown as the activity title inside Locale plugin host apps. -->
-    <string name="locale_setting_edit_title">OpenTasker task</string>
+    <string name="locale_setting_edit_title">RuleDeck task</string>
     <string name="task_name_duplicate_warning">Another task already uses this name. References that name a task become ambiguous.</string>
     <string name="run_log_load_failed_title">Run log could not be loaded</string>
     <string name="run_log_load_failed_body">The stored run history could not be read. Retry, or check Diagnostics if it keeps failing.</string>
@@ -1754,10 +1754,10 @@
     <string name="ui_error_task_delete">The task couldn\'t be deleted. Diagnostics has the details.</string>
     <string name="ui_error_automation_import_preview">MacroDroid import preview failed. Diagnostics has the details.</string>
     <string name="ui_error_automation_import">The MacroDroid import failed. Diagnostics has the details.</string>
-    <string name="ui_error_bundle_export">The OpenTasker bundle couldn\'t be exported. Diagnostics has the details.</string>
-    <string name="ui_error_bundle_preview">OpenTasker bundle preview failed. Diagnostics has the details.</string>
+    <string name="ui_error_bundle_export">The RuleDeck bundle couldn\'t be exported. Diagnostics has the details.</string>
+    <string name="ui_error_bundle_preview">RuleDeck bundle preview failed. Diagnostics has the details.</string>
     <string name="ui_error_share_preview">The share preview couldn\'t be made. Diagnostics has the details.</string>
-    <string name="ui_error_bundle_import">The OpenTasker bundle couldn\'t be imported. Diagnostics has the details.</string>
+    <string name="ui_error_bundle_import">The RuleDeck bundle couldn\'t be imported. Diagnostics has the details.</string>
     <string name="ui_error_run_logs_load">The run log couldn\'t be loaded. Diagnostics has the details.</string>
     <string name="ui_error_run_logs_more">More of the run log couldn\'t be loaded. Diagnostics has the details.</string>
     <string name="ui_error_run_log_export">The run log couldn\'t be exported. Diagnostics has the details.</string>
@@ -1767,7 +1767,7 @@
         <item quantity="other">Cooldown has %1$d seconds remaining.</item>
     </plurals>
     <string name="synthetic_trigger_admission_rejected">A run limit would have stopped this one.</string>
-    <string name="ui_error_bundle_not_recognized">That does not look like an OpenTasker bundle. Paste the JSON exported from OpenTasker, or scan its QR code.</string>
+    <string name="ui_error_bundle_not_recognized">That does not look like an RuleDeck bundle. Paste the JSON exported from RuleDeck, or scan its QR code.</string>
     <string name="ui_error_run_action">That action could not be run</string>
     <string name="ui_error_run_task">Task could not be run</string>
     <string name="ui_error_run_log_replay">Held run could not be replayed</string>
@@ -1776,10 +1776,10 @@
     <string name="ui_error_action_type_unsupported">This build has no editor for that action. Remove it, or import it again on a build that supports it.</string>
     <string name="ui_error_share_diagnostics">Failed to share diagnostic report</string>
     <string name="ui_error_copy_diagnostics">Failed to copy diagnostic report</string>
-    <string name="diagnostics_share_subject">OpenTasker diagnostic report</string>
+    <string name="diagnostics_share_subject">RuleDeck diagnostic report</string>
     <string name="diagnostics_share_chooser">Share diagnostic report</string>
     <string name="import_document_macrodroid">MacroDroid export</string>
-    <string name="import_document_opentasker_bundle">OpenTasker bundle</string>
+    <string name="import_document_ruledeck_bundle">RuleDeck bundle</string>
     <string name="ui_error_document_unreadable">Couldn\'t open the selected %1$s.</string>
     <string name="ui_error_document_too_large">The selected %1$s is larger than %2$d MB.</string>
     <string name="ui_error_import_budget">This file is too large to import. It goes over the limit for %1$s, which is %2$d.</string>
@@ -1789,7 +1789,7 @@
     <string name="ui_error_macrodroid_password_protected">This MacroDroid export has a password, so it can\'t be read here. Export the macros again in MacroDroid with the password left blank, then import that file.</string>
     <string name="dialog_password_open">Open</string>
     <string name="dialog_backup_passphrase_title">Encrypted snapshot</string>
-    <string name="dialog_backup_passphrase_body">This is an encrypted OpenTasker snapshot. Enter the passphrase you set for snapshots in Settings. OpenTasker doesn\'t save it.</string>
+    <string name="dialog_backup_passphrase_body">This is an encrypted RuleDeck snapshot. Enter the passphrase you set for snapshots in Settings. RuleDeck doesn\'t save it.</string>
     <string name="dialog_backup_passphrase_label">Snapshot passphrase</string>
     <string name="dialog_backup_passphrase_wrong">That passphrase doesn\'t open this file. If it\'s the right one, the file may be damaged.</string>
     <string name="ui_error_write_settings_required">This automation needs Modify system settings. Open Setup, grant it, then try again.</string>
@@ -1862,7 +1862,7 @@
         <item quantity="other">Task is still used by %1$d automations. Reassign or clear those references first.</item>
     </plurals>
     <string name="ui_message_automation_import_ready">Automation import ready for review</string>
-    <string name="ui_message_bundle_ready">OpenTasker bundle ready for review</string>
+    <string name="ui_message_bundle_ready">RuleDeck bundle ready for review</string>
     <string name="ui_message_edit_undone">Edit undone</string>
     <string name="ui_message_edit_redone">Edit redone</string>
     <string name="ui_message_no_edit_history">No edit history available</string>
@@ -1879,7 +1879,7 @@
     </plurals>
     <string name="ui_message_snapshots_disabled">Automatic snapshots off</string>
     <string name="ui_message_snapshot_destination_saved">Snapshot destination saved</string>
-    <string name="ui_message_restore_staged">Restore staged. Restart OpenTasker to apply it.</string>
+    <string name="ui_message_restore_staged">Restore staged. Restart RuleDeck to apply it.</string>
     <string name="ui_message_restore_cancelled">Staged restore canceled</string>
     <string name="ui_message_no_staged_restore">There is no staged restore to cancel</string>
     <string name="ui_message_no_restore_rollback">There\'s no earlier database to go back to.</string>
@@ -1943,7 +1943,7 @@
     <string name="inspector_latest_value">Latest value</string>
     <string name="inspector_warning">Warning</string>
     <string name="inspector_causal_loop_title">Causal profile loop stopped</string>
-    <string name="inspector_causal_loop_body">OpenTasker stopped this chain of profiles: %1$s. The run log and Diagnostics show the run that started it.</string>
+    <string name="inspector_causal_loop_body">RuleDeck stopped this chain of profiles: %1$s. The run log and Diagnostics show the run that started it.</string>
     <string name="inspector_no_profiles_body">Create a profile before reviewing match explanations.</string>
     <string name="inspector_ready">Ready</string>
     <plurals name="inspector_attention">
@@ -2005,7 +2005,7 @@
     <string name="inspector_setup_calendar_missing">Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates.</string>
     <string name="inspector_setup_event_ready">Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in memory for matching and is not written to the run log. %1$s</string>
     <string name="inspector_setup_event_notification_missing">Boot, system, NFC, calendar, and sun events are registered. Notification events need Notification Access in Setup before Android will bind the listener. %1$s</string>
-    <string name="inspector_setup_nfc_blocked">Android isn\'t handing NFC tags to OpenTasker yet, so NFC events won\'t fire. Allow it in Setup under Read NFC tags.</string>
+    <string name="inspector_setup_nfc_blocked">Android isn\'t handing NFC tags to RuleDeck yet, so NFC events won\'t fire. Allow it in Setup under Read NFC tags.</string>
     <string name="inspector_setup_source_generic">This source has no setup check of its own yet.</string>
     <string name="diagnostics_health_state_ready">Ready</string>
     <string name="diagnostics_health_state_loading">Loading</string>
@@ -2062,7 +2062,7 @@
     <string name="setup_locale_grant_revoke">Revoke</string>
     <string name="setup_locale_grant_revoked">Revoked the grant for %1$s</string>
     <string name="setup_target_signer_title">%1$s has a new signing key</string>
-    <string name="setup_target_signer_body">OpenTasker stopped sending commands to %1$s because it is now signed with a different certificate than the one OpenTasker trusted. Re-approve it only if you installed this version from a source you trust.</string>
+    <string name="setup_target_signer_body">RuleDeck stopped sending commands to %1$s because it is now signed with a different certificate than the one RuleDeck trusted. Re-approve it only if you installed this version from a source you trust.</string>
     <string name="setup_target_signer_required_for">Plugin and Termux actions</string>
     <string name="setup_target_signer_reapprove">Re-approve</string>
     <string name="setup_target_signer_reapproved">Re-approved %1$s</string>

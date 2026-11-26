@@ -1,7 +1,7 @@
 param(
     [string]$Serial = $env:ANDROID_SERIAL,
-    [string]$Package = "com.opentasker.app",
-    [string]$Activity = "com.opentasker.app.MainActivity",
+    [string]$Package = "com.sysadmindoc.ruledeck",
+    [string]$Activity = "com.sysadmindoc.ruledeck.MainActivity",
     [int]$SampleSeconds = 120,
     [string]$OutputRoot = "build/device-evidence/location",
     [switch]$GrantLocationPermissions,
@@ -567,7 +567,7 @@ function Parse-PermissionGrant {
     return $PackageDump -match "${escaped}:\s+granted=true"
 }
 
-function Parse-OpenTaskerProviderCadenceEvidence {
+function Parse-RuleDeckProviderCadenceEvidence {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Text,
@@ -607,9 +607,9 @@ function Copy-AppDatabaseSnapshot {
     param([string]$PackageName)
 
     $files = @(
-        "opentasker.db",
-        "opentasker.db-wal",
-        "opentasker.db-shm"
+        "ruledeck.db",
+        "ruledeck.db-wal",
+        "ruledeck.db-shm"
     )
     $copied = @()
     $errors = @()
@@ -809,7 +809,7 @@ $packageAfter = Get-ShellText -ShellArgs @("dumpsys", "package", $Package) -Allo
 $appOpsAfter = Get-ShellText -ShellArgs @("appops", "get", $Package) -AllowFailure
 $logcat = (Invoke-Adb -AdbArgs @("logcat", "-d", "-t", "1000") -AllowFailure).StdOut
 $databaseSnapshot = Copy-AppDatabaseSnapshot -PackageName $Package
-$roomDatabasePath = Join-Path $script:OutputDir "room-opentasker.db"
+$roomDatabasePath = Join-Path $script:OutputDir "room-ruledeck.db"
 $roomSummary = if (Test-Path $roomDatabasePath) {
     Read-RoomDatabaseSummary -DatabasePath $roomDatabasePath
 } else {
@@ -847,7 +847,7 @@ $batteryHistory = Parse-RecentUnpluggedBatteryHistory `
     -Text $afterBattery `
     -MinimumRequiredSeconds $MinimumUnpluggedHistorySeconds `
     -MaximumAgeMinutes $MaximumUnpluggedHistoryAgeMinutes
-$providerCadence = Parse-OpenTaskerProviderCadenceEvidence -Text $afterLocation -PackageName $Package
+$providerCadence = Parse-RuleDeckProviderCadenceEvidence -Text $afterLocation -PackageName $Package
 
 $summary = [ordered]@{
     collectedAt = (Get-Date).ToString("o")
@@ -946,7 +946,7 @@ if ($RequireProviderCadenceEvidence) {
     $gpsEvidence = Get-MapValue -Map (Get-MapValue -Map $summary.providerCadence -Key "gps") -Key "evidenceFound"
     $networkEvidence = Get-MapValue -Map (Get-MapValue -Map $summary.providerCadence -Key "network") -Key "evidenceFound"
     if (-not $gpsEvidence -or -not $networkEvidence) {
-        throw "Location provider cadence evidence did not include expected OpenTasker GPS and network registrations or historical aggregates. Evidence: $script:OutputDir"
+        throw "Location provider cadence evidence did not include expected RuleDeck GPS and network registrations or historical aggregates. Evidence: $script:OutputDir"
     }
 }
 if (-not [string]::IsNullOrWhiteSpace($RequireLogcatPattern) -and $logcat -notmatch $RequireLogcatPattern) {

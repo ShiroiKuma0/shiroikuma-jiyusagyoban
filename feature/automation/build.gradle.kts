@@ -14,7 +14,7 @@ configurations.configureEach {
 }
 
 android {
-    namespace = "com.opentasker.feature.automation"
+    namespace = "com.sysadmindoc.ruledeck.feature.automation"
     compileSdk = 37
 
     defaultConfig {

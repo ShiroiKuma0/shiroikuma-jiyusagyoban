@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.opentasker.baselineprofile"
+    namespace = "com.sysadmindoc.ruledeck.baselineprofile"
     compileSdk = 37
 
     defaultConfig {

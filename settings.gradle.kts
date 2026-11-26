@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenTasker"
+rootProject.name = "RuleDeck"
 include(":app")
 include(":baselineprofile")
 include(":core:model")

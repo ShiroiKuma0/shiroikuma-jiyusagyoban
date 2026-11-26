@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <string name="app_name">OpenTasker</string>
+    <string name="app_name">RuleDeck</string>
     <string name="qs_tile_subtitle_default">点击运行任务</string>
     <string name="qs_tile_subtitle_no_task">点击选择任务</string>
     <string name="qs_tile_config_title">配置快捷设置磁贴</string>
@@ -14,9 +14,9 @@
     <string name="qs_tile_subtitle_hint">简短的说明文字</string>
     <string name="qs_tile_icon">图标</string>
     <string name="qs_tile_save">保存磁贴</string>
-    <string name="permission_automation_label">控制OpenTasker自动化</string>
-    <string name="permission_automation_description">允许同签名集成方通过文档化的Intent运行OpenTasker任务、切换配置文件并查询自动化状态。</string>
-    <string name="widget_task_description">一键运行一个OpenTasker任务</string>
+    <string name="permission_automation_label">控制RuleDeck自动化</string>
+    <string name="permission_automation_description">允许同签名集成方通过文档化的Intent运行RuleDeck任务、切换配置文件并查询自动化状态。</string>
+    <string name="widget_task_description">一键运行一个RuleDeck任务</string>
     <string name="widget_task_already_running">该任务已在运行</string>
     <string name="widget_task_missing">任务已删除。点击选择另一个。</string>
     <string name="widget_task_invalid">此小部件或快捷方式没有指向任务。</string>
@@ -35,17 +35,17 @@
     <string name="nfc_write_read_only">此NFC标签为只读。</string>
     <string name="nfc_write_too_small">此NFC标签容量不足，无法写入%1$d字节的记录。</string>
     <string name="nfc_write_no_ndef">此NFC标签不支持NDEF写入。</string>
-    <string name="nfc_write_written">已向NFC标签写入OpenTasker辅助文本。</string>
-    <string name="nfc_write_formatted">已格式化NFC标签并写入OpenTasker辅助文本。</string>
-    <string name="share_draft_default_name">OpenTasker社区分享</string>
-    <string name="share_draft_default_title">OpenTasker分享</string>
-    <string name="share_draft_default_description">本地OpenTasker配置文件分享草稿。</string>
-    <string name="workspace_export_name">OpenTasker工作区导出</string>
-    <string name="workspace_export_description">从OpenTasker导出的配置文件、任务、变量和场景。</string>
+    <string name="nfc_write_written">已向NFC标签写入RuleDeck辅助文本。</string>
+    <string name="nfc_write_formatted">已格式化NFC标签并写入RuleDeck辅助文本。</string>
+    <string name="share_draft_default_name">RuleDeck社区分享</string>
+    <string name="share_draft_default_title">RuleDeck分享</string>
+    <string name="share_draft_default_description">本地RuleDeck配置文件分享草稿。</string>
+    <string name="workspace_export_name">RuleDeck工作区导出</string>
+    <string name="workspace_export_description">从RuleDeck导出的配置文件、任务、变量和场景。</string>
 
     <!-- Navigation -->
     <string name="locale_select_task_title">为Locale插件选择任务</string>
-    <string name="locale_condition_edit_title">选择OpenTasker条件</string>
+    <string name="locale_condition_edit_title">选择RuleDeck条件</string>
     <string name="locale_condition_profiles">配置文件状态</string>
     <string name="locale_condition_profile_active">配置文件当前处于活动状态</string>
     <string name="locale_condition_no_profiles">没有可用的配置文件。</string>
@@ -71,7 +71,7 @@
     <string name="locale_condition_blurb_context">上下文已满足：%1$s #%2$d</string>
     <string name="locale_condition_blurb_variable">%1$s %2$s 设定值</string>
     <string name="locale_setting_blurb">运行任务：%1$s</string>
-    <string name="locale_setting_no_tasks">没有可用的任务。请先在OpenTasker中创建任务。</string>
+    <string name="locale_setting_no_tasks">没有可用的任务。请先在RuleDeck中创建任务。</string>
     <string name="locale_setting_task_id">任务 #%1$d</string>
     <string name="nav_profiles">配置文件</string>
     <string name="nav_tasks">任务</string>
@@ -84,7 +84,7 @@
     <string name="nav_inspector">检查器</string>
     <string name="nav_diagnostics">诊断</string>
     <string name="global_search_content_description">搜索所有自动化</string>
-    <string name="global_search_title">搜索OpenTasker</string>
+    <string name="global_search_title">搜索RuleDeck</string>
     <string name="global_search_label">搜索配置文件、任务、操作、变量和场景</string>
     <string name="global_search_hint">尝试输入名称、操作类型或变量引用</string>
     <string name="global_search_clear">清除全局搜索</string>
@@ -190,7 +190,7 @@
     <string name="settings_engine_notification_action">打开</string>
     <string name="settings_section_data_recovery">数据与恢复</string>
     <string name="settings_section_integrations">集成</string>
-    <string name="settings_section_about">关于OpenTasker</string>
+    <string name="settings_section_about">关于RuleDeck</string>
     <string name="about_version">版本 %1$s（构建 %2$d，%3$s）</string>
     <string name="about_body">免费且开源，采用MIT许可。所有内容都在此设备上运行。没有账号，也不会向任何地方上传任何内容。</string>
     <string name="about_source">源代码</string>
@@ -227,7 +227,7 @@
     <string name="context_picker_search_hint">名称、描述或上下文类型</string>
     <string name="context_picker_clear_search">清除上下文搜索</string>
     <string name="context_picker_no_results">没有匹配你搜索的上下文。</string>
-    <string name="dialog_review_bundle">审阅OpenTasker包</string>
+    <string name="dialog_review_bundle">审阅RuleDeck包</string>
     <string name="dialog_review_macrodroid">审阅MacroDroid导入</string>
     <string name="dialog_profile_share_review">审阅社区分享</string>
 
@@ -364,22 +364,22 @@
     <string name="setup_backup_restore_staged">恢复暂存备份</string>
     <string name="setup_backup_available">有可用备份</string>
     <string name="setup_backup_none">尚无备份</string>
-    <string name="setup_checklist_body">OpenTasker可以在缺少访问权限的情况下运行，但受影响的自动化在设置完成前会一直保持受限。</string>
+    <string name="setup_checklist_body">RuleDeck可以在缺少访问权限的情况下运行，但受影响的自动化在设置完成前会一直保持受限。</string>
     <string name="setup_item_already_ready">%1$s 已就绪。</string>
     <string name="setup_direct_boot_title">解锁前的时间触发</string>
-    <string name="setup_direct_boot_body">可选，默认关闭。开启时，OpenTasker在你首次解锁手机前唯一会启动的是它自己的每分钟时钟，并在锁屏可访问的存储中记住一次滴答。你的配置文件、任务、已保存数据、机密以及所有其他类型的触发都会等到你解锁。</string>
+    <string name="setup_direct_boot_body">可选，默认关闭。开启时，RuleDeck在你首次解锁手机前唯一会启动的是它自己的每分钟时钟，并在锁屏可访问的存储中记住一次滴答。你的配置文件、任务、已保存数据、机密以及所有其他类型的触发都会等到你解锁。</string>
     <string name="setup_direct_boot_enabled">开启：解锁前可能记住一次时钟滴答。</string>
     <string name="setup_direct_boot_disabled">已禁用：所有触发都会等到解锁。</string>
     <string name="setup_backup_helper_full">创建本地数据库备份、导出副本，或在你可控制的文件夹中保留加密快照。机密变量值仍绑定设备，迁移后必须重新输入。</string>
     <string name="setup_backup_working">处理中…</string>
-    <string name="setup_backup_restore_body">重启OpenTasker以在数据库打开前应用暂存恢复。</string>
-    <string name="setup_backup_restore_summary">%1$s · 架构 v%2$d · %3$s、%4$s、%5$s。重启OpenTasker以应用。</string>
+    <string name="setup_backup_restore_body">重启RuleDeck以在数据库打开前应用暂存恢复。</string>
+    <string name="setup_backup_restore_summary">%1$s · 架构 v%2$d · %3$s、%4$s、%5$s。重启RuleDeck以应用。</string>
     <string name="setup_backup_restore_unreadable">暂存恢复已无法读取（%1$s）。取消它以免下一次启动被阻塞。</string>
     <string name="setup_backup_restore_cancel">取消暂存恢复</string>
     <string name="setup_backup_rollback_kept">你于 %1$s 恢复前的数据库仍在这里，如果需要可回退到它。</string>
     <string name="setup_backup_rollback_action">回退</string>
     <string name="setup_snapshots_label">自动设备外快照</string>
-    <string name="setup_snapshots_helper">将加密恢复存档写入你选择的文件夹。OpenTasker从不上传它们，且恢复仅在审阅后应用。</string>
+    <string name="setup_snapshots_helper">将加密恢复存档写入你选择的文件夹。RuleDeck从不上传它们，且恢复仅在审阅后应用。</string>
     <string name="setup_snapshots_retention">最多保留 %1$s，为期 %2$s。</string>
     <string name="setup_snapshots_choice">%1$d · %2$d 天</string>
     <string name="setup_snapshots_status_ok">上次快照 %1$s · 已存储 %2$d 个 · %3$s</string>
@@ -390,11 +390,11 @@
         <item quantity="other">该文件夹未能删除 %1$d 个旧快照，请在文件夹中手动删除。</item>
     </plurals>
     <string name="setup_snapshots_destination_missing">快照运行前需要一个目标文件夹。</string>
-    <string name="setup_snapshots_destination_ready">设备外目标就绪。OpenTasker只能访问你选择的文件夹。</string>
+    <string name="setup_snapshots_destination_ready">设备外目标就绪。RuleDeck只能访问你选择的文件夹。</string>
     <string name="setup_snapshots_destination_choose">选择快照文件夹</string>
     <string name="setup_snapshots_destination_change">更改快照文件夹或口令</string>
     <string name="setup_snapshots_passphrase_title">保护快照存档</string>
-    <string name="setup_snapshots_passphrase_body">选择一个恢复口令并保存在你的密码管理器中。卸载后或换设备时会需要它；OpenTasker无法替你找回。</string>
+    <string name="setup_snapshots_passphrase_body">选择一个恢复口令并保存在你的密码管理器中。卸载后或换设备时会需要它；RuleDeck无法替你找回。</string>
     <string name="setup_snapshots_passphrase_label">恢复口令</string>
     <string name="setup_snapshots_passphrase_confirm">确认口令</string>
     <plurals name="setup_snapshots_passphrase_error">
@@ -425,8 +425,8 @@
     <string name="setup_action_open_dontkillmyapp">打开 dontkillmyapp.com</string>
     <string name="setup_shizuku_permission_requested">已请求Shizuku权限。</string>
     <string name="setup_shizuku_permission_failed">无法请求Shizuku权限；请确认服务正在运行。</string>
-    <string name="setup_shizuku_permission_granted">Shizuku已授予OpenTasker权限。</string>
-    <string name="setup_shizuku_permission_denied">Shizuku拒绝了。如果它不再询问，请在Shizuku内的已授权应用列表中允许OpenTasker。</string>
+    <string name="setup_shizuku_permission_granted">Shizuku已授予RuleDeck权限。</string>
+    <string name="setup_shizuku_permission_denied">Shizuku拒绝了。如果它不再询问，请在Shizuku内的已授权应用列表中允许RuleDeck。</string>
     <string name="setup_shizuku_mode_disabled">Shizuku电源模式已禁用。</string>
     <string name="setup_shizuku_mode_enabled">Shizuku电源模式已启用。</string>
 
@@ -436,17 +436,17 @@
     <string name="setup_promoted_notifications_title">提升的运行中任务通知</string>
     <string name="setup_promoted_notifications_body">在Android 16及更新版本上可选。启用后，活动任务可以以状态栏实时更新的形式出现；当提升不可用或禁用时，标准前台通知仍可用。</string>
     <string name="setup_promoted_notifications_required_for">活动任务的可选实时更新</string>
-    <string name="service_notification_channel_name">OpenTasker引擎</string>
-    <string name="service_notification_idle_title">OpenTasker正在运行</string>
+    <string name="service_notification_channel_name">RuleDeck引擎</string>
+    <string name="service_notification_idle_title">RuleDeck正在运行</string>
     <string name="service_notification_active_title">任务运行中：%1$s</string>
     <string name="service_notification_open_status">点击打开自动化状态</string>
     <plurals name="service_notification_multiple_tasks">
         <item quantity="other">另有 %1$d 个任务在运行</item>
     </plurals>
     <string name="setup_exact_alarm_card_title">精确闹钟</string>
-    <string name="setup_exact_alarm_card_body">允许精确的计划自动化。如果被拒绝，OpenTasker会回退到不精确的投递窗口。</string>
+    <string name="setup_exact_alarm_card_body">允许精确的计划自动化。如果被拒绝，RuleDeck会回退到不精确的投递窗口。</string>
     <string name="setup_exact_alarm_required_for">时间触发、计划任务</string>
-    <string name="setup_battery_card_body">OEM和Android的电池管理器可能停止后台自动化。将OpenTasker加入豁免名单可提高可靠性。%1$s</string>
+    <string name="setup_battery_card_body">OEM和Android的电池管理器可能停止后台自动化。将RuleDeck加入豁免名单可提高可靠性。%1$s</string>
     <string name="setup_battery_required_for">长时间运行的自动化服务</string>
     <string name="setup_oem_guidance_title">%1$s 后台指南</string>
     <string name="setup_oem_guidance_body">检测到 %1$s（可靠性风险：%2$s）。仅豁免电池优化在此OEM上通常不够。\n\n%3$s\n\n如果按钮无法打开正确屏幕，请参见 %4$s</string>
@@ -471,35 +471,35 @@
     <string name="setup_contacts_access_body">无人值守的联系人查找操作所需。联系人值会写入敏感变量，且绝不会复制到运行日志消息中。在Android 17及以上，选择器模式可以只授予所选字段。</string>
     <string name="setup_contacts_access_required_for">无人值守联系人查找</string>
     <string name="setup_nfc_tags_title">读取 NFC 标签</string>
-    <string name="setup_nfc_tags_body">Android 16 及更高版本只会把扫描到的标签交给你允许的应用。在允许 OpenTasker 之前，扫描标签不会有任何反应，NFC 配置文件也不会运行。</string>
+    <string name="setup_nfc_tags_body">Android 16 及更高版本只会把扫描到的标签交给你允许的应用。在允许 RuleDeck 之前，扫描标签不会有任何反应，NFC 配置文件也不会运行。</string>
     <string name="setup_nfc_tags_required_for">NFC 标签上下文</string>
     <string name="setup_health_title">读取 Health Connect</string>
-    <string name="setup_health_body">让健康上下文从 Health Connect 读取步数、心率、睡眠和锻炼数据。读数会在 OpenTasker 处于后台时按计划检查，所以也需要允许后台读取。OpenTasker 只读取，从不写入健康数据。</string>
+    <string name="setup_health_body">让健康上下文从 Health Connect 读取步数、心率、睡眠和锻炼数据。读数会在 RuleDeck 处于后台时按计划检查，所以也需要允许后台读取。RuleDeck 只读取，从不写入健康数据。</string>
     <string name="setup_health_required_for">健康上下文</string>
     <string name="setup_health_install">获取 Health Connect</string>
     <string name="setup_health_note_unavailable">这台手机上没有 Health Connect。Android 14 及更高版本已内置，Android 9 到 13 上它是 Google 提供的应用。Android 8 无法运行。</string>
-    <string name="setup_health_note_update">Health Connect 需要更新后，OpenTasker 才能在后台读取。</string>
-    <string name="setup_health_note_system_update">这台手机的 Health Connect 是 Android 的一部分，随 Google Play 系统更新一起更新。请安装最新的系统更新，OpenTasker 才能在后台读取。</string>
+    <string name="setup_health_note_update">Health Connect 需要更新后，RuleDeck 才能在后台读取。</string>
+    <string name="setup_health_note_system_update">这台手机的 Health Connect 是 Android 的一部分，随 Google Play 系统更新一起更新。请安装最新的系统更新，RuleDeck 才能在后台读取。</string>
     <string name="setup_health_denied">Health Connect 没有允许全部读数。再次点按此行可打开它的设置。</string>
     <string name="health_metric_steps">步数</string>
     <string name="health_metric_heart_rate">心率</string>
     <string name="health_metric_sleep">睡眠</string>
     <string name="health_metric_exercise">锻炼</string>
-    <string name="health_setup_denied_detail">Health Connect 不允许 OpenTasker 在后台读取%1$s，所以此上下文无法匹配。请在设置向导的“读取 Health Connect”中允许。</string>
+    <string name="health_setup_denied_detail">Health Connect 不允许 RuleDeck 在后台读取%1$s，所以此上下文无法匹配。请在设置向导的“读取 Health Connect”中允许。</string>
     <string name="health_setup_unavailable_detail">这台手机上的 Health Connect 缺失、需要更新或无法在后台读取，所以此上下文无法匹配。设置向导的“读取 Health Connect”会说明原因。</string>
     <string name="health_setup_failed_detail">从 Health Connect 读取%1$s连续失败两次，所以在读取成功之前此上下文无法匹配。应用日志里有错误详情。</string>
-    <string name="health_rationale_title">OpenTasker 与你的健康数据</string>
-    <string name="health_rationale_body">OpenTasker 只为你设置了健康上下文的配置文件读取 Health Connect，例如今天的步数或最近一次心率。\n\n它可以读取步数、心率、睡眠和锻炼，并且只读取你的配置文件用到的项目。读数按你的健康上下文中最短的计划检查，最快每 15 分钟一次。读取在后台进行，所以 OpenTasker 未打开时配置文件也能运行。\n\nOpenTasker 从不写入 Health Connect，也不会把你的读数发送到任何地方。你可以随时在 Health Connect 中收回访问权限。</string>
+    <string name="health_rationale_title">RuleDeck 与你的健康数据</string>
+    <string name="health_rationale_body">RuleDeck 只为你设置了健康上下文的配置文件读取 Health Connect，例如今天的步数或最近一次心率。\n\n它可以读取步数、心率、睡眠和锻炼，并且只读取你的配置文件用到的项目。读数按你的健康上下文中最短的计划检查，最快每 15 分钟一次。读取在后台进行，所以 RuleDeck 未打开时配置文件也能运行。\n\nRuleDeck 从不写入 Health Connect，也不会把你的读数发送到任何地方。你可以随时在 Health Connect 中收回访问权限。</string>
     <string name="setup_overlay_access_title">叠加层访问</string>
-    <string name="setup_overlay_access_body">在其他应用之上显示场景叠加层和控件所需；OpenTasker在后台时，触发器打开应用、链接或主屏幕也需要此权限。Android中称为“显示在其他应用的上层”。</string>
+    <string name="setup_overlay_access_body">在其他应用之上显示场景叠加层和控件所需；RuleDeck在后台时，触发器打开应用、链接或主屏幕也需要此权限。Android中称为“显示在其他应用的上层”。</string>
     <string name="setup_overlay_access_required_for">场景、叠加层UI、由触发器打开应用和链接</string>
     <string name="ui_message_run_busy">已有任务在运行。请等待其完成。</string>
     <string name="action_run_alone_busy">运行中…</string>
     <string name="device_admin_label">锁屏</string>
-    <string name="device_admin_description">让任务可以锁定屏幕。这是OpenTasker在此处唯一请求的内容。</string>
+    <string name="device_admin_description">让任务可以锁定屏幕。这是RuleDeck在此处唯一请求的内容。</string>
     <string name="setup_device_admin_title">锁屏管理员</string>
-    <string name="setup_device_admin_body">Android只允许应用在被设成设备管理员后锁定屏幕。OpenTasker在该角色中只请求一个权限：强制锁定，不请求其他任何内容。它无法擦除你的设备、设置密码策略或读取任何东西。在开启前值得了解的一点：在你关闭此权限之前，Android不允许卸载OpenTasker，而你可以在这里关闭它。</string>
-    <string name="setup_device_admin_explanation">OpenTasker在任务要求时使用此权限锁定屏幕。它不请求其他管理员权限。</string>
+    <string name="setup_device_admin_body">Android只允许应用在被设成设备管理员后锁定屏幕。RuleDeck在该角色中只请求一个权限：强制锁定，不请求其他任何内容。它无法擦除你的设备、设置密码策略或读取任何东西。在开启前值得了解的一点：在你关闭此权限之前，Android不允许卸载RuleDeck，而你可以在这里关闭它。</string>
+    <string name="setup_device_admin_explanation">RuleDeck在任务要求时使用此权限锁定屏幕。它不请求其他管理员权限。</string>
     <string name="setup_device_admin_required_for">锁定设备</string>
     <string name="setup_device_admin_turn_on">开启</string>
     <string name="setup_device_admin_turn_off">关闭</string>
@@ -518,14 +518,14 @@
     <string name="setup_foreground_location_body_approximate">当前只允许粗略位置。Wi-Fi网络名称和小地理围栏需要精确位置，因此请点击“请求”并选择“精确”。</string>
     <string name="setup_foreground_location_required_for">位置和Wi-Fi上下文</string>
     <string name="setup_activity_recognition_title">身体活动</string>
-    <string name="setup_activity_recognition_body">活动上下文值所需。OpenTasker使用Android的计步检测器或加速度计，不记录麦克风音频或移动历史。</string>
+    <string name="setup_activity_recognition_body">活动上下文值所需。RuleDeck使用Android的计步检测器或加速度计，不记录麦克风音频或移动历史。</string>
     <string name="setup_activity_recognition_required_for">活动上下文</string>
     <string name="setup_nearby_wifi_title">附近的Wi-Fi设备</string>
     <string name="setup_nearby_wifi_body">在Android 13及更新版本上，支持Wi-Fi感知自动化所需。SSID可见性仍可能要求位置访问。</string>
     <string name="setup_nearby_wifi_required_for">Wi-Fi上下文</string>
     <string name="setup_background_location_title">后台位置</string>
-    <string name="setup_background_location_body_modern">仅当地理围栏自动化需要在OpenTasker不再可见后继续评估时需要。Android 11及以上从应用设置而非前台权限对话框授予后台位置。用户可以拒绝并继续使用仅前台自动化。公共可靠性仍需要设备验证。</string>
-    <string name="setup_background_location_body_legacy">仅当地理围栏自动化需要在OpenTasker不再可见后继续评估时需要。Android 10可以将用户从权限流程路由到应用位置设置。用户可以拒绝并继续使用仅前台自动化。公共可靠性仍需要设备验证。</string>
+    <string name="setup_background_location_body_modern">仅当地理围栏自动化需要在RuleDeck不再可见后继续评估时需要。Android 11及以上从应用设置而非前台权限对话框授予后台位置。用户可以拒绝并继续使用仅前台自动化。公共可靠性仍需要设备验证。</string>
+    <string name="setup_background_location_body_legacy">仅当地理围栏自动化需要在RuleDeck不再可见后继续评估时需要。Android 10可以将用户从权限流程路由到应用位置设置。用户可以拒绝并继续使用仅前台自动化。公共可靠性仍需要设备验证。</string>
     <string name="setup_background_location_required_for">后台位置半径评估</string>
     <string name="setup_bluetooth_title">蓝牙连接</string>
     <string name="setup_bluetooth_body">在Android 12及更新版本上，蓝牙设备操作和上下文检查所需，包括Android 16的绑定丢失和加密事件。“附近的蓝牙设备”上下文也用它识别已连接的配对设备（例如车载系统或耳机），这类设备通常不会出现在扫描结果中。</string>
@@ -534,7 +534,7 @@
     <string name="setup_bluetooth_scan_body">让“附近的蓝牙设备”上下文查找你指定的设备。Android 11及更早版本改为请求位置权限，并且需要开启位置信息。手机只有在广播时才会被发现，配对一次有助于Android识别它。</string>
     <string name="setup_bluetooth_scan_required_for">“附近的蓝牙设备”上下文</string>
     <string name="setup_screen_recording_title">屏幕录制检测</string>
-    <string name="setup_screen_recording_body">在Android 15及更新版本上，当此应用在屏幕录制中变得可见或不可见时，OpenTasker可以做出反应。此触发不会捕获任何屏幕内容。</string>
+    <string name="setup_screen_recording_body">在Android 15及更新版本上，当此应用在屏幕录制中变得可见或不可见时，RuleDeck可以做出反应。此触发不会捕获任何屏幕内容。</string>
     <string name="setup_screen_recording_required_for">屏幕录制事件上下文</string>
     <string name="setup_platform_blocked_title">部分触发条件无法在此手机上触发</string>
     <string name="setup_platform_blocked_body">此手机运行Android %1$s。下列配置文件等待的是更新版本Android才提供的功能，在手机升级之前不会在此运行。</string>
@@ -545,7 +545,7 @@
     <string name="platform_family_advanced_protection">高级保护状态变化</string>
     <string name="platform_family_bluetooth_security">蓝牙密钥或加密变化</string>
     <string name="setup_advanced_protection_title">高级保护已开启</string>
-    <string name="setup_advanced_protection_body">Android高级保护可能限制与自动化相关的能力。OpenTasker不使用辅助功能，但某些特权扩展在此保护启用时可能受限。</string>
+    <string name="setup_advanced_protection_body">Android高级保护可能限制与自动化相关的能力。RuleDeck不使用辅助功能，但某些特权扩展在此保护启用时可能受限。</string>
     <string name="setup_local_network_required_for">局域网网络操作</string>
     <string name="setup_sms_title">短信发送</string>
     <string name="setup_sms_body">短信操作发送消息前需要此项。请保持短信自动化明确且由用户编写。</string>
@@ -554,46 +554,46 @@
     <string name="setup_sms_receive_body">允许 event=sms_received 自动化接收经过净化的发送方和内容值。除非应用被豁免，否则Android 17可能将标准OTP短信投递延迟最多三小时。</string>
     <string name="setup_sms_receive_required_for">短信/彩信接收事件上下文</string>
     <string name="setup_phone_state_title">电话状态</string>
-    <string name="setup_phone_state_body">漫游和通话状态上下文所需。OpenTasker只读取匹配所需的当前状态，不存储电话号码或通话历史。</string>
+    <string name="setup_phone_state_body">漫游和通话状态上下文所需。RuleDeck只读取匹配所需的当前状态，不存储电话号码或通话历史。</string>
     <string name="setup_phone_state_required_for">漫游和通话上下文</string>
     <string name="setup_call_log_title">来电号码</string>
-    <string name="setup_call_log_body">只有拥有“通话记录”权限的应用，Android才会告诉它谁在来电。OpenTasker只在手机响铃时使用该号码，不会读取或存储你的通话记录。</string>
+    <string name="setup_call_log_body">只有拥有“通话记录”权限的应用，Android才会告诉它谁在来电。RuleDeck只在手机响铃时使用该号码，不会读取或存储你的通话记录。</string>
     <string name="setup_call_log_required_for">来电触发器的号码</string>
     <string name="setup_dnd_title">勿扰模式访问</string>
-    <string name="setup_dnd_body">OpenTasker更改打扰过滤器或创建、更新、移除专有Zen规则前需要此项。</string>
+    <string name="setup_dnd_body">RuleDeck更改打扰过滤器或创建、更新、移除专有Zen规则前需要此项。</string>
     <string name="setup_dnd_required_for">勿扰模式操作</string>
     <string name="setup_shizuku_title">Shizuku电源模式</string>
     <string name="setup_shizuku_required_for">提权操作</string>
     <string name="setup_shizuku_status_not_installed">未安装Shizuku管理器。</string>
     <string name="setup_shizuku_status_disabled">Shizuku电源模式被持久化开关禁用。</string>
     <string name="setup_shizuku_status_manager_stopped">已安装Shizuku管理器，但服务未运行。</string>
-    <string name="setup_shizuku_status_permission_needed">Shizuku正在运行，但OpenTasker需要权限。</string>
-    <string name="setup_shizuku_status_transport_unavailable">Shizuku已授予权限，但OpenTasker无法访问其辅助服务。需要提权的操作会拒绝运行，直到该连接恢复。</string>
-    <string name="setup_shizuku_status_ready">Shizuku正在运行，已授予权限，且OpenTasker可以访问其辅助服务。</string>
-    <string name="setup_shizuku_android17_note">在 Android 17 上，原版 Shizuku 可能无法启动。GitHub 上 thedjchi 维护的 Shizuku 分支支持 Android 17，其主页显示版本 13.6 属于正常情况。部分手机重启后会关闭无线调试，而 OpenTasker 无法自行重新开启，因此重启后请在开发者选项中开启无线调试，再重新启动 Shizuku。</string>
+    <string name="setup_shizuku_status_permission_needed">Shizuku正在运行，但RuleDeck需要权限。</string>
+    <string name="setup_shizuku_status_transport_unavailable">Shizuku已授予权限，但RuleDeck无法访问其辅助服务。需要提权的操作会拒绝运行，直到该连接恢复。</string>
+    <string name="setup_shizuku_status_ready">Shizuku正在运行，已授予权限，且RuleDeck可以访问其辅助服务。</string>
+    <string name="setup_shizuku_android17_note">在 Android 17 上，原版 Shizuku 可能无法启动。GitHub 上 thedjchi 维护的 Shizuku 分支支持 Android 17，其主页显示版本 13.6 属于正常情况。部分手机重启后会关闭无线调试，而 RuleDeck 无法自行重新开启，因此重启后请在开发者选项中开启无线调试，再重新启动 Shizuku。</string>
     <string name="setup_assistant_title">数字助理应用</string>
     <string name="setup_assistant_required_for">不使用Shizuku切换飞行模式</string>
-    <string name="setup_assistant_status_active">OpenTasker是数字助理应用，因此即使Shizuku未运行，飞行模式也能使用。</string>
-    <string name="setup_assistant_status_inactive">Android允许数字助理应用切换飞行模式。如果无法使用Shizuku，请在“默认应用”的“数字助理应用”中选择OpenTasker。</string>
-    <string name="setup_assistant_status_disconnected">OpenTasker是数字助理应用，但Android尚未连接它。OpenTasker被强行停止后会出现这种情况。请在“默认应用”中先选择其他助理，再重新选择OpenTasker。</string>
-    <string name="setup_assistant_note">这会替换你当前的助理，因此长按主屏幕键或电源键会打开OpenTasker。你可以随时在同一界面切换回来。</string>
+    <string name="setup_assistant_status_active">RuleDeck是数字助理应用，因此即使Shizuku未运行，飞行模式也能使用。</string>
+    <string name="setup_assistant_status_inactive">Android允许数字助理应用切换飞行模式。如果无法使用Shizuku，请在“默认应用”的“数字助理应用”中选择RuleDeck。</string>
+    <string name="setup_assistant_status_disconnected">RuleDeck是数字助理应用，但Android尚未连接它。RuleDeck被强行停止后会出现这种情况。请在“默认应用”中先选择其他助理，再重新选择RuleDeck。</string>
+    <string name="setup_assistant_note">这会替换你当前的助理，因此长按主屏幕键或电源键会打开RuleDeck。你可以随时在同一界面切换回来。</string>
     <string name="setup_wireguard_title">WireGuard隧道控制</string>
     <string name="setup_wireguard_body">让配置文件开启和关闭你的WireGuard隧道。还需在WireGuard设置中开启“允许远程控制应用”，否则它会忽略请求。</string>
     <string name="setup_wireguard_required_for">使用WireGuard的“连接或断开VPN”</string>
     <string name="setup_shizuku_allowlist_title">已批准的Shizuku脚本</string>
-    <string name="setup_shizuku_allowlist_body">这些脚本以Android shell用户身份运行，权限范围与adb相同。请把脚本放在该用户可读取的位置，例如/data/local/tmp或共享存储，并输入来自可信副本的SHA-256（sha256sum会输出它）。OpenTasker会读取文件、检查哈希，并只运行检查过的内容，因此被修改的脚本在你再次批准之前会拒绝运行。</string>
+    <string name="setup_shizuku_allowlist_body">这些脚本以Android shell用户身份运行，权限范围与adb相同。请把脚本放在该用户可读取的位置，例如/data/local/tmp或共享存储，并输入来自可信副本的SHA-256（sha256sum会输出它）。RuleDeck会读取文件、检查哈希，并只运行检查过的内容，因此被修改的脚本在你再次批准之前会拒绝运行。</string>
     <string name="setup_shizuku_script_path_hint">/data/local/tmp/my_script.sh</string>
     <string name="setup_shizuku_script_path_error">请使用以/开头、且不含.或..片段的完整路径。</string>
     <string name="setup_shizuku_allowlist_empty">尚未批准任何脚本，因此“运行Shizuku脚本”会拒绝运行。</string>
     <string name="setup_termux_title">Termux脚本桥接</string>
     <string name="setup_termux_status_missing">未安装Termux。</string>
     <string name="setup_termux_status_version_unsupported">有界的命令结果需要Termux 0.109或更高版本。</string>
-    <string name="setup_termux_status_permission_needed">已安装Termux，但OpenTasker需要RUN_COMMAND权限。</string>
+    <string name="setup_termux_status_permission_needed">已安装Termux，但RuleDeck需要RUN_COMMAND权限。</string>
     <string name="setup_termux_status_ready">已安装Termux并已授予RUN_COMMAND权限。</string>
     <string name="setup_termux_body">%1$s 只有SHA-256哈希匹配的已批准脚本才能运行。</string>
     <string name="setup_termux_required_for">脚本操作</string>
     <string name="setup_termux_allowlist_title">已批准的Termux脚本</string>
-    <string name="setup_termux_allowlist_body">从可信副本输入期望的SHA-256。OpenTasker会在每次运行前立即验证Termux中的脚本。Termux还需要在 ~/.termux/termux.properties 中设置 allow-external-apps=true，否则不会返回结果且检查无法运行。脚本运行时不会读取 .bashrc 或 .profile，因此请使用命令的完整路径。</string>
+    <string name="setup_termux_allowlist_body">从可信副本输入期望的SHA-256。RuleDeck会在每次运行前立即验证Termux中的脚本。Termux还需要在 ~/.termux/termux.properties 中设置 allow-external-apps=true，否则不会返回结果且检查无法运行。脚本运行时不会读取 .bashrc 或 .profile，因此请使用命令的完整路径。</string>
     <string name="setup_termux_script_path_label">脚本路径</string>
     <string name="setup_termux_script_path_hint">~/.termux/tasker/my_script</string>
     <string name="setup_termux_script_path_error">请使用 ~/.termux/tasker 内的脚本，不要使用路径穿越。</string>
@@ -649,8 +649,8 @@
     <string name="run_log_hide_filters">隐藏筛选条件</string>
     <string name="run_log_share_diagnostic">分享诊断报告</string>
     <string name="run_log_share_short">分享</string>
-    <string name="share_uri_unreadable">OpenTasker无法读取共享的文件。请以读取权限重新分享它。</string>
-    <string name="share_invalid">OpenTasker无法读取该分享。</string>
+    <string name="share_uri_unreadable">RuleDeck无法读取共享的文件。请以读取权限重新分享它。</string>
+    <string name="share_invalid">RuleDeck无法读取该分享。</string>
     <string name="run_log_loading">正在加载运行日志…</string>
     <string name="run_log_load_more">加载更多</string>
     <string name="run_log_refresh">刷新</string>
@@ -757,7 +757,7 @@
     <string name="automation_lint_invariant_violation_detail">你的规则 %1$s（%2$s）监视的设置可能被 %3$s 通过写入 %4$s 而更改。</string>
     <string name="automation_lint_invariant_violation_fix">关闭该配置文件，或缩小其运行范围。如果此更改是有意的，请改为编辑该规则。</string>
     <string name="automation_invariant_panel_title">要警告的设置</string>
-    <string name="automation_invariant_panel_body">列出你不希望自动化更改的设备设置。不会阻止任何内容。OpenTasker会检查规则，并在已启用的配置文件看起来会更改其中某项时警告你。</string>
+    <string name="automation_invariant_panel_body">列出你不希望自动化更改的设备设置。不会阻止任何内容。RuleDeck会检查规则，并在已启用的配置文件看起来会更改其中某项时警告你。</string>
     <string name="automation_invariant_empty">尚未监视任何设置。</string>
     <string name="automation_invariant_limit">上限为%1$d。停止监视某个设置后才能再添加。</string>
     <string name="automation_invariant_add">监视一个设置</string>
@@ -779,7 +779,7 @@
     <string name="automation_invariant_validation_name">请输入最多64个字符的名称。</string>
     <string name="automation_invariant_validation_guard_key">以字母开头，然后使用字母、数字、点、下划线、冒号或连字符。</string>
     <string name="automation_invariant_validation_guard_value">请输入最多96个字符的值。</string>
-    <string name="automation_invariant_validation_write_key">请输入OpenTasker识别的设置名称。</string>
+    <string name="automation_invariant_validation_write_key">请输入RuleDeck识别的设置名称。</string>
     <string name="automation_invariant_validation_generic">请用有效值填写每个字段。</string>
     <string name="automation_invariant_save">保存规则</string>
     <string name="automation_invariant_cancel">取消</string>
@@ -821,7 +821,7 @@
     <string name="import_disabled_notice">导入的配置文件将以禁用状态创建以供审阅。</string>
     <string name="import_schema_app">架构 %1$d · 由应用 %2$s 导出</string>
     <string name="import_incompatible">无法导入</string>
-    <string name="import_incompatible_body">包架构与此版本的OpenTasker不兼容。</string>
+    <string name="import_incompatible_body">包架构与此版本的RuleDeck不兼容。</string>
     <string name="import_capability_review">能力审阅</string>
     <string name="import_capability_item">%1$s · %2$s：%3$s</string>
     <string name="import_warnings">导入警告</string>
@@ -836,14 +836,14 @@
     <string name="import_import_json">导入JSON</string>
     <string name="import_paste_json_action">粘贴 / 扫描</string>
     <string name="import_paste_json_title">粘贴或扫描导入</string>
-    <string name="import_paste_json_body">在此粘贴一个OpenTasker包，或使用一个输入已解码文本的QR扫描器。在你于审阅中确认之前不会写入任何内容。</string>
-    <string name="import_paste_json_hint">OpenTasker JSON</string>
+    <string name="import_paste_json_body">在此粘贴一个RuleDeck包，或使用一个输入已解码文本的QR扫描器。在你于审阅中确认之前不会写入任何内容。</string>
+    <string name="import_paste_json_hint">RuleDeck JSON</string>
     <string name="import_paste_too_long">内容过长，粘贴时末尾已被截断。请将其保存为文件，然后改用“导入JSON”。</string>
     <string name="import_paste_json_review">审阅导入</string>
     <plurals name="import_paste_hidden">
         <item quantity="other">已粘贴%1$s个字符，太多，无法在此显示。</item>
     </plurals>
-    <string name="import_opentasker_bundle">OpenTasker包</string>
+    <string name="import_ruledeck_bundle">RuleDeck包</string>
     <string name="import_count_tasks">任务</string>
     <string name="import_count_profiles">配置文件</string>
     <string name="import_count_variables">变量</string>
@@ -864,7 +864,7 @@
     <string name="import_count_src_profiles">源配置文件</string>
     <string name="import_mapped">已映射</string>
     <string name="import_unsupported">不支持</string>
-    <string name="profile_share_unverified_notice">这是一个未经核实的本地草稿。在向OpenTasker写入任何内容之前，请审阅清单和导入计划。</string>
+    <string name="profile_share_unverified_notice">这是一个未经核实的本地草稿。在向RuleDeck写入任何内容之前，请审阅清单和导入计划。</string>
     <string name="profile_share_slug">分享标识</string>
     <string name="profile_share_slug_hint">3-64个小写字母、数字和连字符</string>
     <string name="profile_share_title">标题</string>
@@ -873,7 +873,7 @@
     <string name="profile_share_source_url">来源URL（可选）</string>
     <string name="profile_share_invalid_details">分享详情需要关注</string>
     <string name="profile_share_trust_title">信任与提交</string>
-    <string name="profile_share_trust_body">信任：%1$s。提交渠道：%2$s。OpenTasker不将此草稿视为已核实。</string>
+    <string name="profile_share_trust_body">信任：%1$s。提交渠道：%2$s。RuleDeck不将此草稿视为已核实。</string>
     <string name="profile_share_trust_local_draft">本地草稿</string>
     <string name="profile_share_trust_community_unverified">社区草稿，未核实</string>
     <string name="profile_share_invalid_details_body">请审阅分享字段并重试。</string>
@@ -1062,7 +1062,7 @@
     <string name="context_preset_incoming_call">来电</string>
     <string name="context_preset_incoming_call_not_in_contacts">来电，不在联系人中</string>
     <string name="context_incoming_call_note">任务通过{{ event.incoming_number }}读取来电者。只有允许“通话记录”时，Android才会提供号码；区分陌生人和联系人需要联系人权限。隐藏号码的来电者，或无法核实的来电者，永远不会被算作陌生人。</string>
-    <string name="context_broadcast_platform_action_note">这看起来是一个系统动作。应用无法发送这些动作，因此基于它的配置文件可能永远不会触发。OpenTasker为常见系统事件提供了专门构建的触发器。</string>
+    <string name="context_broadcast_platform_action_note">这看起来是一个系统动作。应用无法发送这些动作，因此基于它的配置文件可能永远不会触发。RuleDeck为常见系统事件提供了专门构建的触发器。</string>
     <string name="context_broadcast_sender_unavailable_note">Android 13及更早版本从不报告广播的发送方是谁，因此此过滤器在此设备上不会匹配任何内容。</string>
     <string name="context_broadcast_sender_optin_note">只有发送应用选择共享其身份时，Android才会标明发送方。大多数应用不会，adb也不会。发送方未知的广播会被此过滤器拒绝，因此除非你确定你的发送方共享其身份，否则请留空。</string>
     <string name="context_event_variables_title">此触发器提供的变量</string>
@@ -1128,7 +1128,7 @@
     <string name="import_reading_bundle">正在读取包…</string>
 
     <string name="workspace_stored_data_review">存储的数据需要审阅</string>
-    <string name="workspace_stored_data_review_body">OpenTasker阻止了受影响的记录被执行和编辑。%1$s%2$s。请先恢复数据库备份再继续；原始存储的数据保持不变。</string>
+    <string name="workspace_stored_data_review_body">RuleDeck阻止了受影响的记录被执行和编辑。%1$s%2$s。请先恢复数据库备份再继续；原始存储的数据保持不变。</string>
     <string name="workspace_runs_task">运行：%1$s</string>
     <string name="workspace_missing_task">缺失任务 #%1$d</string>
     <string name="workspace_exit_task_only">%1$s（停止匹配时）</string>
@@ -1349,8 +1349,8 @@
     <string name="context_invert_helper">当此上下文不为真时运行。</string>
     <string name="context_days_select_one">请至少选择一天。</string>
     <string name="context_days_invalid_helper">使用工作日、周末、每天，或日期标记/范围。</string>
-    <string name="context_nfc_trigger_label">OpenTasker NFC触发器</string>
-    <string name="context_nfc_trigger_label_with_tag">OpenTasker NFC触发器 %1$s</string>
+    <string name="context_nfc_trigger_label">RuleDeck NFC触发器</string>
+    <string name="context_nfc_trigger_label_with_tag">RuleDeck NFC触发器 %1$s</string>
     <string name="context_nfc_write_helper_body">为下一个被扫描的标签启动一次性的NDEF文本写入。</string>
 
     <string name="label_min">最小</string>
@@ -1430,11 +1430,11 @@
     <string name="diagnostics_process_exit_matched">%1$s，%3$s。Android的说明：%2$s。引擎有%4$s没有响应。</string>
     <string name="diagnostics_fgs_types">前台服务类型</string>
     <string name="diagnostics_standby_consequence">待机投递后果</string>
-    <string name="diagnostics_standby_throttled">此存储桶会限制每分钟的触发闹钟和后台工作，因此时间和轮询触发可能延迟。请将OpenTasker添加到设置中的电池优化豁免名单，以保持其响应。</string>
+    <string name="diagnostics_standby_throttled">此存储桶会限制每分钟的触发闹钟和后台工作，因此时间和轮询触发可能延迟。请将RuleDeck添加到设置中的电池优化豁免名单，以保持其响应。</string>
     <string name="diagnostics_advanced_protection">高级保护</string>
     <string name="diagnostics_advanced_protection_on">开</string>
     <string name="diagnostics_advanced_protection_off">关</string>
-    <string name="diagnostics_advanced_protection_warning">Android高级保护模式已开启。它可以从未注册为辅助功能工具的应用撤销辅助功能，并限制某些自动化能力。OpenTasker不使用辅助功能，因此其触发器仍可工作，但特权扩展（如Shizuku电源操作）在关闭高级保护前可能受限。</string>
+    <string name="diagnostics_advanced_protection_warning">Android高级保护模式已开启。它可以从未注册为辅助功能工具的应用撤销辅助功能，并限制某些自动化能力。RuleDeck不使用辅助功能，因此其触发器仍可工作，但特权扩展（如Shizuku电源操作）在关闭高级保护前可能受限。</string>
     <string name="diagnostics_exact_alarm">时间闹钟投递</string>
     <string name="diagnostics_matcher_error">上次匹配器错误</string>
     <string name="diagnostics_worker_stop">看门狗停止原因</string>
@@ -1455,7 +1455,7 @@
     <!-- %1$s is why Android stopped an earlier run, %2$s when. Appended after the latest outcome. -->
     <string name="diagnostics_work_outcome_also_stopped">\n更早的一次运行被Android停止：%1$s · %2$s</string>
     <string name="diagnostics_stop_reason_not_stopped">未停止</string>
-    <string name="diagnostics_stop_reason_cancelled_by_app">被OpenTasker取消</string>
+    <string name="diagnostics_stop_reason_cancelled_by_app">被RuleDeck取消</string>
     <string name="diagnostics_stop_reason_preempt">被更高优先级的任务抢占</string>
     <string name="diagnostics_stop_reason_timeout">时间用尽</string>
     <string name="diagnostics_stop_reason_timeout_abandoned">运行时间过长后放弃</string>
@@ -1497,12 +1497,12 @@
     <string name="diagnostics_signal_engine_stale">引擎上次报告状态是在%1$s前。</string>
     <string name="diagnostics_signal_engine_ready">引擎最近报告过状态。</string>
     <string name="diagnostics_signal_matchers_ready">配置文件检查正常。</string>
-    <string name="diagnostics_signal_exact_alarm_ready">Android允许OpenTasker设置精确闹钟。</string>
+    <string name="diagnostics_signal_exact_alarm_ready">Android允许RuleDeck设置精确闹钟。</string>
     <string name="diagnostics_signal_exact_alarm_inexact">Android不允许精确闹钟，因此定时触发可能会晚几分钟。</string>
     <string name="diagnostics_signal_watchdog_none">没有停止记录。</string>
     <string name="diagnostics_signal_scheduled_jobs_blocked">部分计划任务正在等待条件满足。</string>
     <string name="diagnostics_signal_advanced_protection_on">高级保护已开启，可能会限制部分功能。</string>
-    <string name="diagnostics_signal_advanced_protection_off">高级保护没有限制OpenTasker。</string>
+    <string name="diagnostics_signal_advanced_protection_off">高级保护没有限制RuleDeck。</string>
     <string name="diagnostics_signal_executions_count">%1$d个在等待其他应用，%2$d个正在运行</string>
     <string name="diagnostics_exact_alarm_exact">精确</string>
     <string name="diagnostics_exact_alarm_inexact">可能晚几分钟</string>
@@ -1585,7 +1585,7 @@
     <string name="action_field_error_body_not_allowed">所选HTTP方法不接受请求体。</string>
     <string name="action_field_error_invalid_definition">此字段配置不正确。</string>
     <string name="action_field_unknown_option">不支持的已保存值：%1$s</string>
-    <string name="action_file_picker_saved_files">OpenTasker文件</string>
+    <string name="action_file_picker_saved_files">RuleDeck文件</string>
     <string name="action_file_picker_empty">还没有已保存的文件。你可以输入一个新的相对路径。</string>
 
     <string name="action_option_toggle">切换</string>
@@ -1711,7 +1711,7 @@
          refused the change, so this carries it through without prefixing it with noise. -->
     <string name="ui_error_reason">%1$s</string>
     <!-- Shown as the activity title inside Locale plugin host apps. -->
-    <string name="locale_setting_edit_title">OpenTasker任务</string>
+    <string name="locale_setting_edit_title">RuleDeck任务</string>
     <string name="task_name_duplicate_warning">另一个任务已使用此名称。按名称引用该任务的引用会变得有歧义。</string>
     <string name="run_log_load_failed_title">无法加载运行日志</string>
     <string name="run_log_load_failed_body">无法读取存储的运行历史。请重试；如果持续失败，请检查诊断。</string>
@@ -1724,10 +1724,10 @@
     <string name="ui_error_task_delete">无法删除任务。详情见“诊断”。</string>
     <string name="ui_error_automation_import_preview">MacroDroid导入预览失败。详情见“诊断”。</string>
     <string name="ui_error_automation_import">MacroDroid导入失败</string>
-    <string name="ui_error_bundle_export">OpenTasker包导出失败</string>
-    <string name="ui_error_bundle_preview">OpenTasker包预览失败。详情见“诊断”。</string>
+    <string name="ui_error_bundle_export">RuleDeck包导出失败</string>
+    <string name="ui_error_bundle_preview">RuleDeck包预览失败。详情见“诊断”。</string>
     <string name="ui_error_share_preview">无法准备分享预览</string>
-    <string name="ui_error_bundle_import">OpenTasker包导入失败</string>
+    <string name="ui_error_bundle_import">RuleDeck包导入失败</string>
     <string name="ui_error_run_logs_load">无法加载运行日志</string>
     <string name="ui_error_run_logs_more">无法加载更多运行日志</string>
     <string name="ui_error_run_log_export">运行日志导出失败</string>
@@ -1737,7 +1737,7 @@
         <item quantity="other">冷却还剩 %1$d 秒。</item>
     </plurals>
     <string name="synthetic_trigger_admission_rejected">一个运行上限本会阻止这一次。</string>
-    <string name="ui_error_bundle_not_recognized">这看起来不像OpenTasker包。请粘贴从OpenTasker导出的JSON，或扫描其QR码。</string>
+    <string name="ui_error_bundle_not_recognized">这看起来不像RuleDeck包。请粘贴从RuleDeck导出的JSON，或扫描其QR码。</string>
     <string name="ui_error_import_damaged">此导出内容已损坏或不完整，无法读取。请重新导出后导入新副本。</string>
     <string name="ui_error_macrodroid_password_protected">此MacroDroid导出文件设置了密码，无法在此读取。请在MacroDroid中不设密码重新导出宏，然后导入该文件。</string>
     <string name="ui_error_import_budget_items">此文件过大，无法导入。其中的任务、配置文件、变量和场景合计不能超过%1$d个。</string>
@@ -1750,10 +1750,10 @@
     <string name="ui_error_action_type_unsupported">此构建没有该操作的编辑器。请移除它，或在支持它的构建上重新导入。</string>
     <string name="ui_error_share_diagnostics">分享诊断报告失败</string>
     <string name="ui_error_copy_diagnostics">复制诊断报告失败</string>
-    <string name="diagnostics_share_subject">OpenTasker诊断报告</string>
+    <string name="diagnostics_share_subject">RuleDeck诊断报告</string>
     <string name="diagnostics_share_chooser">分享诊断报告</string>
     <string name="import_document_macrodroid">MacroDroid导出文件</string>
-    <string name="import_document_opentasker_bundle">OpenTasker包</string>
+    <string name="import_document_ruledeck_bundle">RuleDeck包</string>
     <string name="ui_error_document_unreadable">无法打开所选 %1$s。</string>
     <string name="ui_error_document_too_large">所选 %1$s 大于 %2$d MB。</string>
     <string name="ui_error_import_budget">此文件太大，无法导入。它超出了%1$s的上限，即%2$d。</string>
@@ -1826,7 +1826,7 @@
         <item quantity="other">任务仍被 %1$d 个自动化使用。请先重新分配或清除这些引用。</item>
     </plurals>
     <string name="ui_message_automation_import_ready">自动化导入已就绪，可供审阅</string>
-    <string name="ui_message_bundle_ready">OpenTasker包已就绪，可供审阅</string>
+    <string name="ui_message_bundle_ready">RuleDeck包已就绪，可供审阅</string>
     <string name="ui_message_edit_undone">编辑已撤销</string>
     <string name="ui_message_edit_redone">编辑已重做</string>
     <string name="ui_message_no_edit_history">没有可用的编辑历史</string>
@@ -1842,7 +1842,7 @@
     </plurals>
     <string name="ui_message_snapshots_disabled">自动快照已关闭</string>
     <string name="ui_message_snapshot_destination_saved">快照目标已保存</string>
-    <string name="ui_message_restore_staged">恢复已暂存。请重启OpenTasker以应用。</string>
+    <string name="ui_message_restore_staged">恢复已暂存。请重启RuleDeck以应用。</string>
     <string name="ui_message_restore_cancelled">暂存恢复已取消</string>
     <string name="ui_message_no_staged_restore">没有可取消的暂存恢复</string>
     <string name="ui_message_no_restore_rollback">没有更早的数据库可回退。</string>
@@ -1965,7 +1965,7 @@
     <string name="inspector_setup_calendar_missing">日历触发需要设置中的日历访问；日出/日落匹配使用配置的坐标。</string>
     <string name="inspector_setup_event_ready">开机、系统、通知、NFC、日历和太阳事件已注册。通知文本仅保存在内存中用于匹配，不会写入运行日志。%1$s</string>
     <string name="inspector_setup_event_notification_missing">开机、系统、NFC、日历和太阳事件已注册。通知事件需要Android绑定监听器前的设置中的通知访问。%1$s</string>
-    <string name="inspector_setup_nfc_blocked">Android 尚未把 NFC 标签交给 OpenTasker，因此 NFC 事件不会触发。请在“设置”的“读取 NFC 标签”中允许。</string>
+    <string name="inspector_setup_nfc_blocked">Android 尚未把 NFC 标签交给 RuleDeck，因此 NFC 事件不会触发。请在“设置”的“读取 NFC 标签”中允许。</string>
     <string name="inspector_setup_source_generic">来源设置状态尚未专门化。</string>
     <string name="diagnostics_health_state_ready">就绪</string>
     <string name="diagnostics_health_state_loading">加载中</string>
@@ -2022,7 +2022,7 @@
     <string name="setup_locale_grant_revoke">撤销</string>
     <string name="setup_locale_grant_revoked">已撤销 %1$s 的授权</string>
     <string name="setup_target_signer_title">%1$s 的签名密钥已更改</string>
-    <string name="setup_target_signer_body">%1$s 现在使用的签名证书与 OpenTasker 之前信任的不同，因此 OpenTasker 已停止向它发送命令。只有当你从信任的来源安装了此版本时，才重新批准它。</string>
+    <string name="setup_target_signer_body">%1$s 现在使用的签名证书与 RuleDeck 之前信任的不同，因此 RuleDeck 已停止向它发送命令。只有当你从信任的来源安装了此版本时，才重新批准它。</string>
     <string name="setup_target_signer_required_for">插件和 Termux 操作</string>
     <string name="setup_target_signer_reapprove">重新批准</string>
     <string name="setup_target_signer_reapproved">已重新批准 %1$s</string>
@@ -2102,7 +2102,7 @@
     <string name="sub_task_input_error_reset_return_variable">resetReturnVariable是先清空该变量的开关。请换一个名称。</string>
     <string name="dialog_password_open">打开</string>
     <string name="dialog_backup_passphrase_title">加密快照</string>
-    <string name="dialog_backup_passphrase_body">这是一个加密的 OpenTasker 快照。请输入你在设置中为快照设定的密码。OpenTasker 不会保存它。</string>
+    <string name="dialog_backup_passphrase_body">这是一个加密的 RuleDeck 快照。请输入你在设置中为快照设定的密码。RuleDeck 不会保存它。</string>
     <string name="dialog_backup_passphrase_label">快照密码</string>
     <string name="dialog_backup_passphrase_wrong">这个密码打不开此文件。如果密码没错，文件可能已损坏。</string>
 </resources>

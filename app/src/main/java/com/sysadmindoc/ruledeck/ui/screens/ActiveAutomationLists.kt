@@ -1,0 +1,1167 @@
+package com.sysadmindoc.ruledeck.ui.screens
+
+import android.os.Build
+import androidx.annotation.StringRes
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.sysadmindoc.ruledeck.R
+import com.sysadmindoc.ruledeck.core.actions.ActionMetadataRegistry
+import com.sysadmindoc.ruledeck.core.actions.ActionSummaryFormatter
+import com.sysadmindoc.ruledeck.core.capabilities.ActionCapabilityRegistry
+import com.sysadmindoc.ruledeck.core.capabilities.CapabilityLevel
+import com.sysadmindoc.ruledeck.core.capabilities.SetupRequirement
+import com.sysadmindoc.ruledeck.core.capabilities.SetupRequirementResolver
+import com.sysadmindoc.ruledeck.core.contexts.contextConfigSummary
+import com.sysadmindoc.ruledeck.core.engine.ActiveExecution
+import com.sysadmindoc.ruledeck.core.engine.SingleActionRun
+import com.sysadmindoc.ruledeck.core.model.ActionSpec
+import com.sysadmindoc.ruledeck.core.model.ContextSpec
+import com.sysadmindoc.ruledeck.core.model.Profile
+import com.sysadmindoc.ruledeck.core.model.RunLogEntry
+import com.sysadmindoc.ruledeck.core.model.Task
+import com.sysadmindoc.ruledeck.core.model.enterTaskIdOrNull
+import com.sysadmindoc.ruledeck.core.plugins.locale.localePluginReceiverInstalled
+import com.sysadmindoc.ruledeck.core.storage.EditHistoryDao
+import com.sysadmindoc.ruledeck.core.storage.StorageDecodeIssue
+import com.sysadmindoc.ruledeck.ui.theme.DesignSystem
+import com.sysadmindoc.ruledeck.ui.utils.expandCollapseToggle
+import com.sysadmindoc.ruledeck.ui.utils.rememberSingleTap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+@Composable
+internal fun ProfilesScreen(
+    profiles: List<Profile>,
+    tasks: List<Task>,
+    runLogs: List<RunLogEntry>,
+    storageDecodeIssues: List<StorageDecodeIssue>,
+    onCreateTaskFirst: () -> Unit,
+    onCreateProfile: () -> Unit,
+    onBrowseTemplates: () -> Unit,
+    onPreviewProfileShare: () -> Unit,
+    onPreflightProfile: (Profile) -> Unit,
+    onExportRuleDeckBundle: () -> Unit,
+    onImportRuleDeckBundle: () -> Unit,
+    onImportRuleDeckBundleText: () -> Unit,
+    ruleDeckBundleBusy: Boolean,
+    onImportMacroDroid: () -> Unit,
+    automationImportBusy: Boolean,
+    onEditProfile: (Profile) -> Unit,
+    onUndoProfileEdit: (Profile) -> Unit = {},
+    onRedoProfileEdit: (Profile) -> Unit = {},
+    onDeleteProfile: (Profile) -> Unit,
+    onDuplicateProfile: (Profile) -> Unit = {},
+    onToggleProfile: (Profile, Boolean) -> Unit,
+    onAddContext: (Profile) -> Unit,
+    onEditContextLogic: (Profile) -> Unit,
+    onEditContext: (Profile, Int, ContextSpec) -> Unit,
+    onDeleteContext: (Profile, Int) -> Unit,
+    contentPadding: PaddingValues,
+    contentLoaded: Boolean = true,
+    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    librarySort: LibrarySortControl = LibrarySortControl(),
+    /** Every task, whatever the project scope, so a card can name a task from another project. */
+    allTasks: List<Task> = tasks,
+    /** Tasks with a run in flight; a profile whose enter or exit task is one says Running. */
+    runningTaskIds: Set<Long> = emptySet(),
+) {
+    // An unread database and an empty one look identical from here; without this gate a cold
+    // start with existing data flashes the first-run screen before Room's first emission.
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
+    // Both lists arrive scoped to the selected project, and a profile can run a task that lives
+    // in another project. Gating on tasks alone hid such a profile behind the first-run screen.
+    if (tasks.isEmpty() && profiles.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.empty_first_automation_title),
+            body = stringResource(R.string.empty_first_automation_body),
+            actionLabel = stringResource(R.string.action_browse_templates),
+            onAction = onBrowseTemplates,
+            secondaryActionLabel = if (ruleDeckBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
+            onSecondaryAction = onImportRuleDeckBundle,
+            secondaryActionEnabled = !ruleDeckBundleBusy,
+            quinaryActionLabel = stringResource(R.string.import_paste_json_action),
+            onQuinaryAction = onImportRuleDeckBundleText,
+            quinaryActionEnabled = !ruleDeckBundleBusy,
+            tertiaryActionLabel = if (automationImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.action_import_macrodroid),
+            onTertiaryAction = onImportMacroDroid,
+            tertiaryActionEnabled = !automationImportBusy,
+            quaternaryActionLabel = stringResource(R.string.action_create_blank_task),
+            onQuaternaryAction = onCreateTaskFirst,
+            contentPadding = contentPadding,
+        )
+        return
+    }
+    if (profiles.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.empty_first_profile_title),
+            body = stringResource(R.string.empty_first_profile_body),
+            actionLabel = stringResource(R.string.action_browse_templates),
+            onAction = onBrowseTemplates,
+            secondaryActionLabel = if (ruleDeckBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
+            onSecondaryAction = onImportRuleDeckBundle,
+            secondaryActionEnabled = !ruleDeckBundleBusy,
+            quinaryActionLabel = stringResource(R.string.import_paste_json_action),
+            onQuinaryAction = onImportRuleDeckBundleText,
+            quinaryActionEnabled = !ruleDeckBundleBusy,
+            tertiaryActionLabel = if (automationImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.action_import_macrodroid),
+            onTertiaryAction = onImportMacroDroid,
+            tertiaryActionEnabled = !automationImportBusy,
+            quaternaryActionLabel = stringResource(R.string.action_create_blank_profile),
+            onQuaternaryAction = onCreateProfile,
+            contentPadding = contentPadding,
+        )
+        return
+    }
+
+    var profileSearchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedGroup by rememberSaveable { mutableStateOf<String?>(null) }
+    val groups = remember(profiles) {
+        profiles.mapNotNull { it.group }.distinct().sorted()
+    }
+    val filteredProfiles = profiles
+        .filter { selectedGroup == null || it.group == selectedGroup }
+        .filter { profileSearchQuery.isBlank() || it.name.contains(profileSearchQuery, ignoreCase = true) }
+        .let { shown -> sortLibrary(shown, librarySort.order, Profile::name) { historyAvailability.lastEditedAt(EditHistoryDao.TYPE_PROFILE, it.id) } }
+    // A context's delete runs on the tap, so one gate keeps a double tap from taking the next context too.
+    val singleDelete = rememberSingleTap()
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+        // Extra bottom inset so the extended FAB never sits on top of the last row; Scaffold's
+        // innerPadding does not reserve floating-action-button height.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+    ) {
+        if (storageDecodeIssues.isNotEmpty()) {
+            item {
+                StorageDecodeWarningCard(storageDecodeIssues)
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = profileSearchQuery,
+                    onValueChange = { profileSearchQuery = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.workspace_search_profiles)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = if (profileSearchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.workspace_search_profiles_clear)) } }
+                    } else null,
+                    singleLine = true,
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                )
+                LibrarySortButton(librarySort, defaultIsName = true)
+                WorkspaceActionsButton(
+                    onBrowseTemplates = onBrowseTemplates,
+                    onPreviewProfileShare = onPreviewProfileShare,
+                    onExportRuleDeckBundle = onExportRuleDeckBundle,
+                    onImportRuleDeckBundle = onImportRuleDeckBundle,
+                    onImportRuleDeckBundleText = onImportRuleDeckBundleText,
+                    onImportMacroDroid = onImportMacroDroid,
+                )
+            }
+        }
+        if (groups.isNotEmpty()) {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+                    item {
+                        FilterChip(
+                            selected = selectedGroup == null,
+                            onClick = { selectedGroup = null },
+                            label = { Text(stringResource(R.string.label_all)) },
+                        )
+                    }
+                    items(groups, key = { it }) { group ->
+                        FilterChip(
+                            selected = selectedGroup == group,
+                            onClick = { selectedGroup = if (selectedGroup == group) null else group },
+                            label = { Text(group) },
+                        )
+                    }
+                }
+            }
+        }
+        if (filteredProfiles.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = stringResource(R.string.workspace_no_matching_profiles),
+                    body = stringResource(R.string.workspace_no_matching_profiles_body),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        items(filteredProfiles, key = { it.id }) { profile ->
+            val enterTaskId = profile.enterTaskIdOrNull
+            val exitTaskId = profile.exitTaskId
+            fun taskName(id: Long) = allTasks.firstOrNull { it.id == id }?.name
+            val enterTaskName = when {
+                enterTaskId != null -> taskName(enterTaskId) ?: stringResource(R.string.workspace_missing_task, enterTaskId)
+                // A profile with only an exit task.
+                exitTaskId != null -> stringResource(
+                    R.string.workspace_exit_task_only,
+                    taskName(exitTaskId) ?: stringResource(R.string.workspace_missing_task, exitTaskId),
+                )
+                else -> stringResource(R.string.label_none)
+            }
+            ProfileCard(
+                profile = profile,
+                enterTaskName = enterTaskName,
+                onEdit = { onEditProfile(profile) },
+                onUndo = { onUndoProfileEdit(profile) },
+                onRedo = { onRedoProfileEdit(profile) },
+                canUndo = historyAvailability.canUndoProfile(profile.id),
+                canRedo = historyAvailability.canRedoProfile(profile.id),
+                onDelete = { onDeleteProfile(profile) },
+                onDuplicate = { onDuplicateProfile(profile) },
+                onToggle = { onToggleProfile(profile, it) },
+                onAddContext = { onAddContext(profile) },
+                onEditContextLogic = { onEditContextLogic(profile) },
+                onEditContext = { index, context -> onEditContext(profile, index, context) },
+                onDeleteContext = { index -> singleDelete { onDeleteContext(profile, index) } },
+                onPreflight = { onPreflightProfile(profile) },
+                running = listOfNotNull(enterTaskId, exitTaskId, profile.fallbackTaskId).any { it in runningTaskIds },
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceActionsButton(
+    onBrowseTemplates: () -> Unit,
+    onPreviewProfileShare: () -> Unit,
+    onExportRuleDeckBundle: () -> Unit,
+    onImportRuleDeckBundle: () -> Unit,
+    onImportRuleDeckBundleText: () -> Unit,
+    onImportMacroDroid: () -> Unit,
+) {
+    var actionsExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { actionsExpanded = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.workspace_actions_content_description))
+        }
+        DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+            WorkspaceActionMenuItem(R.string.workspace_templates) { actionsExpanded = false; onBrowseTemplates() }
+            WorkspaceActionMenuItem(R.string.import_macrodroid) { actionsExpanded = false; onImportMacroDroid() }
+            WorkspaceActionMenuItem(R.string.import_export_json) { actionsExpanded = false; onExportRuleDeckBundle() }
+            WorkspaceActionMenuItem(R.string.import_import_json) { actionsExpanded = false; onImportRuleDeckBundle() }
+            WorkspaceActionMenuItem(R.string.import_paste_json_action) { actionsExpanded = false; onImportRuleDeckBundleText() }
+            WorkspaceActionMenuItem(R.string.profile_share_preview_action) { actionsExpanded = false; onPreviewProfileShare() }
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceActionMenuItem(@androidx.annotation.StringRes labelRes: Int, onClick: () -> Unit) {
+    DropdownMenuItem(text = { Text(stringResource(labelRes)) }, onClick = onClick)
+}
+
+@Composable
+internal fun StorageDecodeWarningCard(issues: List<StorageDecodeIssue>) {
+    val issueSummary = issues.take(3).joinToString(separator = "; ") { issue ->
+        "${issue.recordType.label} \"${issue.recordName}\" #${issue.recordId}: ${issue.fieldName}"
+    }
+    val remaining = issues.size - 3
+    val suffix = if (remaining > 0) "; ${stringResource(R.string.label_more_count, remaining)}" else ""
+    InlineNotice(
+        title = stringResource(R.string.workspace_stored_data_review),
+        body = stringResource(R.string.workspace_stored_data_review_body, issueSummary, suffix),
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+@Composable
+private fun ProfileCard(
+    profile: Profile,
+    enterTaskName: String,
+    onEdit: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+    onPreflight: () -> Unit,
+    onAddContext: () -> Unit,
+    onEditContextLogic: () -> Unit,
+    onEditContext: (Int, ContextSpec) -> Unit,
+    onDeleteContext: (Int) -> Unit,
+    running: Boolean,
+) {
+    var expanded by rememberSaveable(profile.id) { mutableStateOf(false) }
+    val profileState = when {
+        profile.requiresRiskAcknowledgement -> stringResource(R.string.imported_profile_review_required)
+        profile.enabled -> stringResource(R.string.label_enabled)
+        else -> stringResource(R.string.label_paused)
+    }
+    val toggleDescription = stringResource(R.string.a11y_profile_status, profile.name)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+            Row(
+                modifier = Modifier.expandCollapseToggle(expanded) { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.66f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    // Decorative: the switch carries "<name> profile status" and its state.
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(10.dp).size(22.dp),
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(profile.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        stringResource(R.string.workspace_runs_task, enterTaskName),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Switch(
+                    checked = profile.enabled,
+                    onCheckedChange = onToggle,
+                    modifier = Modifier.semantics {
+                        contentDescription = toggleDescription
+                        stateDescription = profileState
+                    },
+                )
+                ProfileActionsMenu(
+                    contentDescription = stringResource(R.string.a11y_duplicate_profile, profile.name),
+                    editDescription = stringResource(R.string.a11y_edit_profile, profile.name),
+                    canEditContextLogic = profile.contexts.size >= 2,
+                    canUndo = canUndo,
+                    canRedo = canRedo,
+                    onEdit = onEdit,
+                    onAddContext = onAddContext,
+                    onEditContextLogic = onEditContextLogic,
+                    onPreflight = onPreflight,
+                    onDuplicate = onDuplicate,
+                    onUndo = onUndo,
+                    onRedo = onRedo,
+                    onDelete = onDelete,
+                )
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // One node, so TalkBack reads Running together with the profile's state.
+            Row(
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                if (running) StatusPill(stringResource(R.string.label_running), MaterialTheme.colorScheme.primary)
+                Text(
+                    text = listOf(
+                        profileState,
+                        pluralStringResource(R.plurals.label_context_count, profile.contexts.size, profile.contexts.size),
+                        stringResource(R.string.label_cooldown_seconds, profile.cooldownSec),
+                    ).joinToString(" · "),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (expanded && profile.contexts.isEmpty()) {
+                InlineNotice(
+                    title = stringResource(R.string.workspace_profile_cannot_match),
+                    body = stringResource(R.string.workspace_profile_cannot_match_body),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else if (expanded) {
+                profile.contexts.forEachIndexed { index, context ->
+                    ContextRow(
+                        index = index,
+                        context = context,
+                        onEdit = { onEditContext(index, context) },
+                        onDelete = { onDeleteContext(index) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * What Setup still lists as missing, so an action's Needs setup pill can follow the live grant.
+ * It's read again on every resume, so coming back from a settings page clears a pill it fixed,
+ * and whenever [refreshKey] changes. Null until the first read comes back.
+ */
+@Composable
+internal fun rememberPendingSetup(refreshKey: Any?, read: () -> Set<SetupRequirement>): Set<SetupRequirement>? {
+    val resumes = rememberResumeCount()
+    val pending by produceState<Set<SetupRequirement>?>(null, resumes, refreshKey) {
+        value = withContext(Dispatchers.IO) { read() }
+    }
+    return pending
+}
+
+/** Goes up on every ON_RESUME, so a read keyed on it runs again when the user comes back from another app. */
+@Composable
+private fun rememberResumeCount(): Int {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var resumes by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) resumes++ }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    return resumes
+}
+
+@Composable
+internal fun TasksScreen(
+    tasks: List<Task>,
+    storageDecodeIssues: List<StorageDecodeIssue>,
+    onCreateTask: () -> Unit,
+    onEditTask: (Task) -> Unit,
+    onUndoTaskEdit: (Task) -> Unit = {},
+    onRedoTaskEdit: (Task) -> Unit = {},
+    onDeleteTask: (Task) -> Unit,
+    onDuplicateTask: (Task) -> Unit = {},
+    onRunTask: (Task) -> Unit,
+    onPreflightTask: (Task) -> Unit,
+    onPinTask: (Task) -> Unit,
+    onAddAction: (Task) -> Unit,
+    onEditAction: (Task, Int, ActionSpec) -> Unit,
+    onDeleteAction: (Task, Int) -> Unit,
+    onMoveAction: (Task, Int, Int) -> Unit,
+    onRunAction: (Task, Int) -> Unit,
+    contentPadding: PaddingValues,
+    onToggleAction: (Task, Int) -> Unit = { _, _ -> },
+    runBusy: Boolean = false,
+    contentLoaded: Boolean = true,
+    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    librarySort: LibrarySortControl = LibrarySortControl(),
+    // What Setup still lists as missing; null until the first read comes back.
+    pendingSetup: Set<SetupRequirement>? = null,
+    onOpenSetup: (Set<SetupRequirement>) -> Unit = {},
+    /** Tasks with a run in flight; their cards say Running. */
+    runningTaskIds: Set<Long> = emptySet(),
+) {
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
+    if (tasks.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.empty_tasks_title),
+            body = stringResource(R.string.empty_tasks_create_body),
+            actionLabel = stringResource(R.string.action_create_task),
+            onAction = onCreateTask,
+            contentPadding = contentPadding,
+        )
+        return
+    }
+    var taskSearchQuery by rememberSaveable { mutableStateOf("") }
+    val filteredTasks = (if (taskSearchQuery.isBlank()) tasks else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) })
+        .let { shown -> sortLibrary(shown, librarySort.order, Task::name) { historyAvailability.lastEditedAt(EditHistoryDao.TYPE_TASK, it.id) } }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+        // Extra bottom inset so the extended FAB never sits on top of the last row; Scaffold's
+        // innerPadding does not reserve floating-action-button height.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+    ) {
+        if (storageDecodeIssues.isNotEmpty()) {
+            item {
+                StorageDecodeWarningCard(storageDecodeIssues)
+            }
+        }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+            OutlinedTextField(
+                value = taskSearchQuery,
+                onValueChange = { taskSearchQuery = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(stringResource(R.string.workspace_search_tasks)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = if (taskSearchQuery.isNotEmpty()) {
+                    { IconButton(onClick = { taskSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.workspace_search_tasks_clear)) } }
+                } else null,
+                singleLine = true,
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+            )
+            LibrarySortButton(librarySort, defaultIsName = true)
+            }
+        }
+        if (filteredTasks.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = stringResource(R.string.workspace_no_matching_tasks),
+                    body = stringResource(R.string.workspace_no_matching_tasks_body),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        items(filteredTasks, key = { it.id }) { task ->
+            TaskCard(
+                task = task,
+                initiallyExpanded = filteredTasks.firstOrNull()?.id == task.id,
+                onEdit = { onEditTask(task) },
+                onUndo = { onUndoTaskEdit(task) },
+                onRedo = { onRedoTaskEdit(task) },
+                canUndo = historyAvailability.canUndoTask(task.id),
+                canRedo = historyAvailability.canRedoTask(task.id),
+                onDelete = { onDeleteTask(task) },
+                onDuplicate = { onDuplicateTask(task) },
+                onRun = { onRunTask(task) },
+                onPreflight = { onPreflightTask(task) },
+                onPin = { onPinTask(task) },
+                onAddAction = { onAddAction(task) },
+                onEditAction = { index, action -> onEditAction(task, index, action) },
+                onDeleteAction = { index -> onDeleteAction(task, index) },
+                onMoveAction = { fromIndex, toIndex -> onMoveAction(task, fromIndex, toIndex) },
+                onRunAction = { index -> onRunAction(task, index) },
+                onToggleAction = { index -> onToggleAction(task, index) },
+                runBusy = runBusy,
+                pendingSetup = pendingSetup,
+                onOpenSetup = onOpenSetup,
+                running = task.id in runningTaskIds,
+            )
+        }
+    }
+}
+
+/**
+ * The tasks with a run in flight, for the Running pill on task and profile cards: each run's own
+ * task and any task one of them is running as a sub-task ([nestedTaskIds]).
+ */
+internal fun runningTaskIds(executions: List<ActiveExecution>, nestedTaskIds: List<Long> = emptyList()): Set<Long> =
+    executions.mapTo(HashSet()) { it.taskId } + nestedTaskIds
+
+@Composable
+private fun TaskCard(
+    task: Task,
+    initiallyExpanded: Boolean,
+    onEdit: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onRun: () -> Unit,
+    onPreflight: () -> Unit,
+    onPin: () -> Unit,
+    onAddAction: () -> Unit,
+    onEditAction: (Int, ActionSpec) -> Unit,
+    onDeleteAction: (Int) -> Unit,
+    onMoveAction: (Int, Int) -> Unit,
+    onRunAction: (Int) -> Unit,
+    onToggleAction: (Int) -> Unit,
+    runBusy: Boolean,
+    pendingSetup: Set<SetupRequirement>?,
+    onOpenSetup: (Set<SetupRequirement>) -> Unit,
+    running: Boolean,
+) {
+    var expanded by rememberSaveable(task.id) { mutableStateOf(initiallyExpanded) }
+    val runDescription = stringResource(R.string.a11y_run_task, task.name)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+            Row(
+                modifier = Modifier.expandCollapseToggle(expanded) { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = runDescription,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(20.dp)
+                            .clearAndSetSemantics { },
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(task.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        pluralStringResource(R.plurals.label_action_count, task.actions.size, task.actions.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button(
+                    onClick = onRun,
+                    modifier = Modifier.semantics { contentDescription = runDescription },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.sm),
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = runDescription,
+                        modifier = Modifier.clearAndSetSemantics { },
+                    )
+                    Spacer(Modifier.width(2.dp))
+                    Text(stringResource(R.string.action_run), style = MaterialTheme.typography.labelLarge)
+                }
+                TaskActionsMenu(
+                    contentDescription = stringResource(R.string.a11y_duplicate_task, task.name),
+                    canUndo = canUndo,
+                    canRedo = canRedo,
+                    onEdit = onEdit,
+                    onAddAction = onAddAction,
+                    onPreflight = onPreflight,
+                    onPin = onPin,
+                    onDuplicate = onDuplicate,
+                    onUndo = onUndo,
+                    onRedo = onRedo,
+                    onDelete = onDelete,
+                )
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // One node, so TalkBack reads Running together with the task's settings.
+            Row(
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                if (running) StatusPill(stringResource(R.string.label_running), MaterialTheme.colorScheme.primary)
+                Text(
+                    text = listOf(
+                        stringResource(R.string.label_priority_short, task.priority),
+                        collisionModeTitle(task.collisionMode),
+                    ).joinToString(" · "),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (expanded && task.actions.isEmpty()) {
+                InlineNotice(
+                    title = stringResource(R.string.workspace_task_has_no_actions),
+                    body = stringResource(R.string.workspace_task_has_no_actions_body),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else if (expanded) {
+                task.actions.forEachIndexed { index, action ->
+                    ActionRow(
+                        index = index,
+                        action = action,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < task.actions.lastIndex,
+                        onMoveUp = { onMoveAction(index, index - 1) },
+                        onMoveDown = { onMoveAction(index, index + 1) },
+                        onEdit = { onEditAction(index, action) },
+                        onDelete = { onDeleteAction(index) },
+                        onRun = { onRunAction(index) },
+                        onToggleEnabled = { onToggleAction(index) },
+                        runBusy = runBusy,
+                        pendingSetup = pendingSetup,
+                        onOpenSetup = onOpenSetup,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileActionsMenu(
+    contentDescription: String,
+    editDescription: String,
+    canEditContextLogic: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onEdit: () -> Unit,
+    onAddContext: () -> Unit,
+    onEditContextLogic: () -> Unit,
+    onPreflight: () -> Unit,
+    onDuplicate: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ContextualActionsMenu(
+        contentDescription = contentDescription,
+        actions = listOf(
+            ContextualMenuAction(R.string.action_edit, accessibilityLabel = editDescription, onClick = onEdit),
+            ContextualMenuAction(R.string.profile_add_context, onClick = onAddContext),
+            ContextualMenuAction(R.string.profile_edit_context_logic, enabled = canEditContextLogic, onClick = onEditContextLogic),
+            ContextualMenuAction(R.string.action_preflight, onClick = onPreflight),
+            ContextualMenuAction(R.string.action_duplicate, onClick = onDuplicate),
+            ContextualMenuAction(R.string.action_undo, enabled = canUndo, onClick = onUndo),
+            ContextualMenuAction(R.string.action_redo, enabled = canRedo, onClick = onRedo),
+            ContextualMenuAction(R.string.profile_delete, onClick = onDelete),
+        ),
+    )
+}
+
+@Composable
+private fun TaskActionsMenu(
+    contentDescription: String,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onEdit: () -> Unit,
+    onAddAction: () -> Unit,
+    onPreflight: () -> Unit,
+    onPin: () -> Unit,
+    onDuplicate: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ContextualActionsMenu(
+        contentDescription = contentDescription,
+        actions = listOf(
+            ContextualMenuAction(R.string.action_edit, onClick = onEdit),
+            ContextualMenuAction(R.string.task_add_action, onClick = onAddAction),
+            ContextualMenuAction(R.string.action_preflight, onClick = onPreflight),
+            ContextualMenuAction(R.string.action_pin, onClick = onPin),
+            ContextualMenuAction(R.string.action_duplicate, onClick = onDuplicate),
+            ContextualMenuAction(R.string.action_undo, enabled = canUndo, onClick = onUndo),
+            ContextualMenuAction(R.string.action_redo, enabled = canRedo, onClick = onRedo),
+            ContextualMenuAction(R.string.task_delete, onClick = onDelete),
+        ),
+    )
+}
+
+private data class ContextualMenuAction(
+    @StringRes val labelRes: Int,
+    val enabled: Boolean = true,
+    val accessibilityLabel: String? = null,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun ContextualActionsMenu(
+    contentDescription: String,
+    actions: List<ContextualMenuAction>,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.semantics { this.contentDescription = contentDescription },
+        ) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = contentDescription,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(action.labelRes)) },
+                    enabled = action.enabled,
+                    modifier = Modifier.semantics {
+                        action.accessibilityLabel?.let { this.contentDescription = it }
+                    },
+                    onClick = {
+                        expanded = false
+                        action.onClick()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DuplicateMenu(
+    contentDescription: String,
+    onDuplicate: () -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.semantics { this.contentDescription = contentDescription },
+        ) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = contentDescription,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_duplicate)) },
+                onClick = {
+                    expanded = false
+                    onDuplicate()
+                },
+            )
+        }
+    }
+}
+
+/** [pendingSetup] is what Setup still lists as missing, or null before its first read. */
+@Composable
+internal fun ActionRow(
+    index: Int,
+    action: ActionSpec,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onRun: () -> Unit,
+    runBusy: Boolean,
+    pendingSetup: Set<SetupRequirement>?,
+    onOpenSetup: (Set<SetupRequirement>) -> Unit = {},
+    onToggleEnabled: () -> Unit = {},
+) {
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val resources = context.resources
+    val metadata = ActionMetadataRegistry.get(action.type)
+    val capability = ActionCapabilityRegistry.get(action.type)
+    // A plugin step's setup is its plugin being installed, which no Setup row grants, so the pill
+    // asks the package manager instead of staying on for good.
+    val pluginCondition = action.type == "plugin.locale.query"
+    val pluginStep = pluginCondition || action.type == "plugin.locale.fire"
+    val pluginPackage = action.args["package"]?.trim().orEmpty().takeIf { pluginStep }
+    // Asked again on resume, since the plugin usually gets installed in another app. A package
+    // named by a variable is only known when the step runs, so there's nothing to look up here.
+    val resumes = if (pluginStep) rememberResumeCount() else 0
+    val pluginMissing by produceState<Boolean?>(null, pluginPackage, pluginCondition, resumes) {
+        value = pluginPackage?.takeUnless { '%' in it }?.let { packageName ->
+            withContext(Dispatchers.IO) {
+                !localePluginReceiverInstalled(context.applicationContext, packageName, pluginCondition)
+            }
+        }
+    }
+    // The tier says an action can need setup, the live grants say whether it still does. An action
+    // no Setup row can settle (an approved script, a VPN app) keeps its pill.
+    val needsSetup = capability.level == CapabilityLevel.RequiresSetup &&
+        if (pluginStep) {
+            pluginMissing == true
+        } else {
+            SetupRequirementResolver.stillNeedsSetup(action, Build.VERSION.SDK_INT, pendingSetup)
+        }
+    // Setup lists a row only for enabled profiles, so the pill opens Setup on the rows it means.
+    val setupRows = if (needsSetup && pendingSetup != null) {
+        SetupRequirementResolver.forAction(action, Build.VERSION.SDK_INT) intersect pendingSetup
+    } else {
+        emptySet()
+    }
+    val metadataName = metadata?.let { stringResource(it.nameRes) }
+    val metadataDescription = metadata?.let { stringResource(it.descriptionRes) }
+    val actionLabel = action.label ?: metadataName ?: stringResource(R.string.action_unknown_name)
+    val editDescription = stringResource(R.string.a11y_edit_action, index + 1, actionLabel)
+    val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
+    val runDescription = stringResource(R.string.a11y_run_action, index + 1, actionLabel)
+    val moveUpDescription = stringResource(R.string.a11y_move_action_up, index + 1, actionLabel)
+    val moveDownDescription = stringResource(R.string.a11y_move_action_down, index + 1, actionLabel)
+    val toggleDescription = stringResource(
+        if (action.enabled) R.string.a11y_turn_off_action else R.string.a11y_turn_on_action,
+        index + 1,
+        actionLabel,
+    )
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(DesignSystem.Radii.sm),
+                modifier = Modifier.sizeIn(minWidth = 28.dp, minHeight = 28.dp),
+            ) {
+                Box(modifier = Modifier.padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+            // A step turned off is dimmed so it reads as skipped.
+            Column(Modifier.weight(1f).alpha(if (action.enabled) 1f else 0.55f)) {
+                Text(actionLabel, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    ActionSummaryFormatter.format(resources, action.type, action.args)
+                        .ifBlank { metadataDescription ?: stringResource(R.string.workspace_no_arguments) },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (capability.level == CapabilityLevel.Unsupported || needsSetup) {
+                    Spacer(Modifier.height(6.dp))
+                    val openSetupLabel = stringResource(R.string.action_open_setup)
+                    StatusPill(
+                        if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.status_needs_setup),
+                        if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier = if (setupRows.isEmpty()) {
+                            Modifier
+                        } else {
+                            Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable(onClickLabel = openSetupLabel, role = Role.Button) { onOpenSetup(setupRows) }
+                        },
+                    )
+                }
+                action.condition?.takeIf(String::isNotBlank)?.let { condition ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.action_condition_summary, condition),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                if (action.continueOnError) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.action_continue_on_error_summary),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                if (!action.enabled) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.action_turned_off_summary),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.semantics { contentDescription = editDescription },
+            ) {
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = editDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
+            }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.a11y_action_menu, index + 1, actionLabel))
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    // The menu item text is only "Move up"/"Move down", so without an explicit
+                    // description a screen reader cannot say which action moves.
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.projects_move_up)) },
+                        onClick = { menuExpanded = false; onMoveUp() },
+                        enabled = canMoveUp,
+                        modifier = Modifier.semantics { contentDescription = moveUpDescription },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.projects_move_down)) },
+                        onClick = { menuExpanded = false; onMoveDown() },
+                        enabled = canMoveDown,
+                        modifier = Modifier.semantics { contentDescription = moveDownDescription },
+                    )
+                    // Flow-control markers are omitted rather than disabled: "Run this if"
+                    // has no meaning on its own, so offering it greyed out would only invite
+                    // the question of why.
+                    if (SingleActionRun.isRunnableAlone(action)) {
+                        // Only one run happens at a time, and a second tap used to be swallowed
+                        // with no sign anything had happened. Say which state the option is in.
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (runBusy) R.string.action_run_alone_busy else R.string.action_run_alone,
+                                    ),
+                                )
+                            },
+                            onClick = { menuExpanded = false; onRun() },
+                            enabled = !runBusy,
+                            leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = runDescription) },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(if (action.enabled) R.string.action_turn_off else R.string.action_turn_on)) },
+                        onClick = { menuExpanded = false; onToggleEnabled() },
+                        modifier = Modifier.semantics { contentDescription = toggleDescription },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_delete)) },
+                        onClick = { menuExpanded = false; onDelete() },
+                        leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = deleteDescription, tint = MaterialTheme.colorScheme.error) },
+                    )
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    }
+}
+
+@Composable
+private fun ContextRow(
+    index: Int,
+    context: ContextSpec,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val contextTypeLabel = stringResource(contextTitleRes(context.type))
+    val editDescription = stringResource(R.string.a11y_edit_context, index + 1, contextTypeLabel)
+    val deleteDescription = stringResource(R.string.a11y_delete_context, index + 1, contextTypeLabel)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        shape = RoundedCornerShape(DesignSystem.Radii.sm),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(contextTypeLabel, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    contextConfigSummary(context),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (context.invert) {
+                StatusPill(stringResource(R.string.label_inverted), MaterialTheme.colorScheme.secondary)
+            }
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.semantics { contentDescription = editDescription },
+            ) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = editDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                )
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.semantics { contentDescription = deleteDescription },
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = deleteDescription,
+                    modifier = Modifier.clearAndSetSemantics { },
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
