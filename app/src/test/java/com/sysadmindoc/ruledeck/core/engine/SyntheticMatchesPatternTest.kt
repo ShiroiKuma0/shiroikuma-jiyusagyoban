@@ -1,5 +1,6 @@
 package com.sysadmindoc.ruledeck.core.engine
 
+import com.sysadmindoc.ruledeck.core.contexts.ContextMatchEvaluator
 import com.sysadmindoc.ruledeck.core.model.ContextSpec
 import com.sysadmindoc.ruledeck.core.model.ContextType
 import com.sysadmindoc.ruledeck.core.model.Profile
@@ -30,7 +31,7 @@ class SyntheticMatchesPatternTest {
     fun aNotificationPatternSimulatesWithATitleItMatches() {
         val spec = ContextSpec(
             ContextType.EVENT,
-            mapOf("event" to "notification", "title" to "mail/inbox", "body" to "!*spam*", "patterns" to "tasker"),
+            mapOf("event" to "notification", "title" to "mail/inbox", "body" to "!*spam*", "patterns" to ContextMatchEvaluator.MATCHES_PATTERNS),
         )
 
         val context = simulate(spec)
@@ -43,7 +44,7 @@ class SyntheticMatchesPatternTest {
     @Test
     fun aPatternNoMadeUpValueMatchesSaysSo() {
         val regexName = simulate(ContextSpec(ContextType.STATE, mapOf("key" to "wifi", "operator" to "~", "value" to "~Rguest\\d")))
-        val nothing = simulate(ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "title" to "!*", "patterns" to "tasker")))
+        val nothing = simulate(ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "title" to "!*", "patterns" to ContextMatchEvaluator.MATCHES_PATTERNS)))
 
         assertNotNull(regexName.template.issue)
         assertNotNull(nothing.template.issue)

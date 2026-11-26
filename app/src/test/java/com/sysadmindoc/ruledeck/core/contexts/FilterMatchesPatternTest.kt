@@ -74,10 +74,18 @@ class FilterMatchesPatternTest {
         assertTrue(contains.matches(posted("Front Door", "")))
     }
 
+    @Test
+    fun aPatternsValueSavedByAnOlderBuildStillMeansMatchesPatterns() {
+        val older = ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "patterns" to "legacy", "title" to "door"))
+
+        assertFalse(older.matches(posted("Front Door", "")))
+        assertTrue(older.matches(posted("door", "")))
+    }
+
     private fun wifi(pattern: String) = ContextSpec(ContextType.STATE, mapOf("key" to "wifi", "operator" to "~", "value" to pattern))
 
     private fun notification(vararg filters: Pair<String, String>) =
-        ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "patterns" to "tasker") + filters)
+        ContextSpec(ContextType.EVENT, mapOf("event" to "notification", "patterns" to ContextMatchEvaluator.MATCHES_PATTERNS) + filters)
 
     private fun connectedTo(ssid: String) = ContextEvent("state", true, DeviceStateEvents.wifiPatch(ssid, connected = true))
 

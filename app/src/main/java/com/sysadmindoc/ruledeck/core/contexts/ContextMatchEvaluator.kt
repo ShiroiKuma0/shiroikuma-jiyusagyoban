@@ -248,7 +248,7 @@ object ContextMatchEvaluator {
         }
 
         // Title and text written as Matches patterns, which match the whole value.
-        if (spec.config["patterns"] == MATCHES_PATTERNS) {
+        if (usesMatchesPatterns(spec.config)) {
             for (field in listOf("title", "body")) {
                 val pattern = spec.config[field].orEmpty()
                 if (pattern.isNotEmpty() && !matchesPatternMatcher.matches(event.metadata[field].orEmpty(), pattern)) return false
@@ -420,9 +420,13 @@ object ContextMatchEvaluator {
 
     /**
      * An event's `patterns` value when its title and body are Matches patterns (`*`, `/` between
-     * alternatives, `!` to leave out, `~R` for a regex). The text is what saved profiles hold.
+     * alternatives, `!` to leave out, `~R` for a regex). Profiles saved by older builds hold another
+     * word there, so [usesMatchesPatterns] accepts any value.
      */
-    const val MATCHES_PATTERNS = "tasker"
+    const val MATCHES_PATTERNS = "matches"
+
+    /** True when [config]'s title and body are Matches patterns rather than plain text filters. */
+    fun usesMatchesPatterns(config: Map<String, String>): Boolean = !config["patterns"].isNullOrBlank()
     private val matchesPatternMatcher = VariableExpander()
 
     /** The plugin editors and the importers keep at most this much of a blurb. */
