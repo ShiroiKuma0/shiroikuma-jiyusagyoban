@@ -11,6 +11,7 @@ import com.opentasker.core.huawei.HuaweiBondWatch
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scheduling.ExpectedTriggerLedger
+import com.opentasker.core.scheduling.TaskAlarms
 
 /**
  * Receives app-owned time ticks and exact-alarm permission changes.
@@ -49,6 +50,9 @@ class TimeEventReceiver : BroadcastReceiver() {
                 } finally {
                     TimeEventScheduler(context).scheduleNextMinute()
                 }
+                // Task alarms: set them again after a restart, and run whatever is overdue.
+                runCatching { TaskAlarms.sweep(context) }
+                    .onFailure { AppLogger.error(TAG, "Task alarm sweep failed", it) }
                 // The watch's bond, read once a minute; a loss is confirmed and its evidence saved
                 // off this thread, inside goAsync's window, before Bluetooth or logcat can lose it.
                 runCatching { HuaweiBondWatch.check(context) }

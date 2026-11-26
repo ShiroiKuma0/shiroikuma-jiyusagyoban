@@ -87,7 +87,7 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("title", "Title", required = true, hint = "Notification title"),
                 ActionField("text", "Message", FieldType.MULTILINE, hint = "Notification body"),
-                ActionField("channel", "Channel", FieldType.DROPDOWN, hint = "quiet / default / urgent"),
+                ActionField("channel", "Channel", FieldType.DROPDOWN, hint = "quiet / default / urgent / top (high in the shade, silent)"),
                 ActionField("persistent", "Persistent", FieldType.CHECKBOX, hint = "Keep until cancelled"),
                 ActionField("tag", "Tag", hint = "Replacement tag (same tag replaces)"),
                 ActionField("id", "ID", FieldType.NUMBER, hint = "Notification ID (same ID replaces)"),
@@ -1991,6 +1991,19 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "sim.ring.wait",
+            name = "Wait for Ring",
+            description = "Wait until one of the phone's SIMs rings, and say which slot it was — the sure way to tell two look-alike cards apart",
+            category = "System",
+            fields = listOf(
+                ActionField("timeout", "Seconds to wait", FieldType.NUMBER, hint = "default 60, at most 300"),
+                ActionField("prefix", "Variable prefix", hint = "default ring — writes %ring_status (ringing / timeout), %ring_slot and %ring_sub (empty on a timeout); a SIM under unconditional forwarding never rings"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "sim.status",
             name = "SIM Status",
             description = "Read one SIM slot's state: SIM present, operator, service state, signal and roaming",
@@ -2059,6 +2072,36 @@ fun registerActionMetadata() {
             category = "System",
             fields = listOf(
                 ActionField("seconds", "Seconds at most", FieldType.NUMBER, hint = "default 300, at most 3600 — asking again replaces the limit; 0 lets the phone sleep again at once"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "task.alarm.set",
+            name = "Set Task Alarm",
+            description = "Run a task at one moment, by an exact alarm that wakes a sleeping phone at the second and survives a restart of the app and a reboot",
+            category = "System",
+            fields = listOf(
+                ActionField("task", "Task to run", required = true),
+                ActionField("project", "Its project", hint = "only when the task's name alone is not unique"),
+                ActionField("key", "Alarm name", hint = "default: the task's name — setting a name again replaces its alarm"),
+                ActionField("at", "Moment (epoch milliseconds)", hint = "what Add to Date/Time writes; a moment already past runs the task within the minute"),
+                ActionField("seconds", "Or: seconds from now", FieldType.NUMBER, hint = "used when the moment is empty"),
+                ActionField("var", "Variable for the moment", hint = "optional — receives the moment in epoch milliseconds"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "task.alarm.cancel",
+            name = "Cancel Task Alarm",
+            description = "Forget the task alarm set under a name. Nothing waiting under it is not an error",
+            category = "System",
+            fields = listOf(
+                ActionField("key", "Alarm name", required = true),
+                ActionField("store", "Variable for the outcome", hint = "optional — true when an alarm was waiting, false otherwise"),
             )
         )
     )

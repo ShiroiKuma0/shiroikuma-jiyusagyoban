@@ -1038,3 +1038,49 @@
 : オンのとき：コマンドはTermuxの端末セッションで実行されます。Termuxが前面に出て、入力もできます。セッションは、そこでEnterを押すまで開いたままです。
 = This switch does nothing while “Run in a command window” is off.
 : 「コマンドウィンドウで実行」がオフの間は、このスイッチは何もしません。
+= Set Task Alarm
+: 課題アラームを設定
+= Run a task at one moment, by an exact alarm that wakes a sleeping phone at the second and survives a restart of the app and a reboot
+: 課題を決まった時刻に実行します。専用の正確なアラームを使うので、スリープ中の電話もその秒に目を覚まし、アプリの再起動や端末の再起動の後も残ります。
+= Task to run
+: 実行する課題
+= Its project
+: その課題のプロジェクト
+= only when the task's name alone is not unique
+: 課題の名前だけでは一つに決まらないときだけ指定します。
+= Alarm name
+: アラームの名前
+= default: the task's name — setting a name again replaces its alarm
+: 既定は課題の名前です。同じ名前でもう一度設定すると、そのアラームが置き換わります。
+= Moment (epoch milliseconds)
+: 時刻（エポックのミリ秒）
+= what Add to Date/Time writes; a moment already past runs the task within the minute
+: 「日時に加算」が書き出す値です。すでに過ぎた時刻を指定すると、課題は1分以内に実行されます。
+= Or: seconds from now
+: または：今からの秒数
+= used when the moment is empty
+: 時刻が空のときに使われます。
+= Variable for the moment
+: 時刻を受け取る変数
+= optional — receives the moment in epoch milliseconds
+: 任意です。時刻をエポックのミリ秒で受け取ります。
+= Cancel Task Alarm
+: 課題アラームを取り消す
+= Forget the task alarm set under a name. Nothing waiting under it is not an error
+: その名前で設定した課題アラームを取り消します。待っているアラームが無くても、エラーにはなりません。
+= optional — true when an alarm was waiting, false otherwise
+: 任意です。アラームが待っていたときは true、そうでなければ false になります。
+= Runs a task at one moment by an exact alarm of its own, which wakes a sleeping phone and survives a restart.
+: 課題を決まった時刻に、専用の正確なアラームで実行します。スリープ中の電話も目を覚まし、再起動の後も残ります。
+= Forgets a task alarm set under a key.
+: 名前を付けて設定した課題アラームを取り消します。
+= Wait for Ring
+: 着信を待つ
+= Wait until one of the phone's SIMs rings, and say which slot it was — the sure way to tell two look-alike cards apart
+: 電話のSIMのどれかが鳴るまで待ち、どの差し込み口だったかを知らせます。見分けのつかない2枚のカードを確実に区別する方法です。
+= default 60, at most 300
+: 既定は60、最長300。
+= default ring — writes %ring_status (ringing / timeout), %ring_slot and %ring_sub (empty on a timeout); a SIM under unconditional forwarding never rings
+: 既定は ring。%ring_status（ringing / timeout）、%ring_slot、%ring_sub を書き込みます（時間切れのときは空）。無条件転送中のSIMは鳴りません。
+= Needs the Phone (READ_PHONE_STATE) permission to see which SIM slot is ringing.
+: どのSIMの差し込み口が鳴っているかを見るには、電話（READ_PHONE_STATE）の権限が必要です。

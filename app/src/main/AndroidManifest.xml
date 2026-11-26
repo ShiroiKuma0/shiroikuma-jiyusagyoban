@@ -749,6 +749,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- The alarm of one task.alarm.set order. Not exported: only our own PendingIntent reaches it. -->
+        <receiver
+            android:name="com.opentasker.core.scheduling.TaskAlarmReceiver"
+            android:exported="false" />
+
         <!-- The installer's answer to a package.install session. -->
         <receiver
             android:name="com.opentasker.core.actions.PackageInstallResultReceiver"

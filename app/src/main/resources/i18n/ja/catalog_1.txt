@@ -1,5 +1,5 @@
-= quiet / default / urgent
-: quiet / default / urgent
+= quiet / default / urgent / top (high in the shade, silent)
+: quiet / default / urgent / top（通知の上の方に出る、音無し）
 = Keep until cancelled
 : 取り消すまで残す
 = ID

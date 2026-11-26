@@ -105,6 +105,9 @@ object AutomationSensitivityRegistry {
         "package.info",
         // A wakelock that ends with the run that asked for it; nothing is read or sent.
         "power.keep_awake",
+        // An alarm of this app's own that runs one of this workspace's tasks; nothing is read or sent.
+        "task.alarm.set",
+        "task.alarm.cancel",
         "image.badge",
         "flow.fail",
         "system.get_locale",
@@ -243,6 +246,7 @@ object AutomationSensitivityRegistry {
         "provider.call",
         "file.from_uri",
         "sim.status",
+        "sim.ring.wait",
     )
 
     private val externalTransmissionActionIds = setOf(

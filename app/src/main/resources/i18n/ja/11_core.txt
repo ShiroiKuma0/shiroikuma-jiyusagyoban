@@ -12,6 +12,8 @@
 : 白い熊 自由作業盤 アクション
 = 白い熊 自由作業盤 urgent
 : 白い熊 自由作業盤 緊急
+= 白い熊 自由作業盤 top
+: 白い熊 自由作業盤 最上段
 
 # CopyLauncherShortcutAction.kt
 = Copy for 貼り付け

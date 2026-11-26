@@ -56,7 +56,12 @@ class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
         val channelKey = args["channel"] ?: "default"
         val channelDef = NotificationChannels.resolve(channelKey)
         nm.createNotificationChannel(
-            NotificationChannel(channelDef.id, tr(channelDef.name), channelDef.importance),
+            NotificationChannel(channelDef.id, tr(channelDef.name), channelDef.importance).apply {
+                if (channelDef.silent) {
+                    setSound(null, null)
+                    enableVibration(false)
+                }
+            },
         )
 
         val channel = nm.getNotificationChannel(channelDef.id)
@@ -77,6 +82,7 @@ class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(!persistent)
             .setOngoing(persistent)
+            .setOnlyAlertOnce(channelDef.silent)
 
         val taskReferences = (1..NotificationTaskBindings.BUTTON_COUNT).mapNotNull { buttonIndex ->
             NotificationTaskBindings.parse(args, buttonIndex)?.let { buttonIndex to it }
@@ -341,12 +347,19 @@ internal object NotificationChannels {
         val id: String,
         val name: String,
         val importance: Int,
+        /** High in the shade, yet never heard: no channel sound, no vibration, and a rewrite does not pop up again. */
+        val silent: Boolean = false,
     )
 
     private val channels = mapOf(
         "quiet" to ChannelDef("opentasker.quiet", "白い熊 自由作業盤 quiet", NotificationManager.IMPORTANCE_LOW),
         "default" to ChannelDef("opentasker.actions", "白い熊 自由作業盤 actions", NotificationManager.IMPORTANCE_DEFAULT),
         "urgent" to ChannelDef("opentasker.urgent", "白い熊 自由作業盤 urgent", NotificationManager.IMPORTANCE_HIGH),
+        // 白い熊, 2026-11-26: standing status notifications (携帯 生存, an open tunnel) were buried at the
+        // bottom of the shade — a LOW channel is sorted into the silent section. Android sorts by
+        // importance first, so "top" is HIGH; it is silenced on the channel and alerts only once, so a
+        // rewrite every few minutes neither sounds nor pops up.
+        "top" to ChannelDef("opentasker.top", "白い熊 自由作業盤 top", NotificationManager.IMPORTANCE_HIGH, silent = true),
     )
 
     fun resolve(key: String): ChannelDef =
