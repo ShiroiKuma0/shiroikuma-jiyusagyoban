@@ -18,12 +18,11 @@ WHAT YOU GET
   recovered and explained rather than lost.
 * Review before it runs. Imported profiles arrive disabled, actions that need
   special access are labelled, and risky imports need an explicit acknowledgement.
-* Portable data. Export and import OpenTasker JSON bundles, import from Tasker
-  XML with a migration report, and export to Tasker XML. Secret values are never
-  exported.
+* Portable data. Export and import OpenTasker JSON bundles, and bring macros over
+  from MacroDroid with a migration report. Secret values are never exported.
 * Local backups. Create a database backup on demand or on a schedule, review what
   a restore would install before staging it, and protect exports with a passphrase.
-* Interoperability. Locale/Tasker plugin host and target, external automation
+* Interoperability. Locale plugin host and target, external automation
   intents, launcher shortcuts, quick-settings tile, and a home-screen widget.
 
 PRIVACY AND PERMISSIONS

@@ -16,7 +16,7 @@
   <sub><em>If OpenTasker runs useful automations for you, a coffee helps me keep building and testing it.</em></sub>
 </p>
 
-**OpenTasker** is a fully open-source, on-device, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android. It doesn't use an accessibility service, so Android's [Advanced Protection limit on accessibility services](https://support.google.com/android/answer/16339980) doesn't touch it.
+**OpenTasker** is an open-source Android automation app that runs entirely on your phone. Profiles watch for things like a time, a place, a Wi-Fi network or an incoming message, and run your tasks when they match. It doesn't use an accessibility service, so Android's [Advanced Protection limit on accessibility services](https://support.google.com/android/answer/16339980) doesn't touch it.
 
 ---
 
@@ -38,14 +38,14 @@
 
 - **Profiles, contexts, tasks, actions**. A complete Room-backed automation pipeline with a Compose UI
 - **Companion presence triggers**. User-confirmed CompanionDeviceManager associations emit low-power present/absent events without a scanning loop, with setup-time revocation
-- **7 context families**. Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
+- **7 context families**. Application, Time, Day, Location, State, Event, and Plugin (Locale condition)
 - **103 built-in actions** plus engine-handled flow control (`task.run` with named inputs, `task.stop`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`, `go to` and `anchor`)
 - **USB device contexts**. Attach/detach event pulses expose bounded device, vendor, product, and class fields for local input-device automations
 - **Template expressions**. Bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews**. Preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
 - **Trigger simulation**. From a profile editor or Context Inspector, pin family-specific synthetic events and see each predicate, context expression, cooldown, and admission result without writing a production run-log row or running the task
 - **Automation lint**. Profile saves, imports, the flow graph, and Context Inspector surface missing reversals, repeated state triggers, conflicting writers, and inter-profile loops with concrete fixes
-- **Profile lifecycle policy**. Assign deterministic priority, symmetric activation grace, and never/date/once lifetimes. The Inspector explains expiry and priority suppression, while bundles and Tasker mappings preserve safe defaults
+- **Profile lifecycle policy**. Assign deterministic priority, symmetric activation grace, and never/date/once lifetimes. The Inspector explains expiry and priority suppression, while bundles preserve safe defaults
 - **Profile execution admission**. Optionally bound active and burst starts per profile, choose replayable logged holds or silent skips on overflow, and inspect rejection counts and circuit-breaker state in Diagnostics
 - **Failure recovery**. Route unhandled failures to an optional per-profile or global fallback task. The fallback receives bounded structured error variables and cannot recurse into another fallback
 - **First-class secret variables**. AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
@@ -80,7 +80,7 @@
 - Authenticated `event=push` bridge for a de-googled UnifiedPush distributor. Delivery IDs are deduplicated, payloads are bounded, and message content is redacted before matching/logging
 - Received Share (`ACTION_SEND`/`SEND_MULTIPLE`) trigger for bounded text, URLs, single files, and multiple files, with MIME/text/URI filters and `share_*` task variables
 - FOSS platform location/geofence. GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
-- Locale/Tasker condition plugins, polled as first-class context predicates with last-known-state caching, and asked again early when a plugin says its answer changed
+- Locale condition plugins, polled as first-class context predicates with last-known-state caching, and asked again early when a plugin says its answer changed
 - Home Assistant bridge proof of concept, with bounded outbound JSON webhooks, HTTPS by default, redacted webhook secrets and retries with backoff
 
 ### Actions (103 registered + 13 engine-handled)
@@ -94,7 +94,7 @@
 | Media | 11 | play, beep, stop, pause, resume, play/pause, next, previous, rewind, fast forward, mute |
 | System | 7 | vibrate, clipboard set, reboot, lock, screen off, wake, log |
 | Notification | 4 | notify/toast, progress, cancel, TTS speak |
-| Variable | 26 | set variable, set several variables at once, variable clear (one, a pattern or all), clipboard get, contacts lookup, find calendar events, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match, replace or collect regex matches into an array, split, join, substring, length), Tasker's numbered arrays (variable split/join, array push/pop/clear/process), variable convert (sizes, units, dates, Base64, hashes and more), sunrise and sunset times, the phone's current location |
+| Variable | 26 | set variable, set several variables at once, variable clear (one, a pattern or all), clipboard get, contacts lookup, find calendar events, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match, replace or collect regex matches into an array, split, join, substring, length), numbered arrays (variable split/join, array push/pop/clear/process), variable convert (sizes, units, dates, Base64, hashes and more), sunrise and sunset times, the phone's current location |
 | Flow | 2+13 | wait, profile status; engine: task.run, task.stop, if/else/end if, for each/end for, try/catch/end try, stop, go to, anchor |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 2 | SHA-256-pinned Termux `RUN_COMMAND` and Shizuku shell scripts, both with bounded result capture |
@@ -120,7 +120,7 @@ The **push trigger** uses the official distributor-neutral UnifiedPush connector
 
 The **Received Share trigger** registers OpenTasker in Android's Sharesheet for text, URLs, MIME-typed content, and one or more file/content URIs. It sanitizes and bounds every value before matching, rejects arbitrary Parcelable or oversized extras, checks content-URI readability using the temporary grant without reading file contents, and shows an in-app error when access is missing. Matching share tasks receive `share_text`, `share_uri`, `share_uris`, `share_mime`, `share_count`, and `share_multiple` as run-scoped variables, plus `share_event`, which is always true. An Event context's editor lists what its trigger hands the task under **Variables this trigger provides**, one line per variable, for share, SMS, notification, incoming call and broadcast events. The action editor's variable chips follow the profiles that start the task. A task a share profile starts is offered the `share_*` names and nothing from other triggers, while a task another task runs keeps every event's chips, since it can read its caller's event fields.
 
-Variable names follow Tasker's scope rule: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization. Concurrent runs merge changes to different globals. If two stale snapshots change the same global, the first committed value is kept and the later conflict is recorded in the run log.
+A variable's case sets its scope: an all-lowercase name is local to the current task, while any name containing an uppercase letter is global and durable. `var.persist` promotes an all-lowercase target to a global name, and the Variable vault applies the same normalization. Concurrent runs merge changes to different globals. If two stale snapshots change the same global, the first committed value is kept and the later conflict is recorded in the run log.
 
 ### Reliability and observability
 
@@ -138,17 +138,16 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 
 ### Interoperability
 
-- **Locale/Tasker plugin host**. Setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback. `Set up in the plugin` opens the plugin's own settings screen and saves what it returns. Bundle values keep their types, so a plugin that reads an int or a boolean gets one: plain JSON values are sent as strings, and a typed value looks like `{"int":3}`, `{"boolean":true}`, `{"long":5}`, `{"double":0.5}`, `{"stringArray":["a","b"]}` or `{"null":true}`. Variables fill in one value at a time, so a quote in one can't change the bundle around it, and a bundle that lists Tasker's `VARIABLE_REPLACE_KEYS` only gets those keys filled in
-- **Locale/Tasker condition plugin target**. Third-party hosts can configure OpenTasker profile-active, context-satisfied, and non-secret variable-comparison conditions. The exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
-- **Locale/Tasker condition context**. Condition plugins as first-class profile predicates polled every 30 seconds, with the blurb their setup saved. A plugin that sends a query request is asked again as soon as any check already under way is done, instead of at the next poll
+- **Locale plugin host**. Setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback. `Set up in the plugin` opens the plugin's own settings screen and saves what it returns. Bundle values keep their types, so a plugin that reads an int or a boolean gets one: plain JSON values are sent as strings, and a typed value looks like `{"int":3}`, `{"boolean":true}`, `{"long":5}`, `{"double":0.5}`, `{"stringArray":["a","b"]}` or `{"null":true}`. Variables fill in one value at a time, so a quote in one can't change the bundle around it, and a bundle that lists `VARIABLE_REPLACE_KEYS` only gets those keys filled in
+- **Locale condition plugin target**. Third-party hosts can configure OpenTasker profile-active, context-satisfied, and non-secret variable-comparison conditions. The exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
+- **Locale condition context**. Condition plugins as first-class profile predicates polled every 30 seconds, with the blurb their setup saved. A plugin that sends a query request is asked again as soon as any check already under way is done, instead of at the next poll
 - **External automation target**. Signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`. See [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
 - **Home Assistant / ntfy interoperability**. The Home Assistant webhook action accepts the Companion `message`/`data` envelope, including documented `command_*` values such as `command_broadcast_intent`. The push bridge accepts ntfy's `id`, `topic`, `title`, `time`, `tags`, `priority`, and other bounded metadata names. An ntfy `broadcast` action can target `com.opentasker.action.PUSH_EVENT` directly with the per-install token and needs no relay app. Message bodies and remote URLs stay out of event metadata and logs.
 - **OpenTasker JSON bundles**. Schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
-- **Tasker XML import/export**. Preview with migration/capability warnings, deterministic mapped/unsupported/lossy reporting, and safe batches for notification, variable, media, settings, and flow actions. Tasker plugin steps (AutoInput, Kustom and the like) come over as plugin steps with their typed settings
-- **MacroDroid JSON import**. Full `.mdr` backups, password-protected `.emdr` exports and single `.macro` shares use the same review gate, with safe trigger/action conversions (If, Else If and Else blocks that check variables among them), explicit placeholders, and disabled-by-default profiles
+- **MacroDroid JSON import**. Full `.mdr` backups and single `.macro` shares use the same review gate, with safe trigger/action conversions (If, Else If and Else blocks that check variables among them), explicit placeholders, and disabled-by-default profiles. A password-protected export can't be read here, so the import says so and asks for one saved without a password
 - **Profile sharing**. Offline share manifests with editable local preview, screenshot attachments, safety findings, import-plan review, and GitHub Discussions submission text. Unverified shares stay blocked until the existing import review passes
 
-Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64. A MacroDroid source file gets 3 million tokens and depth 256 because a whole-app backup passes the ordinary limit at about 1.5 MB, and what it converts into still has to fit the ordinary limits. Tasker XML is capped at 4 Mi characters, 100,000 nodes, and depth 64. Every format shares decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
+Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64. A MacroDroid source file gets 3 million tokens and depth 256 because a whole-app backup passes the ordinary limit at about 1.5 MB, and what it converts into still has to fit the ordinary limits. Every format shares decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
 
 ### UI and theming
 
@@ -236,7 +235,7 @@ Releases come from this repository.
 
 **With [Obtainium](https://github.com/ImranR98/Obtainium)** (recommended, it tracks new releases for you): tap the Obtainium badge above on the device, or add `https://github.com/SysAdminDoc/OpenTasker` as a GitHub source. Default settings are correct, nothing needs configuring.
 
-**By hand:** download the APK attached to the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. Since `v0.2.88` that file is named `OpenTasker-v<version>.apk`. `v0.2.87` and earlier predate the naming gate, and `v0.2.87` ships its APK as `app-release.apk`. Releases after `v0.2.95` also attach `OpenTasker-v<version>-fdroid.apk`. That's the F-Droid flavor (no GitHub update check) under the same key, and it's there so F-Droid can confirm its own build matches ours. Take the plain one unless you want that flavor.
+**By hand:** download `OpenTasker-v<version>.apk` from the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. Each release also attaches `OpenTasker-v<version>-fdroid.apk`. That's the F-Droid flavor (no GitHub update check) under the same key, and it's there so F-Droid can confirm its own build matches.
 
 **Checking the signature.** Every release since `v0.2.93` is signed with the same certificate. [AppVerifier](https://github.com/soupslurpr/AppVerifier) reads it in this form, package name first:
 
@@ -247,9 +246,7 @@ DB:A1:AA:88:E3:7B:90:15:5F:CA:31:35:CA:3B:78:1D:E9:2C:22:51:07:E4:7C:98:06:E7:5B
 
 To check a downloaded APK on a computer, `apksigner verify --print-certs OpenTasker-v<version>.apk` prints the same SHA-256 digest in lowercase without the colons.
 
-**Upgrading from v0.2.92 or earlier?** v0.2.93 and later are signed with a new key, so Android refuses to install them over an older copy. The install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` until the old one is removed. Uninstalling also erases the automation database, so export a backup before you do anything else. Open Settings, export a copy of the database or an encrypted `.otbackup` snapshot to a folder you control, then uninstall the old build, install the current release, and restore. A backup that only lives in app storage goes away with the app, so make sure the copy you keep is the exported one. Secret variable values stay bound to the device that created them and have to be re-entered after a restore. The previous key was published in this repository, which is why it was retired instead of reused.
-
-Releases tagged `v0.1.0`, `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. All four carry versionCode 1 and were signed with a key that no longer exists, so they cannot be upgraded in place. Ignore them, and if you have one installed, uninstall before installing a current build. The live line is `v0.2.x`, and its newest tag is the one to take.
+**Coming from an older build?** Builds before the rename used a different package name, so Android installs this one next to an old copy instead of over it. In the old copy, open Settings and export an encrypted backup to a folder you control. Install the current release, restore that backup from its Settings, check that your profiles came across, then uninstall the old copy. Backups from older builds restore as they are.
 
 ---
 
