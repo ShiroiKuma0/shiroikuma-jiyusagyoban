@@ -1,0 +1,5 @@
+The app has a new name, RuleDeck, and a new icon.
+Apps and scripts that drive RuleDeck from outside need the new names.
+Termux scripts go in ~/.termux/ruledeck/ now.
+Encrypted backups and automatic snapshots save as .rdbackup.
+If you build from source, the signing variables are RULEDECK_RELEASE_KEYSTORE, RULEDECK_RELEASE_KEYSTORE_PASSWORD, RULEDECK_RELEASE_KEY_ALIAS and RULEDECK_RELEASE_KEY_PASSWORD, and the Gradle properties are -PruleDeckDistribution and -PruleDeckSignFdroid.

@@ -16,9 +16,9 @@ Binaries:
   https://github.com/SysAdminDoc/RuleDeck/releases/download/v%v/RuleDeck-v%v-fdroid.apk
 
 Builds:
-  - versionName: 0.2.97
-    versionCode: 99
-    commit: v0.2.97
+  - versionName: 1.0.0
+    versionCode: 100
+    commit: v1.0.0
     subdir: .
     gradle:
       - yes
@@ -34,5 +34,5 @@ AutoUpdateMode: Version
 UpdateCheckMode: Tags
 UpdateCheckData: 
   app/build.gradle.kts|appVersionCode\s*=\s*(\d+)|app/build.gradle.kts|appVersionName\s*=\s*"(.*)"
-CurrentVersion: 0.2.97
-CurrentVersionCode: 99
+CurrentVersion: 1.0.0
+CurrentVersionCode: 100
