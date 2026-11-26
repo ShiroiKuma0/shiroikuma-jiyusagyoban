@@ -246,7 +246,6 @@ object AutomationSensitivityRegistry {
         "provider.call",
         "file.from_uri",
         "sim.status",
-        "sim.ring.wait",
     )
 
     private val externalTransmissionActionIds = setOf(

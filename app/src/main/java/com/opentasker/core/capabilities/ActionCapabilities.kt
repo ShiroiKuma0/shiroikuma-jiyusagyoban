@@ -250,7 +250,6 @@ object ActionCapabilityRegistry {
         "sim.data.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
         "sim.list" to ActionCapability(CapabilityLevel.Supported, "Reads the active SIM slots and which one carries data."),
         "sim.status" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (READ_PHONE_STATE) permission to read a SIM slot's service state and signal."),
-        "sim.ring.wait" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (READ_PHONE_STATE) permission to see which SIM slot is ringing."),
         "ussd.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to send a USSD code from a SIM slot."),
         "package.install" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs “Install unknown apps” allowed for this app. Silent on Android 12+ for an update of this app itself, and for another app from the second install on; otherwise the accessibility service presses the confirmation."),
         "workspace.import" to ActionCapability(CapabilityLevel.Supported, "Imports an OpenTasker bundle file into this workspace, overwriting same-name items in place."),

@@ -1991,19 +1991,6 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
-            id = "sim.ring.wait",
-            name = "Wait for Ring",
-            description = "Wait until one of the phone's SIMs rings, and say which slot it was — the sure way to tell two look-alike cards apart",
-            category = "System",
-            fields = listOf(
-                ActionField("timeout", "Seconds to wait", FieldType.NUMBER, hint = "default 60, at most 300"),
-                ActionField("prefix", "Variable prefix", hint = "default ring — writes %ring_status (ringing / timeout), %ring_slot and %ring_sub (empty on a timeout); a SIM under unconditional forwarding never rings"),
-            )
-        )
-    )
-
-    ActionMetadataRegistry.register(
-        ActionMetadata(
             id = "sim.status",
             name = "SIM Status",
             description = "Read one SIM slot's state: SIM present, operator, service state, signal and roaming",

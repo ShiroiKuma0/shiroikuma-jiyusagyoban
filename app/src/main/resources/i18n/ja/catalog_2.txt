@@ -1074,13 +1074,3 @@
 : 課題を決まった時刻に、専用の正確なアラームで実行します。スリープ中の電話も目を覚まし、再起動の後も残ります。
 = Forgets a task alarm set under a key.
 : 名前を付けて設定した課題アラームを取り消します。
-= Wait for Ring
-: 着信を待つ
-= Wait until one of the phone's SIMs rings, and say which slot it was — the sure way to tell two look-alike cards apart
-: 電話のSIMのどれかが鳴るまで待ち、どの差し込み口だったかを知らせます。見分けのつかない2枚のカードを確実に区別する方法です。
-= default 60, at most 300
-: 既定は60、最長300。
-= default ring — writes %ring_status (ringing / timeout), %ring_slot and %ring_sub (empty on a timeout); a SIM under unconditional forwarding never rings
-: 既定は ring。%ring_status（ringing / timeout）、%ring_slot、%ring_sub を書き込みます（時間切れのときは空）。無条件転送中のSIMは鳴りません。
-= Needs the Phone (READ_PHONE_STATE) permission to see which SIM slot is ringing.
-: どのSIMの差し込み口が鳴っているかを見るには、電話（READ_PHONE_STATE）の権限が必要です。

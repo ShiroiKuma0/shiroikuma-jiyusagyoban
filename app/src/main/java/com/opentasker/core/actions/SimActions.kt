@@ -174,62 +174,6 @@ class SimStatusAction : Action {
     }
 }
 
-/**
- * `Wait for Ring` — wait until one of the phone's SIMs rings, and say which slot it was.
- *
- * Why: two cards of one operator that carry no number look exactly alike in a settings form, so a
- * slot picked by eye can be the wrong one (skfst, 2026-11-26: a chat's commands went to the other
- * card). Calling the number and watching which slot rings cannot be wrong. Each SIM's own call
- * state is polled; nothing is answered or touched.
- *
- * Args:
- *   - "timeout": seconds to wait (default 60, at most 300)
- *   - "prefix":  variable prefix (default `ring`)
- *
- * Writes `<prefix>_status` (ringing / timeout), `<prefix>_slot` and `<prefix>_sub` (empty on a
- * timeout). A SIM under unconditional forwarding never rings here.
- */
-class SimRingWaitAction : Action {
-    override val id = "sim.ring.wait"
-    override val category = ActionCategory.SYSTEM
-
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val raw = args["timeout"]?.trim().orEmpty()
-        val seconds = (if (raw.isEmpty()) 60 else raw.toIntOrNull()
-            ?: return ActionResult.Failure("timeout is not a number: $raw")).coerceIn(1, 300)
-        val prefix = args["prefix"]?.trim()?.ifBlank { null } ?: "ring"
-        val base = ctx.app.getSystemService(android.telephony.TelephonyManager::class.java)
-            ?: return ActionResult.Failure("this phone has no telephony service")
-        val sims = DataSimSwitch.slots(ctx.app)
-        if (sims.isEmpty()) return ActionResult.Failure("no active SIM, or the Phone permission is missing")
-        val managers = sims.map { it to base.createForSubscriptionId(it.subId) }
-        val deadline = android.os.SystemClock.elapsedRealtime() + seconds * 1000L
-        try {
-            while (android.os.SystemClock.elapsedRealtime() < deadline) {
-                for ((sim, tm) in managers) {
-                    @Suppress("MissingPermission", "NewApi", "DEPRECATION")
-                    val state = runCatching { tm.callStateForSubscription }.getOrElse { tm.callState }
-                    if (state == android.telephony.TelephonyManager.CALL_STATE_RINGING) {
-                        ctx.variables.set("${prefix}_status", "ringing")
-                        ctx.variables.set("${prefix}_slot", sim.slotIndex.toString())
-                        ctx.variables.set("${prefix}_sub", sim.subId.toString())
-                        ctx.logger("Ring on SIM slot ${sim.slotIndex} (sub ${sim.subId})")
-                        return ActionResult.Success
-                    }
-                }
-                kotlinx.coroutines.delay(250)
-            }
-        } catch (ex: SecurityException) {
-            return ActionResult.Failure("Phone permission needed to see a ringing SIM: ${ex.message}", ex)
-        }
-        ctx.variables.set("${prefix}_status", "timeout")
-        ctx.variables.set("${prefix}_slot", "")
-        ctx.variables.set("${prefix}_sub", "")
-        ctx.logger("No SIM rang within $seconds s")
-        return ActionResult.Success
-    }
-}
-
 /** Serialises [UssdAction] across every task: see the comment where it is taken. */
 private val ussdLock = Mutex()
 
