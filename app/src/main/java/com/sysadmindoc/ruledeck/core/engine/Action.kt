@@ -79,7 +79,7 @@ sealed class ActionResult {
         val message: String,
         val cause: Throwable? = null,
         /** Child task failures retain their original structured location when they bubble up. */
-        val structuredError: StructuredTaskError? = null,
+        val structuredError: StructuredFailure? = null,
     ) : ActionResult()
     data object Skip : ActionResult()
 }

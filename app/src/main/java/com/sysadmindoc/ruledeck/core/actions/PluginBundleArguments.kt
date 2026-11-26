@@ -54,7 +54,7 @@ internal object PluginBundleArguments {
     }
 
     /** The prefixes of the keys the plugin protocol itself sets, which are never filled in. */
-    private val HOST_KEY_PREFIXES = listOf("net.dinglisch.android.tasker.", "com.twofortyfouram.locale.intent.extra.")
+    private val HOST_KEY_PREFIXES = listOf(LocalePluginContract.EXTENSION_NAMESPACE, "com.twofortyfouram.locale.intent.extra.")
     private val JSON_KEYWORDS = setOf("true", "false", "null")
     private val JSON_NUMBER = Regex("""-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?""")
 

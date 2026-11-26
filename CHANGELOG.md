@@ -7875,10 +7875,24 @@ The action catalogue grew from a few dozen built-ins to **~100**. New built-in a
 
 # Changelog
 
-## Unreleased
+## v1.0.0 - 2026-11-26
+
+### Changed
+
+- The app has a new name, RuleDeck, and a new icon. Its app id is new too, `com.sysadmindoc.ruledeck`, and Android sees that as a different app, so RuleDeck installs next to an older build rather than over it. To move your setup across, tap Export under Backup and restore in the old app's Settings, then Import that file in RuleDeck, stage the restore and reopen the app. A `.otbackup` snapshot from the old app works as well. Check your profiles, then uninstall the old copy. Secret variable values stay locked to the old app, so the Variables screen asks for each one again.
+- Apps and scripts that drive RuleDeck from outside need the new names. Intent actions, extras and the automation permission start with `com.sysadmindoc.ruledeck` now in place of the old package name, and the target package is `com.sysadmindoc.ruledeck`. [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md) lists every one.
+- Termux scripts go in `~/.termux/ruledeck/` now. Move each script there, then update its path in the Run Termux script step and under Approved Termux scripts in Setup.
+- Encrypted backups and automatic snapshots save as `.rdbackup`. A `.otbackup` from an older build still opens, since restore goes by what's inside the file.
+- If you build from source, the signing variables are `RULEDECK_RELEASE_KEYSTORE`, `RULEDECK_RELEASE_KEYSTORE_PASSWORD`, `RULEDECK_RELEASE_KEY_ALIAS` and `RULEDECK_RELEASE_KEY_PASSWORD`, and the Gradle properties are `-PruleDeckDistribution` and `-PruleDeckSignFdroid`.
+
+### Removed
+
+- XML project import and export. Bundles and MacroDroid backups are the ways in now, and bundles are the way out. A step that an XML import left as a placeholder shows up as an unknown action after a restore. It never ran before either, so delete it or swap in a real step.
+- Password-protected MacroDroid exports (`.emdr`) aren't opened any more. Picking one says so and asks for an export saved with the password left blank. Plain `.mdr` backups and single `.macro` shares import the same as before.
 
 ### Fixed
 
+- The restore review names the file you picked. It used to show an id from the file picker there, like `msf:9705`.
 - `tools/smoke-old-api.ps1` upgrades from the previous release's standard APK again. Since v0.2.96 a release also carries an F-Droid APK, and the download took whichever file sorted first by name, which was the F-Droid one.
 
 ## v0.2.97 - 2026-11-22

@@ -231,10 +231,10 @@ class TaskRunner(
         var unhandledFailure = false
         // Only the FIRST unhandled failure is kept: it is the one that actually ended the run, and a
         // later one (from a continueOnError action further down) would misname the cause.
-        var structuredFailure: StructuredTaskError? = null
+        var structuredFailure: StructuredFailure? = null
         fun recordFailure(index: Int, spec: ActionSpec, failure: ActionResult.Failure) {
             if (structuredFailure != null) return
-            structuredFailure = failure.structuredError ?: StructuredTaskError(
+            structuredFailure = failure.structuredError ?: StructuredFailure(
                 taskId = task.id,
                 taskName = task.name,
                 actionId = spec.id,
@@ -1121,7 +1121,7 @@ data class TaskRunReport(
      * anything useful about what broke — and it is the presence of this, not `!success`, that makes a
      * run eligible for a fallback: a run stopped on purpose has no error to recover from.
      */
-    val structuredError: StructuredTaskError? = null,
+    val structuredError: StructuredFailure? = null,
 )
 
 enum class ActionTraceStatus {

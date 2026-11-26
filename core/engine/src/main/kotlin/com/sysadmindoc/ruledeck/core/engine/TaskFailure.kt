@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
  * action id; the type and index are still always present.
  */
 @Serializable
-data class StructuredTaskError(
+data class StructuredFailure(
     val taskId: Long,
     val taskName: String,
     val actionId: Long,
@@ -43,15 +43,15 @@ object TaskFailureVariables {
 }
 
 /** Bounded JSON transport for passing the error object into a user-authored fallback task. */
-object StructuredTaskErrorCodec {
+object StructuredFailureCodec {
     private val json = Json {
         encodeDefaults = true
         explicitNulls = true
     }
 
-    fun encode(error: StructuredTaskError): String = json.encodeToString(error.bounded())
+    fun encode(error: StructuredFailure): String = json.encodeToString(error.bounded())
 
-    private fun StructuredTaskError.bounded(): StructuredTaskError = copy(
+    private fun StructuredFailure.bounded(): StructuredFailure = copy(
         taskName = taskName.take(MAX_ERROR_NAME_LENGTH),
         actionType = actionType.take(MAX_ERROR_NAME_LENGTH),
         message = message.take(MAX_ERROR_MESSAGE_LENGTH),
@@ -61,8 +61,8 @@ object StructuredTaskErrorCodec {
 }
 
 /** Initial variable payload for a user-authored fallback task. */
-fun StructuredTaskError.toFailureVariables(): Map<String, String> = mapOf(
-    TaskFailureVariables.JSON to StructuredTaskErrorCodec.encode(this),
+fun StructuredFailure.toFailureVariables(): Map<String, String> = mapOf(
+    TaskFailureVariables.JSON to StructuredFailureCodec.encode(this),
     TaskFailureVariables.TASK_ID to taskId.toString(),
     TaskFailureVariables.TASK_NAME to taskName,
     TaskFailureVariables.ACTION_ID to actionId.toString(),

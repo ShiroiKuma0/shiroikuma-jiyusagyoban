@@ -12,7 +12,7 @@ import org.junit.Test
  */
 class PluginRequestQuerySpelledOutKeyTest {
 
-    private val ftpdEditor = "org.primftpd.remotecontrol.TaskerEditConditionActivity"
+    private val ftpdEditor = "com.example.ftpd.EditConditionActivity"
 
     @Test
     fun aRequestWithTheClassUnderTheSpelledOutKeyNamesThePlugin() {
@@ -23,9 +23,9 @@ class PluginRequestQuerySpelledOutKeyTest {
 
         assertEquals(ftpdEditor, event?.metadata?.get("activityClass"))
         assertEquals(
-            setOf("org.primftpd"),
-            packagesAskingForQuery(requested, listOf("org.primftpd", "com.example.other")) { pkg ->
-                if (pkg == "org.primftpd") setOf(ftpdEditor) else setOf("com.example.other.Edit")
+            setOf("com.example.ftpd"),
+            packagesAskingForQuery(requested, listOf("com.example.ftpd", "com.example.other")) { pkg ->
+                if (pkg == "com.example.ftpd") setOf(ftpdEditor) else setOf("com.example.other.Edit")
             },
         )
     }

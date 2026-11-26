@@ -127,12 +127,12 @@ class LocalePluginSyncProtocolTest {
         val variables = LocalePluginReturnedVariables(values = mapOf("errmsg" to "No such file", "stderr" to "boom"))
         val failed = LocalePluginSettingOutcome.of(
             LocalePluginSettingReply(LocalePluginContract.RESULT_CODE_FAILED, variables),
-            "com.termux.tasker/.FireReceiver",
+            "com.example.plugin/.FireReceiver",
             5_000,
         )
 
         assertFalse(failed.success)
-        assertEquals("Plugin com.termux.tasker/.FireReceiver failed (result code 2): No such file.", failed.message)
+        assertEquals("Plugin com.example.plugin/.FireReceiver failed (result code 2): No such file.", failed.message)
         assertEquals(variables, failed.variables)
 
         val long = LocalePluginSettingOutcome.of(

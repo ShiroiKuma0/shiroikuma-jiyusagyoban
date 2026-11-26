@@ -56,11 +56,17 @@ object LocalePluginContract {
     const val EXTRA_BLURB = EXTRA_STRING_BLURB
     const val EXTRA_ACTIVITY_CLASS_NAME = EXTRA_STRING_ACTIVITY_CLASS_NAME
 
+    /**
+     * The namespace of the plugin protocol's extension extras. Installed plugins read and write these
+     * exact names, so this one string has to match what they were built against.
+     */
+    const val EXTENSION_NAMESPACE = "net.dinglisch.android.tasker."
+
     /** The protocol's extension: the bundle keys, space-separated, whose values the host fills variables into. */
-    const val EXTRA_VARIABLE_REPLACE_KEYS = "net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS"
+    const val EXTRA_VARIABLE_REPLACE_KEYS = "${EXTENSION_NAMESPACE}extras.VARIABLE_REPLACE_KEYS"
 
     /** The protocol's extension: the variables a plugin sets once it finishes, each as `%name\nLabel\nDescription`. */
-    const val EXTRA_RELEVANT_VARIABLES = "net.dinglisch.android.tasker.RELEVANT_VARIABLES"
+    const val EXTRA_RELEVANT_VARIABLES = "${EXTENSION_NAMESPACE}RELEVANT_VARIABLES"
 
     /**
      * The protocol's synchronous setting extension. The host says what it supports in
@@ -69,12 +75,12 @@ object LocalePluginContract {
      * its RESULT_CODE and a VARIABLES bundle; one that finishes at once sets both on the ordered
      * broadcast's result.
      */
-    const val EXTRA_HOST_CAPABILITIES = "net.dinglisch.android.tasker.extras.HOST_CAPABILITIES"
-    const val EXTRA_REQUESTED_TIMEOUT = "net.dinglisch.android.tasker.extras.REQUESTED_TIMEOUT"
-    const val EXTRA_COMPLETION_INTENT = "net.dinglisch.android.tasker.extras.COMPLETION_INTENT"
-    const val EXTRA_RESULT_CODE = "net.dinglisch.android.tasker.extras.RESULT_CODE"
-    const val EXTRA_VARIABLES = "net.dinglisch.android.tasker.extras.VARIABLES"
-    const val EXTRA_HINTS = "net.dinglisch.android.tasker.extras.HINTS"
+    const val EXTRA_HOST_CAPABILITIES = "${EXTENSION_NAMESPACE}extras.HOST_CAPABILITIES"
+    const val EXTRA_REQUESTED_TIMEOUT = "${EXTENSION_NAMESPACE}extras.REQUESTED_TIMEOUT"
+    const val EXTRA_COMPLETION_INTENT = "${EXTENSION_NAMESPACE}extras.COMPLETION_INTENT"
+    const val EXTRA_RESULT_CODE = "${EXTENSION_NAMESPACE}extras.RESULT_CODE"
+    const val EXTRA_VARIABLES = "${EXTENSION_NAMESPACE}extras.VARIABLES"
+    const val EXTRA_HINTS = "${EXTENSION_NAMESPACE}extras.HINTS"
     const val HINT_TIMEOUT_MS = ".hints.TIMEOUT"
 
     /** Variables returned from a setting, `%var` replacement in VARIABLE_REPLACE_KEYS, and the wait. */

@@ -14,7 +14,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class TermuxScriptBackendTest {
-    private val script = "~/.termux/tasker/backup.sh"
+    private val script = "~/.termux/ruledeck/backup.sh"
     private val approvedHash = "a".repeat(64)
 
     @Test
@@ -49,7 +49,7 @@ class TermuxScriptBackendTest {
     fun packageAndPermissionConstantsMatchTermuxContracts() {
         assertEquals("com.termux", TermuxScriptBackend.TERMUX_PACKAGE)
         assertEquals("com.termux.permission.RUN_COMMAND", TermuxScriptBackend.RUN_COMMAND_PERMISSION)
-        assertEquals("~/.termux/tasker", TermuxScriptBackend.SCRIPT_DIRECTORY)
+        assertEquals("~/.termux/ruledeck", TermuxScriptBackend.SCRIPT_DIRECTORY)
         assertFalse(TermuxScriptBackend.supportsResultProtocol("0.108.0"))
         assertTrue(TermuxScriptBackend.supportsResultProtocol("0.109.0-beta.1"))
         assertTrue(TermuxScriptBackend.supportsResultProtocol("0.118.3"))
@@ -86,7 +86,7 @@ class TermuxScriptBackendTest {
         )
         val traversal = coordinator().execute(
             ready = true,
-            invocation = invocation(executable = "~/.termux/tasker/../escape.sh"),
+            invocation = invocation(executable = "~/.termux/ruledeck/../escape.sh"),
             approvedHashFor = { approvedHash },
             commandRunner = {
                 calls++
@@ -340,7 +340,7 @@ class TermuxScriptBackendTest {
         var now = 1_000L
         val limiter = TermuxDispatchLimiter(maxEntries = 128, clock = { now++ })
 
-        repeat(500) { index -> assertTrue(limiter.tryAcquire("~/.termux/tasker/script-$index")) }
+        repeat(500) { index -> assertTrue(limiter.tryAcquire("~/.termux/ruledeck/script-$index")) }
 
         assertEquals(128, limiter.size())
     }

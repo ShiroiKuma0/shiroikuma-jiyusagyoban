@@ -165,28 +165,28 @@ class ImportBoundaryCorpusTest {
     fun termuxCorpusFailsClosedWithoutCommandDispatch() {
         val invalid = listOf(
             TermuxScriptInvocation(
-                executable = "~/.termux/tasker/../escape.sh",
+                executable = "~/.termux/ruledeck/../escape.sh",
                 argumentText = null,
                 workingDirectory = null,
                 stdin = null,
                 timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
             ),
             TermuxScriptInvocation(
-                executable = "~/.termux/tasker/run.sh",
+                executable = "~/.termux/ruledeck/run.sh",
                 argumentText = "'unterminated",
                 workingDirectory = null,
                 stdin = null,
                 timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
             ),
             TermuxScriptInvocation(
-                executable = "~/.termux/tasker/run.sh",
+                executable = "~/.termux/ruledeck/run.sh",
                 argumentText = null,
                 workingDirectory = null,
                 stdin = "x".repeat(TermuxScriptPolicy.MAX_STDIN_BYTES + 1),
                 timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
             ),
             TermuxScriptInvocation(
-                executable = "~/.termux/tasker/run.sh",
+                executable = "~/.termux/ruledeck/run.sh",
                 argumentText = null,
                 workingDirectory = null,
                 stdin = null,

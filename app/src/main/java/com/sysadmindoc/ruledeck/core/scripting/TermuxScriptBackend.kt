@@ -9,7 +9,7 @@ object TermuxScriptBackend {
     const val ACTION_ID = "script.termux.run"
     const val TERMUX_PACKAGE = "com.termux"
     const val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
-    const val SCRIPT_DIRECTORY = "~/.termux/tasker"
+    const val SCRIPT_DIRECTORY = "~/.termux/ruledeck"
     const val MINIMUM_RESULT_VERSION = "0.109"
     const val SETUP_URL = "https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent"
 

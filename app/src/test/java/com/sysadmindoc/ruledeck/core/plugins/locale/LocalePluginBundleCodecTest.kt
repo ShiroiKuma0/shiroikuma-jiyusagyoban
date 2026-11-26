@@ -215,10 +215,10 @@ class LocalePluginBundleCodecTest {
     fun configurationResultsKeepTheirTypes() {
         val values = LocalePluginBundleCodec.sanitizeTypedValues(
             mapOf(
-                "com.termux.tasker.extra.VERSION_CODE" to 1002,
-                "com.termux.tasker.extra.EXECUTABLE" to "hello.sh",
-                "com.termux.tasker.extra.ARGUMENTS" to null,
-                "com.termux.tasker.extra.TERMINAL" to false,
+                "com.example.plugin.extra.VERSION_CODE" to 1002,
+                "com.example.plugin.extra.EXECUTABLE" to "hello.sh",
+                "com.example.plugin.extra.ARGUMENTS" to null,
+                "com.example.plugin.extra.TERMINAL" to false,
                 "since" to 7L,
                 "level" to 0.5f,
                 "ratio" to 0.25,
@@ -227,10 +227,10 @@ class LocalePluginBundleCodecTest {
             )
         )
 
-        assertEquals(LocaleBundleValue.IntNumber(1002), values["com.termux.tasker.extra.VERSION_CODE"])
-        assertEquals(LocaleBundleValue.Text("hello.sh"), values["com.termux.tasker.extra.EXECUTABLE"])
-        assertEquals(LocaleBundleValue.Null, values["com.termux.tasker.extra.ARGUMENTS"])
-        assertEquals(LocaleBundleValue.Flag(false), values["com.termux.tasker.extra.TERMINAL"])
+        assertEquals(LocaleBundleValue.IntNumber(1002), values["com.example.plugin.extra.VERSION_CODE"])
+        assertEquals(LocaleBundleValue.Text("hello.sh"), values["com.example.plugin.extra.EXECUTABLE"])
+        assertEquals(LocaleBundleValue.Null, values["com.example.plugin.extra.ARGUMENTS"])
+        assertEquals(LocaleBundleValue.Flag(false), values["com.example.plugin.extra.TERMINAL"])
         assertEquals(LocaleBundleValue.LongNumber(7L), values["since"])
         assertEquals(LocaleBundleValue.FloatNumber(0.5f), values["level"])
         assertEquals(LocaleBundleValue.DoubleNumber(0.25), values["ratio"])

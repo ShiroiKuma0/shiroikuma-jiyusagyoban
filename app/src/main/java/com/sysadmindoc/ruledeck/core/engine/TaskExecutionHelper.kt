@@ -335,7 +335,7 @@ private suspend fun runFallbackTask(
     appContext: Context,
     db: AppDatabase,
     failedTask: Task,
-    error: StructuredTaskError,
+    error: StructuredFailure,
     profileFallbackTaskId: Long?,
     admissionController: ExecutionAdmissionController,
     profileId: Long?,

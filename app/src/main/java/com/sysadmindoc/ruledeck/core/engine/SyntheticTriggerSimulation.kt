@@ -343,7 +343,7 @@ object SyntheticTriggerSimulator {
         spec.config["eventId"]?.trim()?.takeIf(String::isNotBlank)?.let { metadata["eventId"] = it }
         first(spec.config, "tagId", "tagIds", "tag").takeIf(String::isNotBlank)?.let { metadata["tagId"] = csvFirst(it) }
         // A title and text written as Matches patterns each get a made-up value the pattern matches.
-        val matchesPatterns = spec.config["patterns"] == ContextMatchEvaluator.MATCHES_PATTERNS
+        val matchesPatterns = ContextMatchEvaluator.usesMatchesPatterns(spec.config)
         val patternExamples = if (matchesPatterns) {
             listOf("title", "body").filter { spec.config[it].orEmpty().isNotEmpty() }
                 .associateWith { matchesPatternExample(spec.config[it].orEmpty()) }

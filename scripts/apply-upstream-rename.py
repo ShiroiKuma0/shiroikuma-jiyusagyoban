@@ -16,7 +16,7 @@ manifest declares — is put back afterwards by `scripts/keep-stored-names.py`.
 
 --check lists what would change and writes nothing.
 """
-import pathlib, subprocess, sys
+import pathlib, re, subprocess, sys
 
 # Most specific first. `com.opentasker.app` collapses into the new root: upstream moved MainActivity
 # and the Application class up one level.
@@ -32,7 +32,11 @@ RULES = [
 # Never touched: the fork's own records and tooling, which speak about the upstream project by its
 # old name on purpose (history), and this script and its sibling.
 SKIP_PREFIXES = (".git/", ".claude/", ".scratch/", "CLAUDE.md", "CHANGELOG.md", "README.md", "docs/gengoshima.md",
-                 "scripts/apply-upstream-rename.py", "scripts/keep-stored-names.py")
+                 "scripts/apply-upstream-rename.py", "scripts/keep-stored-names.py", "scripts/stored-names/")
+
+# Source files are text whatever they contain: a Kotlin file with a NUL character in a string literal
+# is not a binary (four of the fork's are like that, and the first run skipped them).
+TEXT = re.compile(r"\.(kt|kts|java|xml|pro|py|json|md|txt|toml|properties|yml|yaml|ps1|sh|cfg|gradle|html|svg)$")
 
 
 def apply(text):
@@ -52,9 +56,9 @@ def main():
         if not p.is_file() or p.is_symlink():
             continue
         data = p.read_bytes()
-        if b"\0" not in data[:8000]:
+        if TEXT.search(f) or b"\0" not in data[:8000]:
             try:
-                text = data.decode("utf-8")
+                text = data.decode("utf-8", errors="surrogateescape")
             except UnicodeDecodeError:
                 text = None
             if text is not None:
@@ -62,7 +66,7 @@ def main():
                 if new != text:
                     changed += 1
                     if not check:
-                        p.write_bytes(new.encode("utf-8"))
+                        p.write_bytes(new.encode("utf-8", errors="surrogateescape"))
         g = apply(f)
         if g != f:
             moved += 1
