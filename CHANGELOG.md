@@ -8,6 +8,73 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.97+2026-11-23.00-46.g014a87d5+030 — 2026-11-26
+
+Built on upstream `014a87d5` — OpenTasker **0.2.97**, the same base as `+004`. The database stays
+at version 41. Builds `+005` to `+029` were steps on the way and were not released.
+
+### Gates on every outside door
+
+From an audit of the command channel between the phones. None of these settings travels in an
+export, an import or a restore — each is set by a tap on the phone it applies to.
+
+- **The adb bridge is closed by a switch and takes signed commands only.** A command is signed by
+  the PC's key (ECDSA P-256) over the action, every extra, a rising counter and the SHA-256 of any
+  file it reads, so a replayed command and a swapped file are both refused. The key is offered
+  over adb and approved on the phone. `scripts/bridge.py` is the PC side.
+- **New bridge actions**: `BRIDGE_INFO`, `BRIDGE_OFFER_KEY`, `PROTECT_VARIABLES`.
+- **Commands as root and commands in Termux each sit behind a switch of their own**, off by
+  default, per phone. `Run Shell`'s plain mode is removed, since a command as the app's own user
+  could have switched the others on.
+- **A shortcut may start a task only when the task allows it**; the app's own widgets carry a seal.
+- **Variables can be protected** against imports, or locked against tasks as well.
+- **The state export** takes no path from outside and runs at most once a minute.
+- **A provider authority is pinned** to the app that first answered for it, with its signing key;
+  “Forget pinned provider apps” clears the pins after an app was replaced on purpose.
+- **Sister apps run a task through the provider's `run_task`**; the exported receiver is gone.
+
+### Commands
+
+- **Run Termux Shell** (`shell.termux`): any command line inside Termux, as Termux, with its
+  output, error output and exit code kept in variables.
+- **A command window** shows what a command prints while it runs.
+- **Keep Awake** (`power.keep_awake`): holds the phone awake for the length of a run, so that a
+  wait on an unplugged phone is not stretched by its sleep.
+- **The Termux switch says at once when the permission is missing.** Switching “Allow tasks to run
+  commands in Termux” on now checks whether Termux can really be asked. If Android has not granted
+  “Run commands in Termux environment”, a dialog says so, requests the permission, and opens the
+  app's settings when Android shows no prompt. A missing or too old Termux is named the same way.
+
+### Share tiles
+
+- **A share tile can start a task** instead of forwarding to an app. The task gets the share as
+  variables: `%share_paths` (real paths, each quoted for a shell), `%share_count`,
+  `%share_subject`.
+- **A file in shared storage is passed in place**: its path is read back from the opened
+  reference and checked against size and time. Only what has no such path — a screenshot shared
+  from its preview — is copied, and the copy is deleted when the task ends.
+- **Only the tile made for a task may start it**: the tile proves itself with a token the system
+  vouches for, checked against this installation's own tile key.
+- **The screen is “Share tiles”**, and its buttons read Create / Recreate / Update / Delete tile,
+  so that nothing reads as if it acted on the app behind the tile.
+
+### Connectivity
+
+- **A VPN that comes or goes over an unchanged Wi-Fi is noticed.** The published state `vpn` used
+  to change only together with the network under it, so a profile on `vpn=true` never fired. The
+  monitor now also listens to the app's own default network and to VPN networks as such.
+
+### UI
+
+- **App language** is the first section of the UI page: English or Japanese, for this app alone.
+- **The action editor's dialogs** are almost page-size.
+- **A long text dialog** frames its text, scrolls it inside the frame and keeps its buttons at the
+  very bottom.
+
+### Japanese
+
+- Every string added in these builds has its Japanese translation.
+
 ## 0.2.97+2026-11-23.00-46.g014a87d5+004 — 2026-11-24
 
 Built on upstream `014a87d5` — OpenTasker **0.2.97**, the same base as `+001`. The database stays
