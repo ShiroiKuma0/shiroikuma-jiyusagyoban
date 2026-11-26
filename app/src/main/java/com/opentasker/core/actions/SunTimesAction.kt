@@ -10,7 +10,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
-import com.opentasker.core.contexts.TaskerSunTimes
+import com.opentasker.core.contexts.SunTimeVariables
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
@@ -21,11 +21,11 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Tasker's Get Sunrise/Sunset Times. Args: `latitude`, `longitude`, `time` (epoch seconds),
+ * Get Sunrise/Sunset Times. Args: `latitude`, `longitude`, `time` (epoch seconds),
  * `elevations` (sun elevations in degrees, one per line or comma separated) and `var`, the output
- * prefix (`ss` by default). Times come from [TaskerSunTimes] for the day `time` falls on, or today.
+ * prefix (`ss` by default). Times come from [SunTimeVariables] for the day `time` falls on, or today.
  *
- * Like Tasker, a coordinate that isn't a number is filled from the phone's location, and only that
+ * A coordinate that isn't a number is filled from the phone's location, and only that
  * one: a typed latitude stays when the longitude comes from the fix. A time that isn't a number means
  * now, and an elevation that isn't a number is dropped.
  */
@@ -73,7 +73,7 @@ class SunTimesAction(
         val elevations = text.split(if ('\n' in text) "\n" else ",")
             .mapNotNull { it.trim().toDoubleOrNull()?.takeIf(Double::isFinite) }
 
-        val times = TaskerSunTimes.calculate(latitude, longitude, epochMs, zone(), elevations)
+        val times = SunTimeVariables.calculate(latitude, longitude, epochMs, zone(), elevations)
         fun put(suffix: String, value: Any) = ctx.variables.set(prefix + suffix, value.toString())
         put("_sunrise", times.sunrise)
         put("_sunset", times.sunset)
@@ -112,7 +112,7 @@ class SunTimesAction(
 
         /**
          * A fresh fix from the first enabled provider, or the newest one the phone already has when
-         * no fresh one comes in time, the way Tasker falls back to the last location.
+         * no fresh one comes in time.
          */
         @SuppressLint("MissingPermission")
         private suspend fun currentFix(context: Context): Location? {

@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** New York on 25 June 2025 before dawn; the values are TaskerSunTimesTest's, from Tasker's code. */
+/** New York on 25 June 2025 before dawn; the values are SunTimeVariablesTest's. */
 class SunTimesActionTest {
     private val variables = VariableStore()
     private val logs = mutableListOf<String>()
@@ -109,7 +109,7 @@ class SunTimesActionTest {
     }
 
     @Test
-    fun aCoordinateThatIsNotANumberComesFromTheFixLikeTaskers() {
+    fun aCoordinateThatIsNotANumberComesFromTheFix() {
         assertEquals(ActionResult.Success, run("latitude" to "%LAT", "longitude" to "%LON", "time" to "$NOW_SECONDS"))
         assertNewYorkJune()
         assertEquals(1, fixAsked)

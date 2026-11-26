@@ -8,18 +8,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Expected values come from Tasker 6.7.8's own Get Sunrise/Sunset code, run as written, except for
- * day or night: Tasker drops the fraction of the day there and this keeps it, so those come from the
- * same code with the fraction kept. The cases where the two disagree are marked.
+ * Expected values are pinned from a reference run of these formulas. Day or night keeps the
+ * fraction of the day since 2000; the cases where dropping it would give the other answer are
+ * marked.
  */
-class TaskerSunTimesTest {
+class SunTimeVariablesTest {
     private fun zone(id: String) = TimeZone.getTimeZone(id)
 
     private fun times(latitude: Double, longitude: Double, zone: String, seconds: Long, custom: List<Double> = emptyList()) =
-        TaskerSunTimes.calculate(latitude, longitude, seconds * 1000, zone(zone), custom)
+        SunTimeVariables.calculate(latitude, longitude, seconds * 1000, zone(zone), custom)
 
     /** sunrise, sunset, noon, then each twilight's dawn and dusk, civil first. */
-    private fun TaskerSunTimes.Times.clock() = listOf(
+    private fun SunTimeVariables.Times.clock() = listOf(
         sunrise, sunset, solarNoon, civilDawn, civilDusk, nauticalDawn, nauticalDusk, astronomicalDawn, astronomicalDusk,
     )
 
@@ -80,7 +80,7 @@ class TaskerSunTimesTest {
             listOf(1766313720L, 1766313720, 1766313720, 1766305860, 1766321580, 1766299560, 1766327820, 1766294880, 1766332560),
             times.clock(),
         )
-        // Tasker says night: it reads the twilight of the day before.
+        // Without the day's fraction this would read night, from the twilight of the day before.
         assertTrue(times.isDay)
         assertEquals(0, times.sunlightMinutes)
     }
@@ -92,7 +92,7 @@ class TaskerSunTimesTest {
             listOf(1766256000L, 1766307840, 1766281920, 1766254260, 1766309640, 1766252100, 1766311740, 1766249760, 1766314140),
             times.clock(),
         )
-        // Noon. Tasker says night.
+        // Noon. Without the day's fraction this would read night.
         assertTrue(times.isDay)
         assertEquals(864, times.sunlightMinutes)
     }
@@ -104,14 +104,14 @@ class TaskerSunTimesTest {
             listOf(1741565940L, 1741608780, 1741587360, 1741564620, 1741610160, 1741563060, 1741611720, 1741561500, 1741613280),
             times.clock(),
         )
-        // Tasker says night.
+        // Without the day's fraction this would read night.
         assertTrue(times.isDay)
         assertEquals(714, times.sunlightMinutes)
     }
 
     @Test
     fun dayOrNightFollowsTheMinusSixDegreeTwilight() {
-        // 7 AM in June. Tasker says night.
+        // 7 AM in June. Without the day's fraction this would read night.
         assertTrue(times(NY_LAT, NY_LON, NY, 1750849200).isDay)
         assertTrue(times(NY_LAT, NY_LON, NY, 1750898700).isDay)
         assertFalse(times(NY_LAT, NY_LON, NY, 1750903200).isDay)
