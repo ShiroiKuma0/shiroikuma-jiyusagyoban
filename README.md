@@ -60,7 +60,7 @@
 ### Triggers (contexts)
 
 - **Offline bundle import**. Paste exported JSON or decoded QR text into the existing disabled-by-default review flow with bounded input validation
-- **MacroDroid migration**. Import full `.mdr` backups, password-protected `.emdr` exports or single `.macro` shares into disabled profiles, with bounded decoding and an exact mapped, unsupported, and lossy review
+- **MacroDroid migration**. Import full `.mdr` backups or single `.macro` shares into disabled profiles, with bounded decoding and an exact mapped, unsupported, and lossy review
 
 - Time/day schedules with presets, aliases, and ranges
 - Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID, orientation, proximity, physical activity, speed, roaming, tethering, phone-call state, Bluetooth devices nearby, work profile, and Health Connect steps, heart rate, sleep and exercise). Sensor/GPS/phone callbacks are demand-gated per profile. `work_profile` reads `available`, `paused` or `none` and changes when you pause or resume work apps, with no permission needed. Before Android 15, Android doesn't say what kind a profile is, so any other profile of yours counts, and a paused one wins since only a work profile can pause. Private Space can't be read at all, since Android shows it only to the home screen app
@@ -246,7 +246,7 @@ DB:A1:AA:88:E3:7B:90:15:5F:CA:31:35:CA:3B:78:1D:E9:2C:22:51:07:E4:7C:98:06:E7:5B
 
 To check a downloaded APK on a computer, `apksigner verify --print-certs RuleDeck-v<version>.apk` prints the same SHA-256 digest in lowercase without the colons.
 
-**Coming from an older build?** Builds before the rename used a different package name, so Android installs this one next to an old copy instead of over it. In the old copy, open Settings and export an encrypted backup to a folder you control. Install the current release, restore that backup from its Settings, check that your profiles came across, then uninstall the old copy. Backups from older builds restore as they are. Secret variables are the exception, because their values are locked to the app that saved them. The Variables screen marks each one so you can type it in again.
+**Coming from an older build?** Builds before the rename used a different package name, so Android installs this one next to an old copy instead of over it. In the old copy, open Settings, go to Backup and restore and tap Export to save a copy of your data. Install the current release and tap Import in the same place. Pick that file, check the counts on the review, tap Stage restore, then close RuleDeck and open it again. If the old copy was writing automatic snapshots, its newest `.otbackup` works too, with the snapshot passphrase. Once your profiles are there, uninstall the old copy and delete the exported file, since Export doesn't encrypt it. Secret variable values don't come across because they're locked to the app that saved them. The Variables screen marks each one so you can type it in again.
 
 ---
 
