@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "requiredArtifactCommit": "34eebcb5966d5104235dd18e1ef26299e539a374",
   "releaseTag": "v1.0.0",
-  "releaseTagCommit": "",
+  "releaseTagCommit": "15c8ed92beb0ecf43d2b08a9aa941590092c0819",
   "application": {
     "versionName": "1.0.0",
     "versionCode": 100
