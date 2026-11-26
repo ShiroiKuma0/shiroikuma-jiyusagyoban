@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Full-bleed store tile: the foreground deck on the launcher background, scaled up to fill it. -->
+  <defs>
+    <rect id="card" x="-195" y="-170" width="390" height="340" rx="62"/>
+  </defs>
+  <rect id="tile" width="1024" height="1024" fill="#1E1B4B"/>
+  <g id="deck" transform="translate(512 512) scale(1.3) translate(-512 -512)">
+    <g transform="translate(479.5 493.5) rotate(-17)">
+      <use xlink:href="#card" fill="#5B21B6"/>
+    </g>
+    <g transform="translate(521.5 523.5) rotate(-12)">
+      <use xlink:href="#card" fill="#7C3AED"/>
+    </g>
+    <g transform="translate(565.5 557.5) rotate(-7)">
+      <use xlink:href="#card" fill="#FFF7E6"/>
+      <circle cx="-112" cy="-56" r="40" fill="#F59E0B"/>
+      <polyline points="-44,-80 -20,-56 -44,-32" fill="none" stroke="#6D28D9" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="8" y="-90" width="142" height="68" rx="34" fill="#6D28D9"/>
+      <circle cx="-112" cy="56" r="40" fill="#F59E0B"/>
+      <polyline points="-44,32 -20,56 -44,80" fill="none" stroke="#6D28D9" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="8" y="22" width="142" height="68" rx="34" fill="#6D28D9"/>
+    </g>
+  </g>
+</svg>
