@@ -15,7 +15,7 @@ import org.junit.Test
 
 /**
  * Variable Clear of a path (`%json.key`, `%json.list[0]`) removes that field or item from the JSON
- * the variable holds, the way Tasker 6.7.8 clears `%json.key` (`TaskerJsonWriter.d`): a removed
+ * the variable holds: a removed
  * list item moves the later ones down, and a field or item that isn't there, an unset variable or
  * one that isn't JSON fails the step and changes nothing.
  */
@@ -77,7 +77,7 @@ class VariableClearPathTest {
 
     @Test
     fun aPositionIsOnlyTheDigitsZeroToNine() {
-        // Anything else in [ ] would go out to Tasker as a field name, so it isn't a position here.
+        // Only 0 to 9 make a position, so anything else in [ ] isn't one.
         val store = VariableStore().apply { set("Json", json) }
         listOf("%Json.list[+1]", "%Json.list[-0]", "%Json.list[${Char(0x661)}]").forEach { path ->
             assertEquals("$path: isn't a variable path", failure(run(store, path)))

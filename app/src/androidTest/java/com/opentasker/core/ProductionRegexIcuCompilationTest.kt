@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
  * Compiles every regex literal declared in production source against Android's engine.
  *
  * Android uses ICU, which rejects patterns desktop `java.util.regex` accepts. This project has
- * shipped that divergence three times: the Tasker import DOCTYPE guard, the `data.read` XML parser,
+ * shipped that divergence three times: the XML import DOCTYPE guard, the `data.read` XML parser,
  * and a `TaskRunner` companion-object pattern whose bare `}}` made every task on every device fail
  * with `ExceptionInInitializerError`. All 1,263 JVM tests were green through that last one, because
  * a JVM suite runs against the desktop engine and structurally cannot observe the difference.

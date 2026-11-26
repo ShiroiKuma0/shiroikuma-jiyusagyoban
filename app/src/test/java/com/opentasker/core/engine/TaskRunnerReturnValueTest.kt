@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Stop's value handed back through Run Task's return variable, Tasker's Return and Perform Task. */
+/** Stop's value handed back through Run Task's return variable. */
 class TaskRunnerReturnValueTest {
 
     private val recorded = mutableListOf<String>()

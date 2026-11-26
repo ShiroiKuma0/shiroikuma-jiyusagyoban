@@ -10,10 +10,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A Wi-Fi name or a notification title or text that's a Tasker pattern simulates with a made-up
+ * A Wi-Fi name or a notification title or text that's a Matches pattern simulates with a made-up
  * value the pattern matches, and says so when none can be made up.
  */
-class SyntheticTaskerPatternTest {
+class SyntheticMatchesPatternTest {
 
     @Test
     fun aWifiNamePatternSimulatesWithANameItMatches() {

@@ -57,14 +57,14 @@ class TemplateExpressionEngineTest {
             template = "{{ label | trim | upper }} {{ count | add:5 | mul:2 }} {{ score | round }}",
             scope = TemplateScope(
                 task = mapOf(
-                    "label" to "  open tasker  ",
+                    "label" to "  hello world  ",
                     "count" to "7",
                     "score" to "7.6",
                 ),
             ),
         )
 
-        assertEquals("OPEN TASKER 24 8", result.value)
+        assertEquals("HELLO WORLD 24 8", result.value)
         assertEquals(listOf("trim", "upper"), result.traces[0].functions)
     }
 

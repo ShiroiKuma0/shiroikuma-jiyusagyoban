@@ -13,8 +13,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Replace Text's Store matches in array empties the array first, as Tasker's Search Replace does
- * before it even compiles the pattern, so a step that fails or matches nothing leaves no old
+ * Replace Text's Store matches in array empties the array first, before it even compiles the
+ * pattern, so a step that fails or matches nothing leaves no old
  * elements behind. Globals are used so the results outlive the task.
  */
 class TextReplaceEmptiedArrayTest {

@@ -14,8 +14,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Replace Text's Edit in place, which Tasker's Search Replace imports as. Tasker 6.7.8's handler
- * (`ExecuteService.V2`) fails on an unset variable before it empties the array, writes the variable
+ * Replace Text's Edit in place, which an imported Search Replace runs as. It fails on an unset
+ * variable before it empties the array, writes the variable
  * back only when something matched, unsets it when the result is empty, and logs a replacement it
  * can't make and goes on. Globals are used so what the step leaves can be read after the run.
  */

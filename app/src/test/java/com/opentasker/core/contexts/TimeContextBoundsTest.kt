@@ -21,7 +21,7 @@ class TimeContextBoundsTest {
     private val tick = ContextEvent("time", true, mapOf("time" to "12:00"))
 
     @Test
-    fun aTimeReadsAsTaskerReadsIt() {
+    fun aTimeReadsAsHoursAndMinutesOrEpochSeconds() {
         assertEquals("09:07", TimeContextBounds.clockFromValue("9.7", utc))
         assertEquals("21:05", TimeContextBounds.clockFromValue("21:05", utc))
         assertEquals("06:42", TimeContextBounds.clockFromValue(" 06.42 ", utc))

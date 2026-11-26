@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** For Each over Tasker-style values and ranges, in a run and in the preview. */
+/** For Each over its own values and ranges, in a run and in the preview. */
 class TaskRunnerForValuesTest {
 
     private val recorded = mutableListOf<String>()

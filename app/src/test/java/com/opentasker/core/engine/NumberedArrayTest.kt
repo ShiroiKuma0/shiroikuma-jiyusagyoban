@@ -13,10 +13,10 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker keeps an array as numbered variables (%arr1, %arr2, ...). Imported tasks split, join,
- * push and pop them and read them through the (#), (<) and (a:b) forms, so these follow Tasker.
+ * An array kept as numbered variables (%arr1, %arr2, ...). Tasks split, join, push and pop them and
+ * read them through the (#), (<) and (a:b) forms.
  */
-class TaskerNumberedArrayTest {
+class NumberedArrayTest {
 
     private val recorded = mutableListOf<String>()
 
@@ -140,7 +140,7 @@ class TaskerNumberedArrayTest {
     }
 
     @Test
-    fun aSplitTextArrayNeverHidesATaskerArrayOfTheSameName() {
+    fun aSplitTextArrayNeverHidesANumberedArrayOfTheSameName() {
         val variables = VariableStore()
 
         act(variables, "text.split", "source" to "a,b,c", "delimiter" to ",", "var" to "words")
@@ -152,7 +152,7 @@ class TaskerNumberedArrayTest {
     }
 
     @Test
-    fun aSplitTextArrayStaysHiddenOnceTheTaskerSplitDeletesItsBase() {
+    fun aSplitTextArrayStaysHiddenOnceVariableSplitDeletesItsBase() {
         val variables = VariableStore()
 
         act(variables, "text.split", "source" to "a,b,c", "delimiter" to ",", "var" to "words")
@@ -200,7 +200,7 @@ class TaskerNumberedArrayTest {
     }
 
     @Test
-    fun aPositionWithAFractionCountsByItsWholePartAsInTasker() {
+    fun aPositionWithAFractionCountsByItsWholePart() {
         val variables = store("arr1" to "a", "arr2" to "b", "arr3" to "c")
 
         assertEquals(ActionResult.Success, act(variables, "array.pop", "array" to "%arr", "position" to "2.9", "to_var" to "Got"))
@@ -636,13 +636,13 @@ class TaskerNumberedArrayTest {
     }
 
     @Test
-    fun alphabeticalSortsFollowTaskersCaseRules() {
+    fun alphabeticalSortsKeepTheirCaseRules() {
         val mixed = arrayOf(1 to "b", 2 to "B", 3 to "a", 4 to "A")
 
         assertEquals(listOf("A", "B", "a", "b"), processed("sort_alpha", *mixed).values.toList())
         assertEquals(listOf("b", "a", "B", "A"), processed("sort_alpha_reverse", *mixed).values.toList())
         assertEquals(listOf("a", "A", "b", "B"), processed("sort_alpha_caseless", *mixed).values.toList())
-        // Tasker turns the comparison round instead of reversing the sorted list, so "b" stays before "B".
+        // The comparison is turned round instead of reversing the sorted list, so "b" stays before "B".
         assertEquals(listOf("b", "B", "a", "A"), processed("sort_alpha_caseless_reverse", *mixed).values.toList())
     }
 

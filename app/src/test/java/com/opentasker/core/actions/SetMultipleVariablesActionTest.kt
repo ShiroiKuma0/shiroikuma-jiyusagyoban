@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Tasker's Multiple Variables Set, run on its own with the args as the engine hands them over. */
+/** Multiple Variables Set, run on its own with the args as the engine hands them over. */
 class SetMultipleVariablesActionTest {
     private val variables = VariableStore()
     private val logs = mutableListOf<String>()

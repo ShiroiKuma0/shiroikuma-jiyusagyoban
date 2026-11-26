@@ -5,15 +5,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tasker's `%arr(+sep)`, `%arr(+sep+range)` and `%arr(*)` forms, as its user guide gives them:
+ * The `%arr(+sep)`, `%arr(+sep+range)` and `%arr(*)` forms:
  * `%arr(+=)` reads alpha=beta=cat=dog, `%arr(+>+2:4)` reads beta>cat>dog and `%arr(*)` reads one
  * element at random.
  */
-class TaskerArrayJoinAndRandomFormTest {
+class ArrayJoinAndRandomFormTest {
 
     private val animals = listOf("alpha", "beta", "cat", "dog")
 
-    /** Tasker's own array: numbered variables %arr1 to %arr4. */
+    /** A numbered array: variables %arr1 to %arr4. */
     private fun numbered() = VariableStore().apply { animals.forEachIndexed { index, value -> set("arr${index + 1}", value) } }
 
     /** The same elements in the stored array that Split Text and the array actions keep, 0-based. */

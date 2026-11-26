@@ -13,10 +13,9 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker leaves a variable that has no value as its own name: "User-variables which have not had a
- * value assigned do not have replacements carried out." Imported tasks lean on that, as in
- * `%par1 ~ %*` to ask whether the caller passed anything. OpenTasker filled an unset `%name` in as
- * nothing. Its own `{{ }}` templates still give nothing for a missing value.
+ * A variable that has no value stays as its own name, so a variable nobody set isn't filled in.
+ * Tasks lean on that, as in `%par1 ~ %*` to ask whether the caller passed anything. An unset
+ * `%name` used to fill in as nothing. The `{{ }}` templates still give nothing for a missing value.
  */
 class UnsetVariableAsWrittenTest {
     private val recorded = mutableListOf<String>()

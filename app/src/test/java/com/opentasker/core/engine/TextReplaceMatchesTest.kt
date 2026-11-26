@@ -13,8 +13,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Replace Text's First match only, Store matches in array and Only find matches, which run
- * Tasker's One Match Only, Store Matches In Array and Replace Matches off. The array is emptied and
+ * Replace Text's First match only, Store matches in array and Only find matches, which an imported
+ * One Match Only, Store Matches In Array and Replace Matches off run as. The array is emptied and
  * then holds each whole match as %found1, %found2, ...
  */
 class TextReplaceMatchesTest {

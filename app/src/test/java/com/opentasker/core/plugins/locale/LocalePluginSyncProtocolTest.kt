@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tasker's synchronous setting protocol, as TaskerPlugin.java defines it: the result codes a plugin
+ * The plugin protocol's synchronous setting extension: the result codes a plugin
  * answers with, the `%name` variables it sends back, and the wait it asks for on its settings screen.
  */
 class LocalePluginSyncProtocolTest {

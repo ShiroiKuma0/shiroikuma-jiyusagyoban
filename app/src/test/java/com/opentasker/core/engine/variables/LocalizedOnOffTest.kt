@@ -9,11 +9,10 @@ import org.junit.Test
 import java.util.Locale
 
 /**
- * Tasker 6.7.8's Matches turns a pattern that is just its word for on or off in the phone's
- * language into that word or the English one (decompiled `Expr.a`, words from its `word_on` and
- * `word_off` strings), so a state variable's `on` matches `Ein` in German and `On` in English.
+ * Matches turns a pattern that is just the word for on or off in the phone's language into that
+ * word or the English one, so a state variable's `on` matches `Ein` in German and `On` in English.
  */
-class TaskerLocalizedOnOffTest {
+class LocalizedOnOffTest {
     private lateinit var saved: Locale
 
     @Before
@@ -42,10 +41,10 @@ class TaskerLocalizedOnOffTest {
     }
 
     @Test
-    fun onlyTheWordAsTaskerWritesItCounts() {
+    fun onlyTheWordAsTheTableWritesItCounts() {
         Locale.setDefault(Locale.GERMANY)
 
-        // Tasker compares the whole pattern, case included, and the English word isn't German's.
+        // The whole pattern is compared, case included, and the English word isn't German's.
         assertFalse(holds("%blue ~ ein", "on"))
         assertFalse(holds("%blue ~ Ein/Aus", "on"))
         assertFalse(holds("%blue ~ On", "on"))
@@ -78,7 +77,7 @@ class TaskerLocalizedOnOffTest {
     }
 
     private companion object {
-        // Tasker's zh-rTW word_on.
+        // The zh-rTW word for on.
         const val TRADITIONAL_ON = 0x958B
     }
 }

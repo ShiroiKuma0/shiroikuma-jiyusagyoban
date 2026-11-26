@@ -4,12 +4,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Tasker's array searches (decompiled 6.7.8, `dq.X`, `dq.c0`, `fr.m0`): `%arr(#?pattern)` reads the
- * numbers of the elements that match, `%arr($?pattern)` their values, and `%arr($sep?pattern)` the
- * values joined by `sep`. An element matches when it equals the pattern or Tasker's Matches says
- * so, and when none does the search reads 0.
+ * The array searches: `%arr(#?pattern)` reads the numbers of the elements that match,
+ * `%arr($?pattern)` their values, and `%arr($sep?pattern)` the values joined by `sep`. An element
+ * matches when it equals the pattern or Matches says so, and when none does the search reads 0.
  */
-class TaskerArraySearchTest {
+class ArraySearchFormTest {
     private val animals = listOf("alpha", "beta", "cat", "bat")
 
     private fun numbered() = VariableStore().apply { animals.forEachIndexed { index, value -> set("arr${index + 1}", value) } }
@@ -44,7 +43,7 @@ class TaskerArraySearchTest {
     @Test
     fun aJoinReadsAValueSearchAfterItsPlusDollar() {
         assertEquals("cat;bat", numbered().expand("%arr(+;+\$?*at)"))
-        // Tasker splits at the first +$?, so the joiner can hold a +.
+        // The form splits at the first +$?, so the joiner can hold a +.
         assertEquals("cata+bbat", numbered().expand("%arr(+a+b+\$?*at)"))
     }
 
@@ -56,14 +55,14 @@ class TaskerArraySearchTest {
 
     @Test
     fun aJoinedSearchOnAVariableWithNoElementsFindsNothingToo() {
-        // Tasker reads the range by calling itself on %arr($?cat), so the base's own value never counts.
+        // The range is read as %arr($?cat) on its own, so the base's own value never counts.
         assertEquals("0", VariableStore().apply { set("arr", "cat") }.expand("%arr(+;+\$?cat)"))
         assertEquals("0", VariableStore().apply { set("n", "5") }.expand("%n(+;+\$?5)"))
     }
 
     @Test
     fun aSearchFindsElementZeroAndANumberWrittenWithALeadingZero() {
-        // `dq.c0` reads whatever follows the base as a number, where the other array forms skip these.
+        // A search reads whatever follows the base as a number, where the other array forms skip these.
         val variables = VariableStore().apply {
             set("arr0", "cat")
             set("arr2", "cat")
@@ -71,8 +70,8 @@ class TaskerArraySearchTest {
         }
         assertEquals("0,2", variables.expand("%arr(#?cat)"))
         assertEquals("7", variables.expand("%arr(#?dog)"))
-        // A value search reads each value back by its number (`fr.i0`). Tasker has none for 0 and
-        // shows the name `%arr0`, which reads as nothing here, like any element that isn't set.
+        // A value search reads each value back by its number, and number 0 reads as nothing there,
+        // like any element that isn't set, so only element 2's value shows.
         assertEquals("cat", variables.expand("%arr(\$?cat)"))
     }
 
@@ -86,7 +85,7 @@ class TaskerArraySearchTest {
         assertEquals("7", variables.expand("%arr(#?dog)"))
         assertEquals("cat", variables.expand("%arr(\$?dog)"))
         variables.set("arr07", "cat")
-        // Both are number 7 to Tasker, so both count.
+        // Both are number 7, so both count.
         assertEquals("7,7", variables.expand("%arr(#?cat)"))
         assertEquals("cat,cat", variables.expand("%arr(\$?cat)"))
     }
@@ -103,7 +102,7 @@ class TaskerArraySearchTest {
 
     @Test
     fun aValueSearchFillsInItsTrimmedTextSoAVariablesSpacesStay() {
-        // `dq.X` trims the text and then fills it in, so a space a variable ends with is part of the pattern.
+        // The text is trimmed and then filled in, so a space a variable ends with is part of the pattern.
         val variables = VariableStore().apply {
             set("arr1", "cat ")
             set("arr2", "cat")
@@ -133,7 +132,7 @@ class TaskerArraySearchTest {
 
     @Test
     fun theListsSplitTextKeepsDontSearchYet() {
-        // Not Tasker's answer: these read the way they did before searches came in (see the roadmap's
+        // Not searched yet: these read the way they did before searches came in (see the roadmap's
         // array leftovers), joining the list with the form like any other form a kept list doesn't read.
         val kept = VariableStore().apply { setArray("parts", listOf("cat", "bat")) }
         assertEquals("cat#?catbat", kept.expand("%parts(#?cat)"))

@@ -6,10 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tasker keeps a Matches pattern in a field of its own, so a `<`, `>` or `==` in it is part of the
- * pattern. Here the first match sign starts the pattern and the rest of the condition is all pattern.
+ * A `<`, `>` or `==` in a Matches pattern is part of the pattern: the first match sign starts the
+ * pattern and the rest of the condition is all pattern.
  */
-class TaskerPatternHoldsOperatorsTest {
+class MatchesPatternHoldsOperatorsTest {
 
     @Test
     fun aPatternHoldingAComparisonSignIsStillOnePattern() {

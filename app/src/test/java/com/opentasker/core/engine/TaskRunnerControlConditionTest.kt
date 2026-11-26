@@ -10,11 +10,11 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * The generic "Run only if" guard ([ActionSpec.condition], what a Tasker `<ConditionList>` imports
- * to) on flow-control actions. Non-control actions have always evaluated it in `runOne`, but the
+ * The generic "Run only if" guard ([ActionSpec.condition], where an imported step's own condition
+ * list lands) on flow-control actions. Non-control actions have always evaluated it in `runOne`, but the
  * control markers are dispatched through `stepControl` before that check, so an imported
  * "Stop If %x ~ y" stopped unconditionally: the condition survived in data and was ignored at
- * runtime. Tasker semantics throughout: an unmet guard skips the control action, it never aborts
+ * runtime. Throughout, an unmet guard skips the control action, it never aborts
  * the task; for block-opening markers the whole block is what gets skipped.
  */
 class TaskRunnerControlConditionTest {
@@ -210,7 +210,7 @@ class TaskRunnerControlConditionTest {
         assertEquals(listOf("then", "after"), recorded)
     }
 
-    // flow.else — a guard on the else marker is Tasker's "Else If".
+    // flow.else: a guard on the else marker makes it an "Else If".
 
     @Test
     fun elseIfWithUnmetGuardSkipsTheElseBranch() {

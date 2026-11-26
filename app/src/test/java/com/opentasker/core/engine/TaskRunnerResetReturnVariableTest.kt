@@ -15,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Run Task's switch that clears the return variable before the task runs, Tasker's Reset Return Variable. */
+/** Run Task's switch that clears the return variable before the task runs (Reset Return Variable). */
 class TaskRunnerResetReturnVariableTest {
 
     private val recorded = mutableListOf<String>()
@@ -158,7 +158,7 @@ class TaskRunnerResetReturnVariableTest {
         assertEquals("true", saved[SUB_TASK_RESET_RETURN_KEY])
     }
 
-    // The import notes for Tasker's Limit Passthrough To and Allow Overwrite Variables rest on this.
+    // The import notes for Limit Passthrough To and Allow Overwrite Variables rest on this.
     @Test
     fun aCalledTaskReadsTheCallersLocalsAndASetVariableThereStaysItsOwn() {
         val child = Task(id = 2, name = "Child", actions = listOf(record("city"), set("city", "Bergen"), record("city")))

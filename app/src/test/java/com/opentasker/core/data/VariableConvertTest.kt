@@ -33,7 +33,7 @@ class VariableConvertTest {
     private fun u(hex: String) = "\\" + "u" + hex
 
     @Test
-    fun byteSizesRoundTheWayTaskersDo() {
+    fun byteSizesKeepOneDecimalUnlessItsZero() {
         assertEquals("4", convert("bytes_to_kilobytes", "5000"))
         assertNull(convert("bytes_to_kilobytes", " 5000"))
         assertEquals("1.5", convert("bytes_to_megabytes", "1572864"))
@@ -47,7 +47,7 @@ class VariableConvertTest {
     }
 
     @Test
-    fun unitsUseTaskersFactors() {
+    fun unitsUseTheirRoundedFactors() {
         assertEquals("212.0", convert("celsius_to_fahrenheit", " 100 "))
         assertEquals("100.0", convert("fahrenheit_to_celsius", "212"))
         assertEquals("4.0", convert("centimetres_to_inches", "1e1"))
@@ -96,7 +96,7 @@ class VariableConvertTest {
     }
 
     @Test
-    fun secondsFormatAsTaskersThreeDateStyles() {
+    fun secondsFormatInThreeDateStyles() {
         assertEquals("1-1-70 00.00", convert("seconds_to_date_time", "0"))
         assertEquals("11-14-23 22.13", convert("seconds_to_date_time", "1700000000"))
         assertEquals("Nov 14, 2023 22:13", convert("seconds_to_medium_date_time", "1700000000"))

@@ -5,11 +5,11 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
- * Tasker's `%arr(1,3)`: a form with a comma lists element numbers (decompiled 6.7.8, `fr.h0`), in
+ * `%arr(1,3)`: a form with a comma lists element numbers, in
  * the order given, skipping a part that isn't a whole number. It also works as the range of
  * `%arr(+sep+1,3)`.
  */
-class TaskerIndexListFormTest {
+class PositionListFormTest {
 
     private val animals = listOf("alpha", "beta", "cat", "dog")
 
@@ -23,7 +23,7 @@ class TaskerIndexListFormTest {
 
     @Test
     fun aPartThatIsntAWholeNumberNamesNothing() {
-        // Kotlin's toIntOrNull, which Tasker uses, doesn't trim, so " 3" isn't 3.
+        // Each part is read with Kotlin's toIntOrNull, which doesn't trim, so " 3" isn't 3.
         assertEquals("alpha", numbered().expand("%arr(1, 3)"))
         assertEquals("beta", numbered().expand("%arr(2,9)"))
         assertEquals("", numbered().expand("%arr(,)"))
@@ -31,7 +31,7 @@ class TaskerIndexListFormTest {
 
     @Test
     fun aListIsReadAsWrittenSoASpaceAtEitherEndStaysOnItsPart() {
-        // Tasker trims the form only to spot the comma, then hands fr.h0 the text as written.
+        // The form is trimmed only to spot the comma, then its parts are read as written.
         assertEquals("cat", numbered().expand("%arr( 1,3)"))
         assertEquals("alpha", numbered().expand("%arr(1,3 )"))
         assertEquals("cat", numbered().expand("%arr(+;+ 1,3)"))
@@ -53,19 +53,19 @@ class TaskerIndexListFormTest {
     }
 
     @Test
-    fun aLetterAfterASpaceIsStillTaskersList() {
-        // This app's own operators only count right after the parenthesis, and Tasker trims, then reads a list.
+    fun aLetterAfterASpaceIsStillAPositionList() {
+        // This app's own operators only count right after the parenthesis, and the trimmed form reads as a list.
         assertEquals("alpha", numbered().expand("%arr( a,1)"))
         assertEquals("alpha", numbered().expand("%arr(+;+ a,1)"))
     }
 
     @Test
-    fun onlyTaskersSearchesAsTypedAndThisAppsOwnOperatorsArentLists() {
-        // Tasker spots `#?` and `$...?` in the text as typed, before trimming (dq.X), so these are lists there.
+    fun onlySearchesAsTypedAndThisAppsOwnOperatorsArentLists() {
+        // `#?` and `$...?` are spotted in the text as typed, before trimming, so these are lists.
         assertEquals("beta", numbered().expand("%arr(#1,2)"))
         assertEquals("alpha", numbered().expand("%arr(\$a,1)"))
         assertEquals("alpha", numbered().expand("%arr( #?x,1)"))
-        // Typed right at the start they're searches (TaskerArraySearchTest), so not the list 1.
+        // Typed right at the start they're searches (ArraySearchFormTest), so not the list 1.
         assertNotEquals("alpha", numbered().expand("%arr(#?x,1)"))
         assertNotEquals("alpha", numbered().expand("%arr(\$a?,1)"))
         // A letter keeps this app's operator only where it's typed: not one a variable fills in, nor a range after +sep+.

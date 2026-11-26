@@ -5,11 +5,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Matches and Doesn't Match with an empty pattern, and with long lists of choices. */
-class TaskerPatternEdgeCasesTest {
+class MatchesPatternEdgeCasesTest {
 
     @Test
     fun anEmptyPatternMatchesNothing() {
-        // Tasker checks for an empty pattern before it looks at the value or a leading !, so
+        // An empty pattern is checked for before the value or a leading !, so
         // Matches is false and Doesn't Match is true, even when the value is empty too.
         val variables = VariableStore().apply {
             set("value", " ")

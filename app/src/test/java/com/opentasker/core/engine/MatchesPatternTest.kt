@@ -12,14 +12,13 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker's Matches and Doesn't Match conditions (`~` and `!~` here) use its simple pattern
- * matching (https://tasker.joaoapps.com/userguide/en/matching.html): "a * will match any number of
- * any character", "a + will match one or more of any character", "/ means 'or'", "a ! at the very
- * start of a match means not", and matching is case-insensitive unless the pattern has a capital.
- * Its Matches Regex and Doesn't Match Regex (`~R` and `!~R`) find a regular expression anywhere in
+ * The Matches and Doesn't Match conditions (`~` and `!~` here) use simple pattern matching: `*`
+ * matches any number of any character, `+` one or more of any character, `/` means or, a `!` at
+ * the very start means not, and matching is case-insensitive unless the pattern has a capital.
+ * Matches Regex and Doesn't Match Regex (`~R` and `!~R`) find a regular expression anywhere in
  * the value. Each case is checked in a run and in Preflight.
  */
-class TaskerPatternMatchingTest {
+class MatchesPatternTest {
     private val recorded = mutableListOf<String>()
 
     @Before
@@ -104,7 +103,7 @@ class TaskerPatternMatchingTest {
 
     @Test
     fun aWildcardRunAtEitherEndCountsOnce() {
-        // Tasker builds its pattern from the literals between wildcards, so at either end only the
+        // The pattern is built from the literals between wildcards, so at either end only the
         // outermost wildcard counts: *+a reads as *a, and a+* as a*.
         assertRunsFor("a", "~", "*+a" to true, "a+*" to true, "+*a" to false)
         assertRunsFor("ab", "~", "a**b" to true, "a+*b" to false)
@@ -145,15 +144,15 @@ class TaskerPatternMatchingTest {
 
     @Test
     fun aMatchesPatternCanBeARegex() {
-        // Tasker reads a pattern starting ~R as a regex, and !~R as one turned around.
+        // A pattern starting ~R reads as a regex, and !~R as one turned around.
         assertRunsFor("Hello World", "~", "~R^Hel" to true, "~R^World" to false, "!~R^Hel" to false, "!~R^World" to true)
         assertRunsFor("Hello World", "!~", "~R^Hel" to false)
     }
 
     @Test
     fun aRegexThisAppCantRunMatchesNothing() {
-        // Tasker's Java engine runs a lookahead or a backreference, but RE2 doesn't, so here the
-        // pattern matches nothing. That's a known difference, and the import notes such a pattern.
+        // Java's regex engine runs a lookahead or a backreference, but RE2 doesn't, so here the
+        // pattern matches nothing, and an import notes such a pattern.
         assertRunsFor("abab", "~R", "(ab)\\1" to false, "a(?=b)" to false, "ab" to true)
         assertRunsFor("abab", "!~R", "(ab)\\1" to true)
     }

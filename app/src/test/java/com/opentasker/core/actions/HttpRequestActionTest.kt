@@ -55,7 +55,7 @@ class HttpRequestActionTest {
             mapOf(
                 "method" to "POST",
                 "url" to server.url("/items").toString(),
-                "query" to "name=Open Tasker\ntag=one two",
+                "query" to "name=Hello World\ntag=one two",
                 "headers" to "Accept: application/json\nX-Custom: value",
                 "authorization" to "Bearer top-secret",
                 "content_type" to "application/json",
@@ -74,7 +74,7 @@ class HttpRequestActionTest {
         assertEquals("200", variables.get("status"))
         assertTrue(variables.get("response_headers").orEmpty().contains("X-Request-Id: abc-123"))
         val request = server.takeRequest()
-        assertEquals("Open Tasker", request.url.queryParameter("name"))
+        assertEquals("Hello World", request.url.queryParameter("name"))
         assertEquals("one two", request.url.queryParameter("tag"))
         assertEquals("application/json", request.headers["Accept"])
         assertEquals("value", request.headers["X-Custom"])

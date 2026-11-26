@@ -8,11 +8,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Runs the Matches/Doesn't Match (Tasker op codes 2/3) condition evaluator on a device.
+ * Runs the Matches/Doesn't Match (`~` and `!~`) condition evaluator on a device.
  *
  * Per CONTRIBUTING.md, this project has shipped desktop-JVM/Android regex divergences three
  * times already, and the JVM unit test suite cannot see that class of bug by construction.
- * `VariableExpander.matchesGlob` builds its pattern at runtime from imported Tasker pattern data
+ * `VariableExpander.matchesGlob` builds its pattern at runtime from a condition's own pattern text
  * rather than from a fixed literal, so it isn't covered by the generated
  * `production-regex-patterns.txt` corpus either (that scanner finds compile-time regex literals in
  * source, and this pattern doesn't exist until a condition actually runs). This test is the only
@@ -31,8 +31,8 @@ class VariableExpanderConditionInstrumentedTest {
 
     @Test
     fun matchesLeadingAndTrailingWildcardOnDevice() {
-        // The shape actually produced by a real Tasker export for a JSON-substring guard
-        // (verified against a live 6.6.20 backup): op=2, lhs a JSON blob, rhs `*"say":*`.
+        // A JSON-substring guard as a real task writes it: a Matches with a JSON blob on the
+        // left and `*"say":*` on the right.
         val variables = VariableStore().apply { set("pa_json", "{\"say\":\"hello\"}") }
         assertTrue(variables.evaluateCondition("%pa_json ~ *\"say\":*"))
     }
@@ -51,7 +51,7 @@ class VariableExpanderConditionInstrumentedTest {
 
     @Test
     fun wildcardValueContainingRegexMetacharactersIsTreatedLiterallyOnDevice() {
-        // Everything except Tasker's own pattern characters ("*", "+", "/" and a leading "!") must
+        // Everything except the Matches pattern characters ("*", "+", "/" and a leading "!") must
         // be escaped, not interpreted as regex syntax -- a value or pattern containing ".", "(",
         // "?", "$", "\" (all realistic in imported %pa_json / %pa_url condition data) must match
         // literally.

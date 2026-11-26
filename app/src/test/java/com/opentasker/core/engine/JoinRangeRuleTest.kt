@@ -6,12 +6,12 @@ import org.junit.Test
 
 /**
  * When `%arr(+sep+...)` reads a range after the second `+` and when all of it is the separator.
- * Tasker 6.7.8 (decompiled `dq.X`) takes a range only when the text after the first `+` holds
+ * A range is taken only when the text after the first `+` holds
  * another `+` and also a `:` or `,` with a digit, a `+$?`, or ends in `+` and one digit, all as
  * Android's regex reads them. Anything else joins with all of it, so `%arr(+;+12)` joins with
  * `;+12` rather than reading element 12.
  */
-class TaskerJoinRangeRuleTest {
+class JoinRangeRuleTest {
 
     private val animals = listOf("alpha", "beta", "cat", "dog")
 
@@ -48,8 +48,8 @@ class TaskerJoinRangeRuleTest {
     }
 
     @Test
-    fun spacesAroundTheRangeGoTheWayTaskersSecondReadTrimsThem() {
-        // Tasker reads the range by calling itself on %arr(range), and that call trims the form.
+    fun spacesAroundTheRangeGoTheWayTheRangesOwnReadTrimsThem() {
+        // The range is read as %arr(range) on its own, and that read trims the form.
         assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+ 1:3)"))
         assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+1:3 )"))
         assertEquals("beta;alpha", stored().expand("%arr(+;+ 1:0 )"))
@@ -57,7 +57,7 @@ class TaskerJoinRangeRuleTest {
 
     @Test
     fun theFormIsTrimmedTheWayJavaTrimsIt() {
-        // Tasker's String.trim drops control characters and keeps a no-break space, where Kotlin's trim() does the reverse.
+        // Java's String.trim drops control characters and keeps a no-break space, where Kotlin's trim() does the reverse.
         val control = Char(1)
         val noBreak = Char(0xA0)
         assertEquals("beta", numbered().expand("%arr(${control}2)"))
@@ -77,13 +77,13 @@ class TaskerJoinRangeRuleTest {
 
     @Test
     fun aDigitEarlierMakesAnEmptyRangeThatJoinsEverything() {
-        // `a:1+` passes Tasker's test, so the separator is `a:1` and the empty range is every element.
+        // `a:1+` passes the range test, so the separator is `a:1` and the empty range is every element.
         assertEquals("alphaa:1betaa:1cata:1dog", numbered().expand("%arr(+a:1+)"))
     }
 
     @Test
     fun aCarriageReturnInTheSeparatorHidesTheDigit() {
-        // Tasker's `(.|\n)*\d(.|\n)*` can't cross a `\r`, so a CRLF separator before a range joins with all of it.
+        // The test's `(.|\n)*\d(.|\n)*` can't cross a `\r`, so a CRLF separator before a range joins with all of it.
         assertEquals("beta\ncat", numbered().apply { set("sep", "\n") }.expand("%arr(+%sep+2:3)"))
         assertEquals(
             listOf("alpha", "beta", "cat", "dog").joinToString("\r\n+2:3"),
@@ -93,7 +93,7 @@ class TaskerJoinRangeRuleTest {
 
     @Test
     fun aSearchRangeSplitsAtItsPlusDollarSoTheRestIsItsPattern() {
-        // Tasker splits at `+$?`, not the last `+`, so `2:3` is part of the search, not a range
+        // The form splits at `+$?`, not the last `+`, so `2:3` is part of the search, not a range
         // (which would read beta;cat). Nothing matches `a+2:3`, and a search that finds nothing reads 0.
         assertEquals("0", numbered().expand("%arr(+;+\$?a+2:3)"))
         assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+\$?*a*)"))
@@ -107,7 +107,7 @@ class TaskerJoinRangeRuleTest {
 
     @Test
     fun aDigitInAnyScriptCounts() {
-        // Tasker runs its test on Android's regex, where \d is any script's decimal digit, and reads a
+        // The range test runs on Android's regex, where \d is any script's decimal digit, and reads a
         // list's numbers with Kotlin's toIntOrNull and a range's with Integer.parseInt, which take them too.
         val three = Char(0x663).toString()
         val four = Char(0x664).toString()

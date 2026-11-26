@@ -12,12 +12,12 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker's `(#)`, `(#<)` and `(#>)` count the numbered elements whatever the base itself holds
- * (decompiled 6.7.8, `dq.X` and `dq.V`), so they read 0 when there are none. They used to fall back
+ * `(#)`, `(#<)` and `(#>)` count the numbered elements whatever the base itself holds, so they
+ * read 0 when there are none. They used to fall back
  * to the base's own value, so after Split Text into %found and then an Array Clear, `%found(#)`
  * read the first part.
  */
-class TaskerCountFormOnASetBaseTest {
+class CountFormOnASetBaseTest {
 
     @Before
     fun setUp() {

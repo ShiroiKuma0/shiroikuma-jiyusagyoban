@@ -6,11 +6,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tasker 6.7.8's maths strips `\s` from a value anywhere in it (decompiled `Expr.d`), and Android's
+ * Maths strips `\s` from a value anywhere in it, and Android's
  * `\s` is every Unicode White_Space character, not just ASCII spaces. Characters that look blank but
  * aren't White_Space stay in and keep the value from being a number.
  */
-class TaskerMathsUnicodeSpaceTest {
+class MathsUnicodeSpaceTest {
     private fun isFortyTwo(value: String): Boolean =
         VariableStore().apply { set("x", value) }.evaluateCondition("%x > 41 && %x < 43")
 

@@ -171,8 +171,8 @@ class TaskRunnerGotoTest {
     }
 
     @Test
-    fun aGotoIntoAnIfBranchFromOutsideRunsOnIntoItsElseAsInTasker() {
-        // Tasker skips an Else only when its If was found true, and a jump past the If doesn't test it.
+    fun aGotoIntoAnIfBranchFromOutsideRunsOnIntoItsElse() {
+        // An Else is skipped only when its If was found true, and a jump past the If doesn't test it.
         val report = run(
             VariableStore().apply { set("x", "1") },
             goto(label = "then"),

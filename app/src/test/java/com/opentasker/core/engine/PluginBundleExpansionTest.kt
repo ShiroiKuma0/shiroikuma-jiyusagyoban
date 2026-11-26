@@ -70,7 +70,7 @@ class PluginBundleExpansionTest {
     }
 
     @Test
-    fun onlyTheKeysTaskerNamedForReplacementAreFilledIn() {
+    fun onlyTheKeysNamedForReplacementAreFilledIn() {
         val sent = run(
             """{"name":"%TITLE","pattern":"100%TITLE","net.dinglisch.android.tasker.extras.VARIABLE_REPLACE_KEYS":"name "}""",
             mapOf("TITLE" to "Hello"),

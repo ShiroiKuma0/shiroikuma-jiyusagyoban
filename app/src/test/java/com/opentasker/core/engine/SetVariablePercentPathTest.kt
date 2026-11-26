@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Set Variable on a path written with `%`, the way a Tasker user writes a name, writes like the bare path. */
+/** Set Variable on a path written with `%`, the way a name is usually written, writes like the bare path. */
 class SetVariablePercentPathTest {
 
     @Before
