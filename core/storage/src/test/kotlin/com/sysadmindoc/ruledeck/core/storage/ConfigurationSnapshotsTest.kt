@@ -192,17 +192,17 @@ class ConfigurationSnapshotsTest {
     fun archiveNamesAreStableUtcV2BackupNames() {
         val name = configurationSnapshotArchiveName(1_700_000_000_123L)
 
-        assertEquals("ruledeck_snapshot_2023-11-14_22-13-20_123Z.otbackup", name)
+        assertEquals("ruledeck_snapshot_2023-11-14_22-13-20_123Z.rdbackup", name)
         assertTrue(isConfigurationSnapshotArchive(name))
         assertEquals(1_700_000_000_123L, configurationSnapshotTimestamp(name))
     }
 
     @Test
     fun archiveRetentionNeverClaimsUnrelatedOrPartialFiles() {
-        assertTrue(isConfigurationSnapshotArchive("ruledeck_snapshot_2026-08-12_12-00-00_000Z.otbackup"))
-        assertTrue(!isConfigurationSnapshotArchive("family-photos.otbackup"))
+        assertTrue(isConfigurationSnapshotArchive("ruledeck_snapshot_2026-08-12_12-00-00_000Z.rdbackup"))
+        assertTrue(!isConfigurationSnapshotArchive("family-photos.rdbackup"))
         assertTrue(!isConfigurationSnapshotArchive("ruledeck_snapshot_2026-08-12.partial"))
-        assertEquals(null, configurationSnapshotTimestamp("ruledeck_snapshot_invalid.otbackup"))
+        assertEquals(null, configurationSnapshotTimestamp("ruledeck_snapshot_invalid.rdbackup"))
     }
 
     private companion object {

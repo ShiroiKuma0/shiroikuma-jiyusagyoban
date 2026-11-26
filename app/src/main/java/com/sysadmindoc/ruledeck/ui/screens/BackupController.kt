@@ -34,7 +34,7 @@ data class RestoreReviewState(
     val replacesPending: RestoreCandidate? = null,
 )
 
-/** An encrypted `.otbackup` picked for restore, waiting for the passphrase it was written with. */
+/** An encrypted `.rdbackup` picked for restore, waiting for the passphrase it was written with. */
 data class EncryptedRestorePrompt(val uri: Uri, val wrongPassphrase: Boolean = false)
 
 /**

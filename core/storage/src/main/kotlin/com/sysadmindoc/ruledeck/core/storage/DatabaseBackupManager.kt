@@ -150,7 +150,7 @@ class DatabaseBackupManager(
             }
         }
 
-    /** Whether [uri] starts with the encrypted `.otbackup` header. Unreadable reads as no. */
+    /** Whether [uri] starts with the encrypted `.rdbackup` header. Unreadable reads as no. */
     suspend fun isEncryptedBackup(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             context.contentResolver.openInputStream(uri)?.use(BackupEncryption::hasEncryptedHeader) ?: false
@@ -158,7 +158,7 @@ class DatabaseBackupManager(
     }
 
     /**
-     * Decrypts an encrypted `.otbackup` into the same candidate [inspectRestore] parks, so a
+     * Decrypts an encrypted `.rdbackup` into the same candidate [inspectRestore] parks, so a
      * snapshot gets the same review and Stage steps as a plain database (A-439). Nothing is
      * staged here, and a failure leaves no candidate behind.
      */

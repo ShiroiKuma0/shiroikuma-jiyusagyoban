@@ -575,7 +575,7 @@ internal fun automationPowerLabel(power: AutomationPower): String = stringResour
 )
 
 /**
- * Asks for the passphrase an encrypted `.otbackup` snapshot was written with. The backup lane
+ * Asks for the passphrase an encrypted `.rdbackup` snapshot was written with. The backup lane
  * can't be stopped partway, so while it works the dialog only waits.
  */
 @Composable

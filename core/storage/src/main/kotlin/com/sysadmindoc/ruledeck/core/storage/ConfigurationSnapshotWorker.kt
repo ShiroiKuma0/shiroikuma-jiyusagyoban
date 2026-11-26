@@ -17,7 +17,7 @@ import kotlinx.coroutines.CancellationException
  *
  * The temporary managed backup inherits [DatabaseBackupManager]'s WAL checkpoint and schema
  * validation. Its portable copy is streamed into the selected SAF tree through the authenticated
- * v2 `.otbackup` format. Nothing here restores anything.
+ * v2 `.rdbackup` format. Nothing here restores anything.
  */
 class ConfigurationSnapshotWorker(
     appContext: Context,
@@ -52,7 +52,7 @@ class ConfigurationSnapshotWorker(
                 try {
                     manager.exportEncryptedBackup(managedBackup, archiveUri, passphrase).getOrThrow()
                 } catch (error: Throwable) {
-                    // An export that stops partway leaves a truncated .otbackup in the user's
+                    // An export that stops partway leaves a truncated .rdbackup in the user's
                     // folder, so the archive this run created has to go. The provider can refuse,
                     // and it used to refuse silently: both the exception and a false return were
                     // discarded, so a leftover partial file looked exactly like a clean failure.

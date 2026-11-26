@@ -12,7 +12,7 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * An `.otbackup` failed its authentication: the passphrase is wrong or the file is damaged, which
+ * An `.rdbackup` failed its authentication: the passphrase is wrong or the file is damaged, which
  * AES-GCM can't tell apart. Its own type, so a restore asks for the passphrase again on this and
  * not on another crypto failure further down, like the device key being unavailable.
  */
@@ -24,7 +24,7 @@ class LegacyBackupTooLargeException(val limitBytes: Long) :
     IOException("Backup file uses the old format, which restores only up to ${limitBytes / 1024 / 1024} MB")
 
 /**
- * Encrypts and decrypts `.otbackup` files using AES-256-GCM with PBKDF2-derived keys.
+ * Encrypts and decrypts `.rdbackup` files using AES-256-GCM with PBKDF2-derived keys.
  *
  * Format v2 is a bounded-memory sequence of independently authenticated 64 KiB frames. The frame
  * index and plaintext length are authenticated and each frame has a unique nonce, preventing
@@ -103,7 +103,7 @@ object BackupEncryption {
     }
 
     /**
-     * True when [input] starts with the `.otbackup` header, read from at most its first four bytes.
+     * True when [input] starts with the `.rdbackup` header, read from at most its first four bytes.
      * A restore pick uses it to tell an encrypted snapshot from a plain database before asking for
      * a passphrase.
      */
@@ -123,7 +123,7 @@ object BackupEncryption {
         cancellationCheck()
         val magic = encryptedInput.readExact(MAGIC.size, cancellationCheck)
         if (!magic.contentEquals(MAGIC)) {
-            throw IOException("Not a valid .otbackup file (bad magic)")
+            throw IOException("Not a valid .rdbackup file (bad magic)")
         }
         val versionBytes = encryptedInput.readExact(Int.SIZE_BYTES, cancellationCheck)
         when (val version = bytesToInt(versionBytes)) {
@@ -142,7 +142,7 @@ object BackupEncryption {
                 maxPlaintextBytes,
                 cancellationCheck,
             )
-            else -> throw IOException("Unsupported .otbackup format version: $version")
+            else -> throw IOException("Unsupported .rdbackup format version: $version")
         }
     }
 
@@ -159,7 +159,7 @@ object BackupEncryption {
         val chunkSizeBytes = input.readExact(Int.SIZE_BYTES, cancellationCheck)
         val chunkSize = bytesToInt(chunkSizeBytes)
         if (chunkSize != STREAM_CHUNK_BYTES) {
-            throw IOException("Unsupported .otbackup frame size: $chunkSize")
+            throw IOException("Unsupported .rdbackup frame size: $chunkSize")
         }
         val header = headerPrefix + salt + noncePrefix + chunkSizeBytes
         val key = deriveKey(passphrase, salt)
@@ -171,10 +171,10 @@ object BackupEncryption {
             cancellationCheck()
             val plaintextLength = bytesToInt(input.readExact(Int.SIZE_BYTES, cancellationCheck))
             if (plaintextLength !in 0..chunkSize) {
-                throw IOException("Invalid .otbackup frame length: $plaintextLength")
+                throw IOException("Invalid .rdbackup frame length: $plaintextLength")
             }
             if (sawShortDataFrame && plaintextLength != 0) {
-                throw IOException("Invalid .otbackup frame sequence after final data frame")
+                throw IOException("Invalid .rdbackup frame sequence after final data frame")
             }
             if (plaintextLength > 0) {
                 totalPlaintext += plaintextLength
@@ -192,13 +192,13 @@ object BackupEncryption {
                 encryptedFrame = encryptedFrame,
             )
             if (plaintextLength == 0) {
-                if (plaintext.isNotEmpty()) throw IOException("Invalid .otbackup terminal frame")
-                if (input.read() != -1) throw IOException("Unexpected trailing data after .otbackup terminal frame")
+                if (plaintext.isNotEmpty()) throw IOException("Invalid .rdbackup terminal frame")
+                if (input.read() != -1) throw IOException("Unexpected trailing data after .rdbackup terminal frame")
                 cancellationCheck()
                 output.flush()
                 return
             }
-            if (plaintext.size != plaintextLength) throw IOException("Invalid decrypted .otbackup frame length")
+            if (plaintext.size != plaintextLength) throw IOException("Invalid decrypted .rdbackup frame length")
             output.write(plaintext)
             frameIndex += 1
         }
@@ -336,7 +336,7 @@ object BackupEncryption {
         while (offset < length) {
             cancellationCheck()
             val count = read(bytes, offset, length - offset)
-            if (count < 0) throw IOException("Unexpected end of .otbackup file")
+            if (count < 0) throw IOException("Unexpected end of .rdbackup file")
             if (count == 0) continue
             offset += count
         }

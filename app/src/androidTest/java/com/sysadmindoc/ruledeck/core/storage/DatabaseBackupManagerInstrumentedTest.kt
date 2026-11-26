@@ -173,7 +173,7 @@ class DatabaseBackupManagerInstrumentedTest {
         val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
             .allowMainThreadQueries()
             .build()
-        val encrypted = context.cacheDir.resolve("ruledeck-corrupt-restore.otbackup")
+        val encrypted = context.cacheDir.resolve("ruledeck-corrupt-restore.rdbackup")
         try {
             val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
             db.profileDao().insert(Profile(name = "Keep pending", enterTaskId = 1).toEntity())
@@ -208,7 +208,7 @@ class DatabaseBackupManagerInstrumentedTest {
 
     /**
      * The reinstall/device-transfer case the feature exists for: the SQLCipher key that encrypted
-     * the database is gone, and the exported `.otbackup` must still open.
+     * the database is gone, and the exported `.rdbackup` must still open.
      */
     @Test
     fun encryptedExportRestoresAfterTheDatabaseKeyIsLost() = runBlocking {
@@ -216,7 +216,7 @@ class DatabaseBackupManagerInstrumentedTest {
         val appKey = KeptDatabaseKey(context)
         cleanupEncrypted(context)
 
-        val exported = context.cacheDir.resolve("ruledeck-portable-export.otbackup")
+        val exported = context.cacheDir.resolve("ruledeck-portable-export.rdbackup")
         val passphrase = "portable-passphrase"
         var key = DatabaseSecurity.prepareEncryptedDatabase(context, ENCRYPTED_TEST_DATABASE)
         var db = encryptedDatabase(context, key)
