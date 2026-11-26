@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- The restore review names the file you picked. It used to show an id from the file picker there, like `msf:9705`.
 - `tools/smoke-old-api.ps1` upgrades from the previous release's standard APK again. Since v0.2.96 a release also carries an F-Droid APK, and the download took whichever file sorted first by name, which was the F-Droid one.
 
 ## v0.2.97 - 2026-11-22

@@ -1,9 +1,11 @@
 package com.sysadmindoc.ruledeck.core.storage
 
+import android.content.ContentResolver
 import android.content.Context
 import android.content.SharedPreferences
 import android.database.Cursor
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.room.withTransaction
 import com.sysadmindoc.ruledeck.core.logging.AppLogger
 import com.sysadmindoc.ruledeck.core.text.countOf
@@ -197,7 +199,7 @@ class DatabaseBackupManager(
                     deleteDatabaseSidecars(temp)
                     throw error
                 }
-                summarize(candidate, sourceLabel ?: uri.lastPathSegment ?: candidate.name)
+                summarize(candidate, sourceLabel ?: pickedFileLabel(uri, candidate))
             }.onFailure { error ->
                 shredFile(candidateRestoreFile(context, databaseName))
                 if (error is CancellationException) throw error
@@ -239,7 +241,7 @@ class DatabaseBackupManager(
                     ?: throw IOException("Could not open backup file")
                 val candidate = candidateRestoreFile(context, databaseName)
                 writeValidatedCopy(input, candidate, "restore candidate")
-                summarize(candidate, sourceLabel ?: uri.lastPathSegment ?: candidate.name)
+                summarize(candidate, sourceLabel ?: pickedFileLabel(uri, candidate))
             }.onFailure { error ->
                 shredFile(candidateRestoreFile(context, databaseName))
                 AppLogger.error(tag, "Restore inspection failed: ${error.message}", error)
@@ -327,6 +329,27 @@ class DatabaseBackupManager(
             deleteDatabaseSidecars(temp)
             throw error
         }
+    }
+
+    /**
+     * The name the picker showed for [uri]. A Downloads or documents URI ends in a row or document
+     * id ("665", "msf:9705"), so the review asks the provider for the display name instead.
+     */
+    private fun pickedFileLabel(uri: Uri, candidate: File): String {
+        if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
+            try {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            cursor.getString(0)?.takeIf { it.isNotBlank() }?.let { return it }
+                        }
+                    }
+            } catch (error: RuntimeException) {
+                // A provider that refuses the query still let us read the file; the id is the fallback label.
+                AppLogger.warn(tag, "Could not read the picked backup's display name: ${error.message}", error)
+            }
+        }
+        return uri.lastPathSegment ?: candidate.name
     }
 
     private fun summarize(file: File, sourceLabel: String): RestoreCandidate =

@@ -1,14 +1,18 @@
 package com.sysadmindoc.ruledeck.core.storage
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sysadmindoc.ruledeck.core.model.Profile
 import com.sysadmindoc.ruledeck.core.model.RunLogEntry
@@ -58,6 +62,51 @@ class DatabaseBackupManagerInstrumentedTest {
             assertTrue(backup.exists())
             assertTrue(backup.length() > 0L)
         } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = Build.VERSION_CODES.Q)
+    fun restoreReviewNamesThePickedFileRatherThanItsDocumentId() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        val resolver = context.contentResolver
+        val prefix = "ruledeck_review_name_${System.nanoTime()}"
+        var picked: Uri? = null
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
+            .allowMainThreadQueries()
+            .build()
+        val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+        try {
+            db.profileDao().insert(Profile(name = "Named profile", enterTaskId = 1).toEntity())
+            val backup = manager.backup().getOrThrow()
+            // A file picked from Downloads arrives as a MediaStore or documents URI whose last
+            // segment is a row or document id (the S22 showed "665" and "msf:9705"). The row
+            // stays pending so a media scan can't take it from this app before the delete below.
+            picked = requireNotNull(
+                resolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, "$prefix.db")
+                        put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    },
+                ),
+            ) { "MediaStore refused the test download" }
+            requireNotNull(resolver.openOutputStream(picked)).use { out ->
+                backup.inputStream().use { it.copyTo(out) }
+            }
+
+            val reviewed = manager.inspectRestore(picked).getOrThrow()
+
+            assertTrue("label was ${reviewed.sourceLabel}", reviewed.sourceLabel.startsWith(prefix))
+            assertEquals(1, reviewed.profileCount)
+        } finally {
+            picked?.let { resolver.delete(it, null, null) }
+            manager.discardInspectedRestore()
             db.close()
             cleanup(context)
         }
