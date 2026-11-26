@@ -78,7 +78,7 @@ go. Parser: `app/src/main/java/com/sysadmindoc/ruledeck/core/gengoshima/VocabImp
 3. **adb bridge** (from a PC chat, no typing):
 
    ```
-   adb shell am broadcast -n shiroikuma.jiyusagyoban/com.sysadmindoc.ruledeck.core.transfer.WorkspaceTransferReceiver \
+   adb shell am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
      -a shiroikuma.jiyusagyoban.action.GENGOSHIMA_IMPORT --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
      --es shiroikuma.jiyusagyoban.extra.PATH <file in /sdcard/tmp> --es shiroikuma.jiyusagyoban.extra.GENERATE true
    ```

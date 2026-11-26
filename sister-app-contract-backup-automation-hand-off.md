@@ -1384,7 +1384,7 @@ follow, and both bit real repos in the rollout:
 reasoned that the Mate XT reporting `SDK_INT = 31` would reject the type on the device even though
 the build passed, and switched to `dataSync`. That switch is harmless, but the premise is wrong and
 it should not spread: 自由作業盤 has shipped **two** `specialUse` services on that exact phone for
-months — `com.sysadmindoc.ruledeck.core.engine.AutomationService`, the profile engine that runs continuously,
+months — `com.opentasker.core.engine.AutomationService`, the profile engine that runs continuously,
 and `SceneOverlayService`, which draws the scenes 白い熊 uses every day. Both work. So do not
 downgrade a working `specialUse` on this reasoning; downgrade only when `aapt2` will not compile it.
 

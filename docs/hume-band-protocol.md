@@ -903,5 +903,5 @@ Running instrumented tests at all needed two build changes, both debug-only and 
 release build: the debug variant takes `applicationIdSuffix = ".debug"` so it installs **alongside**
 the release APK rather than failing on a signature mismatch (the only way through would have been
 `adb uninstall`, which destroys the workspace database), and `app/src/debug/AndroidManifest.xml`
-drops the `com.sysadmindoc.ruledeck.permission.AUTOMATION` declaration, since two packages cannot both own a
+drops the `com.opentasker.permission.AUTOMATION` declaration, since two packages cannot both own a
 custom permission.

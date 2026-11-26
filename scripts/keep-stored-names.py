@@ -211,6 +211,21 @@ def main():
     for old in aliases:
         sub_all(re.escape('"' + new_fqcn(old) + '"'), lambda m, o=old: '"' + o + '"')
 
+    # ── 2b. the same names where they are written down outside the app: docs, contracts, tooling ──
+    # `scripts/bridge.py` addresses the transfer receiver by its component name; renamed, every bridge
+    # command is delivered to nobody and answers result=0.
+    outside = [f for f in tracked(".") if re.search(r"\.(md|py|ps1|sh|json|txt)$", f)
+               and not f.startswith(("app/", "core/", "baselineprofile/", "benchmark/", "buildSrc/", ".git/", ".scratch/",
+                                     "scripts/stored-names/", "scripts/apply-upstream-rename.py", "scripts/keep-stored-names.py"))]
+    n_out = 0
+    for old in sorted(classes + aliases, key=len, reverse=True):
+        n_out += sub_all(r"(?<![\w.])" + re.escape(new_fqcn(old)) + r"(?![\w])", lambda m, o=old: o, files=outside)
+    for old in sorted(lines("literals.txt"), key=len, reverse=True):
+        new = ren.apply(old)
+        if new != old and re.search(r"[._:]", old.strip("._:")):
+            n_out += sub_all(r"(?<![\w./])" + re.escape(new) + r"(?![\w/])", lambda m, o=old: o, files=outside)
+    print(f"kept names put back in docs and tooling: {n_out} occurrences")
+
     # ── 3. what is left to look at ───────────────────────────────────────────────────────────────
     left = {}
     lit = re.compile(r'"((?:[^"\\\n]|\\.)*)"')

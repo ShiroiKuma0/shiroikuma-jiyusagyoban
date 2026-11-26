@@ -1,7 +1,7 @@
 param(
     [string]$Serial = $env:ANDROID_SERIAL,
     [string]$Package = "com.sysadmindoc.ruledeck",
-    [string]$Activity = "com.sysadmindoc.ruledeck.MainActivity",
+    [string]$Activity = "com.opentasker.app.MainActivity",
     [int]$SampleSeconds = 120,
     [string]$OutputRoot = "build/device-evidence/location",
     [switch]$GrantLocationPermissions,
@@ -607,9 +607,9 @@ function Copy-AppDatabaseSnapshot {
     param([string]$PackageName)
 
     $files = @(
-        "ruledeck.db",
-        "ruledeck.db-wal",
-        "ruledeck.db-shm"
+        "opentasker.db",
+        "opentasker.db-wal",
+        "opentasker.db-shm"
     )
     $copied = @()
     $errors = @()
@@ -809,7 +809,7 @@ $packageAfter = Get-ShellText -ShellArgs @("dumpsys", "package", $Package) -Allo
 $appOpsAfter = Get-ShellText -ShellArgs @("appops", "get", $Package) -AllowFailure
 $logcat = (Invoke-Adb -AdbArgs @("logcat", "-d", "-t", "1000") -AllowFailure).StdOut
 $databaseSnapshot = Copy-AppDatabaseSnapshot -PackageName $Package
-$roomDatabasePath = Join-Path $script:OutputDir "room-ruledeck.db"
+$roomDatabasePath = Join-Path $script:OutputDir "room-opentasker.db"
 $roomSummary = if (Test-Path $roomDatabasePath) {
     Read-RoomDatabaseSummary -DatabasePath $roomDatabasePath
 } else {
