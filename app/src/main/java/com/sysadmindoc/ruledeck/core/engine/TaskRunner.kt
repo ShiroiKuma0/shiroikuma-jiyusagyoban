@@ -148,7 +148,7 @@ class TaskRunner(
         val ifResults = mutableMapOf<Int, Boolean>()
         val handledFailureIndices = mutableSetOf<Int>()
         var unhandledFailure = false
-        var structuredFailure: StructuredTaskError? = null
+        var structuredFailure: StructuredFailure? = null
         try {
             var pc = 0
             var steps = 0
@@ -287,7 +287,7 @@ class TaskRunner(
                 ),
             ),
             success = false,
-            structuredError = StructuredTaskError(
+            structuredError = StructuredFailure(
                 taskId = task.id,
                 taskName = task.name,
                 actionId = 0L,
@@ -715,9 +715,9 @@ class TaskRunner(
         attempt: Int,
         retrying: Boolean,
         retryReason: String?,
-        structuredError: StructuredTaskError? = null,
-    ): StructuredTaskError {
-        val error = structuredError ?: failure.structuredError ?: StructuredTaskError(
+        structuredError: StructuredFailure? = null,
+    ): StructuredFailure {
+        val error = structuredError ?: failure.structuredError ?: StructuredFailure(
             taskId = task.id,
             taskName = task.name,
             actionId = spec.id,
@@ -728,7 +728,7 @@ class TaskRunner(
             originatingProfileId = originatingProfileId,
             originatingProfileName = originatingProfileName,
         )
-        ctx.variables.set(FLOW_ERROR_JSON, StructuredTaskErrorCodec.encode(error))
+        ctx.variables.set(FLOW_ERROR_JSON, StructuredFailureCodec.encode(error))
         ctx.variables.set(FLOW_ERROR_TASK_ID, error.taskId.toString())
         ctx.variables.set(FLOW_ERROR_TASK_NAME, error.taskName)
         ctx.variables.set(FLOW_ERROR_ACTION_ID, error.actionId.toString())
@@ -1269,7 +1269,7 @@ data class TaskRunReport(
     val traces: List<ActionExecutionTrace>,
     val success: Boolean,
     /** Present only when the task completed with an unhandled failure. */
-    val structuredError: StructuredTaskError? = null,
+    val structuredError: StructuredFailure? = null,
 )
 
 enum class ActionTraceStatus {

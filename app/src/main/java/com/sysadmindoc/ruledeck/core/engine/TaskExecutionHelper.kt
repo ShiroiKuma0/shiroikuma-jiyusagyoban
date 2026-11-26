@@ -697,7 +697,7 @@ private suspend fun selectFallbackTask(
     return null
 }
 
-private fun structuredFailureMetadata(error: StructuredTaskError): List<String> = listOf(
+private fun structuredFailureMetadata(error: StructuredFailure): List<String> = listOf(
     "Failure task: ${error.taskName} (${error.taskId})",
     "Failure action: id=${error.actionId}, index=${error.actionIndex}, type=${error.actionType}",
     "Failure attempts: ${error.attemptCount}",
