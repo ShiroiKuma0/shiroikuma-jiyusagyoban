@@ -1,12 +1,15 @@
 package com.sysadmindoc.ruledeck.core.actions
 
 import android.Manifest
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.service.notification.StatusBarNotification
 import androidx.core.content.ContextCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import com.sysadmindoc.ruledeck.core.engine.AutomationService
@@ -16,6 +19,7 @@ import com.sysadmindoc.ruledeck.core.engine.VariableStore
 import com.sysadmindoc.ruledeck.core.model.Scene
 import com.sysadmindoc.ruledeck.core.model.SceneElement
 import com.sysadmindoc.ruledeck.core.model.SceneElementType
+import com.sysadmindoc.ruledeck.core.platform.PromotedOngoingNotificationSupport
 import com.sysadmindoc.ruledeck.core.scenes.SceneOverlayService
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -113,7 +117,11 @@ class Api37LocalNetworkInstrumentedTest {
         ContextCompat.startForegroundService(app, Intent(app, AutomationService::class.java))
         assertDumpContains("dumpsys activity services $packageName", "AutomationService")
 
-        assertDumpContains("dumpsys notification --noredact", "ruledeck.engine")
+        // Samsung's notification dump shortens channel ids ("rulede..."), even with --noredact,
+        // so ask the notification service for this package's live notifications instead.
+        // Android holds a new foreground service's notification back for up to 10 s
+        // (deferred_fgs_notification_interval), so the wait has to outlast that.
+        assertEngineNotificationPosted()
 
         val bluetoothDump = shell("dumpsys bluetooth_manager")
         assertTrue("expected Bluetooth service dump", bluetoothDump.isNotBlank())
@@ -149,6 +157,25 @@ class Api37LocalNetworkInstrumentedTest {
             !logcat.contains("FATAL EXCEPTION") || !logcat.contains(packageName),
         )
     }
+
+    private fun assertEngineNotificationPosted(timeoutMs: Long = 15_000) {
+        val manager = app.getSystemService(NotificationManager::class.java)
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (manager.activeNotifications.any { it.isEngineForegroundNotification() }) return
+            Thread.sleep(250)
+        }
+        val posted = manager.activeNotifications.joinToString { "${it.id}:${it.notification.channelId}" }
+        assertTrue(
+            "expected a foreground-service notification on " +
+                "${PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID}, posted: [$posted]",
+            manager.activeNotifications.any { it.isEngineForegroundNotification() },
+        )
+    }
+
+    private fun StatusBarNotification.isEngineForegroundNotification(): Boolean =
+        notification.channelId == PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID &&
+            notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0
 
     private fun ctx(variables: VariableStore = VariableStore()): ActionContext =
         ActionContext(permissionProbeContext, variables)
