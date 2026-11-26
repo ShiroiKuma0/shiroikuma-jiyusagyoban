@@ -1,0 +1,96 @@
+package com.sysadmindoc.ruledeck.core.storage
+
+import androidx.room.ColumnInfo
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.Insert
+import androidx.room.PrimaryKey
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.serialization.encodeToString
+import com.sysadmindoc.ruledeck.core.model.ActionSpec
+import com.sysadmindoc.ruledeck.core.model.CollisionMode
+import com.sysadmindoc.ruledeck.core.model.Task
+
+// Unique (projectId, name): a task name is unique within its project (SQLite treats NULL projectId —
+// Unfiled — as distinct, so the editor's UI check covers Unfiled).
+@Entity("tasks", indices = [Index(value = ["projectId", "name"], unique = true)])
+data class TaskEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val priority: Int,
+    val collisionMode: String,
+    val actionsJson: String,
+    val projectId: Long? = null,
+    val position: Int = 0,
+    val iconPath: String? = null,
+    val freezeBubble: Boolean = false,
+    /** Off = the task does not run. See [Task.enabled]; the DEFAULT is spelled in MIGRATION_30_31. */
+    @ColumnInfo(defaultValue = "1") val enabled: Boolean = true,
+) {
+    fun toDomain(): Task = toDomainDecodeResult().requireDecoded()
+
+    fun toDomainDecodeResult(): StorageDecodeResult<Task> {
+        val mode = runCatching { CollisionMode.valueOf(collisionMode) }
+            .getOrElse { error ->
+                return StorageDecodeResult(
+                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position, iconPath, freezeBubble, enabled = enabled),
+                    issue = StorageDecodeIssue(
+                        recordType = StorageRecordType.TASK,
+                        recordId = id,
+                        recordName = name,
+                        fieldName = "collisionMode",
+                        message = error.storageDecodeMessage(),
+                    ),
+                )
+            }
+
+        val actions = runCatching { StorageJson.decodeFromString<List<ActionSpec>>(actionsJson) }
+            .getOrElse { error ->
+                return StorageDecodeResult(
+                    value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath, freezeBubble, enabled = enabled),
+                    issue = StorageDecodeIssue(
+                        recordType = StorageRecordType.TASK,
+                        recordId = id,
+                        recordName = name,
+                        fieldName = "actionsJson",
+                        message = error.storageDecodeMessage(),
+                    ),
+                )
+            }
+
+        return StorageDecodeResult(
+            value = Task(id, name, priority, mode, actions, projectId, position, iconPath, freezeBubble, enabled = enabled),
+        )
+    }
+}
+
+fun Task.toEntity() = TaskEntity(
+    id, name, priority, collisionMode.name, StorageJson.encodeToString(actions), projectId, position, iconPath, freezeBubble, enabled
+)
+
+data class TaskNameRow(val id: Long, val name: String)
+
+@Dao
+interface TaskDao {
+    @Insert suspend fun insert(t: TaskEntity): Long
+    @Update suspend fun update(t: TaskEntity)
+    @Delete suspend fun delete(t: TaskEntity)
+    @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: Long): TaskEntity?
+    @Query("SELECT * FROM tasks ORDER BY position, id") suspend fun getAll(): List<TaskEntity>
+    @Query("SELECT * FROM tasks ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
+
+    /** Ids and names only, for watching renames and deletes without reading every task's steps. */
+    @Query("SELECT id, name FROM tasks") fun observeNames(): kotlinx.coroutines.flow.Flow<List<TaskNameRow>>
+    @Query("SELECT * FROM tasks WHERE name = :name LIMIT 1") suspend fun getByName(name: String): TaskEntity?
+
+    /** See [ProfileDao.getByNameIgnoreCase] for the ASCII-folding caveat. */
+    @Query("SELECT * FROM tasks WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun getByNameIgnoreCase(name: String): TaskEntity?
+
+    @Query("SELECT COUNT(*) FROM tasks") suspend fun countAll(): Int
+    @Query("UPDATE tasks SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM tasks") suspend fun nextPosition(): Int
+}

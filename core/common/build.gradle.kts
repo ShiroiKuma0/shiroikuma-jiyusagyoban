@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.opentasker.core.common"
+    namespace = "com.sysadmindoc.ruledeck.core.common"
     compileSdk = 37
 
     defaultConfig {

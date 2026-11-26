@@ -259,8 +259,8 @@
 : Shizuku強化モードはオフです。高い権限が必要なアクションを使うには、ここでオンにしてください。
 = Shizuku manager is installed but the service is not running.
 : Shizukuの管理アプリはインストールされていますが、サービスが動作していません。
-= Shizuku is running but OpenTasker needs permission.
-: Shizukuは動作していますが、OpenTaskerに権限が必要です。
+= Shizuku is running but RuleDeck needs permission.
+: Shizukuは動作していますが、RuleDeckに権限が必要です。
 = Shizuku permission is granted, but this build has no privileged user-service transport. Elevated actions cannot run until the transport is available.
 : Shizukuの権限は許可されていますが、このビルドには特権付きの補助サービスへの接続手段がありません。それが使えるようになるまで、高い権限が必要なアクションは実行できません。
 = Shizuku is active, permission is granted, and a privileged transport is available.
@@ -274,8 +274,8 @@
 : オフにすると、この端末への遠隔アクセスを含め、データ通信が必要なものがすべて止まります。
 = A display that stays on uses more battery.
 : 画面を点けたままにすると、電池の消費が増えます。
-= It saves whatever is on screen to OpenTasker's storage, passwords and messages included.
-: 画面に映っているものを、パスワードやメッセージも含めてそのままOpenTaskerのストレージに保存します。
+= It saves whatever is on screen to RuleDeck's storage, passwords and messages included.
+: 画面に映っているものを、パスワードやメッセージも含めてそのままRuleDeckのストレージに保存します。
 = The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.
 : 端末は警告なしにすぐ再起動し、保存していない作業は失われます。起動時のトリガーに再起動のタスクを付けると、再起動を繰り返すことがあります。
 = The screen goes dark even if someone is using the phone, and it may lock.
@@ -324,8 +324,8 @@
 : 上限付きの結果を受け取るには、Termux %1$s以降が必要です。
 = Termux 0.109 or newer is required for bounded results.
 : 上限付きの結果を受け取るには、Termux 0.109以降が必要です。
-= Termux is installed, but OpenTasker lacks RUN_COMMAND permission.
-: Termuxはインストールされていますが、OpenTaskerにRUN_COMMANDの権限がありません。
+= Termux is installed, but RuleDeck lacks RUN_COMMAND permission.
+: Termuxはインストールされていますが、RuleDeckにRUN_COMMANDの権限がありません。
 = Termux is installed and RUN_COMMAND permission is granted.
 : Termuxはインストールされており、RUN_COMMANDの権限も許可されています。
 = Requires Termux 0.109 or newer with RUN_COMMAND permission.

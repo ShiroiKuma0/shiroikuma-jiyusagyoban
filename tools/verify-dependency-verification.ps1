@@ -11,7 +11,7 @@ $MetadataPath = Join-Path $Root "gradle\verification-metadata.xml"
 $VerificationNamespace = "https://schema.gradle.org/dependency-verification"
 $HttpClient = [System.Net.Http.HttpClient]::new()
 $HttpClient.Timeout = [TimeSpan]::FromSeconds(30)
-$HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenTasker-dependency-verification/1")
+$HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RuleDeck-dependency-verification/1")
 $RemoteCache = @{}
 
 function Get-RemoteBytes {
@@ -152,7 +152,7 @@ function Get-CandidateUrls {
 function Get-OriginRepository {
     param([Parameter(Mandatory = $true)][string]$Origin)
 
-    if ($Origin -match "^OpenTasker: (Google Maven|Maven Central|Gradle Plugin Portal) ") {
+    if ($Origin -match "^RuleDeck: (Google Maven|Maven Central|Gradle Plugin Portal) ") {
         switch ($Matches[1]) {
             "Google Maven" { return [pscustomobject]@{ Name = "Google Maven"; Base = "https://dl.google.com/dl/android/maven2/" } }
             "Maven Central" { return [pscustomobject]@{ Name = "Maven Central"; Base = "https://repo.maven.apache.org/maven2/" } }
@@ -197,7 +197,7 @@ function Resolve-Evidence {
                     if ($publishedHash -ne $ExpectedHash) {
                         throw "Upstream SHA-256 mismatch for $($Component.group):$($Component.name):$($Component.version) at $artifactUrl."
                     }
-                    return "OpenTasker: $($repository.Name) published .sha256"
+                    return "RuleDeck: $($repository.Name) published .sha256"
                 }
             } elseif ($originMode -eq "sha256") {
                 $publishedHash = Get-PublishedHash (Get-RemoteBytes "$artifactUrl.sha256")
@@ -215,7 +215,7 @@ function Resolve-Evidence {
                 if (Test-PgpSignatureFile $signature) {
                     $actualHash = Get-ArtifactHash (Get-RemoteBytes $artifactUrl)
                     if ($actualHash -eq $ExpectedHash) {
-                        return "OpenTasker: $($repository.Name) published .asc + artifact SHA-256"
+                        return "RuleDeck: $($repository.Name) published .asc + artifact SHA-256"
                     }
                     throw "Artifact SHA-256 mismatch for the upstream-signed $artifactUrl."
                 }
@@ -248,7 +248,7 @@ function Resolve-Evidence {
             $actualHash = Get-ArtifactHash $bytes
             Write-Verbose "Upstream artifact hash $actualHash"
             if ($actualHash -eq $ExpectedHash) {
-                return "OpenTasker: $($repository.Name) direct artifact SHA-256 (no upstream .sha256/.asc)"
+                return "RuleDeck: $($repository.Name) direct artifact SHA-256 (no upstream .sha256/.asc)"
             }
             throw "Upstream artifact SHA-256 mismatch for $artifactUrl; expected $ExpectedHash, actual $actualHash."
         }

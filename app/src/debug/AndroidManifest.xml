@@ -6,7 +6,7 @@
   the release build on 白い熊's phone — replacing it would mean `adb uninstall`, and that destroys
   the workspace database. But two packages cannot both declare the same custom permission: Android
   refuses the second install with INSTALL_FAILED_DUPLICATE_PERMISSION, and the release build owns
-  `com.opentasker.permission.AUTOMATION`.
+  `com.sysadmindoc.ruledeck.permission.AUTOMATION`.
 
   So the debug build simply does not declare it, and the one receiver guarded by it drops its guard
   along with it — an unguarded receiver in a debug package that no sister app addresses is
@@ -20,12 +20,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <permission
-        android:name="com.opentasker.permission.AUTOMATION"
+        android:name="com.sysadmindoc.ruledeck.permission.AUTOMATION"
         tools:node="remove" />
 
     <application>
         <receiver
-            android:name="com.opentasker.core.external.AutomationTargetReceiver"
+            android:name="com.sysadmindoc.ruledeck.core.external.AutomationTargetReceiver"
             android:permission=""
             tools:replace="android:permission" />
     </application>

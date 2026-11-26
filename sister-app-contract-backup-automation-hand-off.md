@@ -85,7 +85,7 @@ back. That is the §2a half — the reason the token had to become optional in t
 **The reference implementations already in-tree** (read them if anything here is ambiguous):
 - `shiroikuma-renrakusaki` — `app/src/main/kotlin/org/fossify/contacts/receivers/BackupContactsReceiver.kt`
   (the EMUI-proven reply round-trip) and `helpers/Config.kt` (token infra).
-- `shiroikuma-jiyusagyoban` — `app/src/main/java/com/opentasker/core/transfer/StateExportReceiver.kt`
+- `shiroikuma-jiyusagyoban` — `app/src/main/java/com/sysadmindoc/ruledeck/core/transfer/StateExportReceiver.kt`
   (this exact contract, implemented over a Kōjiki-style category ZIP) and `AutomationAuth.kt`.
 
 ---
@@ -617,7 +617,7 @@ Three rows now, in this order:
    sitting under an off switch invites 白い熊 to paste it somewhere it will do nothing.
 
 Reference implementation: `shiroikuma-jiyusagyoban` →
-`app/src/main/java/com/opentasker/ui/screens/UiCustomizationScreen.kt` (the rows after
+`app/src/main/java/com/sysadmindoc/ruledeck/ui/screens/UiCustomizationScreen.kt` (the rows after
 「Export / Import…」) backed by `core/transfer/AutomationAuth.kt`.
 
 ---
@@ -678,7 +678,7 @@ key is ever rotated its calls stop working and the fix is these constants — th
 failure, because a signing key changing unnoticed is exactly what a pin is for.
 
 Copy `AutomationCallers.kt` from `shiroikuma-jiyusagyoban`
-(`app/src/main/java/com/opentasker/core/automation/AutomationCallers.kt`) — it is deliberately
+(`app/src/main/java/com/sysadmindoc/ruledeck/core/automation/AutomationCallers.kt`) — it is deliberately
 self-contained and app-independent.
 
 ### The four methods
@@ -1384,7 +1384,7 @@ follow, and both bit real repos in the rollout:
 reasoned that the Mate XT reporting `SDK_INT = 31` would reject the type on the device even though
 the build passed, and switched to `dataSync`. That switch is harmless, but the premise is wrong and
 it should not spread: 自由作業盤 has shipped **two** `specialUse` services on that exact phone for
-months — `com.opentasker.core.engine.AutomationService`, the profile engine that runs continuously,
+months — `com.sysadmindoc.ruledeck.core.engine.AutomationService`, the profile engine that runs continuously,
 and `SceneOverlayService`, which draws the scenes 白い熊 uses every day. Both work. So do not
 downgrade a working `specialUse` on this reasoning; downgrade only when `aapt2` will not compile it.
 

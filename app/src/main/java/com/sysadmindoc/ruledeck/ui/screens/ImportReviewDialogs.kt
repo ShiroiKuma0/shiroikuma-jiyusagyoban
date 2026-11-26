@@ -1,0 +1,186 @@
+package com.sysadmindoc.ruledeck.ui.screens
+
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.sysadmindoc.ruledeck.ui.components.AlertDialog
+import com.sysadmindoc.ruledeck.ui.components.Button
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import com.sysadmindoc.ruledeck.ui.components.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import com.sysadmindoc.ruledeck.R
+import com.sysadmindoc.ruledeck.i18n.tr
+import com.sysadmindoc.ruledeck.ui.theme.DesignSystem
+
+@Composable
+internal fun TaskerImportReviewDialog(
+    state: TaskerImportReviewState,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    progress: TransferProgress? = null,
+    onCancel: () -> Unit = {},
+    onConfirm: () -> Unit,
+) {
+    val preview = state.preview
+    val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(tr(state.title)) },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (busy) item { TransferProgressRow(progress) }
+                item {
+                    Text(
+                        tr("Imported profiles will be created disabled so actions, contexts, and permissions can be reviewed before use."),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${preview.importTaskCount}", tr("Tasks"), Modifier.weight(1f))
+                        SummaryMetric("${preview.importProfileCount}", tr("Profiles"), Modifier.weight(1f))
+                        SummaryMetric("${preview.importVariableCount}", tr("Variables"), Modifier.weight(1f))
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SummaryMetric("${preview.sourceTaskCount}", tr("Src tasks"), Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceProfileCount}", tr("Src profiles"), Modifier.weight(1f))
+                        SummaryMetric("${preview.sourceSceneCount}", tr("Scenes"), Modifier.weight(1f))
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusPill(tr("%1\$s mapped", preview.mappedActionCount), MaterialTheme.colorScheme.tertiary)
+                        StatusPill(tr("%1\$s unsupported", preview.unsupportedActionCount), MaterialTheme.colorScheme.error)
+                    }
+                }
+                if (preview.capabilityWarnings.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = tr("Capability review"),
+                            values = preview.capabilityWarnings,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                if (migrationWarnings.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = tr("Migration warnings"),
+                            values = migrationWarnings.map { tr(it) },
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (state.unsupportedActionRows.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = tr("Unsupported actions"),
+                            values = state.unsupportedActionRows,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (state.mappedActionRows.isNotEmpty()) {
+                    item {
+                        TaskerImportListSection(
+                            title = tr("Mapped actions"),
+                            values = state.mappedActionRows,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            OutlinedButton(
+                enabled = preview.canImport && !busy,
+                onClick = onConfirm,
+            ) {
+                Text(if (busy) tr("Importing...") else tr("Import for Review"))
+            }
+        },
+        // Stays enabled while busy. Disabling it left the only way out of a long import as force
+        // stopping the app, because nothing held the job to cancel.
+        dismissButton = {
+            OutlinedButton(onClick = if (busy) onCancel else onDismiss) {
+                Text(stringResource(if (busy) R.string.action_stop else R.string.action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun TaskerImportListSection(
+    title: String,
+    values: List<String>,
+    color: Color,
+) {
+    InlineNotice(
+        title = title,
+        body = values.take(5).joinToString("\n") + if (values.size > 5) {
+            "\n" + pluralStringResource(R.plurals.import_review_more, values.size - 5, values.size - 5)
+        } else {
+            ""
+        },
+        color = color,
+    )
+}
+
+/**
+ * What a running transfer is doing. A relabelled button could not distinguish reading a 16 MiB
+ * backup from writing it, so a large import looked identical to a hang.
+ */
+@Composable
+internal fun TransferProgressRow(progress: TransferProgress?) {
+    if (progress == null) return
+    Column(
+        // The stage label is the only thing that reports an import or export moving from one step
+        // to the next, and it changes in place without moving focus.
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs),
+    ) {
+        Text(
+            stringResource(progress.stage.labelRes()),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val fraction = progress.fraction
+        if (fraction == null) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+private fun TransferStage.labelRes(): Int = when (this) {
+    TransferStage.Preflight -> R.string.transfer_stage_preflight
+    TransferStage.Decode -> R.string.transfer_stage_decode
+    TransferStage.Plan -> R.string.transfer_stage_plan
+    TransferStage.Write -> R.string.transfer_stage_write
+}

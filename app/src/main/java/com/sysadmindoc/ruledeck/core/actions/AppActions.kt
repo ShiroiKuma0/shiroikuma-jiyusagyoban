@@ -1,0 +1,506 @@
+package com.sysadmindoc.ruledeck.core.actions
+
+import android.Manifest
+import android.app.AppOpsManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.Process
+import android.telephony.SmsManager
+import android.widget.Toast
+import androidx.core.content.ContextCompat
+import com.sysadmindoc.ruledeck.BuildConfig
+import com.sysadmindoc.ruledeck.core.accessibility.ShiroiKumaAccessibilityService
+import com.sysadmindoc.ruledeck.core.engine.Action
+import com.sysadmindoc.ruledeck.core.engine.ActionCategory
+import com.sysadmindoc.ruledeck.core.engine.ActionContext
+import com.sysadmindoc.ruledeck.core.engine.ActionResult
+import com.sysadmindoc.ruledeck.core.platform.BackgroundActivityStart
+import com.sysadmindoc.ruledeck.core.policy.AppFreeze
+import com.sysadmindoc.ruledeck.core.shizuku.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.sysadmindoc.ruledeck.widget.TaskShortcutHelper
+
+/**
+ * Launch an application.
+ *
+ * Args:
+ *   - "package": package name (e.g., "com.spotify.music")
+ */
+class LaunchAppAction : Action {
+    override val id = "app.launch"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"] ?: return ActionResult.Failure("missing package")
+        return try {
+            val intent = ctx.app.packageManager.getLaunchIntentForPackage(pkg)
+                ?: return frozenOrMissing(ctx, pkg)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val result = startActivityFromAction(ctx, intent, pkg)
+            ctx.logger("Launch: $pkg")
+            result
+        } catch (e: Exception) {
+            ActionResult.Failure("launch failed: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Starts the activity whatever the odds, so a screen Android allows for a reason this app can't see
+ * still opens, then says so when Android most likely dropped it. [what] names it for that message.
+ */
+internal fun startActivityFromAction(ctx: ActionContext, intent: Intent, what: String): ActionResult {
+    val blocked = BackgroundActivityStart.likelyBlocked(ctx.app)
+    ctx.app.startActivity(intent)
+    return if (blocked) ActionResult.Failure(BackgroundActivityStart.failureMessage(what)) else ActionResult.Success
+}
+
+/**
+ * A launch intent that resolved to nothing, explained.
+ *
+ * A frozen app has no launch intent — hidden or disabled, `getLaunchIntentForPackage` answers null
+ * exactly as it does for one that was never installed. Saying "app not found" for an app sitting
+ * frozen on the phone sent whoever read the run log looking for an install problem; the state is one
+ * cheap read away, so read it.
+ */
+private fun frozenOrMissing(ctx: ActionContext, pkg: String): ActionResult {
+    val state = AppFreeze.read(ctx.app, pkg)
+    return when {
+        !state.installed -> ActionResult.Failure("app not found: $pkg")
+        state.frozen -> ActionResult.Failure("$pkg is frozen (${state.summary}) — unfreeze it first")
+        else -> ActionResult.Failure("app has no launcher entry: $pkg")
+    }
+}
+
+/**
+ * Kill (force-stop) an application.
+ *
+ * Args:
+ *   - "package": package name
+ */
+class KillAppAction : Action {
+    override val id = "app.kill"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"] ?: return ActionResult.Failure("missing package")
+        ctx.logger("Kill: $pkg")
+        return ActionResult.Failure("Killing apps is not supported without privileged app-management access")
+    }
+}
+
+/**
+ * Go to home screen (dismiss notifications, etc.).
+ */
+class GoHomeAction : Action {
+    override val id = "home.go"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val result = startActivityFromAction(ctx, intent, "the home screen")
+        ctx.logger("Go to home")
+        return result
+    }
+}
+
+/**
+ * Open a URL in the browser.
+ *
+ * Args:
+ *   - "url": URL to open
+ */
+class OpenUrlAction : Action {
+    override val id = "url.open"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val url = args["url"] ?: return ActionResult.Failure("missing url")
+        val uri = Uri.parse(url)
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != null && scheme !in ALLOWED_SCHEMES) {
+            return ActionResult.Failure("blocked URI scheme: $scheme (allowed: ${ALLOWED_SCHEMES.joinToString()})")
+        }
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val result = startActivityFromAction(ctx, intent, "the link")
+            ctx.logger("Open URL: $url")
+            result
+        } catch (e: Exception) {
+            ActionResult.Failure("open failed: ${e.message}")
+        }
+    }
+
+    companion object {
+        private val ALLOWED_SCHEMES = setOf("https", "http", "tel", "mailto", "geo")
+        fun allowedSchemes(): Set<String> = ALLOWED_SCHEMES
+    }
+}
+
+/**
+ * Send an SMS.
+ *
+ * Args:
+ *   - "number": recipient phone number
+ *   - "message": SMS text
+ */
+class SendSmsAction : Action {
+    override val id = "sms.send"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val number = args["number"] ?: return ActionResult.Failure("missing number")
+        val message = args["message"] ?: ""
+        if (ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return ActionResult.Failure("SMS permission is not granted")
+        }
+        if (message.isBlank()) return ActionResult.Failure("missing message")
+        return try {
+            val smsManager = if (android.os.Build.VERSION.SDK_INT >= 31) {
+                ctx.app.getSystemService(SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            } ?: return ActionResult.Failure("SMS service not available")
+            smsManager.sendTextMessage(number, null, message, null, null)
+            // Mask the recipient in the persisted run log — full numbers are PII and run-log
+            // redaction does not scrub phone numbers.
+            ctx.logger("SMS sent to ${maskPhoneNumber(number)}")
+            ActionResult.Success
+        } catch (ex: Exception) {
+            ActionResult.Failure("SMS send failed: ${ex.message}", ex)
+        }
+    }
+}
+
+/** Masks all but the last 4 characters of a recipient number for logging (e.g. "***6789"). */
+internal fun maskPhoneNumber(number: String): String {
+    val tail = number.takeLast(4)
+    return if (number.length <= 4) "***" else "***$tail"
+}
+
+/**
+ * Freeze an app so it cannot run, as hard as this phone allows.
+ *
+ * Applies the same **four gates** as 白い熊 応用管理's "Total freeze" — force-stop, the device-policy
+ * suspension, `pm disable-user`, and the device-policy hide — so an app re-frozen from a bubble ends
+ * up exactly as held as 応用管理 left it, rather than in a weaker state that adb could lift. The two
+ * policy gates need 雫's delegation, the two shell gates need Shizuku, and whichever are available are
+ * applied; the log line names them, because that is the first thing anyone wants when a later defrost
+ * misbehaves.
+ *
+ * Three packages are refused outright — see [AppFreeze.PROTECTED].
+ *
+ * Args:
+ *   - "package": package name (an installed-apps picker fills it; a %var also works)
+ */
+class FreezeAppAction : Action {
+    override val id = "app.freeze"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("missing package")
+        AppFreeze.protectedReason(pkg)?.let { reason ->
+            ctx.logger("Refused to freeze $pkg — $reason")
+            return ActionResult.Failure("$pkg must never be frozen: $reason")
+        }
+        val result = withContext(Dispatchers.IO) { AppFreeze.freeze(ctx.app, pkg) }
+        if (!result.frozen) {
+            ctx.logger("Freeze failed: $pkg")
+            return ActionResult.Failure("could not freeze $pkg — needs the device-policy delegation or Shizuku")
+        }
+        // Which gates landed, not just that something did: a freeze that misses the two policy gates
+        // is one adb command away from being undone, and only this line says so.
+        ctx.logger("Froze $pkg (${result.summary})")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Thaw an app, clearing **every** lock that could be holding it.
+ *
+ * "Frozen" covers four independent gates and an app stays held while any one survives, so this does
+ * not branch on how it was frozen — it cannot know, and with two delegates under one admin whatever
+ * either app suspended the other must be able to lift. Success is re-read from the platform
+ * afterwards, never inferred from an exit code: the incident this fixes had `pm enable` exiting 0
+ * and reporting success against an app that stayed suspended.
+ *
+ * Args:
+ *   - "package": package name
+ */
+class UnfreezeAppAction : Action {
+    override val id = "app.unfreeze"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("missing package")
+        val thawed = withContext(Dispatchers.IO) { AppFreeze.thaw(ctx.app, pkg) }
+        if (thawed) {
+            ctx.logger("Unfroze $pkg")
+            return ActionResult.Success
+        }
+        // The two ways a defrost fails need opposite fixes — a missing delegation and a missing
+        // Shizuku — so the message names which one this was.
+        val reason = withContext(Dispatchers.IO) { AppFreeze.stuckReason(ctx.app, pkg) }
+        ctx.logger("Unfreeze failed: $reason")
+        return ActionResult.Failure("could not unfreeze $pkg — $reason")
+    }
+}
+
+/**
+ * Is an app frozen right now? Stores "true" / "false" into [store] (default `%frozen`); an app that
+ * isn't installed stores "" and fails.
+ *
+ * The pre-flight for anything that talks to another app: a frozen package cannot receive broadcasts
+ * at all, so a token-gated request to a frozen sister app is never delivered and the caller sits out
+ * its whole reply timeout in silence. Read the state, thaw it, do the work, and re-freeze exactly
+ * what was frozen.
+ *
+ * **Frozen means disabled OR suspended OR hidden.** Until 2026-09-05 this read only the enabled
+ * state, so an app suspended by device policy answered "false" — and 保存中核's thaw-work-refreeze
+ * then skipped the thaw and blamed the sister app for the silence that followed. Hiding, 応用管理's
+ * fourth gate since 2026-09-10, was worse still: a hidden app answered "not installed" and failed
+ * outright. All three are readable with no privilege at all, and this action keeps needing none.
+ *
+ * Args:
+ *   - "package": package name
+ *   - "store": variable to receive "true"/"false" (default "frozen")
+ */
+class AppFrozenAction : Action {
+    override val id = "app.frozen"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("missing package")
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "frozen"
+        val state = withContext(Dispatchers.IO) { AppFreeze.read(ctx.app, pkg) }
+        if (!state.installed) {
+            ctx.variables.set(store, "")
+            // A remembered package is not a frozen one. The platform still answers questions about a
+            // system app uninstalled for this user, and calling that "frozen" would send a
+            // thaw-work-refreeze off to work on a ghost.
+            return ActionResult.Failure(
+                if (state.remembered) "$pkg is not installed for this user — only its data is remembered"
+                else "app not installed: $pkg",
+            )
+        }
+        ctx.variables.set(store, state.frozen.toString())
+        // Which lock, not just whether: a defrost that fails reads very differently for the two.
+        val how = state.summary.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty()
+        ctx.logger("$pkg frozen=${state.frozen}$how → %$store")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Switch to the previous / next app — like the system quick-switch. Builds an MRU list of recently
+ * foregrounded apps from UsageStats and steps a cursor through a stable snapshot: "previous" goes to an
+ * older app, "next" comes back toward the current one. The snapshot is retaken whenever the foreground
+ * is an app we didn't launch (i.e. the user switched apps themselves), so cycling stays coherent. Needs
+ * Usage access; "previous" is the common alt-tab-to-last-app.
+ */
+internal object RecentAppsSwitcher {
+    private var snapshot: List<String> = emptyList()
+    private var pos: Int = 0
+    private var lastLaunched: String? = null
+
+    enum class NavResult { SWITCHED, NO_RECENT, LAUNCH_FAILED }
+
+    @Synchronized
+    fun navigate(context: Context, forward: Boolean): NavResult {
+        val mru = recentPackages(context) // most-recent-first, incl. the current app, excl. launcher/systemui
+        if (mru.isEmpty()) return NavResult.NO_RECENT
+        val self = context.packageName
+        val current = mru.first()                  // the foreground app right now
+        val switchable = mru.filter { it != self }  // apps we can alt-tab to (never our own)
+        if (switchable.isEmpty()) return NavResult.NO_RECENT
+        // Anchor the cursor to the current app whenever the user is somewhere we didn't send them; the
+        // current app's index is -1 when it's our own app (so "previous" lands on switchable[0]).
+        if (snapshot.isEmpty() || current != lastLaunched) {
+            snapshot = switchable
+            pos = snapshot.indexOf(current)
+        }
+        pos = (if (forward) pos - 1 else pos + 1).coerceIn(0, snapshot.size - 1)
+        val target = snapshot.getOrNull(pos) ?: return NavResult.NO_RECENT
+        val intent = context.packageManager.getLaunchIntentForPackage(target)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } ?: return NavResult.LAUNCH_FAILED
+        return runCatching { context.startActivity(intent); lastLaunched = target; NavResult.SWITCHED }
+            .getOrDefault(NavResult.LAUNCH_FAILED)
+    }
+
+    /** Whether the user has granted "Usage access" (PACKAGE_USAGE_STATS) — required to read the MRU list. */
+    fun hasUsageAccess(context: Context): Boolean {
+        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return false
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+        } else {
+            @Suppress("DEPRECATION") appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+        }
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    fun toast(context: Context, msg: String) {
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(context.applicationContext, msg, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun recentPackages(context: Context): List<String> {
+        val launchers = launcherPackages(context)
+        // Keep our own package here (the caller uses it to detect the current foreground app); only
+        // drop the launcher(s) + system UI. The switchable list filters out self.
+        fun keep(p: String) = p.isNotEmpty() && p !in launchers && p != "com.android.systemui"
+
+        // Primary: the accessibility service's foreground history — it sees every app the user switches
+        // to, including ones UsageStats omits (e.g. emacs). Used once it has warmed up a couple entries.
+        val acc = ShiroiKumaAccessibilityService.recentApps.asSequence().filter { keep(it) }.distinct().toList()
+        if (acc.size >= 2) return acc
+
+        // Fallback (service off, or its history not warmed yet): UsageStats.
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return acc
+        val now = System.currentTimeMillis()
+
+        // 1) Precise most-recent-first order from foreground events over the last day.
+        val events = runCatching { usm.queryEvents(now - 24 * 60 * 60 * 1000L, now) }.getOrNull()
+        if (events != null) {
+            val ev = UsageEvents.Event()
+            val ordered = ArrayList<String>()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(ev)
+                val t = ev.eventType
+                @Suppress("DEPRECATION")
+                val fg = t == UsageEvents.Event.MOVE_TO_FOREGROUND ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && t == UsageEvents.Event.ACTIVITY_RESUMED)
+                if (fg) ev.packageName?.let { ordered += it }
+            }
+            val mru = ordered.asReversed().asSequence().filter { keep(it) }.distinct().toList()
+            if (mru.size >= 2) return mru
+        }
+        // 2) Fallback: aggregated last-used over the last week (catches a sparse event stream).
+        val stats = runCatching {
+            usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 7 * 24 * 60 * 60 * 1000L, now)
+        }.getOrNull().orEmpty()
+        return stats.asSequence()
+            .filter { keep(it.packageName) && it.lastTimeUsed > 0 }
+            .sortedByDescending { it.lastTimeUsed }
+            .map { it.packageName }
+            .distinct()
+            .toList()
+    }
+
+    // ALL packages that can act as Home (Huawei ships more than one) — so none leak into the app cycle.
+    private fun launcherPackages(context: Context): Set<String> = runCatching {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            .map { it.activityInfo.packageName }
+            .toSet()
+    }.getOrDefault(emptySet())
+}
+
+// Shared app-switch: report the precise reason as a toast (so a failed swipe isn't a silent no-op).
+private fun switchApp(ctx: ActionContext, forward: Boolean, label: String): ActionResult {
+    if (!RecentAppsSwitcher.hasUsageAccess(ctx.app)) {
+        RecentAppsSwitcher.toast(ctx.app, "アプリ切替には「使用状況へのアクセス」(Usage access) の許可が必要です")
+        return ActionResult.Failure("Switch apps needs Usage access")
+    }
+    return when (RecentAppsSwitcher.navigate(ctx.app, forward)) {
+        RecentAppsSwitcher.NavResult.SWITCHED -> { ctx.logger(label); ActionResult.Success }
+        RecentAppsSwitcher.NavResult.NO_RECENT -> {
+            RecentAppsSwitcher.toast(ctx.app, "切替先の最近のアプリがありません（先に他のアプリを2つ以上開いてください）")
+            ActionResult.Failure("No app to switch to")
+        }
+        RecentAppsSwitcher.NavResult.LAUNCH_FAILED -> {
+            RecentAppsSwitcher.toast(ctx.app, "アプリの起動がブロックされました（背景起動制限）")
+            ActionResult.Failure("App launch blocked")
+        }
+    }
+}
+
+/** `Previous app` — switch to the most recent app before the current one (alt-tab to last app). */
+class PreviousAppAction : Action {
+    override val id = "app.previous"
+    override val category = ActionCategory.APP
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+        switchApp(ctx, forward = false, label = "Previous app")
+}
+
+/** `Next app` — step forward through the recent-apps cycle. */
+class NextAppAction : Action {
+    override val id = "app.next"
+    override val category = ActionCategory.APP
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+        switchApp(ctx, forward = true, label = "Next app")
+}
+
+/**
+ * Take a screenshot.
+ *
+ * Args:
+ *   - "path": optional output file path
+ */
+class ScreenshotAction : Action {
+    override val id = "screenshot.take"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val path = args["path"]?.takeIf { it.isNotBlank() }
+            ?: ctx.app.getExternalFilesDir(null)?.resolve("screenshot_${System.currentTimeMillis()}.png")?.absolutePath
+            ?: return ActionResult.Failure("no writable path for the screenshot")
+        requireShizuku("Screenshot")?.let { return it }
+        val result = runCatching { withContext(Dispatchers.IO) { ShizukuShell.exec("screencap -p '$path'") } }
+            .getOrElse { return ActionResult.Failure("Shizuku exec failed: ${it.message}") }
+        if (result.exitCode != 0) {
+            return ActionResult.Failure("screencap failed: ${result.stderr.trim().take(160).ifBlank { "exit ${result.exitCode}" }}")
+        }
+        ctx.variables.set(args["store"]?.trim()?.takeIf { it.isNotEmpty() } ?: "screenshot_path", path)
+        ctx.logger("Screenshot: $path")
+        return ActionResult.Success
+    }
+}
+
+/** Publish a dynamic launcher shortcut or request a pinned shortcut for an existing task. */
+class ShortcutPublishAction : Action {
+    override val id = "shortcut.publish"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val shortcutId = args["id"]?.trim().orEmpty()
+        val taskId = args["task_id"]?.trim()?.toLongOrNull() ?: return ActionResult.Failure("task_id must be a positive number")
+        val label = args["label"]?.trim().orEmpty()
+        val mode = args["mode"]?.trim()?.lowercase().orEmpty().ifBlank { "dynamic" }
+        val validation = TaskShortcutHelper.validatePublish(shortcutId, taskId, label, mode)
+        if (!validation.isValid) return ActionResult.Failure(validation.error ?: "invalid shortcut")
+        val publishMode = TaskShortcutHelper.PublishMode.valueOf(mode.uppercase())
+        // Upstream 0.2.97: the task's name lets the shortcut come back with it after a delete is
+        // undone. Without it the shortcut is still published, and the first reconcile records it.
+        val taskName = try {
+            com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt.readyDb?.taskDao()?.getById(taskId)?.name
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            ctx.logger("Shortcut $shortcutId: couldn't read the task's name (${error.message})")
+            null
+        }
+        return if (TaskShortcutHelper.publishShortcut(ctx.app, shortcutId, taskId, label, publishMode, taskName)) {
+            ctx.logger("Shortcut published: $shortcutId ($mode)")
+            ActionResult.Success
+        } else {
+            ActionResult.Failure("shortcut request was declined or unsupported")
+        }
+    }
+}

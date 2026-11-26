@@ -95,9 +95,9 @@
     <string name="context_field_plugin_bundle_label" formatted="false">Plugin config JSON</string>
     <string name="context_field_plugin_bundle_hint" formatted="false">{&quot;key&quot;:&quot;value&quot;,&quot;count&quot;:{&quot;int&quot;:3}}</string>
     <string name="locale_plugin_configure">Set up in the plugin</string>
-    <string name="locale_plugin_configure_missing">That app doesn\'t have a plugin settings screen OpenTasker can open.</string>
+    <string name="locale_plugin_configure_missing">That app doesn\'t have a plugin settings screen RuleDeck can open.</string>
     <string name="locale_plugin_configure_failed">The plugin\'s settings couldn\'t be saved: %1$s</string>
-    <string name="locale_plugin_configure_refused">OpenTasker didn\'t open the plugin\'s settings: %1$s</string>
+    <string name="locale_plugin_configure_refused">RuleDeck didn\'t open the plugin\'s settings: %1$s</string>
     <string name="context_field_plugin_blurb_label" formatted="false">Description</string>
     <string name="context_field_plugin_blurb_hint" formatted="false">Optional label from plugin config</string>
     <string name="context_field_plugin_timeout_label" formatted="false">Query timeout (milliseconds)</string>
@@ -136,7 +136,7 @@
     <string name="widget_choose_task_subtitle" formatted="false">Tap a task to assign it to this home-screen widget</string>
     <string name="widget_setup_required" formatted="false">Setup required</string>
     <string name="widget_empty_title" formatted="false">Create a task first</string>
-    <string name="widget_empty_body" formatted="false">Widgets run saved OpenTasker tasks from your home screen. Build a task in the app, then return here to assign it.</string>
+    <string name="widget_empty_body" formatted="false">Widgets run saved RuleDeck tasks from your home screen. Build a task in the app, then return here to assign it.</string>
     <string name="widget_selectable_task" formatted="false">Selectable task</string>
     <string name="widget_assign" formatted="false">Assign</string>
     <string name="widget_action_title" formatted="false">Widget action</string>
@@ -179,24 +179,24 @@
     <string name="capability_write_settings" formatted="false">Requires Write Settings special access.</string>
     <string name="capability_settings_write_setup" formatted="false">Writing a Global or Secure setting needs one-time access granted from a computer over a cable, set up in Setup. The System table uses Modify system settings instead.</string>
     <string name="capability_app_kill_unsupported" formatted="false">Force-stopping another app needs system app management access that no normal app can hold.</string>
-    <string name="capability_app_archive_ready" formatted="false">Uses Android 15+ PackageInstaller archive requests. OpenTasker is not the installer of record, so Android asks you to confirm each request on screen; run this action with OpenTasker open.</string>
+    <string name="capability_app_archive_ready" formatted="false">Uses Android 15+ PackageInstaller archive requests. RuleDeck is not the installer of record, so Android asks you to confirm each request on screen; run this action with RuleDeck open.</string>
     <string name="capability_app_archive_unsupported" formatted="false">Package archive requests require Android 15 (API 35) or newer.</string>
     <string name="capability_local_network_setup" formatted="false">Android 17+ requires local network access for the LAN broadcast; grant it in Setup.</string>
     <string name="capability_dnd_access" formatted="false">Requires Do Not Disturb access.</string>
-    <string name="capability_zen_rule_access" formatted="false">Needs Do Not Disturb access. On Android 15 and later it uses OpenTasker\'s own Do Not Disturb rules with device effects.</string>
+    <string name="capability_zen_rule_access" formatted="false">Needs Do Not Disturb access. On Android 15 and later it uses RuleDeck\'s own Do Not Disturb rules with device effects.</string>
     <string name="capability_torch_ready" formatted="false">Uses the camera flashlight.</string>
     <string name="capability_aod_unsupported" formatted="false">Always-on display changes need Shizuku, and some builds ignore the setting entirely. A display that stays on uses more battery.</string>
     <string name="capability_sun_times_setup" formatted="false">Needs location access only when latitude or longitude is left blank, to read the phone\'s location.</string>
     <string name="capability_location_get_setup" formatted="false">Needs location access from the Foreground location row in Setup, and the Background location row when a profile runs it.</string>
     <string name="capability_wifi_scan_setup" formatted="false">Scanning needs location access, and Nearby Wi-Fi devices on Android 13 and later. Android rate-limits scans, so results may be the last cached scan rather than a fresh one.</string>
-    <string name="capability_airplane_unsupported" formatted="false">Airplane mode changes need Shizuku, or OpenTasker set as the digital assistant app in Setup. Turning it on cuts calls, mobile data and usually Wi-Fi until something turns it back off.</string>
+    <string name="capability_airplane_unsupported" formatted="false">Airplane mode changes need Shizuku, or RuleDeck set as the digital assistant app in Setup. Turning it on cuts calls, mobile data and usually Wi-Fi until something turns it back off.</string>
     <string name="capability_mobile_data_unsupported" formatted="false">Mobile data changes need Shizuku. Turning it off stops anything that needs data, including remote access to this phone.</string>
     <string name="capability_hotspot_unsupported" formatted="false">The Wi-Fi hotspot needs Android 11 or newer and Shizuku. Anyone with the saved password can join, and connected devices use your mobile data.</string>
     <string name="capability_hotspot_android_version" formatted="false">The Wi-Fi hotspot action needs Android 11 or newer.</string>
-    <string name="capability_screenshot_unsupported" formatted="false">Screenshots need Shizuku. Each one saves whatever is on screen to OpenTasker\'s storage, passwords and messages included.</string>
+    <string name="capability_screenshot_unsupported" formatted="false">Screenshots need Shizuku. Each one saves whatever is on screen to RuleDeck\'s storage, passwords and messages included.</string>
     <string name="capability_reboot_unsupported" formatted="false">Reboot needs Shizuku. The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.</string>
     <string name="capability_lock_setup" formatted="false">Requires the Lock screen device admin, which you turn on in Setup.</string>
-    <string name="capability_tile_ready" formatted="false">Updates a configured OpenTasker Quick Settings tile.</string>
+    <string name="capability_tile_ready" formatted="false">Updates a configured RuleDeck Quick Settings tile.</string>
     <string name="capability_temporary_state_ready" formatted="false">Changes a setting and puts it back later, even after a restart.</string>
     <string name="capability_ime_info_ready" formatted="false">Reports the keyboard in use and the ones turned on.</string>
     <string name="capability_ime_set_unsupported" formatted="false">Android only lets you switch keyboards yourself, so no normal app can do it.</string>
@@ -205,15 +205,15 @@
     <string name="capability_vpn_tunnel_setup" formatted="false">Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on.</string>
     <string name="capability_shizuku_script_setup" formatted="false">Requires Shizuku access and an approved script hash.</string>
     <string name="capability_termux_setup" formatted="false">Requires Termux 0.109 or newer, the Run commands in Termux environment permission, and an approved script hash.</string>
-    <string name="capability_macrodroid_import_unsupported" formatted="false">The imported MacroDroid action could not be mapped to a supported OpenTasker action.</string>
+    <string name="capability_macrodroid_import_unsupported" formatted="false">The imported MacroDroid action could not be mapped to a supported RuleDeck action.</string>
     <string name="capability_sms_permission" formatted="false">Requires SMS permission.</string>
     <string name="capability_calendar_event_add_setup" formatted="false">Needs the Calendar editing row in Setup, and a calendar that takes new events.</string>
     <string name="capability_calendar_event_query_setup" formatted="false">Needs the Calendar access row in Setup.</string>
     <string name="capability_contacts_permission" formatted="false">Requires an explicit Contacts permission for unattended lookup; Android 17+ also supports a field-scoped system picker mode.</string>
-    <string name="capability_audio_output_restricted" formatted="false">Android 17 blocks sound output unless OpenTasker\'s service is running in the foreground.</string>
+    <string name="capability_audio_output_restricted" formatted="false">Android 17 blocks sound output unless RuleDeck\'s service is running in the foreground.</string>
     <string name="capability_audio_output_ready" formatted="false">Audio output is available.</string>
-    <string name="capability_media_key_restricted" formatted="false">Android 17 blocks media keys unless OpenTasker\'s service is running in the foreground.</string>
+    <string name="capability_media_key_restricted" formatted="false">Android 17 blocks media keys unless RuleDeck\'s service is running in the foreground.</string>
     <string name="capability_media_key_ready" formatted="false">Media keys can be sent.</string>
-    <string name="capability_volume_restricted" formatted="false">Android 17 blocks volume changes unless OpenTasker\'s service is running in the foreground.</string>
+    <string name="capability_volume_restricted" formatted="false">Android 17 blocks volume changes unless RuleDeck\'s service is running in the foreground.</string>
     <string name="capability_volume_policy" formatted="false">May require Do Not Disturb policy access.</string>
 </resources>

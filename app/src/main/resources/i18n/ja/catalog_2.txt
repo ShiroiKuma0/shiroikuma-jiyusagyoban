@@ -836,8 +836,8 @@
 : 既定は180、最大280
 = Import Bundle
 : バンドルをインポート
-= Import an OpenTasker bundle file: projects merged by name, same-name items overwritten in place. Overwritten profiles keep their on/off state; new profiles arrive off
-: OpenTaskerのバンドルファイルをインポートします。プロジェクトは名前で統合し、同じ名前の項目はその場で上書きします。上書きされたプロファイルはオン/オフの状態を保ち、新しいプロファイルはオフの状態で入ります。
+= Import an RuleDeck bundle file: projects merged by name, same-name items overwritten in place. Overwritten profiles keep their on/off state; new profiles arrive off
+: RuleDeckのバンドルファイルをインポートします。プロジェクトは名前で統合し、同じ名前の項目はその場で上書きします。上書きされたプロファイルはオン/オフの状態を保ち、新しいプロファイルはオフの状態で入ります。
 = Bundle file (JSON)
 : バンドルファイル（JSON）
 = Switch the bundle's profiles on

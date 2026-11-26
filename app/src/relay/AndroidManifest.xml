@@ -4,7 +4,7 @@
   Gradle task runs this through aapt2 to produce the FIXED binary AndroidManifest.xml template +
   resources.arsc shipped in assets/relay/. At runtime, RelayManifestTemplate rebuilds only the
   string pool to substitute three placeholder strings per generated relay:
-    package="com.opentasker.relay"      -> the per-target relay package (shiroikuma.jiyusagyoban.share.s_<hash>)
+    package="com.sysadmindoc.ruledeck.relay"      -> the per-target relay package (shiroikuma.jiyusagyoban.share.s_<hash>)
     android:label="Relay Placeholder"   -> the editable share-tile label
     <meta-data value="PLACEHOLDER_TARGET_PKG"> -> the target app package the relay forwards to
   Everything else (the activity class, icon ref @0x7f010000, intent-filter, queries) is identical
@@ -12,7 +12,7 @@
   the relay is hidden from the app drawer and exists only as a share-sheet target.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.opentasker.relay"
+    package="com.sysadmindoc.ruledeck.relay"
     android:versionCode="1"
     android:versionName="1.0">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
@@ -21,7 +21,7 @@
     </queries>
     <application android:label="Relay Placeholder" android:icon="@mipmap/ic">
         <activity
-            android:name="com.opentasker.relay.RelayActivity"
+            android:name="com.sysadmindoc.ruledeck.relay.RelayActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"

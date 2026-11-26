@@ -1,0 +1,277 @@
+package com.sysadmindoc.ruledeck.core.power
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Test
+import rikka.shizuku.ShizukuApiConstants
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.readText
+
+class ShizukuPowerBackendTest {
+    @After
+    fun resetKillSwitch() {
+        ShizukuPowerBackend.killSwitchEnabled = true
+    }
+
+    @Test
+    fun statusForReportsManagerPresence() {
+        val installed = ShizukuPowerBackend.statusFor(managerInstalled = true)
+        val missing = ShizukuPowerBackend.statusFor(managerInstalled = false)
+
+        assertEquals(ShizukuPowerState.ManagerInstalled, installed.state)
+        assertTrue(installed.managerInstalled)
+        assertEquals(ShizukuPowerState.NotInstalled, missing.state)
+        assertFalse(missing.managerInstalled)
+    }
+
+    @Test
+    fun aLiveBinderCountsWithoutTheStockManagerPackage() {
+        fun status(
+            killSwitchEnabled: Boolean = false,
+            permissionGranted: Boolean = true,
+            transport: Boolean = true,
+        ) = ShizukuPowerBackend.statusFor(
+            managerInstalled = false,
+            killSwitchEnabled = killSwitchEnabled,
+            serviceRunning = true,
+            permissionGranted = permissionGranted,
+            privilegedTransportAvailable = transport,
+        ).state
+
+        assertEquals(ShizukuPowerState.Ready, status())
+        assertEquals(ShizukuPowerState.PermissionNeeded, status(permissionGranted = false))
+        assertEquals(ShizukuPowerState.BackendUnavailable, status(transport = false))
+        assertEquals(ShizukuPowerState.Disabled, status(killSwitchEnabled = true))
+    }
+
+    @Test
+    fun elevatedActionHintsOnlyCoverRestrictedCandidates() {
+        assertNotNull(ShizukuPowerBackend.hintForAction("reboot"))
+        assertNotNull(ShizukuPowerBackend.hintForAction("airplane.toggle"))
+        assertNull(ShizukuPowerBackend.hintForAction("notify.show"))
+    }
+
+    @Test
+    fun managerPackageIsStableForPackageVisibilityQueries() {
+        assertEquals("moe.shizuku.privileged.api", ShizukuPowerBackend.MANAGER_PACKAGE)
+    }
+
+    @Test
+    fun killSwitchDisablesBackend() {
+        ShizukuPowerBackend.killSwitchEnabled = true
+        assertFalse(ShizukuPowerBackend.isReady())
+    }
+
+    @Test
+    fun shellRunnerRejectsUnknownAction() {
+        val result = ShizukuShellRunner.execute("unknown.action")
+        assertTrue(result is ShellResult.Failure)
+        assertTrue((result as ShellResult.Failure).reason.contains("not in the Shizuku allowlist"))
+    }
+
+    @Test
+    fun shellRunnerRejectsWhenKillSwitchActive() {
+        ShizukuPowerBackend.killSwitchEnabled = true
+        val result = ShizukuShellRunner.execute("reboot")
+        assertTrue(result is ShellResult.Failure)
+        assertEquals(
+            "Shizuku power mode is off, so nothing ran. Turn it on from its row in Setup.",
+            (result as ShellResult.Failure).reason,
+        )
+    }
+
+    @Test
+    fun theHotspotHonorsTheKillSwitchAndNeverFallsBackToTheAppProcess() {
+        ShizukuPowerBackend.killSwitchEnabled = true
+        listOf(ShizukuShellRunner.setWifiHotspot(true), ShizukuShellRunner.readWifiHotspot()).forEach { result ->
+            assertEquals(
+                "Shizuku power mode is off, so nothing ran. Turn it on from its row in Setup.",
+                (result as ShellResult.Failure).reason,
+            )
+        }
+
+        ShizukuPowerBackend.killSwitchEnabled = false
+        listOf(ShizukuShellRunner.setWifiHotspot(false), ShizukuShellRunner.readWifiHotspot()).forEach { result ->
+            assertTrue((result as ShellResult.Failure).reason.contains("Can't reach Shizuku, so nothing ran."))
+        }
+    }
+
+    @Test
+    fun allElevatedActionsAreInAllowlist() {
+        (ShizukuPowerBackend.elevatedActionIds - ShizukuPowerBackend.frameworkActionIds).forEach { actionId ->
+            assertTrue("$actionId should be in allowlist", ShizukuShellRunner.isAllowed(actionId))
+            assertTrue("$actionId should have variants", ShizukuShellRunner.allowedVariantCount(actionId) > 0)
+        }
+    }
+
+    @Test
+    fun allowlistPinsEveryElevatedCommandVariant() {
+        val expected = mapOf(
+            "airplane.toggle" to listOf(
+                listOf("cmd", "connectivity", "airplane-mode", "enable"),
+                listOf("cmd", "connectivity", "airplane-mode", "disable"),
+            ),
+            "mobile.toggle" to listOf(
+                listOf("svc", "data", "enable"),
+                listOf("svc", "data", "disable"),
+            ),
+            "aod.set" to listOf(
+                listOf("settings", "put", "secure", "doze_always_on", "1"),
+                listOf("settings", "put", "secure", "doze_always_on", "0"),
+                listOf("settings", "put", "system", "aod_mode", "1"),
+                listOf("settings", "put", "system", "aod_mode", "0"),
+                listOf("settings", "get", "system", "aod_mode"),
+            ),
+            "screenshot.take" to listOf(listOf("screencap", "-p")),
+            "reboot" to listOf(listOf("svc", "power", "reboot")),
+            "screen.off" to listOf(listOf("input", "keyevent", "223")),
+            "wake" to listOf(listOf("input", "keyevent", "224")),
+        )
+
+        assertEquals(ShizukuPowerBackend.elevatedActionIds - ShizukuPowerBackend.frameworkActionIds, expected.keys)
+        assertFalse(
+            "The hotspot is a framework call, so the shell route must not gain a command for it",
+            ShizukuCommandPolicy.isAllowed("hotspot.toggle"),
+        )
+        expected.forEach { (actionId, variants) ->
+            assertEquals("$actionId variant count", variants.size, ShizukuCommandPolicy.variantCount(actionId))
+            variants.forEachIndexed { index, argv ->
+                assertEquals("$actionId variant $index", argv, ShizukuCommandPolicy.command(actionId, index))
+                assertTrue("$actionId should accept its pinned variant", ShizukuCommandPolicy.isExact(actionId, argv))
+            }
+        }
+
+        assertFalse(
+            ShizukuCommandPolicy.isExact(
+                "reboot",
+                listOf("svc", "power", "reboot", "true"),
+            ),
+        )
+        assertFalse(
+            "Writing the setting leaves the modem and Wi-Fi on, so it must not come back as the airplane route",
+            ShizukuCommandPolicy.isExact("airplane.toggle", listOf("settings", "put", "global", "airplane_mode_on", "1")),
+        )
+        assertFalse(ShizukuCommandPolicy.isExact("airplane.toggle", listOf("cmd", "connectivity", "airplane-mode", "enable", "--user", "0")))
+        assertFalse(
+            "The always-on display write must not accept another secure key",
+            ShizukuCommandPolicy.isExact("aod.set", listOf("settings", "put", "secure", "doze_enabled", "1")),
+        )
+    }
+
+    @Test
+    fun statusForDisabledShowsKillSwitchState() {
+        val status = ShizukuPowerBackend.statusFor(
+            managerInstalled = true,
+            killSwitchEnabled = true,
+        )
+        assertEquals(ShizukuPowerState.Disabled, status.state)
+    }
+
+    @Test
+    fun permissionAloneCannotReportReadyWithoutPrivilegedTransport() {
+        val unavailable = ShizukuPowerBackend.statusFor(
+            managerInstalled = true,
+            serviceRunning = true,
+            permissionGranted = true,
+            privilegedTransportAvailable = false,
+        )
+        val ready = ShizukuPowerBackend.statusFor(
+            managerInstalled = true,
+            serviceRunning = true,
+            permissionGranted = true,
+            privilegedTransportAvailable = true,
+        )
+
+        assertEquals(ShizukuPowerState.BackendUnavailable, unavailable.state)
+        assertFalse(unavailable.isReady)
+        assertEquals(ShizukuPowerState.Ready, ready.state)
+        assertTrue(ready.isReady)
+    }
+
+    @Test
+    fun runnerNeverFallsBackToOrdinaryAppProcess() {
+        ShizukuPowerBackend.killSwitchEnabled = false
+
+        val result = ShizukuShellRunner.execute("reboot")
+
+        assertTrue(result is ShellResult.Failure)
+        assertTrue((result as ShellResult.Failure).reason.contains("Can't reach Shizuku, so nothing ran."))
+        assertFalse(ShizukuShellRunner.hasPrivilegedTransport())
+    }
+
+    @Test
+    fun productionRunnerContainsNoProcessBuilderExecution() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val source = root.resolve("com/sysadmindoc/ruledeck/core/power/ShizukuShellRunner.kt").readText()
+
+        assertFalse(source.contains("ProcessBuilder("))
+
+        val service = root.resolve("com/sysadmindoc/ruledeck/core/power/ShizukuCommandUserService.kt").readText()
+        assertTrue(service.contains("Runtime.getRuntime().exec"))
+        assertFalse(service.contains("ProcessBuilder("))
+        assertTrue(service.contains("ShizukuCommandPolicy.isExact"))
+    }
+
+    @Test
+    fun everyElevatedActionSaysWhatItCanDoToThePerson() {
+        val risks = ShizukuPowerBackend.elevatedActionIds.map { id ->
+            val risk = ShizukuPowerBackend.riskByAction[id]
+            assertNotNull("$id has no risk sentence", risk)
+            assertTrue(ShizukuPowerBackend.hintForAction(id)!!.message.endsWith(risk!!))
+            risk
+        }
+
+        assertEquals("Each action has its own risk", risks.size, risks.toSet().size)
+    }
+
+    @Test
+    fun theServiceAnswersTheDestroyCodeShizukuSends() {
+        // Answering 16777114 instead left every service process running after its app died, until
+        // Shizuku itself restarted. Production can't read the library's constant, so a library
+        // upgrade that moves it fails here.
+        assertEquals(ShizukuApiConstants.USER_SERVICE_TRANSACTION_destroy, SHIZUKU_DESTROY_TRANSACTION)
+        assertTrue(isShizukuDestroyTransaction(ShizukuApiConstants.USER_SERVICE_TRANSACTION_destroy))
+        assertFalse(isShizukuDestroyTransaction(16777114))
+    }
+
+    @Test
+    fun runnerBindsAndUnbindsTheShizukuUserService() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val source = root.resolve("com/sysadmindoc/ruledeck/core/power/ShizukuShellRunner.kt").readText()
+        val application = root.resolve("com/sysadmindoc/ruledeck/RuleDeckApp_NoHilt.kt").readText()
+
+        assertTrue(source.contains("Shizuku.bindUserService"))
+        assertTrue(source.contains("Shizuku.unbindUserService"))
+        assertTrue(source.contains("onBindingDied"))
+        assertTrue(application.contains("ShizukuPowerBackend.shutdown()"))
+    }
+
+    @Test
+    fun killSwitchDefaultsOnAndIsBackedByPreferences() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val source = root.resolve("com/sysadmindoc/ruledeck/core/power/ShizukuPowerBackend.kt").readText()
+
+        assertTrue(source.contains("var killSwitchEnabled: Boolean = true"))
+        assertTrue(source.contains("KEY_KILL_SWITCH"))
+        assertTrue(source.contains("getSharedPreferences"))
+        assertTrue(source.contains("putBoolean(KEY_KILL_SWITCH, enabled)"))
+    }
+
+// RETIRED: pinned upstream's Setup-screen shape (PermissionAction.ShizukuPermission / ShizukuKillSwitch
+// / ShizukuPowerState.BackendUnavailable) and its "no privileged transport" stance. The fork rewrote the
+// Shizuku card and ships privileged execution; ActionCapabilitiesTest asserts the posture that replaced it.
+}

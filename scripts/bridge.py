@@ -30,7 +30,7 @@ The phone's answer is printed as `am broadcast` gives it. Exit status: 0 when re
 import base64, hashlib, os, pathlib, re, shlex, subprocess, sys, time
 
 KEY = pathlib.Path.home() / ".config/shiroikuma-jiyusagyoban/bridge-key.pem"
-COMPONENT = "shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver"
+COMPONENT = "shiroikuma.jiyusagyoban/com.sysadmindoc.ruledeck.core.transfer.WorkspaceTransferReceiver"
 ACTION = "shiroikuma.jiyusagyoban.action."
 EXTRA = "shiroikuma.jiyusagyoban.extra."
 HEADER = "jsb-bridge-1"

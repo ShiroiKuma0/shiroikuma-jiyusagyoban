@@ -429,7 +429,7 @@
 = Plugin
 : プラグイン
 
-# ActiveAutomationUi.kt — the destinations of the bottom bar (OpenTaskerScreen.label)
+# ActiveAutomationUi.kt — the destinations of the bottom bar (RuleDeckScreen.label)
 = Monitor
 : モニター
 = Projects

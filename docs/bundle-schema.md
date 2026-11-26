@@ -1,12 +1,12 @@
 # 白い熊 自由作業盤 — bundle schema & concepts
 
-This is the authoritative reference for the **OpenTaskerBundle** JSON format used by every Import/Export
+This is the authoritative reference for the **RuleDeckBundle** JSON format used by every Import/Export
 in the app, plus the core concepts. The in-app **Help** tab mirrors this document; the **action
 reference** (every action's `type` id and `args`) is generated live in-app from the action registry, so
 it always matches the installed build — it is not duplicated here.
 
-> Source of truth for the data shapes: `app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt`
-> and `app/src/main/java/com/opentasker/core/model/*.kt`. Keep this file in sync when those change.
+> Source of truth for the data shapes: `app/src/main/java/com/sysadmindoc/ruledeck/core/transfer/RuleDeckBundle.kt`
+> and `app/src/main/java/com/sysadmindoc/ruledeck/core/model/*.kt`. Keep this file in sync when those change.
 
 ## Concepts
 
@@ -32,7 +32,7 @@ Variables are written `%name`; scope is decided by the case of the leading lette
 Persisted variables (super-global and project-global) survive restarts and appear on the **Vars** tab.
 Indexing like `%array(2)` is **not** supported — the parenthetical is literal text.
 
-## The bundle file (`OpenTaskerBundle`)
+## The bundle file (`RuleDeckBundle`)
 
 One JSON format is used by every Import/Export. Any tab's **+** menu imports it; each tab exports its own
 slice. Top-level fields:

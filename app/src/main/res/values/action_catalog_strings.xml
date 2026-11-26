@@ -536,7 +536,7 @@
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">Mode</string>
     <string name="catalog_action_dnd_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
     <string name="catalog_action_zen_rule_set_name" formatted="false">Set Do Not Disturb Rule</string>
-    <string name="catalog_action_zen_rule_set_description" formatted="false">Add or update one of OpenTasker\'s own Do Not Disturb rules, with Android 15 device effects</string>
+    <string name="catalog_action_zen_rule_set_description" formatted="false">Add or update one of RuleDeck\'s own Do Not Disturb rules, with Android 15 device effects</string>
     <string name="catalog_action_zen_rule_set_field_id_label" formatted="false">Rule ID</string>
     <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">Stable key, for example focus_evening</string>
     <string name="catalog_action_zen_rule_set_field_name_label" formatted="false">Rule name</string>
@@ -549,7 +549,7 @@
     <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">Dim wallpaper</string>
     <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">Night mode</string>
     <string name="catalog_action_zen_rule_clear_name" formatted="false">Clear Do Not Disturb Rule</string>
-    <string name="catalog_action_zen_rule_clear_description" formatted="false">Remove one of OpenTasker\'s own Do Not Disturb rules</string>
+    <string name="catalog_action_zen_rule_clear_description" formatted="false">Remove one of RuleDeck\'s own Do Not Disturb rules</string>
     <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">Rule ID</string>
     <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">The key used by Set Do Not Disturb Rule</string>
     <string name="catalog_action_ringer_set_name" formatted="false">Set Ringer Mode</string>
@@ -647,7 +647,7 @@
     <string name="catalog_action_http_request_field_authorization_hint" formatted="false">For example, Bearer %SECRET_TOKEN; always redacted from logs</string>
     <string name="catalog_action_http_request_field_body_label" formatted="false">Inline request body</string>
     <string name="catalog_action_http_request_field_body_file_label" formatted="false">Request body file</string>
-    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">Relative path inside OpenTasker Files; cannot be combined with an inline body</string>
+    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">Relative path inside RuleDeck Files; cannot be combined with an inline body</string>
     <string name="catalog_action_http_request_field_content_type_label" formatted="false">Content type</string>
     <string name="catalog_action_http_request_field_content_type_hint" formatted="false">For example, application/json</string>
     <string name="catalog_action_http_request_field_response_var_label" formatted="false">Store response body in</string>
@@ -657,7 +657,7 @@
     <string name="catalog_action_http_request_field_headers_var_label" formatted="false">Store response headers in</string>
     <string name="catalog_action_http_request_field_headers_var_hint" formatted="false">Optional variable; one Name: Value per line</string>
     <string name="catalog_action_http_request_field_output_file_label" formatted="false">Response output file</string>
-    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">Relative path inside OpenTasker Files; published atomically</string>
+    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">Relative path inside RuleDeck Files; published atomically</string>
     <string name="catalog_action_http_request_field_max_response_bytes_label" formatted="false">Maximum response size (bytes)</string>
     <string name="catalog_action_http_request_field_max_response_bytes_hint" formatted="false">Up to 1 MiB for a variable or 50 MiB for a file</string>
     <string name="catalog_action_http_request_field_redirects_label" formatted="false">Redirect policy</string>
@@ -713,7 +713,7 @@
     <string name="catalog_action_mqtt_publish_field_port_label" formatted="false">Broker port</string>
     <string name="catalog_action_mqtt_publish_field_port_hint" formatted="false">Default: 8883 with TLS, 1883 without TLS</string>
     <string name="catalog_action_mqtt_publish_field_tls_label" formatted="false">Use TLS</string>
-    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">On by default. With it off, OpenTasker connects only to private or local hosts.</string>
+    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">On by default. With it off, RuleDeck connects only to private or local hosts.</string>
     <string name="catalog_action_mqtt_publish_field_topic_label" formatted="false">Topic</string>
     <string name="catalog_action_mqtt_publish_field_topic_hint" formatted="false">Publish topic, without + or # wildcards</string>
     <string name="catalog_action_mqtt_publish_field_payload_label" formatted="false">Payload</string>

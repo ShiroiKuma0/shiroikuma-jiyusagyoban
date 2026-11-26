@@ -510,7 +510,7 @@
 = Primary
 : プライマリ
 = Accent of upstream's screens: icons, marks, highlighted text
-: OpenTasker由来の画面のアクセント色：アイコン、印、強調された文字
+: RuleDeck由来の画面のアクセント色：アイコン、印、強調された文字
 = On primary
 : プライマリ上
 = What is drawn on a primary-coloured ground
@@ -526,7 +526,7 @@
 = Secondary
 : セカンダリ
 = The second accent of upstream's screens
-: OpenTasker由来の画面の第二のアクセント色
+: RuleDeck由来の画面の第二のアクセント色
 = On secondary
 : セカンダリ上
 = What is drawn on a secondary-coloured ground
@@ -540,7 +540,7 @@
 = Tertiary
 : ターシャリ
 = The third accent of upstream's screens
-: OpenTasker由来の画面の第三のアクセント色
+: RuleDeck由来の画面の第三のアクセント色
 = On tertiary
 : ターシャリ上
 = What is drawn on a tertiary-coloured ground
@@ -554,7 +554,7 @@
 = Error
 : エラー
 = Errors and failures on upstream's screens
-: OpenTasker由来の画面のエラーと失敗
+: RuleDeck由来の画面のエラーと失敗
 =[role] On error
 : エラー上
 = What is drawn on an error-coloured ground
@@ -580,7 +580,7 @@
 = On surface variant
 : サーフェスバリアント上
 = Second lines, hints and icon tints of upstream's screens
-: OpenTasker由来の画面の二行目、ヒント、アイコンの色
+: RuleDeck由来の画面の二行目、ヒント、アイコンの色
 = Raised panels
 : 浮き上がったパネル
 = The ground of popups, sheets and other raised panels

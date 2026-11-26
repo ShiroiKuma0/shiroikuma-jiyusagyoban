@@ -1,0 +1,577 @@
+package com.sysadmindoc.ruledeck.ui.charts
+
+import com.sysadmindoc.ruledeck.core.band.TrainingSessions
+
+/**
+ * Turning stored samples into the per-night numbers [Recovery] bands.
+ *
+ * Kept apart from [Recovery] for the same reason [HealthIndexSource] is kept apart from
+ * [HealthIndex]: the arithmetic of "how unusual is this" should not know where numbers come from,
+ * and the extraction should not know what they mean.
+ *
+ * Pure Kotlin. Every window, every exclusion and every fallback below was checked against 白い熊's
+ * own ten days before it was written down; where the measurement disagreed with the literature's
+ * recommendation, the comment says so and says which won.
+ */
+object RecoverySource {
+
+    /** A nap is not a night. Below this a session is ignored entirely. */
+    const val MIN_NIGHT_MINUTES = 240
+
+    /** Sleep4h: skip the first half hour, then take four hours. */
+    const val WINDOW_SKIP_MS = 30 * 60_000L
+    const val WINDOW_LENGTH_MS = 4 * 3_600_000L
+
+    /** ≥100 steps/min is the moderate-intensity cadence threshold (Tudor-Locke 2005). */
+    const val MODERATE_CADENCE = 100.0
+
+    /** One night's extracted numbers, before any banding. */
+    data class NightMetrics(
+        val startMs: Long,
+        /**
+         * When the night ended — the instant that NAMES it.
+         *
+         * A night is filed under the morning it ended, not the evening it began, because that is the
+         * morning 白い熊 woke on and rated. Carried here rather than recomputed from the session
+         * because every consumer of a night needs it and none of them holds the session any more.
+         */
+        val endMs: Long,
+        val nocturnalHr: Double?,
+        val sleepMinutes: Double?,
+        val skinTemp: Double?,
+        /**
+         * The band's own staging, and three readings taken over the sleep window.
+         *
+         * **Reported, never scored.** [sleepMinutes] carries the argument at length: consumer
+         * staging runs κ 0.20–0.53 against polysomnography and the single-night limits of agreement
+         * on deep sleep exceed the physiological range of the quantity, so no marker is banded on
+         * these and none ever should be. They are here because 白い熊 asked to see what the band
+         * recorded (2026-09-03), and seeing a figure is not the same as being graded by it.
+         *
+         * [hrvMs] is the exception in kind: RMSSD is a real, standard measure, computed by the band
+         * from its own beat-to-beat intervals and checked against them (see `HuaweiRri`). It is
+         * still not banded, because a within-person HRV baseline needs a stretch of nights this
+         * record does not have yet.
+         */
+        val deepMinutes: Double? = null,
+        val deepRemShare: Double? = null,
+        /** How whole the night was — see [SleepShape.Continuity]. Null for a night with no sleep. */
+        val continuity: SleepShape.Continuity? = null,
+        val lowestHr: Double? = null,
+        val spo2: Double? = null,
+        val hrvMs: Double? = null,
+        /**
+         * The level the body went to bed AT — median heart rate over the first hour of the session.
+         *
+         * A different fact from [nocturnalHr], which measures the floor the night settles to, and
+         * the two can move in opposite directions. Measured over 白い熊's nights it separates them
+         * plainly: 2026-09-11 came in at 64 bpm against a 74 baseline (z = −2.70) while the nocturnal
+         * figure that night was unremarkable. The first hour is where an evening that has already
+         * given up is visible, and the four-hour window averages it away.
+         *
+         * **Measured from sleep ONSET, not from a clock hour.** The two are not the same and reading
+         * one as the other moved an observation onto the wrong night once already: sessions here
+         * begin anywhere between 20:38 and 04:00, so "the 22:00 hour" and "the first hour in bed"
+         * can belong to different nights entirely.
+         */
+        val bedtimeHr: Double? = null,
+        /**
+         * Breaths per minute, from respiratory sinus arrhythmia — see `HuaweiBeatMetrics`.
+         *
+         * After skin temperature, which this band has no sensor for, nocturnal respiratory rate is
+         * the best-evidenced day-ahead illness signal in the wearable literature. Null for every
+         * night before the per-beat stream began to be pulled, and for any night whose records were
+         * all too noisy to carry a peak.
+         */
+        val respirationBpm: Double? = null,
+        /**
+         * The night's heart rate in twelfths, for drawing its shape.
+         *
+         * Binned rather than sampled so that a night with a dense hour and a sparse one still yields
+         * a curve of the same length, and so a single artefact cannot become a spike: each bin is a
+         * MEDIAN. Empty when the night is too thinly sampled to bin — never partly filled, because a
+         * curve with a hole in it invites reading the hole as a measurement.
+         */
+        val hrCurve: List<Double> = emptyList(),
+        /**
+         * How far the binned curve moves across the night, top to bottom, in bpm.
+         *
+         * The measure of "flat" that survived 白い熊's own data. Three candidates were tested over 21
+         * nights: this one, the going-to-bed-minus-nadir dip, and a correlation against the person's
+         * own median curve shape. The dip **fails outright** — the night it was meant to catch reads
+         * 7.2 bpm against a 2.8 median, better than average — and the template correlation is too
+         * noisy to alarm on, taking values of −0.73, −0.62 and 0.01 on unremarkable nights.
+         *
+         * The swing separates cleanly: 2026-09-11 came in at **6.0 bpm, the smallest of the 21**,
+         * against a trailing median of 13.5. A night whose heart rate barely moves is a real and
+         * visible thing; which SHAPE it should have had is, on this much data, not.
+         */
+        val hrSwing: Double? = null,
+        /**
+         * Median HF power over the night — `rri_f8`, in ms².
+         *
+         * Carried for the consecutive-night run rather than for its own sake: a single night's HF
+         * says little (+32 %, +43 %, +80 % and +106 % all occur on ordinary nights) while a RUN of
+         * them was unique in the record. See [Recovery.runAbove].
+         */
+        val hfPower: Double? = null,
+        /**
+         * The Watch D3's morning readings, filed under the night they follow: the first of each
+         * within [MORNING_WINDOW_MS] of waking, or up to [MORNING_LEAD_MS] before the session ends
+         * (taken in bed). A cuff reading at 08:17 belongs to the night that ended at 07:30; one taken
+         * the next evening belongs to no night at all.
+         */
+        val bpSystolic: Double? = null,
+        val bpDiastolic: Double? = null,
+        val restingHrWatch: Double? = null,
+        val pwv: Double? = null,
+        /** Steps over the 24 hours before the night began — the day leading into it. */
+        val steps: Double? = null,
+    )
+
+    /** The Watch D3's own point series, by what they are. Empty for every other device. */
+    data class WatchSeries(
+        val bpSystolic: List<ChartPoint> = emptyList(),
+        val bpDiastolic: List<ChartPoint> = emptyList(),
+        val restingHr: List<ChartPoint> = emptyList(),
+        val pwv: List<ChartPoint> = emptyList(),
+    )
+
+    /** How long after waking a reading still counts as that morning's. */
+    const val MORNING_WINDOW_MS = 14 * 3_600_000L
+
+    /**
+     * How long BEFORE the session's end a reading still counts as that morning's.
+     *
+     * The watch's session ends when it decides 白い熊 is up, which is not when the cuff goes on: on
+     * 2026-10-25 the blood pressure was taken at 07:00 and the stiffness at 07:01, lying in bed, while
+     * the session ran to 07:39 — and both were dropped as "before the morning". Three hours keeps a
+     * reading taken in bed with the night it follows, and is far too short to reach back to the
+     * evening before.
+     */
+    const val MORNING_LEAD_MS = 3 * 3_600_000L
+
+    private fun morning(session: SleepSession, points: List<ChartPoint>): Double? {
+        val from = maxOf(session.startMs, session.endMs - MORNING_LEAD_MS)
+        return points.filter { it.tMs > from && it.tMs <= session.endMs + MORNING_WINDOW_MS }
+            .minByOrNull { it.tMs }?.value
+    }
+
+    /**
+     * Real nights only, oldest first.
+     *
+     * Two independent tests, because they exclude different things. [MIN_NIGHT_MINUTES] is about
+     * whether there is ENOUGH of a session to estimate from — the nocturnal-HR window below needs
+     * onset + 30 min and then four hours, and a shorter session cannot fill it. The midpoint test is
+     * about whether the session is a night AT ALL: a four-hour sleep on a Sunday afternoon clears the
+     * length floor easily and has no business in a baseline of nights (白い熊, 2026-08-20).
+     *
+     * On the data to hand this second test changes nothing — the longest nap on record is 178
+     * minutes, already below the floor — so it is defence rather than repair. That is the point:
+     * the day it does something will be a day nobody is looking.
+     */
+    fun nights(
+        sessions: List<SleepSession>,
+        minuteOfDayOf: (Long) -> Double,
+    ): List<SleepSession> =
+        sessions
+            .filter { it.totalMinutes >= MIN_NIGHT_MINUTES }
+            .filter { SleepShape.isNightMidpoint(minuteOfDayOf(SleepShape.midpointMs(it)).toInt()) }
+            .sortedBy { it.startMs }
+
+    /**
+     * Every night by WHEN it happened, short ones included — the night table's rows.
+     *
+     * [nights] drops a session under [MIN_NIGHT_MINUTES] "entirely", and that is right for what it
+     * feeds: the nocturnal-HR estimator and the baselines. It was wrong for the table. On 2026-11-03
+     * 白い熊 slept 04:04–07:12 — three hours, synced, stored — and the morning's row came up empty
+     * beside the rating 白い熊 had just given it. A short night is still the night that morning
+     * followed ([SleepShape.isNightMidpoint] says so in as many words), so it gets its row; what it
+     * cannot honestly give — the four-hour window — is left out of that row, not the whole row.
+     *
+     * One per morning: the longest session ending on it, so a doze after a full night never
+     * displaces the night.
+     */
+    fun tableNights(
+        sessions: List<SleepSession>,
+        minuteOfDayOf: (Long) -> Double,
+        morningOf: (Long) -> Long,
+    ): List<SleepSession> =
+        sessions
+            .filter { it.totalMinutes > 0 }
+            .filter { SleepShape.isNightMidpoint(minuteOfDayOf(SleepShape.midpointMs(it)).toInt()) }
+            .groupBy { morningOf(it.endMs) }
+            .values.map { same -> same.maxBy { it.totalMinutes } }
+            .sortedBy { it.startMs }
+
+    /**
+     * Nocturnal heart rate over the Sleep4h window — the single best-evidenced marker here.
+     *
+     * ## The window
+     *
+     * Sleep onset + 30 min, then four hours. Nuuttila et al. (2022, *IJSPP*; 2024, *Sports Med Open*)
+     * found this segment the most responsive to training load, and — importantly — that morning
+     * orthostatic measures were **not** sensitive at all in the same cohort. Polar's ANS charge uses
+     * the same first-four-hours window and gives the same reason.
+     *
+     * ## Both populations, pooled — measured, not assumed
+     *
+     * The literature review said to use the periodic series alone, because the SpO₂-coincident
+     * readings carry a different bias. That is true **during the day**, where they diverge with
+     * movement (+22 bpm median with a hundred steps nearby). Inside a sleep window there is no
+     * movement, and on 白い熊's own nights the two agree to 1 bpm.
+     *
+     * Pooling was checked rather than assumed: over eight nights the pooled and periodic-only means
+     * correlate at **r = +0.993**, with the pooled version carrying a constant +0.34 bpm that cancels
+     * in a within-person delta — and it **doubles the sample count**, from 23–33 to 47–57. That
+     * matters: at the periodic-only rate two of those eight nights fell below the viability floor and
+     * would have been thrown away. So: pooled.
+     *
+     * ## Awake minutes are excluded
+     *
+     * An arousal is exactly the sort of high reading whose presence or absence is decided by whether
+     * 白い熊 happened to move, and letting them in makes the estimator noisier in proportion to how
+     * restless the night was — i.e. biased by the thing being measured.
+     */
+    fun nocturnalHr(session: SleepSession, hrPoints: List<ChartPoint>): Double? {
+        val from = session.startMs + WINDOW_SKIP_MS
+        val to = from + WINDOW_LENGTH_MS
+        val awake = session.runs.filter { it.code == '5' }
+        val inWindow = hrPoints.filter { p ->
+            p.tMs in from..to && awake.none { p.tMs >= it.startMs && p.tMs < it.endMs }
+        }
+        if (inWindow.size < Recovery.MIN_HR_SAMPLES_IN_WINDOW) return null
+        return inWindow.sumOf { it.value } / inWindow.size
+    }
+
+    /**
+     * Time actually asleep — total session minus the awake runs.
+     *
+     * Only sleep-vs-wake is used, never the deep/REM split. Consumer staging runs κ 0.20–0.53 against
+     * polysomnography with per-stage sensitivity 0.33–0.70, and the single-night limits of agreement
+     * on deep sleep (±60 to ±290 min across devices) exceed the physiological range of the quantity.
+     * There is also no literature linking stage proportions to next-day readiness — the mechanisms are
+     * real, the *marker* is unvalidated. Apple, which has the best-validated staging of any consumer
+     * device, excludes stages from its own sleep score for the same reason.
+     */
+    fun sleepMinutes(session: SleepSession): Double =
+        (session.totalMinutes - session.awake).toDouble()
+
+    /**
+     * The sleep the time-asleep grade is given on: the main sleep, without what was caught up on
+     * after a long spell up (白い熊, 2026-11-08). The total stays in [NightMetrics.sleepMinutes].
+     */
+    fun gradedSleepMinutes(n: NightMetrics): Double? = n.continuity?.mainSleepMinutes ?: n.sleepMinutes
+
+    /**
+     * Median skin temperature inside the sleep window. Never a raw absolute — only a deviation.
+     *
+     * Readings below [SKIN_TEMP_ON_WRIST_C] are left out: they are the watch off the wrist, not 白い熊
+     * (the D3 off the wrist on 2026-10-18 read 29.9 and 30.6 °C; worn, its lowest was 31.3, outdoors).
+     */
+    /** Below this a wrist reading is the watch off the wrist, or lying on the charger. */
+    const val SKIN_TEMP_ON_WRIST_C = 31.0
+    const val SKIN_TEMP_MAX_C = 42.0
+
+    fun skinTemp(session: SleepSession, tempPoints: List<ChartPoint>): Double? {
+        val inSession = tempPoints.filter {
+            it.tMs in session.startMs..session.endMs && it.value in SKIN_TEMP_ON_WRIST_C..SKIN_TEMP_MAX_C
+        }
+        return HealthIndexSource.median(inSession.map { it.value })
+    }
+
+    fun metricsFor(
+        session: SleepSession,
+        hrPoints: List<ChartPoint>,
+        tempPoints: List<ChartPoint>,
+        spo2Points: List<ChartPoint> = emptyList(),
+        /** RMSSD windows — already filtered to the ones the band itself considers publishable. */
+        hrvPoints: List<ChartPoint> = emptyList(),
+        /** Per-record respiratory rates. Empty for every band and every night that has none. */
+        respirationPoints: List<ChartPoint> = emptyList(),
+        /** Per-window HF power. Empty for the Hume band, which never measured one. */
+        hfPoints: List<ChartPoint> = emptyList(),
+        watch: WatchSeries = WatchSeries(),
+        /** Per-minute steps; empty leaves [NightMetrics.steps] null. */
+        stepPoints: List<ChartPoint> = emptyList(),
+    ): NightMetrics = NightMetrics(
+        startMs = session.startMs,
+        endMs = session.endMs,
+        nocturnalHr = nocturnalHr(session, hrPoints),
+        sleepMinutes = sleepMinutes(session),
+        skinTemp = skinTemp(session, tempPoints),
+        continuity = SleepShape.continuity(session),
+        // A session with no runs at all has no staging to report, and 0 minutes of deep sleep is a
+        // very different claim from "this night was never staged".
+        deepMinutes = session.deep.toDouble().takeIf { session.totalMinutes > 0 },
+        deepRemShare = session.deepRemShare,
+        lowestHr = lowestHr(session, hrPoints),
+        spo2 = nightMedian(session, spo2Points),
+        hrvMs = nightMedian(session, hrvPoints),
+        bedtimeHr = bedtimeHr(session, hrPoints),
+        respirationBpm = nightMedian(session, respirationPoints),
+        hrCurve = hrCurve(session, hrPoints),
+        hrSwing = hrCurve(session, hrPoints).takeIf { it.isNotEmpty() }?.let { it.max() - it.min() },
+        hfPower = nightMedian(session, hfPoints),
+        bpSystolic = morning(session, watch.bpSystolic),
+        bpDiastolic = morning(session, watch.bpDiastolic),
+        restingHrWatch = morning(session, watch.restingHr),
+        pwv = morning(session, watch.pwv),
+        // Zero is a real total (a day indoors); no step data at all before the night is null.
+        steps = stepPoints.takeIf { pts -> pts.isNotEmpty() && pts.minOf { it.tMs } <= session.startMs - DAY_BEFORE_MS }
+            ?.filter { it.tMs in (session.startMs - DAY_BEFORE_MS) until session.startMs }
+            ?.sumOf { it.value },
+    )
+
+    private const val DAY_BEFORE_MS = 24 * 3_600_000L
+
+    /** How many slices the night is cut into for [NightMetrics.hrCurve]. */
+    const val CURVE_BINS = 12
+
+    /** Fewest readings across the whole night before a curve is drawn from it. */
+    const val MIN_CURVE_SAMPLES = 25
+
+    /**
+     * The night's heart rate as [CURVE_BINS] medians, or empty when it cannot be filled.
+     *
+     * All-or-nothing on purpose. A curve missing its third bin is not a curve with a gap, it is a
+     * curve a reader will interpolate across without knowing they did — and the interpolation will
+     * look exactly like a measurement.
+     */
+    fun hrCurve(session: SleepSession, hrPoints: List<ChartPoint>): List<Double> {
+        val inNight = hrPoints.filter { it.tMs in session.startMs..session.endMs }
+        if (inNight.size < MIN_CURVE_SAMPLES) return emptyList()
+        val span = session.endMs - session.startMs
+        if (span <= 0) return emptyList()
+        val out = ArrayList<Double>(CURVE_BINS)
+        for (i in 0 until CURVE_BINS) {
+            val lo = session.startMs + span * i / CURVE_BINS
+            val hi = session.startMs + span * (i + 1) / CURVE_BINS
+            val w = inNight.filter { it.tMs in lo until hi }.map { it.value }
+            out += HealthIndexSource.median(w) ?: return emptyList()
+        }
+        return out
+    }
+
+    /** How long after sleep onset [bedtimeHr] averages over. */
+    const val BEDTIME_WINDOW_MIN = 60
+
+    /**
+     * Median heart rate over the first [BEDTIME_WINDOW_MIN] minutes of the session.
+     *
+     * A median rather than a mean because the first hour is where the night's largest single
+     * transient lives — the descent from waking level — and one long tail should not move the
+     * figure. [MIN_BEDTIME_SAMPLES] guards the other direction: an hour holding three readings is
+     * not a level, and printing one beside a baseline invites reading a gap in the record as a
+     * change in 白い熊.
+     */
+    fun bedtimeHr(session: SleepSession, hrPoints: List<ChartPoint>): Double? {
+        val until = session.startMs + BEDTIME_WINDOW_MIN * 60_000L
+        val window = hrPoints.filter { it.tMs in session.startMs..minOf(until, session.endMs) }
+        if (window.size < MIN_BEDTIME_SAMPLES) return null
+        return HealthIndexSource.median(window.map { it.value })
+    }
+
+    /** Fewest readings in the bedtime window before it is a level rather than an anecdote. */
+    const val MIN_BEDTIME_SAMPLES = 8
+
+    /**
+     * The lowest per-minute heart rate recorded between sleep onset and waking.
+     *
+     * The whole session, awake runs included — the floor is the floor, and a low minute is no less
+     * real for falling in a stretch the band called awake. It is deliberately the MINIMUM of what
+     * was recorded rather than a low percentile: every point here is already the band's own
+     * per-minute figure, so there is no single stray beat for the minimum to land on, and a
+     * percentile would be a number nobody measured.
+     *
+     * A different fact from [nocturnalHr], which averages a fixed four-hour window after onset: that
+     * one answers "what was the night's level", this one "how far down did it get".
+     */
+    fun lowestHr(session: SleepSession, hrPoints: List<ChartPoint>): Double? =
+        hrPoints.filter { it.tMs in session.startMs..session.endMs }.minOfOrNull { it.value }
+
+    /** The median of whatever was recorded inside the sleep window, or null when nothing was. */
+    private fun nightMedian(session: SleepSession, points: List<ChartPoint>): Double? =
+        HealthIndexSource.median(
+            points.filter { it.tMs in session.startMs..session.endMs }.map { it.value },
+        )
+
+    /**
+     * Minutes between the end of the last moderate-cadence effort and sleep onset, or null if there
+     * was none within the window that matters.
+     *
+     * Leota et al. (2025): a bout ending ≥4 h before sleep onset has **no** measured association with
+     * nocturnal heart rate; inside that window the effect climbs to +15 %. So this is the difference
+     * between "you are not recovering" and "you trained at nine o'clock".
+     */
+    fun lateEffortMinutes(sessionStartMs: Long, stepPoints: List<ChartPoint>): Int? {
+        val windowStart = sessionStartMs - Recovery.LATE_EFFORT_WINDOW_MIN * 60_000L
+        val last = stepPoints
+            .filter { it.value >= MODERATE_CADENCE && it.tMs in windowStart..sessionStartMs }
+            .maxByOrNull { it.tMs } ?: return null
+        return ((sessionStartMs - last.tMs) / 60_000L).toInt()
+    }
+
+
+    // --- marked sessions: where the heart-rate channel becomes legitimate --------------------------
+
+    /**
+     * MET-minutes above rest from heart rate, for ONE marked training session.
+     *
+     * The Wicks HR-index (`METs = 6·HR/HR_rest − 5`, from a meta-analysis of 220 datasets and 11 257
+     * subjects) applied to each spot reading inside the window, each held across its own bucket.
+     *
+     * ## Why this is sound here and was not all-day
+     *
+     * Run across a whole day this same arithmetic produced 13 240 MET-min/week against a 500–1 000
+     * reference band, because holding a ten-minute reading turns every transient — standing up,
+     * stairs, a phone call — into ten minutes of exercise, 144 times over. Inside a window 白い熊 has
+     * marked as a workout there are no transients to mistake: the elevation IS the session. The load
+     * review's own simulation puts per-session error at a median of −4 %, and specifically about
+     * −18 % for strength work, which is stated on the card rather than hidden.
+     *
+     * Strength sessions read low for a real reason: heart rate falls between sets, and the ten-minute
+     * grid samples that trough as often as the effort. It is a floor for lifting, more than for
+     * anything else.
+     */
+    fun sessionLoad(
+        session: TrainingSessions.Session,
+        spotPoints: List<ChartPoint>,
+        restingHr: Double,
+    ): Double {
+        if (restingHr <= 0) return 0.0
+        val inside = spotPoints.filter { it.tMs in session.startMs until session.endMs }
+        if (inside.isEmpty()) return 0.0
+        // Each reading stands for its share of the session, so a 40-minute session with four readings
+        // credits ten minutes each — and one with a single reading credits the whole 40 rather than
+        // silently under-reporting to a tenth of it.
+        val minutesEach = session.minutes.toDouble() / inside.size
+        return inside.sumOf { p ->
+            val mets = maxOf(1.0, 6.0 * (p.value / restingHr) - 5.0)
+            (mets - 1.0) * minutesEach
+        }
+    }
+
+    /**
+     * Resting heart rate for the HR-index, taken from the SPOT population.
+     *
+     * The 5th percentile over whatever history is loaded. It must come from the same population the
+     * numerator does — the spot readings — because the periodic series reads a few bpm differently
+     * and a mismatched denominator would bias every session in the same direction.
+     */
+    fun restingSpotHr(spotPoints: List<ChartPoint>): Double? =
+        HealthIndexSource.percentile(spotPoints.map { it.value }, 0.05)
+
+    // --- training load ----------------------------------------------------------------------------
+
+    /**
+     * MET-minutes above rest for one minute of walking at [cadence] steps/min.
+     *
+     * Moore et al. (2021, *MSSE*, n = 235, ages 21–84): `VO2 = 1.811 + 0.02014·cadence +
+     * 7.427e-4·cadence²`, RMSE 2.09 ml/kg/min (≈0.6 MET), bias −0.01 — beating the ACSM equation by
+     * 23–35 %. Level-grade walking only.
+     *
+     * ## Why cadence and not heart rate
+     *
+     * The load review's recommended metric made a heart-rate channel primary: Wicks HR-index METs
+     * from each 10-minute spot reading, held across the bucket. Run against 白い熊's ten days that
+     * produced **13 240 MET-min/week** against a 500–1 000 public-health reference band — 13× too
+     * high, and still 7× too high after gating to ≥3 METs.
+     *
+     * The reason is visible once you look: the review's simulation measured reconstruction error
+     * *inside training sessions*, and holding one spot reading across ten minutes of ordinary life
+     * turns every transient — standing up, stairs, a phone call, digestion — into ten minutes of
+     * exercise, 144 times a day. This channel, with no tuning at all, lands at **567 MET-min/week**.
+     *
+     * The cost is stated on screen rather than hidden: cycling, carrying and strength work leave no
+     * step signature, so the figure is a floor, not a total.
+     */
+    fun metMinutes(cadence: Double): Double {
+        if (cadence <= 0) return 0.0
+        val vo2 = 1.811 + 0.02014 * cadence + 7.427e-4 * cadence * cadence
+        return maxOf(0.0, vo2 / 3.5 - 1.0)
+    }
+
+    /** Daily MET-minute totals, keyed by day index (epoch days), from per-minute step points. */
+    fun dailyLoad(stepPoints: List<ChartPoint>, zoneOffsetMs: Long): Map<Long, Double> {
+        val out = HashMap<Long, Double>()
+        for (p in stepPoints) {
+            val day = (p.tMs + zoneOffsetMs) / 86_400_000L
+            out[day] = (out[day] ?: 0.0) + metMinutes(p.value)
+        }
+        return out
+    }
+
+    /**
+     * Acute-to-chronic load, the 7-day mean over the 28-day mean.
+     *
+     * Polar's Cardio Load Status shape, with its published bands. It is deliberately **not** the
+     * ACWR of the sports-science literature: that construct's own field has called for its dismissal
+     * — replacing the chronic denominator with random numbers predicts injury about as well as the
+     * real one (Impellizzeri 2021), and the single RCT of coaches acting on it was null (RR 1.01,
+     * 95 % CI 0.91–1.12). Simulated over recreational load histories it is also a flat line: median
+     * 0.99, with the "danger zone" firing on 0.14 % of days.
+     *
+     * So this is shown as *what you did lately against what you usually do*, with no injury claim
+     * attached to it, which is the only reading the evidence supports.
+     */
+    fun loadRatio(daily: Map<Long, Double>, today: Long): Double? {
+        val acute = (0 until 7).mapNotNull { daily[today - it] }
+        val chronic = (0 until 28).mapNotNull { daily[today - it] }
+        if (acute.size < 4 || chronic.size < 14) return null
+        val a = acute.sum() / acute.size
+        val c = chronic.sum() / chronic.size
+        return if (c > 0) a / c else null
+    }
+
+    /**
+     * Peak 30-minute cadence — the mean of the day's 30 highest step-count minutes.
+     *
+     * Not necessarily consecutive, which is the published definition. It matters because it is one of
+     * the very few intensity measures that **survived adjustment for total volume**: in 15 cohorts and
+     * 47 471 adults, peak-30 cadence carried a mortality hazard ratio of 0.67 (0.56–0.83) independent
+     * of how many steps were taken, where "minutes above 100 steps/min" did not (HR 0.86, ns). So it
+     * says something daily steps cannot, from data already stored.
+     *
+     * The NHANES population norm is 71.1 steps/min for peak-30 and 100.7 for peak-1.
+     */
+    fun peakCadence(stepPoints: List<ChartPoint>, minutes: Int): Double? {
+        if (stepPoints.isEmpty()) return null
+        val top = stepPoints.map { it.value }.sortedDescending().take(minutes)
+        if (top.isEmpty()) return null
+        return top.sum() / minutes
+    }
+
+    /**
+     * The most recent day that actually contains a day's walking, with its epoch-day.
+     *
+     * Peak-30 cadence is a DAILY figure and it is meaningless before the day has happened: asked at
+     * 07:57 after a night's sleep it answered "8 steps/min against a norm of 71", which is true of
+     * the four minutes on record and absurd as a statement about 白い熊 (reported 2026-08-10). A
+     * day needs at least [MIN_ACTIVE_MINUTES] minutes with steps in it before its peak means
+     * anything; below that the answer is yesterday's, and the row says which day it is.
+     */
+    const val MIN_ACTIVE_MINUTES = 30
+
+    fun lastCompleteDay(
+        stepPoints: List<ChartPoint>,
+        zoneOffsetMs: Long,
+        todayEpochDay: Long,
+    ): Pair<Long, List<ChartPoint>>? {
+        val byDay = stepPoints.groupBy { (it.tMs + zoneOffsetMs) / 86_400_000L }
+        return (0..7).asSequence()
+            .map { todayEpochDay - it }
+            .mapNotNull { day -> byDay[day]?.let { day to it } }
+            .firstOrNull { (_, pts) -> pts.count { it.value > 0 } >= MIN_ACTIVE_MINUTES }
+    }
+
+    /** Polar's published bands for that ratio. */
+    fun loadBand(ratio: Double): LoadBand = when {
+        ratio < 0.8 -> LoadBand.DETRAINING
+        ratio <= 1.0 -> LoadBand.MAINTAINING
+        ratio <= 1.3 -> LoadBand.PRODUCTIVE
+        else -> LoadBand.OVERREACHING
+    }
+}
+
+enum class LoadBand { DETRAINING, MAINTAINING, PRODUCTIVE, OVERREACHING }

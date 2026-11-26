@@ -1,0 +1,946 @@
+package com.sysadmindoc.ruledeck.ui.charts.huawei
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiFrom
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiRriKeys
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSettings
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSleep
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiStatus
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSyncArgs
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSyncRunner
+import com.sysadmindoc.ruledeck.core.huawei.HuaweiSyncState
+import com.sysadmindoc.ruledeck.core.storage.AppDatabase
+import com.sysadmindoc.ruledeck.ui.charts.ChartPipeline
+import com.sysadmindoc.ruledeck.ui.charts.ChartPoint
+import com.sysadmindoc.ruledeck.ui.charts.HealthIndexSource
+import com.sysadmindoc.ruledeck.ui.charts.Loc
+import com.sysadmindoc.ruledeck.ui.charts.MetricChart
+import com.sysadmindoc.ruledeck.ui.charts.MetricSpec
+import com.sysadmindoc.ruledeck.ui.charts.RenderKind
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** One undecoded field, as the 診断 card lists it. */
+data class HuaweiUnknownField(
+    val storageKey: String,
+    val samples: Int,
+    val firstSeconds: Long?,
+    val lastSeconds: Long?,
+)
+
+/**
+ * The most recent night, rebuilt from stored segments.
+ *
+ * Reuses [HuaweiSleep.Session] rather than defining a parallel UI type, so the totals the card shows
+ * are computed by the same code the decoder's tests check against the band's own screen.
+ */
+data class HuaweiSleepNight(val session: HuaweiSleep.Session)
+
+data class HuaweiDashboardState(
+    val loading: Boolean = true,
+    val status: HuaweiStatus? = null,
+    val bound: Boolean = false,
+    val metrics: List<MetricChart> = emptyList(),
+    val coverage: List<HuaweiCoverage> = emptyList(),
+    val diagnostics: List<MetricChart> = emptyList(),
+    val unknownFields: List<HuaweiUnknownField> = emptyList(),
+    val sleep: HuaweiSleepNight? = null,
+    val bounds: LongRange = 0L..0L,
+    val message: Loc? = null,
+    /**
+     * This morning's rating, and the morning it belongs to.
+     *
+     * Read from the SAME store the Hume report writes to, and deliberately so: a morning rating is a
+     * statement about 白い熊, not about a band. Two stores would mean the answer given on one screen
+     * was missing from the other, and the register would show a hole on a morning that was rated.
+     */
+    /** The index and recovery, built exactly as the Hume report builds them — see [buildDerived]. */
+    val index: com.sysadmindoc.ruledeck.ui.charts.HealthIndexResult? = null,
+    val recovery: com.sysadmindoc.ruledeck.ui.charts.RecoveryResult? = null,
+    val load: com.sysadmindoc.ruledeck.ui.charts.RecoveryBuild.LoadReading? = null,
+    val sri: Double? = null,
+    val sleepScore: com.sysadmindoc.ruledeck.ui.charts.SleepScore.Breakdown? = null,
+    val register: com.sysadmindoc.ruledeck.ui.charts.SessionRegister.Register? = null,
+    /** When the latest sync found the watch holding the night back; null when sleep came through. */
+    val sleepHeldAtMs: Long? = null,
+    val nights: List<com.sysadmindoc.ruledeck.ui.charts.SleepSession> = emptyList(),
+    /**
+     * Last night's heart rate in twelfths, for the deviation strip's sparkline.
+     *
+     * Lifted out of the assembled night rather than recomputed in the UI: it is the SAME curve the
+     * swing marker is measured from, and two derivations of one curve would drift the first time
+     * either was touched.
+     */
+    val lastNightHrCurve: List<Double> = emptyList(),
+    /** The per-night series behind every strip row, keyed by marker. See [MarkerHistory]. */
+    val markerHistory: Map<com.sysadmindoc.ruledeck.ui.charts.RecoveryMarker, com.sysadmindoc.ruledeck.ui.charts.MarkerHistory.Series> = emptyMap(),
+    val descent: com.sysadmindoc.ruledeck.ui.charts.MarkerHistory.DescentComparison? = null,
+    val bestDescent: com.sysadmindoc.ruledeck.ui.charts.MarkerHistory.Descent? = null,
+    /** Recent nights' HR curves, newest last — stacked under the swing's history page. */
+    val recentCurves: List<Pair<Long, List<Double>>> = emptyList(),
+    /** One row per day, back across the whole history — see [buildDerived]. */
+    val days: List<com.sysadmindoc.ruledeck.ui.charts.DaySummary> = emptyList(),
+    /** How many of [nights] came off the OTHER wrist — stated, never implied. */
+    val humeNights: Int = 0,
+    /** Where this band's own record begins — rows before it are the other band's. */
+    val cutoverMs: Long? = null,
+    val felt: Int? = null,
+    val feltMorning: Long? = null,
+    val feltEnabled: Boolean = true,
+    /**
+     * This morning's written note, from the same key the rating is filed under.
+     *
+     * Beside the rating rather than inside it: the digit is answered every morning and the sentence
+     * is not, so they are two independent values about one morning — and a note without a rating is
+     * a perfectly ordinary thing to have written.
+     */
+    val feltNote: String? = null,
+    /** Today's body weight in kg — its latest weighing — or null when nothing has been weighed today. */
+    val weightToday: Double? = null,
+    /**
+     * Each day's LATEST weighing, keyed `yyyyMMdd` — the reading the weight dialog opens on and
+     * replaces, for today on the 今朝 card and for any past morning in the register.
+     */
+    val weightReadings: Map<Long, com.sysadmindoc.ruledeck.core.storage.BodyWeightEntity> = emptyMap(),
+    /** 白い熊's own bedtimes, morning key → instant — see NightStarts. */
+    val nightStarts: Map<Long, Long> = emptyMap(),
+    /** 白い熊's own wake times, morning key → instant — see NightEnds. */
+    val nightEnds: Map<Long, Long> = emptyMap(),
+    /** 白い熊's weights for the night score — see NightScore and NightScoreWeights. */
+    val nightScoreWeights: Map<com.sysadmindoc.ruledeck.ui.charts.NightScore.Part, Int> =
+        com.sysadmindoc.ruledeck.ui.charts.NightScore.DEFAULTS,
+    /**
+     * 機能訓練 — the days the rehab was done, and what was written about them.
+     *
+     * Two plain collections rather than a built list of squares: the card shows two weeks and the
+     * page the whole history, and the two must be cut from ONE record. Deciding the span here would
+     * mean the model choosing for both, so it hands over the record and each screen takes its slice.
+     */
+    val rehabDays: Set<Long> = emptySet(),
+    val rehabNotes: Map<Long, String> = emptyMap(),
+    /**
+     * The Watch D3's cuff readings: the dumbbell chart, and every reading as the watch gave it.
+     * Null until the first reading — the Band and the Hume band never measured blood pressure
+     * (Hume's figures were a clamped estimate, and are deliberately not chained in here).
+     */
+    val bloodPressure: com.sysadmindoc.ruledeck.ui.charts.BloodPressureChart? = null,
+    val bpReadings: List<HuaweiBpReading> = emptyList(),
+    /** The watch's resting heart rate, one per day (that day's last figure), and every stiffness reading. */
+    val restingHrDays: List<HuaweiDayValue> = emptyList(),
+    val pwvReadings: List<HuaweiDayValue> = emptyList(),
+    /** The Watch D3's ECG recordings, newest first. */
+    val ecg: List<HuaweiEcgRecording> = emptyList(),
+    /** The Watch D3's pulse-wave arrhythmia checks, newest first. */
+    val arrhythmia: List<HuaweiPwaCheck> = emptyList(),
+)
+
+/** One pulse-wave arrhythmia check: its time and the watch's result (0 = no abnormality). */
+data class HuaweiPwaCheck(val tMs: Long, val result: Int) {
+    val normal: Boolean get() = result == 0
+}
+
+/** One cuff reading: systolic / diastolic (mmHg) and the pulse the cuff counted. */
+data class HuaweiBpReading(val tMs: Long, val systolic: Double, val diastolic: Double, val pulse: Double?)
+
+/** One ECG recording as the watch stored it: its verdict, mean heart rate and the single-lead trace (500 Hz). */
+data class HuaweiEcgRecording(
+    val startMs: Long,
+    val endMs: Long,
+    val verdict: Int,
+    val meanHr: Int,
+    val analysisVersion: String,
+    val sampleRate: Int,
+    val samples: FloatArray,
+) {
+    override fun equals(other: Any?) = other is HuaweiEcgRecording && other.startMs == startMs
+    override fun hashCode() = startMs.hashCode()
+}
+
+/**
+ * The Huawei report's state.
+ *
+ * A **sibling** of `BandDashboardModel`, not a generalisation of it. That model's `DashboardState`
+ * carries twenty fields and this one would return null for fourteen — index, recovery, sleep, blood
+ * pressure, the felt ratings, the register. A shared type would then assert, at every call site,
+ * that any device can produce a recovery card, which is the one claim this report must never make.
+ * The reuse that matters is already paid for by `MetricSpec` and `MetricChart`, which were never
+ * device-specific.
+ *
+ * Loading is one-shot rather than a Room `Flow`, for the reason the Hume model records: table-
+ * granular invalidation re-runs the whole filter chain on every write, thousands of times per sync.
+ */
+class HuaweiDashboardModel(
+    private val db: AppDatabase,
+    private val appContext: Context,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(HuaweiDashboardState())
+    val state: StateFlow<HuaweiDashboardState> = _state.asStateFlow()
+
+    val progress = HuaweiSyncState.progress
+
+    init {
+        // Today, marked, on the very first open and never again — 白い熊 asked the history to start
+        // there (2026-09-03). See [RehabLog.seedTodayOnce] for why it is flagged rather than
+        // conditioned on the store being empty.
+        com.sysadmindoc.ruledeck.core.band.RehabLog.seedTodayOnce(appContext)
+        refresh()
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            val next = withContext(Dispatchers.Default) { load() }
+            _state.value = next
+        }
+    }
+
+    private suspend fun load(): HuaweiDashboardState {
+        // Heal any stored `beat_` series the estimator has moved under, before anything reads them.
+        // Needs no band — it recomputes from the stored per-beat blobs — and does nothing once the
+        // recorded version matches. The sync runs it too, and that is the one that actually fires on
+        // a locked phone; this one is here so a reader never sees a stale figure on the way in.
+        runCatching { HuaweiSyncRunner.recomputeBeatStats(appContext, db) }
+
+        val samples = db.huaweiSampleDao()
+        val oldest = samples.oldestAny()
+        val newest = samples.newestAny()
+        val status = runCatching { HuaweiSyncRunner.status(db, HuaweiSettings.address(appContext)) }.getOrNull()
+        val bound = HuaweiSettings.isBound(appContext)
+
+        // Loaded before the early return: a night can exist when no per-minute sample does, and
+        // showing "no data" over a stored night would be a lie about the band rather than about us.
+        val sleep = loadLatestNight()
+
+        if (oldest == null || newest == null) {
+            return HuaweiDashboardState(
+                loading = false, status = status, bound = bound, sleep = sleep,
+                message = if (bound) HuaweiText.noData else HuaweiText.notPaired,
+                // 機能訓練 is 白い熊's own record and owes the band nothing — it has to be there on a
+                // report that has no samples at all, which is exactly the state a new install is in.
+                // The band's own rehab sessions AND anything 白い熊 ticked by hand.
+                //
+                // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
+                // filled dates from the pulled rehab sessions automatically"*). A recorded session
+                // marks its day without anyone remembering to; the manual tick stays for a day the
+                // band did not record, and it is the half nothing else can re-supply.
+                rehabDays = com.sysadmindoc.ruledeck.core.band.RehabLog.all(appContext) +
+                    com.sysadmindoc.ruledeck.core.huawei.HuaweiWorkoutStore.rehabDays(
+                        com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt.db.huaweiWorkoutDao(),
+                        java.time.ZoneId.systemDefault(),
+                    ),
+                rehabNotes = com.sysadmindoc.ruledeck.core.band.DayNotes.REHAB.all(appContext),
+            )
+        }
+        val fromMs = oldest * 1000L
+        val toMs = newest * 1000L
+
+        // Every instant the band described anything at. A counter with no reading at one of these
+        // is a measured zero; a stretch with none of them is the only thing that deserves gap tint.
+        val recorded = samples.recordedSeconds(oldest, newest)
+
+        // Where the Huawei band's own record begins. Before it, the charts show the Hume band's
+        // history — the era this band did not exist for — and after it, this band alone. The two
+        // never overlap: see HuaweiHistory for why that is the whole basis of it being honest.
+        val cutoverMs = HuaweiHistory.cutover(db)
+
+        // The window opens on the whole history, not just the Huawei era, so the Hume prefix is
+        // reachable by scrolling back rather than invisible.
+        val humeOldest = db.bandSampleDao().oldestEpochMs()
+        val historyFromMs = listOfNotNull(humeOldest, cutoverMs).minOrNull() ?: (oldest * 1000L)
+
+        val bp = loadBloodPressure()
+        val ecg = loadEcg()
+        val arrhythmia = loadArrhythmia()
+        val charts = HuaweiMetricSpecs.ALL.map { spec ->
+            buildChart(spec, oldest, newest, recorded, cutoverMs, historyFromMs)
+        }
+        val diagnostics =
+            HuaweiMetricSpecs.DIAGNOSTIC.map { spec -> buildChart(spec, oldest, newest, recorded) }
+
+        val coverage = (HuaweiMetricSpecs.ALL + HuaweiMetricSpecs.DIAGNOSTIC).map { spec ->
+            HuaweiCoverage.from(
+                spec.key,
+                samples.timesFor(HuaweiKeys.storageKey(spec.key), oldest, newest),
+            )
+        }
+
+        // Anything the band sent that no row describes. Listed rather than charted: the question
+        // these answer is "bit 0x10 started appearing on the 3rd", which is a table, not a curve.
+        val known = (HuaweiMetricSpecs.ALL + HuaweiMetricSpecs.DIAGNOSTIC)
+            .map { HuaweiKeys.storageKey(it.key) }.toSet()
+        val unknown = samples.metrics().filter { it !in known }.map { key ->
+            val times = samples.timesFor(key, oldest, newest)
+            HuaweiUnknownField(key, times.size, times.minOrNull(), times.maxOrNull())
+        }
+
+        val zone = java.time.ZoneId.systemDefault()
+        val derived = buildDerived(charts, cutoverMs, zone)
+        val morningKey = com.sysadmindoc.ruledeck.ui.charts.RecoveryBuild.ratableMorning(
+            java.time.LocalDateTime.now(zone),
+        )
+
+        return HuaweiDashboardState(
+            loading = false,
+            index = derived.index,
+            recovery = derived.recovery,
+            lastNightHrCurve = derived.lastNightHrCurve,
+            markerHistory = derived.markerHistory,
+            descent = derived.descent,
+            bestDescent = derived.bestDescent,
+            recentCurves = derived.recentCurves,
+            load = derived.load,
+            sri = derived.sri,
+            sleepScore = derived.sleepScore,
+            register = derived.register,
+            sleepHeldAtMs = runCatching { db.huaweiSyncDao().recent(1).firstOrNull() }.getOrNull()
+                ?.takeIf { it.ok && com.sysadmindoc.ruledeck.core.huawei.HuaweiSleepHeld.isIn(it.message) }?.startedAt,
+            nights = derived.nights,
+            days = derived.days,
+            humeNights = derived.humeNights,
+            cutoverMs = cutoverMs,
+            felt = com.sysadmindoc.ruledeck.core.band.RecoveryLog.rating(appContext, morningKey),
+            feltMorning = morningKey,
+            feltNote = com.sysadmindoc.ruledeck.core.band.DayNotes.RECOVERY.note(appContext, morningKey),
+            weightToday = weightsByDay(zone)[com.sysadmindoc.ruledeck.core.band.RehabLog.today(zone)],
+            weightReadings = latestWeighings(zone),
+            nightStarts = com.sysadmindoc.ruledeck.core.band.NightStarts.all(appContext),
+            nightEnds = com.sysadmindoc.ruledeck.core.band.NightEnds.all(appContext),
+            nightScoreWeights = com.sysadmindoc.ruledeck.core.band.NightScoreWeights.all(appContext),
+            // The band's own rehab sessions AND anything 白い熊 ticked by hand.
+                //
+                // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
+                // filled dates from the pulled rehab sessions automatically"*). A recorded session
+                // marks its day without anyone remembering to; the manual tick stays for a day the
+                // band did not record, and it is the half nothing else can re-supply.
+                rehabDays = com.sysadmindoc.ruledeck.core.band.RehabLog.all(appContext) +
+                    com.sysadmindoc.ruledeck.core.huawei.HuaweiWorkoutStore.rehabDays(
+                        com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt.db.huaweiWorkoutDao(),
+                        java.time.ZoneId.systemDefault(),
+                    ),
+            rehabNotes = com.sysadmindoc.ruledeck.core.band.DayNotes.REHAB.all(appContext),
+            feltEnabled = com.sysadmindoc.ruledeck.core.band.RecoveryLog.enabled(appContext),
+            status = status,
+            bound = bound,
+            metrics = charts,
+            bloodPressure = bp.first,
+            bpReadings = bp.second,
+            restingHrDays = loadDayValues(HuaweiKeys.RESTING_HR, lastPerDay = true),
+            pwvReadings = loadDayValues(HuaweiKeys.PWV, lastPerDay = false),
+            ecg = ecg,
+            arrhythmia = arrhythmia,
+            coverage = coverage,
+            diagnostics = diagnostics,
+            unknownFields = unknown,
+            sleep = sleep,
+            // The WHOLE history, not just this band's era. The Hume prefix is drawn into every
+            // chart, but ChartViewport clamps panning to these bounds — so with the Huawei-only
+            // range the older readings existed on screen and could not be reached by scrolling,
+            // which is indistinguishable from their not being there.
+            bounds = minOf(fromMs, historyFromMs)..toMs,
+        )
+    }
+
+    /**
+     * The newest stored night, or null when none has been synced — joined across a spell awake and
+     * cleared of superseded copies by [HuaweiNights.latestNight], like every other night figure.
+     */
+    private suspend fun loadLatestNight(): HuaweiSleepNight? =
+        HuaweiNights.latestNight(db)?.let { HuaweiSleepNight(it) }
+
+    /**
+     * The index, the recovery and the register — built by the SAME code the Hume report uses.
+     *
+     * Not a parallel implementation. `RecoveryBuild` and `HealthIndexSource` read their inputs by
+     * metric KEY, so the only adaptation needed is to hand them charts keyed the way they expect;
+     * everything after that is the arithmetic the other report has been using for weeks, with its
+     * gates, its refusals and its published reasoning intact. A second implementation would drift,
+     * and two health indices that disagree would be worse than one.
+     *
+     * **The baseline is not all this band's.** Nights before the cutover come off the Hume wrist,
+     * because this band did not exist for them, and a baseline of two nights is not a baseline. That
+     * is 白い熊's instruction and it is sound — but it means these numbers rest partly on the other
+     * device, so [HuaweiDashboardState.humeNights] carries the count and the cards say so.
+     */
+    private suspend fun buildDerived(
+        charts: List<MetricChart>,
+        cutoverMs: Long?,
+        zone: java.time.ZoneId,
+    ): Derived {
+        // Re-key to the names RecoveryBuild and HealthIndexSource look for. The Huawei charts carry
+        // "hw:" keys precisely so the two devices' series cannot be confused elsewhere; here they
+        // must be spoken to in the shared vocabulary, and this is the ONE place that translates.
+        val rekeyed = charts.mapNotNull { chart ->
+            val humeKey = when (chart.spec.key) {
+                HuaweiKeys.STEPS -> com.sysadmindoc.ruledeck.core.band.BandMetric.STEPS_MINUTE
+                HuaweiKeys.HEART_RATE -> com.sysadmindoc.ruledeck.core.band.BandMetric.HEART_RATE
+                HuaweiKeys.SPO2 -> com.sysadmindoc.ruledeck.core.band.BandMetric.SPO2
+                // The Watch D3's skin temperature feeds the same nightly cue the Hume band's did.
+                HuaweiKeys.SKIN_TEMP -> com.sysadmindoc.ruledeck.core.band.BandMetric.TEMPERATURE
+                else -> null
+            } ?: return@mapNotNull null
+            chart.copy(spec = chart.spec.copy(key = humeKey))
+        }
+
+        val humeSessions = loadHumeSessions(zone)
+        // 白い熊's own bedtimes and wake times over the watch's, where authored — see NightStarts, NightEnds.
+        val nights = com.sysadmindoc.ruledeck.ui.charts.SleepShape.withNightEdges(
+            HuaweiNights.all(db, cutoverMs, humeSessions),
+            com.sysadmindoc.ruledeck.core.band.NightStarts.all(appContext),
+            com.sysadmindoc.ruledeck.core.band.NightEnds.all(appContext),
+        ) { ms -> com.sysadmindoc.ruledeck.core.band.RehabLog.dateKeyOf(java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()) }
+        val boundary = cutoverMs ?: Long.MAX_VALUE
+        val humeNights = nights.count { it.endMs < boundary }
+
+        val zoneOffsetMs = zone.rules.getOffset(java.time.Instant.now()).totalSeconds * 1000L
+        val minuteOfDayOf: (Long) -> Double =
+            { ms -> com.sysadmindoc.ruledeck.ui.charts.SleepShape.minuteOfDay(ms, zone).toDouble() }
+
+        // Read once and handed to all three users: the strip, the index and the day table.
+        val watch = watchSeries()
+        val rmssd = nightlyRmssd()
+        val assembled = com.sysadmindoc.ruledeck.ui.charts.RecoveryBuild.build(
+            metrics = rekeyed,
+            hrvPoints = rmssd,
+            respirationPoints = respirationPoints(),
+            hfPoints = publishableField(8),
+            watch = watch,
+            sessions = nights,
+            ratings = com.sysadmindoc.ruledeck.core.band.RecoveryLog.all(appContext),
+            notes = com.sysadmindoc.ruledeck.core.band.DayNotes.RECOVERY.all(appContext),
+            weights = weightsByDay(zone),
+            sessions_ = com.sysadmindoc.ruledeck.core.band.TrainingSessions.all(appContext),
+            sessionOpen = com.sysadmindoc.ruledeck.core.band.TrainingSessions.openStart(appContext) != null,
+            // yyyyMMdd of an instant, the key every rating and every register row is filed under.
+            localDateOf = { ms ->
+                val d = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+                d.year * 10_000L + d.monthValue * 100L + d.dayOfMonth
+            },
+            zoneOffsetMs = zoneOffsetMs,
+            todayEpochDay = (System.currentTimeMillis() + zoneOffsetMs) / 86_400_000L,
+            nowMs = System.currentTimeMillis(),
+            minuteOfDayOf = minuteOfDayOf,
+        )
+
+        // The band's own last night, if it has one — otherwise the newest on record, which will be
+        // the Hume band's. Either way it is A night that happened, never a blend of two.
+        //
+        // A NIGHT, by the night table's own test ([RecoverySource.nights]): the session list holds
+        // the watch's naps too, and taking its last entry handed the health index a morning nap,
+        // which scored sleep 0 "Very bad" beside a table grading the same morning's 10 h 14 a 4
+        // (2026-10-25). The resting-HR window below it was reading the nap as well.
+        val latest = com.sysadmindoc.ruledeck.ui.charts.RecoverySource.nights(nights, minuteOfDayOf).lastOrNull()
+        // One row per day, back across everything on record — the Huawei era and, before it, the
+        // Hume one. The rows are built from the SAME series the charts draw, so a day's figures and
+        // its curve can never disagree: they are the same points counted twice, not two sources.
+        //
+        // spo2Times is empty because it is a HUME record-type flag — it marks which heart-rate
+        // readings arrived alongside a blood-oxygen one, splitting that band's dual population. This
+        // band has no such split, and passing anything here would be inventing one.
+        val days = com.sysadmindoc.ruledeck.ui.charts.DailySummary.build(
+            hr = rekeyed.firstOrNull { it.spec.key == com.sysadmindoc.ruledeck.core.band.BandMetric.HEART_RATE }
+                ?.chunk?.segments?.flatMap { it.points }.orEmpty(),
+            spo2 = rekeyed.firstOrNull { it.spec.key == com.sysadmindoc.ruledeck.core.band.BandMetric.SPO2 }
+                ?.chunk?.segments?.flatMap { it.points }.orEmpty(),
+            steps = rekeyed.firstOrNull { it.spec.key == com.sysadmindoc.ruledeck.core.band.BandMetric.STEPS_MINUTE }
+                ?.bars.orEmpty(),
+            sleepSessions = nights,
+            spo2Times = emptySet(),
+            zone = zone,
+            watch = watch,
+            hrv = rmssd,
+        )
+
+        return Derived(
+            index = com.sysadmindoc.ruledeck.ui.charts.HealthIndexSource.compute(
+                rekeyed, latest, emptySet(), indexExtras(assembled.recovery, watch),
+            ),
+            days = days,
+            recovery = assembled.recovery,
+            lastNightHrCurve = assembled.lastNightHrCurve,
+            markerHistory = assembled.markerHistory,
+            descent = assembled.descent,
+            bestDescent = assembled.bestDescent,
+            recentCurves = assembled.recentCurves,
+            load = assembled.load,
+            sri = assembled.sri,
+            sleepScore = assembled.sleepScore,
+            register = assembled.register,
+            nights = nights,
+            humeNights = humeNights,
+        )
+    }
+
+    data class Derived(
+        val index: com.sysadmindoc.ruledeck.ui.charts.HealthIndexResult? = null,
+        val recovery: com.sysadmindoc.ruledeck.ui.charts.RecoveryResult? = null,
+        val load: com.sysadmindoc.ruledeck.ui.charts.RecoveryBuild.LoadReading? = null,
+        val sri: Double? = null,
+        val sleepScore: com.sysadmindoc.ruledeck.ui.charts.SleepScore.Breakdown? = null,
+        val register: com.sysadmindoc.ruledeck.ui.charts.SessionRegister.Register? = null,
+        val nights: List<com.sysadmindoc.ruledeck.ui.charts.SleepSession> = emptyList(),
+        val days: List<com.sysadmindoc.ruledeck.ui.charts.DaySummary> = emptyList(),
+        val humeNights: Int = 0,
+        val lastNightHrCurve: List<Double> = emptyList(),
+        val markerHistory: Map<com.sysadmindoc.ruledeck.ui.charts.RecoveryMarker, com.sysadmindoc.ruledeck.ui.charts.MarkerHistory.Series> = emptyMap(),
+        val descent: com.sysadmindoc.ruledeck.ui.charts.MarkerHistory.DescentComparison? = null,
+        val bestDescent: com.sysadmindoc.ruledeck.ui.charts.MarkerHistory.Descent? = null,
+        val recentCurves: List<Pair<Long, List<Double>>> = emptyList(),
+    )
+
+    /** The Hume band's nights, for the era before this band existed. */
+    /**
+     * Every RMSSD window the band itself would publish, as points.
+     *
+     * ## Why the filter is not ours to skip
+     *
+     * Each `rrisqi` window carries the number of beat-to-beat intervals it accepted, and Huawei
+     * Health publishes a window only at roughly 17 or more — a clean 9-for-9 split across the
+     * records it listed and omitted on 白い熊's own wrist. A window the vendor's own app discards is
+     * one the band considers too sparse to mean anything, and a night's median computed over the
+     * sparse ones would be a number with no measurement behind it. Everything is still STORED
+     * unfiltered (see `HuaweiSyncRunner.storeRri`) — the threshold is applied here, where it can be
+     * revisited, rather than at ingest, where it could not.
+     *
+     * The two series are joined on the window's start second, which is the key both are written
+     * under: one row per field per window, so a count and its RMSSD share an instant exactly.
+     */
+    private suspend fun publishableRmssd(): List<ChartPoint> = publishableField(5)
+
+    /**
+     * One `rrisqi` field, filtered to the windows the band itself would publish.
+     *
+     * Generalised from the RMSSD-only version when HF power was needed too: the publishability rule
+     * is a property of the WINDOW, not of the field read out of it, so applying it per field in two
+     * places would have been the same rule written twice.
+     */
+    private suspend fun publishableField(field: Int): List<ChartPoint> {
+        val dao = db.huaweiSampleDao()
+        val from = 0L
+        val to = Long.MAX_VALUE / 2
+        val counts = runCatching { dao.range(HuaweiRriKeys.COUNT, from, to) }.getOrNull().orEmpty()
+        val publishable = counts
+            .filter { it.value >= com.sysadmindoc.ruledeck.core.huawei.HuaweiRri.MIN_VALID_INTERVALS }
+            .mapTo(HashSet()) { it.epochSeconds }
+        if (publishable.isEmpty()) return emptyList()
+        return runCatching { dao.range(HuaweiRriKeys.metricFor(field), from, to) }.getOrNull().orEmpty()
+            .filter { it.epochSeconds in publishable }
+            .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+    }
+
+    /**
+     * RMSSD for the nightly figure: our own, from the beat-to-beat intervals, wherever it exists.
+     *
+     * The Band's panel (`rri_f5`) stopped on 2026-10-17 — the Watch D3 does not send it — while the
+     * intervals kept arriving, and `beat_rmssd` is computed from them every night. One estimator has
+     * to carry the whole baseline, or the change of device reads as a change in 白い熊: on the
+     * nights both exist ours runs 10–30 % below the panel's, because it corrects artefacts the
+     * band's figure keeps. So ours is used for every night it covers (from 2026-09-09) and the
+     * panel only before ours began.
+     */
+    private suspend fun nightlyRmssd(): List<ChartPoint> {
+        val ours = runCatching {
+            db.huaweiSampleDao().range(HuaweiRriKeys.BEAT_RMSSD, 0L, Long.MAX_VALUE / 2)
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList())
+        val from = ours.minOfOrNull { it.tMs } ?: return publishableRmssd()
+        return publishableRmssd().filter { it.tMs < from } + ours
+    }
+
+    /** The Watch D3's morning readings, as points, for the strip. */
+    private suspend fun watchSeries(): com.sysadmindoc.ruledeck.ui.charts.RecoverySource.WatchSeries {
+        val dao = db.huaweiSampleDao()
+        suspend fun points(key: String) = runCatching {
+            dao.range(HuaweiKeys.storageKey(key), 0L, Long.MAX_VALUE / 2000)
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList())
+        return com.sysadmindoc.ruledeck.ui.charts.RecoverySource.WatchSeries(
+            bpSystolic = points(HuaweiKeys.BP_SYSTOLIC),
+            bpDiastolic = points(HuaweiKeys.BP_DIASTOLIC),
+            restingHr = points(HuaweiKeys.RESTING_HR),
+            pwv = points(HuaweiKeys.PWV),
+        )
+    }
+
+    /**
+     * The index's newer inputs: the latest cuff reading within a week, last night's RMSSD, and the
+     * latest stiffness measurement within a month. Older than that and the component is MISSING,
+     * not scored on a stale number — the index says what it did not have.
+     */
+    private fun indexExtras(
+        recovery: com.sysadmindoc.ruledeck.ui.charts.RecoveryResult?,
+        w: com.sysadmindoc.ruledeck.ui.charts.RecoverySource.WatchSeries,
+    ): com.sysadmindoc.ruledeck.ui.charts.HealthIndexSource.Extras {
+        val now = System.currentTimeMillis()
+        fun latestWithin(points: List<ChartPoint>, ms: Long) = points.filter { it.tMs >= now - ms }.maxByOrNull { it.tMs }
+        val sys = latestWithin(w.bpSystolic, 7 * 86_400_000L)
+        val dia = sys?.let { s -> w.bpDiastolic.firstOrNull { it.tMs == s.tMs } }
+        return com.sysadmindoc.ruledeck.ui.charts.HealthIndexSource.Extras(
+            bpSystolic = dia?.let { sys.value },
+            bpDiastolic = dia?.value,
+            hrvMs = recovery?.markers?.firstOrNull { it.marker == com.sysadmindoc.ruledeck.ui.charts.RecoveryMarker.HRV }?.value,
+            pwv = latestWithin(w.pwv, 30 * 86_400_000L)?.value,
+        )
+    }
+
+    /**
+     * Every respiratory rate the per-beat series yielded, as points.
+     *
+     * Unfiltered, unlike [publishableRmssd] — and the asymmetry is deliberate. That filter exists
+     * because Huawei Health applies a publishability threshold to the rrisqi windows and a night's
+     * median over the sparse ones would be a number with no measurement behind it. There is no
+     * vendor threshold here because there is no vendor metric here: the gating happens at the point
+     * of computation instead, where `HuaweiBeatMetrics` declines to return a rate at all unless the
+     * HF peak stands out. A row that exists has already passed its test.
+     */
+    private suspend fun respirationPoints(): List<ChartPoint> =
+        runCatching {
+            db.huaweiSampleDao()
+                .range(HuaweiRriKeys.BEAT_RESP_BPM, 0L, Long.MAX_VALUE / 2)
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList())
+
+    private suspend fun loadHumeSessions(zone: java.time.ZoneId): List<com.sysadmindoc.ruledeck.ui.charts.SleepSession> {
+        val rows = runCatching { db.bandSleepDao().recent(400) }.getOrDefault(emptyList())
+        if (rows.isEmpty()) return emptyList()
+        val inputs = rows.mapNotNull { row ->
+            val start = com.sysadmindoc.ruledeck.ui.charts.BandLocalTimes.toEpochMs(row.startLocalTs, zone)
+                ?: return@mapNotNull null
+            com.sysadmindoc.ruledeck.ui.charts.SleepSegmentInput(start, row.minutes, row.stages)
+        }
+        return com.sysadmindoc.ruledeck.ui.charts.SleepShape.sessions(inputs)
+    }
+
+    /**
+     * Record — or withdraw — this morning's rating.
+     *
+     * Tapping the value already chosen REMOVES it, exactly as on the Hume screen. A rating you can
+     * change but never withdraw is a trap: a stray tap becomes data 白い熊 did not author, and every
+     * later marker is then banded against a number nobody meant. The same gesture must not mean two
+     * different things depending on which report it was made from.
+     */
+    /**
+     * Rate — or un-rate — ONE named night, whichever night it is.
+     *
+     * What the register's editor needs: there the night is chosen by tapping a row, so its key
+     * arrives as an argument rather than being derived from what today happens to be. It writes to
+     * the same store under the same key as [setFelt], so a rating filed here is not a lesser kind.
+     */
+    fun setFeltFor(nightKey: Long, rating: Int) {
+        if (com.sysadmindoc.ruledeck.core.band.RecoveryLog.rating(appContext, nightKey) == rating) {
+            com.sysadmindoc.ruledeck.core.band.RecoveryLog.clear(appContext, nightKey)
+        } else {
+            com.sysadmindoc.ruledeck.core.band.RecoveryLog.setRating(appContext, nightKey, rating)
+        }
+        refresh()
+    }
+
+    fun setFelt(rating: Int) {
+        val key = com.sysadmindoc.ruledeck.ui.charts.RecoveryBuild.ratableMorning(
+            java.time.LocalDateTime.now(java.time.ZoneId.systemDefault()),
+        )
+        if (com.sysadmindoc.ruledeck.core.band.RecoveryLog.rating(appContext, key) == rating) {
+            com.sysadmindoc.ruledeck.core.band.RecoveryLog.clear(appContext, key)
+        } else {
+            com.sysadmindoc.ruledeck.core.band.RecoveryLog.setRating(appContext, key, rating)
+        }
+        refresh()
+    }
+
+    /**
+     * Write — or, on blank text, delete — the note for ONE named morning.
+     *
+     * Deliberately keyed like [setFeltFor] rather than like [setFelt]: the note editor is reachable
+     * from the morning card, from a grid tile and from a table line, and all three name the morning
+     * they mean. One writer for all of them is what stops a note from the card landing on a
+     * different key than a note from the calendar.
+     */
+    fun setNoteFor(morningKey: Long, text: String) {
+        com.sysadmindoc.ruledeck.core.band.DayNotes.RECOVERY.setNote(appContext, morningKey, text)
+        refresh()
+    }
+
+    /** Correct — or, with null, withdraw the correction of — when the night ending on [morningKey] began. */
+    /**
+     * Store the night score's weights. No rebuild: the score is computed from the register's steps
+     * at draw time, so a slider moves the column at once instead of after a reload.
+     */
+    fun setNightScoreWeights(weights: Map<com.sysadmindoc.ruledeck.ui.charts.NightScore.Part, Int>) {
+        com.sysadmindoc.ruledeck.core.band.NightScoreWeights.set(appContext, weights)
+        _state.value = _state.value.copy(nightScoreWeights = weights)
+    }
+
+    fun setNightStart(morningKey: Long, atMs: Long?) {
+        com.sysadmindoc.ruledeck.core.band.NightStarts.set(appContext, morningKey, atMs)
+        refresh()
+    }
+
+    fun setNightEnd(morningKey: Long, atMs: Long?) {
+        com.sysadmindoc.ruledeck.core.band.NightEnds.set(appContext, morningKey, atMs)
+        refresh()
+    }
+
+    /** Tick or un-tick one day of 機能訓練. */
+    fun setRehab(dateKey: Long, done: Boolean) {
+        com.sysadmindoc.ruledeck.core.band.RehabLog.setDone(appContext, dateKey, done)
+        refresh()
+    }
+
+    /** Write — or, on blank text, delete — one day's 機能訓練 note. Its own store; see `DayNotes`. */
+    fun setRehabNote(dateKey: Long, text: String) {
+        com.sysadmindoc.ruledeck.core.band.DayNotes.REHAB.setNote(appContext, dateKey, text)
+        refresh()
+    }
+
+    /**
+     * Save one weighing at [atMs], replacing the reading the dialog was opened on ([replacingMs]).
+     *
+     * The dialog edits ONE reading — the day's latest, which is the figure every screen shows — so
+     * a save moves it to the date and time in the boxes, and a null [kg] (the emptied field) withdraws
+     * it. Earlier weighings of that day are left alone: every save is still its own row and the
+     * history keeps them; only the reading being edited is replaced, so an edit is never hidden
+     * behind the figure it was meant to correct.
+     */
+    fun setWeight(atMs: Long, kg: Double?, replacingMs: Long?) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val dao = db.bodyWeightDao()
+                if (replacingMs != null) dao.delete(replacingMs)
+                if (kg != null) dao.put(com.sysadmindoc.ruledeck.core.storage.BodyWeightEntity(atMs, kg))
+            }
+            refresh()
+        }
+    }
+
+    /** Each local day's latest weighing, keyed `yyyyMMdd` — what the dialog edits. */
+    private suspend fun latestWeighings(zone: java.time.ZoneId): Map<Long, com.sysadmindoc.ruledeck.core.storage.BodyWeightEntity> =
+        runCatching { db.bodyWeightDao().all() }.getOrDefault(emptyList())
+            .associateBy { w ->
+                com.sysadmindoc.ruledeck.core.band.RehabLog.dateKeyOf(
+                    java.time.Instant.ofEpochMilli(w.epochMs).atZone(zone).toLocalDate(),
+                )
+            }
+
+    /** Every weighing, one figure per local day — the day's latest — keyed `yyyyMMdd`. */
+    private suspend fun weightsByDay(zone: java.time.ZoneId): Map<Long, Double> =
+        runCatching { db.bodyWeightDao().all() }.getOrDefault(emptyList())
+            // Ascending by instant, so a later weighing on the same day overwrites an earlier one.
+            .associate { w ->
+                com.sysadmindoc.ruledeck.core.band.RehabLog.dateKeyOf(
+                    java.time.Instant.ofEpochMilli(w.epochMs).atZone(zone).toLocalDate(),
+                ) to w.kg
+            }
+
+    /** The morning the card's own note belongs to — the same one [setFelt] rates. */
+    fun morningKeyNow(): Long = com.sysadmindoc.ruledeck.ui.charts.RecoveryBuild.ratableMorning(
+        java.time.LocalDateTime.now(java.time.ZoneId.systemDefault()),
+    )
+
+    /**
+     * The cuff readings. Systolic, diastolic and pulse are stored as three samples at the reading's
+     * one instant, so they are joined on that instant — a reading missing either pressure is not a
+     * reading and is left out rather than half-drawn.
+     */
+    /**
+     * A single-number series for the bar charts. With [lastPerDay], one per local day — the watch
+     * recomputes its resting heart rate several times a day, and the day's last figure is the one it
+     * settled on; without, every reading, which is what a measurement taken by hand is.
+     */
+    private suspend fun loadDayValues(key: String, lastPerDay: Boolean): List<HuaweiDayValue> {
+        val zone = java.time.ZoneId.systemDefault()
+        val all = runCatching {
+            db.huaweiSampleDao().range(HuaweiKeys.storageKey(key), 0L, Long.MAX_VALUE / 2000)
+                .filter { it.value > 0 }
+                .map { HuaweiDayValue(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList()).sortedBy { it.tMs }
+        if (!lastPerDay) return all
+        return all.groupBy { java.time.Instant.ofEpochMilli(it.tMs).atZone(zone).toLocalDate() }
+            .values.map { it.last() }.sortedBy { it.tMs }
+    }
+
+    private suspend fun loadBloodPressure(): Pair<com.sysadmindoc.ruledeck.ui.charts.BloodPressureChart?, List<HuaweiBpReading>> {
+        val dao = db.huaweiSampleDao()
+        val all = 0L to Long.MAX_VALUE / 2000
+        fun key(k: String) = HuaweiKeys.storageKey(k)
+        val sys = dao.range(key(HuaweiKeys.BP_SYSTOLIC), all.first, all.second).associate { it.epochSeconds to it.value }
+        val dia = dao.range(key(HuaweiKeys.BP_DIASTOLIC), all.first, all.second).associate { it.epochSeconds to it.value }
+        val pulse = dao.range(key(HuaweiKeys.BP_PULSE), all.first, all.second).associate { it.epochSeconds to it.value }
+        val readings = sys.keys.intersect(dia.keys).sorted().map { t ->
+            HuaweiBpReading(t * 1000L, sys.getValue(t), dia.getValue(t), pulse[t])
+        }
+        if (readings.isEmpty()) return null to emptyList()
+        val sysPts = readings.map { ChartPoint(it.tMs, it.systolic) }
+        val diaPts = readings.map { ChartPoint(it.tMs, it.diastolic) }
+        fun range(v: List<ChartPoint>) = "${v.minOf { it.value }.toInt()}–${v.maxOf { it.value }.toInt()}"
+        val last = readings.last()
+        val chart = com.sysadmindoc.ruledeck.ui.charts.BloodPressureChart(
+            dumbbells = com.sysadmindoc.ruledeck.ui.charts.HourlyEnvelope.dumbbells(sysPts, diaPts),
+            headline = "${last.systolic.toInt()}/${last.diastolic.toInt()}",
+            systolicRange = range(sysPts),
+            diastolicRange = range(diaPts),
+        )
+        return chart to readings.reversed()
+    }
+
+    /**
+     * The arrhythmia checks: class 500007's result field, one row per check, kept under its raw
+     * dictionary name (docs/huawei-watch-d3.md §3.11a).
+     */
+    private suspend fun loadArrhythmia(): List<HuaweiPwaCheck> =
+        db.huaweiSampleDao().range(HuaweiKeys.storageKey(HuaweiKeys.PWA_RESULT), 0L, Long.MAX_VALUE / 2000)
+            .map { HuaweiPwaCheck(it.epochSeconds * 1000L, it.value.toInt()) }
+            .sortedByDescending { it.tMs }
+
+    private suspend fun loadEcg(): List<HuaweiEcgRecording> =
+        runCatching { db.huaweiEcgDao().all() }.getOrDefault(emptyList()).map { e ->
+            HuaweiEcgRecording(
+                startMs = e.startSeconds * 1000L,
+                endMs = e.endSeconds * 1000L,
+                verdict = e.verdict,
+                meanHr = e.meanHr,
+                analysisVersion = e.analysisVersion,
+                sampleRate = e.sampleRate,
+                samples = com.sysadmindoc.ruledeck.core.huawei.HuaweiEcg.decode(e.samples),
+            )
+        }
+
+    private suspend fun buildChart(
+        spec: MetricSpec,
+        from: Long,
+        to: Long,
+        recorded: List<Long> = emptyList(),
+        cutoverMs: Long? = null,
+        historyFromMs: Long? = null,
+    ): MetricChart {
+        val rows = db.huaweiSampleDao().range(HuaweiKeys.storageKey(spec.key), from, to)
+        val points = if (!spec.absentIsZero) {
+            // A zero this spec calls "no reading" is not a point. Keeping it made the qualifier
+            // reject it and tint the span as missing, so a metric the band fills with zeros between
+            // its occasional real values read as a day of lost data. Rows already stored are
+            // filtered here rather than migrated away.
+            rows.asSequence()
+                .filterNot { spec.zeroIsNoReading && it.value == 0.0 }
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+                .toList()
+        } else {
+            // Fill the band's own silence with zeros, but only where the band was demonstrably
+            // recording. A stretch it said nothing about at all stays absent, so a real sync hole
+            // still reads as a hole instead of being disguised as a quiet afternoon.
+            val have = rows.associate { it.epochSeconds to it.value }
+            recorded.map { ChartPoint(it * 1000L, have[it] ?: 0.0) }
+        }
+        if (points.isEmpty()) {
+            return MetricChart(
+                spec = spec, chunk = null, buckets = emptyList(), bars = emptyList(),
+                headline = "—", headlineBand = null, subtitle = HuaweiText.noData,
+            )
+        }
+        // The Hume era, prepended. It stops at the cutover, so no instant carries a reading from
+        // both wrists — the prefix is the years this band did not exist for, not a second opinion.
+        val prefix = if (historyFromMs == null) HuaweiHistory.Prefix(emptyList(), cutoverMs, 0)
+        else HuaweiHistory.prefix(db, spec.key, historyFromMs, cutoverMs, spec.cadenceSec)
+        val withHistory = prefix.points + points
+
+        // mixedCadence is on for every row in this table: the real cadence is unmeasured, so the gap
+        // threshold has to come from a high percentile rather than a median it cannot trust.
+        val chunk = ChartPipeline.qualifyAndSegment(withHistory, spec, mixedCadence = spec.mixedCadence)
+        val retained = chunk.segments.flatMap { it.points }
+        val lastDay = HealthIndexSource.lastDay(retained)
+
+        // The number alone, as on the Hume side: the card prints [MetricSpec.unit] beside it in its
+        // own smaller text, and a unit written in here too read "66 bpm bpm" (fixed 2026-10-23).
+        val headline = when {
+            retained.isEmpty() -> "—"
+            // A bar metric headlines its 24 h TOTAL, matching the Hume screen so the two figures
+            // answer the same question.
+            spec.render == RenderKind.BARS -> spec.format(lastDay.sumOf { it.value })
+            spec.headlineIsRange -> {
+                val lo = lastDay.minOfOrNull { it.value }
+                val hi = lastDay.maxOfOrNull { it.value }
+                if (lo == null || hi == null) "—"
+                else "${spec.format(lo)}–${spec.format(hi)}"
+            }
+            else -> HealthIndexSource.median(lastDay.map { it.value })?.let { spec.format(it) } ?: "—"
+        }
+
+        return MetricChart(
+            spec = spec,
+            chunk = chunk,
+            // A capsule metric is drawn from its hourly envelope, so it needs one. Every other row
+            // draws from the chunk and leaves this empty, as before.
+            buckets = if (spec.render == RenderKind.CAPSULE) com.sysadmindoc.ruledeck.ui.charts.HourlyEnvelope.bucket(retained)
+            else emptyList(),
+            // The bar renderer reads raw retained points and must never see a filtered series —
+            // though with every filter off on this table, retained is currently everything.
+            bars = if (spec.render == RenderKind.BARS) retained else emptyList(),
+            headline = headline,
+            headlineBand = null,
+            // Stated on every card, because every gate on this table is a placeholder — and, when
+            // some of what is drawn came off the other wrist, that too. A reader must never have to
+            // guess which band a stretch of chart belongs to.
+            subtitle = when {
+                prefix.humeCount > 0 -> Loc(
+                    "${prefix.humeCount} earlier readings are the Hume band's — Huawei had not " +
+                        "started yet. Nothing is mixed: they stop where Huawei starts." +
+                        (if (spec.provisional) " · " + HuaweiText.provisional.en else ""),
+                    "古い ${prefix.humeCount} 件は Hume のもの — Huawei はまだ無かった。" +
+                        "混ぜてはいない。こちらが始まるところで終わる。" +
+                        (if (spec.provisional) " ／ " + HuaweiText.provisional.ja else ""),
+                )
+                spec.provisional -> HuaweiText.provisional
+                else -> Loc("", "")
+            },
+        )
+    }
+
+    /**
+     * Announce the sync on the main thread BEFORE dispatching, then hand off to the app-scoped
+     * runner so it survives this window closing. Both halves matter: reaching a usable session means
+     * a socket connect plus a full HiChain pass, and nothing is visible on screen until then.
+     */
+    fun sync() {
+        if (!HuaweiSyncState.arm()) return
+        HuaweiSyncRunner.scope.launch {
+            runCatching {
+                val status = HuaweiSyncRunner.status(db, HuaweiSettings.address(appContext))
+                HuaweiSyncRunner.sync(
+                    appContext, db,
+                    HuaweiSyncRunner.Request(
+                        address = HuaweiSettings.address(appContext),
+                        windows = HuaweiSyncArgs.resolve(
+                            from = HuaweiFrom.Auto,
+                            lastSuccessAtSeconds = status.lastSuccessAtMillis?.let { it / 1000 },
+                            overlapMinutes = HuaweiSettings.overlapMinutes(appContext),
+                            nowSeconds = System.currentTimeMillis() / 1000,
+                        ),
+                        timeoutSec = HuaweiSettings.timeoutSec(appContext),
+                        source = "window",
+                    ),
+                )
+            }.onFailure {
+                // The one path where arming without reaching the runner would leave it spinning.
+                HuaweiSyncState.finish(it.message ?: "failed", ok = false)
+            }
+            refresh()
+        }
+    }
+}
+
+class HuaweiDashboardModelFactory(
+    private val db: AppDatabase,
+    private val appContext: Context,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(HuaweiDashboardModel::class.java)) {
+            return HuaweiDashboardModel(db, appContext) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel: $modelClass")
+    }
+}

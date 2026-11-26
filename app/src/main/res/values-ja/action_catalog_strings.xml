@@ -535,7 +535,7 @@
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">モード</string>
     <string name="catalog_action_dnd_set_field_mode_hint" formatted="false">off/priority/alarms/total_silence</string>
     <string name="catalog_action_zen_rule_set_name" formatted="false">おやすみモードのルールを設定</string>
-    <string name="catalog_action_zen_rule_set_description" formatted="false">OpenTasker自身のおやすみモードのルールを追加または更新します。Android 15のデバイス効果も設定できます。</string>
+    <string name="catalog_action_zen_rule_set_description" formatted="false">RuleDeck自身のおやすみモードのルールを追加または更新します。Android 15のデバイス効果も設定できます。</string>
     <string name="catalog_action_zen_rule_set_field_id_label" formatted="false">ルールID</string>
     <string name="catalog_action_zen_rule_set_field_id_hint" formatted="false">変わらないキー（例：focus_evening）</string>
     <string name="catalog_action_zen_rule_set_field_name_label" formatted="false">ルール名</string>
@@ -548,7 +548,7 @@
     <string name="catalog_action_zen_rule_set_field_dim_wallpaper_label" formatted="false">壁紙を暗くする</string>
     <string name="catalog_action_zen_rule_set_field_night_mode_label" formatted="false">夜間モード</string>
     <string name="catalog_action_zen_rule_clear_name" formatted="false">おやすみモードのルールを消去</string>
-    <string name="catalog_action_zen_rule_clear_description" formatted="false">OpenTasker自身のおやすみモードのルールを1つ削除します。</string>
+    <string name="catalog_action_zen_rule_clear_description" formatted="false">RuleDeck自身のおやすみモードのルールを1つ削除します。</string>
     <string name="catalog_action_zen_rule_clear_field_id_label" formatted="false">ルールID</string>
     <string name="catalog_action_zen_rule_clear_field_id_hint" formatted="false">「おやすみモードのルールを設定」で使ったキー</string>
     <string name="catalog_action_ringer_set_name" formatted="false">着信音モードを設定</string>
@@ -646,7 +646,7 @@
     <string name="catalog_action_http_request_field_authorization_hint" formatted="false">例：Bearer %SECRET_TOKEN。ログでは必ず伏せられます。</string>
     <string name="catalog_action_http_request_field_body_label" formatted="false">リクエスト本文（直接入力）</string>
     <string name="catalog_action_http_request_field_body_file_label" formatted="false">リクエスト本文のファイル</string>
-    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">「OpenTasker Files」内の相対パス。直接入力の本文とは併用できません。</string>
+    <string name="catalog_action_http_request_field_body_file_hint" formatted="false">「RuleDeck Files」内の相対パス。直接入力の本文とは併用できません。</string>
     <string name="catalog_action_http_request_field_content_type_label" formatted="false">コンテンツタイプ</string>
     <string name="catalog_action_http_request_field_content_type_hint" formatted="false">例：application/json</string>
     <string name="catalog_action_http_request_field_response_var_label" formatted="false">レスポンス本文の保存先</string>
@@ -656,7 +656,7 @@
     <string name="catalog_action_http_request_field_headers_var_label" formatted="false">レスポンスヘッダーの保存先</string>
     <string name="catalog_action_http_request_field_headers_var_hint" formatted="false">変数（任意）。1行に1つの Name: Value</string>
     <string name="catalog_action_http_request_field_output_file_label" formatted="false">レスポンスの出力ファイル</string>
-    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">「OpenTasker Files」内の相対パス。書き込みが完了した時点で一度に置き換わります。</string>
+    <string name="catalog_action_http_request_field_output_file_hint" formatted="false">「RuleDeck Files」内の相対パス。書き込みが完了した時点で一度に置き換わります。</string>
     <string name="catalog_action_http_request_field_max_response_bytes_label" formatted="false">レスポンスの最大サイズ（バイト）</string>
     <string name="catalog_action_http_request_field_max_response_bytes_hint" formatted="false">変数なら1 MiBまで、ファイルなら50 MiBまで</string>
     <string name="catalog_action_http_request_field_redirects_label" formatted="false">リダイレクトの扱い</string>
@@ -712,7 +712,7 @@
     <string name="catalog_action_mqtt_publish_field_port_label" formatted="false">ブローカーのポート</string>
     <string name="catalog_action_mqtt_publish_field_port_hint" formatted="false">既定：TLSありは8883、TLSなしは1883</string>
     <string name="catalog_action_mqtt_publish_field_tls_label" formatted="false">TLSを使う</string>
-    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">既定はオンです。オフの場合、OpenTaskerはプライベートまたはローカルのホストにだけ接続します。</string>
+    <string name="catalog_action_mqtt_publish_field_tls_hint" formatted="false">既定はオンです。オフの場合、RuleDeckはプライベートまたはローカルのホストにだけ接続します。</string>
     <string name="catalog_action_mqtt_publish_field_topic_label" formatted="false">トピック</string>
     <string name="catalog_action_mqtt_publish_field_topic_hint" formatted="false">発行先のトピック。ワイルドカードの + と # は使えません。</string>
     <string name="catalog_action_mqtt_publish_field_payload_label" formatted="false">ペイロード</string>

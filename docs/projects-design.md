@@ -2,7 +2,7 @@
 
 Status: design agreed, not yet implemented. Fork feature for `shiroikuma-jiyusagyoban`.
 
-OpenTasker organizes everything in flat global lists (`profiles`, `tasks`, `scenes`, `variables`)
+RuleDeck organizes everything in flat global lists (`profiles`, `tasks`, `scenes`, `variables`)
 with no grouping. This adds Tasker-style **Projects** — top-level baskets for one area of activity —
 plus the export/import improvements that go with them.
 
@@ -87,9 +87,9 @@ explicit list of ids, **pulling in nothing automatically**:
 - **Export project**: every item whose `projectId == P` — that project's *own* items only.
 - **Export all**: the whole workspace (today's behavior).
 
-`OpenTaskerBundleCodec.build(...)` already accepts explicit lists, so this is mostly a selection UI +
+`RuleDeckBundleCodec.build(...)` already accepts explicit lists, so this is mostly a selection UI +
 a thin `exportSelection(selection)` entry that funnels into `build`. Each export is a normal
-`OpenTaskerBundle`, so import reuses the existing preview → validate → confirm flow unchanged.
+`RuleDeckBundle`, so import reuses the existing preview → validate → confirm flow unchanged.
 
 **No dependency closure.** If an exported profile references a task that isn't in the selection, we do
 not pull that task in; we record a warning instead (reusing the bundle's `warnings` channel), and the
@@ -109,11 +109,11 @@ import; exporting from Unfiled adds no project rows. `metadata.name` reflects th
 ### Schema v2
 
 ```kotlin
-const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 2
+const val RULEDECK_BUNDLE_SCHEMA_VERSION = 2
 
 @Serializable
-data class OpenTaskerBundle(
-    val schemaVersion: Int = OPEN_TASKER_BUNDLE_SCHEMA_VERSION,
+data class RuleDeckBundle(
+    val schemaVersion: Int = RULEDECK_BUNDLE_SCHEMA_VERSION,
     val appVersion: String,
     val exportedAtEpochMs: Long,
     val metadata: BundleMetadata = BundleMetadata(),
@@ -147,7 +147,7 @@ shape-compatible with what v1 expected for those fields.
 | --- | --- | --- |
 | **1 — Data** | `Project` model + entity/DAO, `projectId` columns, Room migration, mappers. Everything Unfiled. | `core/model`, `core/storage`, `DatabaseMigrations` |
 | **2 — UI** | Project switcher, management screen, "Move to project", filtered lists, persisted selection. | `ActiveAutomationUi`, new screen, prefs store |
-| **3 — JSON v2** | `projects` + `projectId` in bundle, `ignoreUnknownKeys = true`, `projectIdMap` import, selection-based export (item / project / all). | `OpenTaskerBundle`, codec, repository, export UI |
+| **3 — JSON v2** | `projects` + `projectId` in bundle, `ignoreUnknownKeys = true`, `projectIdMap` import, selection-based export (item / project / all). | `RuleDeckBundle`, codec, repository, export UI |
 | **4 — Optional** | project-scoped variables, `Project.enabled` (engine), colors/icons in the theme. | `VariableStore`, engine, `ThemeStore` |
 
 First buildable slice: Phase 1 + the switcher from Phase 2 (low-risk, everything Unfiled), then JSON v2.

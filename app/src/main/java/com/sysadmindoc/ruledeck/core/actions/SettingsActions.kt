@@ -1,0 +1,1018 @@
+package com.sysadmindoc.ruledeck.core.actions
+
+import android.Manifest
+import android.app.NotificationManager
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
+import android.content.ContentResolver
+import android.content.Context
+import android.content.pm.PackageManager
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.media.AudioManager
+import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import androidx.core.content.ContextCompat
+// The fork keeps plain Action implementations alongside upstream's DeclaredAction ones in this
+// file, so both symbols stay imported.
+import com.sysadmindoc.ruledeck.core.engine.Action
+import com.sysadmindoc.ruledeck.core.engine.ActionCategory
+import com.sysadmindoc.ruledeck.core.engine.ActionContext
+import com.sysadmindoc.ruledeck.core.engine.ActionResult
+import com.sysadmindoc.ruledeck.core.engine.ActionRetrySafety
+import com.sysadmindoc.ruledeck.core.model.VariableNamePolicy
+import com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileStore
+import com.sysadmindoc.ruledeck.core.contexts.requestRefresh
+import com.sysadmindoc.ruledeck.core.platform.AndroidAudioHardening
+import com.sysadmindoc.ruledeck.core.platform.AudioUsageEligibility
+import com.sysadmindoc.ruledeck.core.power.ShellResult
+import com.sysadmindoc.ruledeck.core.power.ShizukuPowerBackend
+import com.sysadmindoc.ruledeck.core.power.ShizukuShellRunner
+import com.sysadmindoc.ruledeck.i18n.tr
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+
+/**
+ * Toggle or set WiFi.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ */
+class WiFiToggleAction : DeclaredAction(ActionCatalog.require("wifi.toggle")) {
+
+    @Suppress("DEPRECATION")
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: "toggle"
+        val wm = ctx.app.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Direct toggles are blocked on Android 10+; drive `svc wifi` through Shizuku instead.
+            val target = when (state.lowercase()) {
+                "on" -> true
+                "off" -> false
+                "toggle" -> !(wm?.isWifiEnabled ?: false)
+                else -> return ActionResult.Failure("invalid state: $state")
+            }
+            return runElevated(ctx, "WiFi", "svc wifi ${if (target) "enable" else "disable"}")
+        }
+        wm ?: return ActionResult.Failure("WiFi not available")
+        when (state.lowercase()) {
+            "toggle" -> wm.isWifiEnabled = !wm.isWifiEnabled
+            "on" -> wm.isWifiEnabled = true
+            "off" -> wm.isWifiEnabled = false
+            else -> return ActionResult.Failure("invalid state: $state")
+        }
+        ctx.logger("WiFi: $state")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Toggle or set Bluetooth.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ */
+class BluetoothToggleAction : DeclaredAction(ActionCatalog.require("bluetooth.toggle")) {
+
+    @Suppress("DEPRECATION")
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: "toggle"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.Failure("Bluetooth permission is not granted")
+        }
+        val bm = ctx.app.getSystemService(BluetoothManager::class.java)
+        val adapter = bm?.adapter
+            ?: return ActionResult.Failure("Bluetooth not available")
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            return ActionResult.Failure("Android 13+ blocks direct Bluetooth enable/disable; use system Bluetooth settings instead")
+        }
+
+        when (state.lowercase()) {
+            "toggle" -> if (adapter.isEnabled) adapter.disable() else adapter.enable()
+            "on" -> adapter.enable()
+            "off" -> adapter.disable()
+            else -> return ActionResult.Failure("invalid state: $state")
+        }
+        ctx.logger("Bluetooth: $state")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * A Bluetooth audio device — earphones, a headset, a car: is it connected; connect, disconnect, toggle.
+ *
+ * Args:
+ *   - "address": the device's address, e.g. "C1:EB:C2:F1:FC:17". It must be paired with the phone.
+ *   - "mode": "check" (default), "connect", "disconnect" or "toggle".
+ *   - "var": the variable that gets the answer.
+ *     - check: "1" when the media (A2DP) or call (headset) profile has the device connected, else "0".
+ *     - connect / disconnect / toggle: "connected" or "disconnected" (also when it already was);
+ *       "asked" when the device did not move within "wait" seconds; or "failed: <why>". These never
+ *       fail the task — a device that is not there is an answer, not an error.
+ *   - "wait": seconds to wait for the device to come or go (default 10, max 60).
+ *   - "flash": "false" to stay quiet. Otherwise every mode flashes its result — "B8 CONNECTED".
+ *
+ * Connecting has no public API. `connect` and `disconnect` on the A2DP and headset proxies are
+ * hidden but marked `@UnsupportedAppUsage` with no target limit, so reflection reaches them, and the
+ * Android 13 services behind them ask only BLUETOOTH_CONNECT (checked against android13-release,
+ * 2026-10-22).
+ */
+private val MODES = setOf("check", "connect", "disconnect", "toggle")
+
+class BluetoothAudioAction : DeclaredAction(ActionCatalog.require("bluetooth.audio")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val address = args["address"]?.trim()?.uppercase().orEmpty()
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) return ActionResult.Failure("invalid address: $address")
+        val mode = args["mode"]?.trim()?.lowercase().orEmpty().ifEmpty { "check" }
+        if (mode !in MODES) return ActionResult.Failure("invalid mode: $mode")
+        val variable = args["var"]?.trim()?.removePrefix("%").orEmpty()
+        val quiet = args["flash"]?.trim()?.lowercase() in setOf("false", "0", "no", "off")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.Failure("Bluetooth permission is not granted")
+        }
+        val adapter = ctx.app.getSystemService(BluetoothManager::class.java)?.adapter
+            ?: return ActionResult.Failure("Bluetooth not available")
+        var label = address
+        suspend fun answer(value: String, shown: String): ActionResult {
+            if (variable.isNotEmpty()) ctx.variables.set(variable, value)
+            ctx.logger("Bluetooth audio $address $mode: $value")
+            if (!quiet) FlashAction().run(ctx, mapOf("text" to "$label $shown"))
+            return ActionResult.Success
+        }
+        if (!adapter.isEnabled) {
+            return if (mode == "check") answer("0", tr("NOT CONNECTED — Bluetooth is off"))
+            else answer("failed: Bluetooth is off", tr("%1\$s FAILED — Bluetooth is off", mode))
+        }
+        val device = adapter.getRemoteDevice(address)
+        label = runCatching { device.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: address
+        val a2dp = proxy(ctx.app, adapter, BluetoothProfile.A2DP)
+        val headset = proxy(ctx.app, adapter, BluetoothProfile.HEADSET)
+        val profiles = listOfNotNull(a2dp, headset)
+        try {
+            fun connected() = profiles.any { it.getConnectionState(device) == BluetoothProfile.STATE_CONNECTED }
+            val now = connected()
+            val wantConnected = when (mode) {
+                "check" -> return answer(if (now) "1" else "0", if (now) tr("CONNECTED") else tr("NOT CONNECTED"))
+                "connect" -> true
+                "disconnect" -> false
+                else -> !now
+            }
+            if (now == wantConnected) {
+                return if (now) answer("connected", tr("already CONNECTED")) else answer("disconnected", tr("not connected — nothing to do"))
+            }
+            val verb = if (wantConnected) "connect" else "disconnect"
+            if (wantConnected && device.bondState != BluetoothDevice.BOND_BONDED) {
+                return answer("failed: not paired with this phone", tr("connect FAILED — not paired with this phone"))
+            }
+            val asked = profiles.map { p ->
+                runCatching { p.javaClass.getMethod(verb, BluetoothDevice::class.java).invoke(p, device) as? Boolean ?: false }
+            }
+            if (asked.none { it.getOrNull() == true }) {
+                val why = asked.firstNotNullOfOrNull { it.exceptionOrNull() }
+                    ?.let { (it.cause ?: it).let { e -> e.javaClass.simpleName + (e.message?.let { m -> ": $m" } ?: "") } }
+                    ?: "the system refused"
+                return answer("failed: $why", tr("%1\$s FAILED — %2\$s", verb, why))
+            }
+            val waitS = (args["wait"]?.toLongOrNull() ?: 10L).coerceIn(1L, 60L)
+            val moved = withTimeoutOrNull(waitS * 1000L) {
+                while (connected() != wantConnected) kotlinx.coroutines.delay(250)
+                true
+            } ?: false
+            return when {
+                !moved -> answer("asked", tr("%1\$s asked — no change after %2\$s s", verb, waitS))
+                wantConnected -> answer("connected", tr("CONNECTED"))
+                else -> answer("disconnected", tr("DISCONNECTED"))
+            }
+        } finally {
+            a2dp?.let { adapter.closeProfileProxy(BluetoothProfile.A2DP, it) }
+            headset?.let { adapter.closeProfileProxy(BluetoothProfile.HEADSET, it) }
+        }
+    }
+
+    /** A profile proxy, or null when the profile does not come up within three seconds. */
+    private suspend fun proxy(context: Context, adapter: BluetoothAdapter, profile: Int): BluetoothProfile? =
+        withTimeoutOrNull(3_000L) {
+            suspendCancellableCoroutine { cont ->
+                val asked = adapter.getProfileProxy(
+                    context,
+                    object : BluetoothProfile.ServiceListener {
+                        override fun onServiceConnected(p: Int, proxy: BluetoothProfile) {
+                            if (cont.isActive) cont.resume(proxy) else adapter.closeProfileProxy(p, proxy)
+                        }
+                        override fun onServiceDisconnected(p: Int) = Unit
+                    },
+                    profile,
+                )
+                if (!asked && cont.isActive) cont.resume(null)
+            }
+        }
+}
+
+/**
+ * Set screen brightness.
+ *
+ * Args:
+ *   - "brightness": 0-255 (or auto)
+ */
+class BrightnessAction : DeclaredAction(ActionCatalog.require("brightness.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val brightness = args["brightness"] ?: args["level"] ?: return ActionResult.Failure("missing brightness")
+        if (!Settings.System.canWrite(ctx.app)) {
+            return ActionResult.Failure("Write system settings permission is not granted")
+        }
+        return try {
+            val resolver = ctx.app.contentResolver
+            if (brightness.lowercase() == "auto") {
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC)
+            } else {
+                // percent=true treats the value as 0..100; else it's the raw 0..255 system value.
+                val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+                val raw = brightness.toIntOrNull() ?: return ActionResult.Failure("invalid brightness: $brightness")
+                val value = if (percent) (raw.coerceIn(0, 100) * 255 + 50) / 100 else raw.coerceIn(0, 255)
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+                Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, value)
+            }
+            ctx.logger("Brightness: $brightness")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("failed to set brightness: ${e.message}")
+        }
+    }
+}
+
+/**
+ * Set volume level for a stream.
+ *
+ * Args:
+ *   - "stream": "music", "alarm", "ring", "notification", etc.
+ *   - "level": 0-15 (or "mute", "unmute")
+ */
+class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
+        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
+        val usage = if (streamType == AudioManager.STREAM_ALARM) {
+            AudioUsageEligibility.ALARM
+        } else {
+            AudioUsageEligibility.GENERAL
+        }
+        AndroidAudioHardening.failureIfIneligible(ctx, "volume control", usage)?.let { return it }
+        val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+
+        return try {
+            when (levelArg.lowercase()) {
+                "mute" -> audioManager.adjustStreamVolume(streamType, AudioManager.ADJUST_MUTE, 0)
+                "unmute" -> audioManager.adjustStreamVolume(streamType, AudioManager.ADJUST_UNMUTE, 0)
+                else -> {
+                    val max = audioManager.getStreamMaxVolume(streamType)
+                    val raw = levelArg.toIntOrNull() ?: return ActionResult.Failure("invalid level: $levelArg")
+                    // percent=true treats `level` as 0..100 of the stream's max (so one slider fits any stream).
+                    val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+                    val level = if (percent) (raw.coerceIn(0, 100) * max + 50) / 100 else raw.coerceIn(0, max)
+                    audioManager.setStreamVolume(streamType, level, 0)
+                }
+            }
+            ctx.logger("Volume ${args["stream"] ?: "music"}: $levelArg")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("volume change blocked by Do Not Disturb: ${ex.message}", ex)
+        }
+    }
+}
+
+/**
+ * Read the current volume of a stream into a variable.
+ *
+ * Args:
+ *   - "stream": "music", "alarm", "ring", "notification", etc. (default "music")
+ *   - "var": variable to store the level in (0..stream max). Reading is allowed on all OS versions.
+ */
+class VolumeGetAction : Action {
+    override val id = "volume.get"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val varName = args["var"]?.trim()?.removePrefix("%")?.ifBlank { null }
+            ?: return ActionResult.Failure("missing var")
+        val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
+        val rawLevel = audioManager.getStreamVolume(streamType)
+        val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+        val level = if (percent) {
+            val max = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
+            (rawLevel * 100 + max / 2) / max
+        } else rawLevel
+        ctx.variables.set(varName, level.toString())
+        ctx.logger("Volume ${args["stream"] ?: "music"} = $level${if (percent) "%" else ""} -> %$varName")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Toggle Airplane mode.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ */
+class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: "toggle"
+        val target = when (state.lowercase()) {
+            "on", "enable", "true", "1" -> true
+            "off", "disable", "false", "0" -> false
+            "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 0
+            else -> return ActionResult.Failure("invalid state: $state")
+        }
+        // The AIRPLANE_MODE broadcast is a protected, system-only broadcast — sending it from the
+        // Shizuku shell fails, which previously failed the whole action even though the setting (which
+        // the system observes) was applied. Make the broadcast best-effort so success tracks the put.
+        return runElevated(
+            ctx, "Airplane mode",
+            "settings put global airplane_mode_on ${if (target) 1 else 0} && " +
+                "(am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $target >/dev/null 2>&1 || true)",
+        )
+    }
+
+    private fun readAirplaneMode(ctx: ActionContext): Boolean =
+        Settings.Global.getInt(ctx.app.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
+}
+
+internal enum class AirplaneRoute { SHIZUKU, ASSISTANT }
+
+/**
+ * Shizuku when it's ready, since it needs nothing on screen. The assistant route is for phones
+ * where Shizuku can't run, and only when the person made RuleDeck the assistant app.
+ */
+internal fun airplaneRoute(shizukuReady: Boolean, assistantActive: Boolean): AirplaneRoute =
+    if (!shizukuReady && assistantActive) AirplaneRoute.ASSISTANT else AirplaneRoute.SHIZUKU
+
+internal const val AIRPLANE_ASSISTANT_HINT =
+    "Without Shizuku, make RuleDeck the digital assistant app from Setup and it can switch airplane mode instead."
+
+internal fun airplaneModeOutcome(target: Boolean, applied: Boolean): ActionResult =
+    if (applied == target) {
+        ActionResult.Success
+    } else {
+        ActionResult.Failure("Airplane mode is still ${if (applied) "on" else "off"}. This version of Android ignored the command.")
+    }
+
+/**
+ * Toggle mobile data.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ */
+class MobileDataAction : DeclaredAction(ActionCatalog.require("mobile.toggle")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: "toggle"
+        val target = when (state.lowercase()) {
+            "on", "enable", "true", "1" -> true
+            "off", "disable", "false", "0" -> false
+            "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, "mobile_data", 0) == 0
+            else -> return ActionResult.Failure("invalid state: $state")
+        }
+        return runElevated(ctx, "Mobile data", "svc data ${if (target) "enable" else "disable"}")
+    }
+}
+
+/**
+ * Toggle the Wi-Fi hotspot through Shizuku's shell identity. Android 8 to 10 fail plainly, because
+ * the older tethering API needs a callback class this route can't build.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ */
+class WifiHotspotAction : DeclaredAction(ActionCatalog.require("hotspot.toggle")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"]?.trim()?.lowercase()?.ifEmpty { null } ?: "toggle"
+        if (state !in HOTSPOT_STATES) return ActionResult.Failure("invalid hotspot state: $state")
+        ctx.logger("Wi-Fi hotspot: $state")
+        // Both calls block until Android answers, for up to about 20 seconds.
+        return withContext(Dispatchers.IO) {
+            val target = if (state == "toggle") {
+                when (val current = ShizukuShellRunner.readWifiHotspot()) {
+                    is ShellResult.Failure -> return@withContext ActionResult.Failure(current.reason)
+                    is ShellResult.Success -> current.output != "on"
+                }
+            } else {
+                state == "on"
+            }
+            when (val result = ShizukuShellRunner.setWifiHotspot(target)) {
+                is ShellResult.Success -> {
+                    ctx.logger("Wi-Fi hotspot is ${result.output}")
+                    ActionResult.Success
+                }
+                is ShellResult.Failure -> ActionResult.Failure(result.reason)
+            }
+        }
+    }
+
+    private companion object {
+        val HOTSPOT_STATES = setOf("on", "off", "toggle")
+    }
+}
+
+class DoNotDisturbAction : DeclaredAction(ActionCatalog.require("dnd.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val nm = ctx.app.getSystemService(NotificationManager::class.java)
+            ?: return ActionResult.Failure("notification service not available")
+        if (!nm.isNotificationPolicyAccessGranted) {
+            return ActionResult.Failure("Do Not Disturb access is not granted; enable it in Setup")
+        }
+        val mode = args["mode"] ?: "total_silence"
+        val filter = when (mode.lowercase()) {
+            "off", "all" -> NotificationManager.INTERRUPTION_FILTER_ALL
+            "priority", "priority_only" -> NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            "alarms", "alarms_only" -> NotificationManager.INTERRUPTION_FILTER_ALARMS
+            "total_silence", "none" -> NotificationManager.INTERRUPTION_FILTER_NONE
+            else -> return ActionResult.Failure("invalid Do Not Disturb mode: $mode (use off/priority/alarms/total_silence)")
+        }
+        return try {
+            nm.setInterruptionFilter(filter)
+            ctx.logger("Do Not Disturb: $mode")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("Do Not Disturb change blocked: ${ex.message}", ex)
+        }
+    }
+}
+
+class RingerModeAction : DeclaredAction(ActionCatalog.require("ringer.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val mode = args["mode"] ?: return ActionResult.Failure("missing mode argument")
+        val ringerMode = when (mode.lowercase()) {
+            "normal", "ring" -> AudioManager.RINGER_MODE_NORMAL
+            "vibrate" -> AudioManager.RINGER_MODE_VIBRATE
+            "silent" -> AudioManager.RINGER_MODE_SILENT
+            else -> return ActionResult.Failure("invalid ringer mode: $mode (use normal/vibrate/silent)")
+        }
+        AndroidAudioHardening.failureIfIneligible(ctx, "ringer-mode change")?.let { return it }
+        val am = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+        return try {
+            am.ringerMode = ringerMode
+            ctx.logger("Ringer: $mode")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("ringer change blocked by Do Not Disturb: ${ex.message}", ex)
+        }
+    }
+}
+
+class TorchAction : DeclaredAction(ActionCatalog.require("torch.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: "toggle"
+        val cm = ctx.app.getSystemService(CameraManager::class.java)
+            ?: return ActionResult.Failure("camera service not available")
+        val cameraId = findTorchCameraId(cm)
+            ?: return ActionResult.Failure("no camera with flash found")
+
+        return try {
+            val targetState = when (state.lowercase()) {
+                "on" -> true
+                "off" -> false
+                "toggle" -> {
+                    val currentState = awaitTorchState(cm, cameraId)
+                        ?: return ActionResult.Failure(
+                            "torch toggle state is unavailable; use explicit on/off for reliable state"
+                        )
+                    currentState.not()
+                }
+                else -> return ActionResult.Failure("invalid state: $state (use on/off/toggle)")
+            }
+            cm.setTorchMode(cameraId, targetState)
+            ctx.logger("Torch: ${if (targetState) "on" else "off"}")
+            ActionResult.Success
+        } catch (ex: SecurityException) {
+            ActionResult.Failure("torch blocked by camera permission or policy: ${ex.message}", ex)
+        } catch (ex: IllegalArgumentException) {
+            ActionResult.Failure("torch failed: ${ex.message}", ex)
+        } catch (ex: CameraAccessException) {
+            ActionResult.Failure("torch failed: ${ex.message}", ex)
+        }
+    }
+
+    companion object {
+        internal fun targetStateFor(requestedState: String, currentState: Boolean?): Boolean? =
+            when (requestedState.lowercase()) {
+                "on" -> true
+                "off" -> false
+                "toggle" -> currentState?.not()
+                else -> null
+            }
+
+        internal const val TORCH_STATE_TIMEOUT_MS = 750L
+    }
+}
+
+private fun findTorchCameraId(cameraManager: CameraManager): String? =
+    try {
+        cameraManager.cameraIdList.firstOrNull { cameraId ->
+            try {
+                cameraManager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            } catch (_: CameraAccessException) {
+                false
+            } catch (_: IllegalArgumentException) {
+                false
+            }
+        }
+    } catch (_: CameraAccessException) {
+        null
+    }
+
+private suspend fun awaitTorchState(cameraManager: CameraManager, cameraId: String): Boolean? =
+    withTimeoutOrNull(TorchAction.TORCH_STATE_TIMEOUT_MS) {
+        suspendCancellableCoroutine { continuation ->
+            val handler = Handler(Looper.getMainLooper())
+            val callback = object : CameraManager.TorchCallback() {
+                override fun onTorchModeChanged(id: String, enabled: Boolean) {
+                    if (id != cameraId || !continuation.isActive) return
+                    safelyUnregisterTorchCallback(cameraManager, this)
+                    continuation.resume(enabled)
+                }
+
+                override fun onTorchModeUnavailable(id: String) {
+                    if (id != cameraId || !continuation.isActive) return
+                    safelyUnregisterTorchCallback(cameraManager, this)
+                    continuation.resume(null)
+                }
+            }
+
+            try {
+                cameraManager.registerTorchCallback(callback, handler)
+            } catch (_: RuntimeException) {
+                if (continuation.isActive) continuation.resume(null)
+            }
+            continuation.invokeOnCancellation {
+                safelyUnregisterTorchCallback(cameraManager, callback)
+            }
+        }
+    }
+
+private fun safelyUnregisterTorchCallback(cameraManager: CameraManager, callback: CameraManager.TorchCallback) {
+    try {
+        cameraManager.unregisterTorchCallback(callback)
+    } catch (_: RuntimeException) {
+    }
+}
+
+class TileStateAction : DeclaredAction(ActionCatalog.require("tile.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"] ?: return ActionResult.Failure("missing state argument")
+        val active = when (state.lowercase()) {
+            "active", "on", "true" -> true
+            "inactive", "off", "false" -> false
+            else -> return ActionResult.Failure("invalid state: $state (use active/inactive)")
+        }
+        val slot = args["slot"]?.trim()?.ifBlank { "1" }?.toIntOrNull()
+            ?: return ActionResult.Failure("invalid tile slot (use 1-${com.sysadmindoc.ruledeck.core.contexts.QuickSettingsTileSlots.COUNT})")
+        val store = QuickSettingsTileStore(ctx.app)
+        val current = runCatching { store.load(slot) }
+            .getOrElse { return ActionResult.Failure(it.message ?: "invalid tile slot") }
+        if (current.taskId == null) return ActionResult.Failure("tile slot $slot has no bound task")
+        runCatching {
+            store.setState(
+                slot = slot,
+                active = active,
+                label = args["label"],
+                subtitle = args["subtitle"],
+                iconKey = args["icon"],
+            )
+        }.getOrElse { return ActionResult.Failure(it.message ?: "tile update failed") }
+        store.requestRefresh(ctx.app, slot)
+        return ActionResult.Success
+    }
+}
+
+private fun streamType(name: String): Int? = when (name.lowercase()) {
+    "music", "media" -> AudioManager.STREAM_MUSIC
+    "alarm" -> AudioManager.STREAM_ALARM
+    "ring", "ringer" -> AudioManager.STREAM_RING
+    "notification" -> AudioManager.STREAM_NOTIFICATION
+    "system" -> AudioManager.STREAM_SYSTEM
+    "voice", "call" -> AudioManager.STREAM_VOICE_CALL
+    else -> null
+}
+
+/**
+ * Set screen timeout (stay-on duration).
+ *
+ * Args:
+ *   - "millis": milliseconds until screen times out (minimum 1000)
+ *
+ * Android has no "never" value for SCREEN_OFF_TIMEOUT: 0 turns the screen off
+ * (near-)immediately on real devices, the opposite of what "never" suggests, so
+ * zero and sub-second values are rejected.
+ */
+class ScreenTimeoutAction : DeclaredAction(ActionCatalog.require("screen.timeout")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
+        val ms = rawMillis.toLongOrNull() ?: return ActionResult.Failure("invalid millis: $rawMillis")
+        if (ms !in MIN_SCREEN_TIMEOUT_MS..MAX_SCREEN_TIMEOUT_MS) {
+            return ActionResult.Failure(
+                "screen timeout must be between $MIN_SCREEN_TIMEOUT_MS and $MAX_SCREEN_TIMEOUT_MS ms",
+            )
+        }
+        if (!Settings.System.canWrite(ctx.app)) {
+            return ActionResult.Failure("Write system settings permission is not granted")
+        }
+        return try {
+            Settings.System.putInt(ctx.app.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, ms.toInt())
+            ctx.logger("Screen timeout: ${ms / 1000}s")
+            ActionResult.Success
+        } catch (e: Exception) {
+            ActionResult.Failure("failed: ${e.message}")
+        }
+    }
+
+    companion object {
+        private const val MIN_SCREEN_TIMEOUT_MS = 1_000L
+        private const val MAX_SCREEN_TIMEOUT_MS = 1_800_000L // 30 minutes
+    }
+}
+
+/**
+ * Turn the always-on display on or off.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ *
+ * `settings put secure doze_always_on` returns a zero exit code on builds that do not implement
+ * the key, so writing it proves nothing. The value is read before and after the write and the
+ * action fails when the device did not actually change, rather than reporting a Success the user
+ * can see is false.
+ *
+ * One UI ignores that key (a Galaxy S22 on Android 16 reads it as null) and follows its own
+ * `system aod_mode` instead, so [AlwaysOnDisplaySwitch] picks the switch from the maker and the
+ * keys that are there. aod_mode isn't an AOSP key and an app can't count on reading it, so it's
+ * read through Shizuku's allowlisted `settings get`, before and after the write alike.
+ */
+class AlwaysOnDisplayAction(
+    private val manufacturer: () -> String? = { Build.MANUFACTURER },
+    private val readDozeAlwaysOn: (Context) -> Int? = { context ->
+        runCatching { Settings.Secure.getInt(context.contentResolver, ALWAYS_ON_DISPLAY_KEY) }.getOrNull()
+    },
+    /** Runs one of aod.set's allowlisted Shizuku commands by its index. */
+    private val shell: (variantIndex: Int) -> ShellResult = { variant -> ShizukuShellRunner.execute("aod.set", variant) },
+) : DeclaredAction(ActionCatalog.require("aod.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"]?.lowercase() ?: "toggle"
+        if (state !in STATES) return ActionResult.Failure("invalid always-on display state: $state")
+
+        val maker = manufacturer()
+        val doze = readDozeAlwaysOn(ctx.app)
+        val aodMode = if (AlwaysOnDisplaySwitch.needsSamsungKey(maker, doze)) {
+            when (val read = shell(AlwaysOnDisplaySwitch.SAMSUNG_READ_VARIANT)) {
+                is ShellResult.Success -> AlwaysOnDisplaySwitch.parseSettingsGet(read.output)
+                // On a Samsung the switch can only be read through Shizuku, which the write needs too.
+                is ShellResult.Failure -> if (AlwaysOnDisplaySwitch.isSamsung(maker)) return ActionResult.Failure(read.reason) else null
+            }
+        } else {
+            null
+        }
+        val switch = AlwaysOnDisplaySwitch.choose(maker, doze, aodMode)
+            ?: return ActionResult.Failure(
+                "This device does not expose the always-on display setting ($ALWAYS_ON_DISPLAY_KEY, or aod_mode on Samsung), so it cannot be changed.",
+            )
+        val current = when (switch) {
+            AlwaysOnDisplaySwitch.AOSP -> doze
+            AlwaysOnDisplaySwitch.SAMSUNG -> aodMode
+        }
+        val target = when (state) {
+            "on" -> 1
+            "off" -> 0
+            else -> if (current == 1) 0 else 1
+        }
+        ctx.logger("Always-on display: $state (${switch.table} ${switch.key})")
+        if (target == current) return ActionResult.Success
+
+        when (val write = shell(if (target == 1) switch.onVariant else switch.offVariant)) {
+            is ShellResult.Failure -> return ActionResult.Failure(write.reason)
+            is ShellResult.Success -> ctx.logger("Always-on display completed")
+        }
+
+        val applied = when (switch) {
+            AlwaysOnDisplaySwitch.AOSP -> readDozeAlwaysOn(ctx.app)
+            AlwaysOnDisplaySwitch.SAMSUNG -> (shell(AlwaysOnDisplaySwitch.SAMSUNG_READ_VARIANT) as? ShellResult.Success)
+                ?.output
+                ?.let(AlwaysOnDisplaySwitch::parseSettingsGet)
+        }
+        return when (applied) {
+            target -> ActionResult.Success
+            null -> ActionResult.Failure(
+                "Always-on display couldn't be read back after the write (${switch.key}), so it may not have changed.",
+            )
+            else -> ActionResult.Failure(
+                "Always-on display is still ${if (applied == 1) "on" else "off"}; this build accepted the write and ignored it.",
+            )
+        }
+    }
+
+    companion object {
+        internal const val ALWAYS_ON_DISPLAY_KEY = "doze_always_on"
+        private val STATES = setOf("on", "off", "toggle")
+    }
+}
+
+/**
+ * The setting a device's always-on display follows, with the indexes of aod.set's allowlisted
+ * Shizuku commands that turn it on and off.
+ */
+internal enum class AlwaysOnDisplaySwitch(val table: String, val key: String, val onVariant: Int, val offVariant: Int) {
+    /** AOSP's switch, which the app reads itself. */
+    AOSP("secure", AlwaysOnDisplayAction.ALWAYS_ON_DISPLAY_KEY, onVariant = 0, offVariant = 1),
+
+    /** One UI's switch, read through Shizuku. */
+    SAMSUNG("system", "aod_mode", onVariant = 2, offVariant = 3),
+    ;
+
+    companion object {
+        /** `settings get system aod_mode`. */
+        const val SAMSUNG_READ_VARIANT = 4
+
+        fun isSamsung(manufacturer: String?): Boolean = manufacturer?.trim().equals("samsung", ignoreCase = true)
+
+        /** Whether aod_mode has to be read before a switch can be picked. */
+        fun needsSamsungKey(manufacturer: String?, dozeAlwaysOn: Int?): Boolean =
+            isSamsung(manufacturer) || dozeAlwaysOn == null
+
+        /**
+         * aod_mode on a Samsung, or wherever doze_always_on is missing and aod_mode is there; else
+         * doze_always_on when it's there (a Samsung running an AOSP build, say); null when neither is.
+         */
+        fun choose(manufacturer: String?, dozeAlwaysOn: Int?, aodMode: Int?): AlwaysOnDisplaySwitch? = when {
+            aodMode != null && needsSamsungKey(manufacturer, dozeAlwaysOn) -> SAMSUNG
+            dozeAlwaysOn != null -> AOSP
+            else -> null
+        }
+
+        /** `settings get` prints the value, or `null` for a key the device doesn't have. */
+        fun parseSettingsGet(output: String): Int? = output.trim().toIntOrNull()
+    }
+}
+
+/** The Settings tables a write can target, named as the user picks them. */
+internal enum class SettingsTable(val wireValue: String) {
+    GLOBAL("global"),
+    SECURE("secure"),
+    SYSTEM("system"),
+}
+
+internal sealed interface SettingsWriteRequest {
+    data class Valid(val table: SettingsTable, val key: String, val value: String) : SettingsWriteRequest
+
+    data class Rejected(val message: String) : SettingsWriteRequest
+}
+
+internal const val MAX_SETTINGS_VALUE_CHARS = 256
+
+/**
+ * The value that makes Write Setting flip a setting instead of writing it: it reads the setting
+ * and writes 1 for 0 and 0 for 1, and fails on anything else. Saved and imported steps hold this
+ * exact text.
+ */
+internal const val SETTING_TOGGLE_VALUE = "=:=toggle=:="
+
+/** What a toggle writes over [current], or null when [current] isn't 0 or 1 and so can't be toggled. */
+internal fun toggledSettingValue(current: String?): String? = when (current) {
+    "0" -> "1"
+    "1" -> "0"
+    else -> null
+}
+
+/** One setting's value as Android stores it, or null when the table has no such name. */
+internal fun readSetting(resolver: ContentResolver, table: SettingsTable, key: String): String? = when (table) {
+    SettingsTable.GLOBAL -> Settings.Global.getString(resolver, key)
+    SettingsTable.SECURE -> Settings.Secure.getString(resolver, key)
+    SettingsTable.SYSTEM -> Settings.System.getString(resolver, key)
+}
+
+private val SETTINGS_KEY_PATTERN = Regex("[a-z0-9_.]{1,64}")
+
+/**
+ * Setting names this action refuses to write, whatever the table.
+ *
+ * `WRITE_SECURE_SETTINGS` is granted once, for one reason, and then persists. Without this list a
+ * profile imported afterwards could write `enabled_accessibility_services` and hand an arbitrary
+ * package full accessibility privileges with no system dialog, or turn off the package verifier,
+ * or allow installs from unknown sources. An imported profile reaches this action behind one
+ * generic device-control acknowledgement, which is nowhere near consent for that.
+ *
+ * These are matched as fragments rather than exact names because the same control appears under
+ * several spellings across versions and OEM builds. The cost is refusing a few harmless names that
+ * happen to contain one; that is the right side to be wrong on, and the refusal says why.
+ */
+private val PROTECTED_SETTING_FRAGMENTS = listOf(
+    "accessibility",
+    "notification_listener",
+    "notification_policy",
+    "input_method",
+    // The second family, and the same harm by a different route: these name the app that gets a
+    // role. Becoming the default SMS application grants the SMS permissions outright, with no
+    // dialog; the assistant, autofill and voice-interaction services see what the user types and
+    // what is on screen; the NFC payment default receives taps.
+    "default_application",
+    "assistant",
+    "autofill_service",
+    "voice_interaction",
+    "voice_recognition",
+    "nfc_payment",
+    "verifier",
+    "adb",
+    "development_settings",
+    "device_admin",
+    "device_provisioned",
+    "user_setup_complete",
+    "install_non_market",
+    "unknown_sources",
+    "lock_pattern",
+    "lockscreen",
+    "trust_agent",
+    "location_providers_allowed",
+    "vpn",
+    // The third family: values that redirect other apps' traffic, or lift the platform's own
+    // restrictions on what code may call. hidden_api_blacklist_exemptions takes package prefixes
+    // that are then allowed to call blocked private APIs; the proxy and DNS names point every
+    // other app's traffic wherever the value says.
+    "hidden_api",
+    "http_proxy",
+    "private_dns",
+    "captive_portal",
+)
+
+/**
+ * The one command that turns the Global and Secure tables on.
+ *
+ * `WRITE_SECURE_SETTINGS` cannot be requested at runtime and no dialog can grant it, so this is
+ * built from the installed package name rather than hard-coded: a debug build carries a different
+ * one, and a command naming the wrong package fails with a message that does not say why.
+ */
+internal fun secureSettingsGrantCommand(packageName: String): String =
+    "adb shell pm grant $packageName android.permission.WRITE_SECURE_SETTINGS"
+
+internal fun hasWriteSecureSettings(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) ==
+        PackageManager.PERMISSION_GRANTED
+
+private fun settingsTableArg(args: Map<String, String>): SettingsTable? {
+    val requested = args["table"]?.trim()?.lowercase().orEmpty()
+    return SettingsTable.entries.firstOrNull { it.wireValue == requested }
+}
+
+private fun settingsKeyArg(args: Map<String, String>): String? =
+    args["key"]?.trim().orEmpty().takeIf(SETTINGS_KEY_PATTERN::matches)
+
+private const val SETTINGS_KEY_RULE = "A setting name is up to 64 characters of a-z, 0-9, underscore or dot."
+
+/** Validates the arguments before anything touches a Settings table. */
+internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest {
+    val table = settingsTableArg(args)
+        ?: return SettingsWriteRequest.Rejected(
+            "Choose the table to write: global, secure, or system.",
+        )
+    val key = settingsKeyArg(args) ?: return SettingsWriteRequest.Rejected(SETTINGS_KEY_RULE)
+    PROTECTED_SETTING_FRAGMENTS.firstOrNull { it in key }?.let { fragment ->
+        return SettingsWriteRequest.Rejected(
+            "\"$key\" controls what other apps are allowed to do, so this action will not write " +
+                "it. Names containing \"$fragment\" are refused.",
+        )
+    }
+    val value = args["value"]
+        ?: return SettingsWriteRequest.Rejected("This action needs a value to write.")
+    if (value.length > MAX_SETTINGS_VALUE_CHARS) {
+        return SettingsWriteRequest.Rejected(
+            "The value is longer than $MAX_SETTINGS_VALUE_CHARS characters.",
+        )
+    }
+    return SettingsWriteRequest.Valid(table, key, value)
+}
+
+/**
+ * Writes one Android setting.
+ *
+ * Global and Secure need `WRITE_SECURE_SETTINGS`, which no app can ask for at runtime; it is
+ * granted once over a cable and then persists. System uses the ordinary Modify system settings
+ * access the brightness and screen-timeout actions already use.
+ *
+ * The value is read back afterwards. Android accepts a write to a name it does not know, and
+ * silently normalises or discards values it does not like, so without the read-back the action
+ * would report success for a setting that never changed.
+ *
+ * The toggle value, [SETTING_TOGGLE_VALUE], flips a setting at 0 or 1 instead of being written.
+ */
+class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write")) {
+
+    // A toggle flips the setting each time, so a retried one would undo itself. The args are as
+    // written, so a variable that only holds the toggle value once it runs isn't caught here.
+    override fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety =
+        if (args["value"] == SETTING_TOGGLE_VALUE) ActionRetrySafety.NEVER else retrySafety
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val request = when (val parsed = parseSettingsWrite(args)) {
+            is SettingsWriteRequest.Rejected -> return ActionResult.Failure(parsed.message)
+            is SettingsWriteRequest.Valid -> parsed
+        }
+        val resolver = ctx.app.contentResolver
+        val target = "${request.table.wireValue}/${request.key}"
+
+        if (request.table == SettingsTable.SYSTEM) {
+            if (!Settings.System.canWrite(ctx.app)) {
+                return ActionResult.Failure(
+                    "Writing $target needs Modify system settings, which you grant from Setup.",
+                )
+            }
+        } else if (!hasWriteSecureSettings(ctx.app)) {
+            return ActionResult.Failure(
+                "Writing $target needs secure settings access. Grant it once from a computer: " +
+                    secureSettingsGrantCommand(ctx.app.packageName),
+            )
+        }
+
+        val value = if (request.value == SETTING_TOGGLE_VALUE) {
+            val current = runCatching { readSetting(resolver, request.table, request.key) }.getOrNull()
+            toggledSettingValue(current) ?: return ActionResult.Failure(
+                "$target holds ${current ?: "nothing"}, and only a setting at 0 or 1 can be toggled.",
+            )
+        } else {
+            request.value
+        }
+
+        val accepted = runCatching {
+            when (request.table) {
+                SettingsTable.GLOBAL -> Settings.Global.putString(resolver, request.key, value)
+                SettingsTable.SECURE -> Settings.Secure.putString(resolver, request.key, value)
+                SettingsTable.SYSTEM -> Settings.System.putString(resolver, request.key, value)
+            }
+        }.getOrElse { error ->
+            return ActionResult.Failure(
+                "$target could not be written: ${error.message ?: "Android refused it"}",
+            )
+        }
+        if (!accepted) return ActionResult.Failure("Android refused to write $target.")
+
+        val readBack = runCatching { readSetting(resolver, request.table, request.key) }.getOrNull()
+        if (readBack != value) {
+            // Deliberately not "Android ignored it": the value may also have been accepted and then
+            // normalised or clamped by whatever owns that setting. What is certain is that the
+            // setting does not hold what was asked for, so report that and nothing more.
+            return ActionResult.Failure(
+                "$target reads ${readBack ?: "nothing"} after the write, not $value.",
+            )
+        }
+
+        ctx.logger("Setting $target = $value")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Reads one Android setting into a variable. A setting that isn't there is stored as empty.
+ * Reading needs no access, but Android 12 and newer refuse names they hide from apps, and then the
+ * step fails and says so rather than store an empty value that looks like a real reading.
+ */
+class SettingsReadAction : DeclaredAction(ActionCatalog.require("settings.read")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val table = settingsTableArg(args)
+            ?: return ActionResult.Failure("Choose the table to read: global, secure, or system.")
+        val key = settingsKeyArg(args) ?: return ActionResult.Failure(SETTINGS_KEY_RULE)
+        val output = VariableNamePolicy.normalize(args["var"].orEmpty())
+            ?: return ActionResult.Failure("Choose a variable to store the setting in.")
+        val target = "${table.wireValue}/$key"
+        val value = runCatching { readSetting(ctx.app.contentResolver, table, key) }.getOrElse { error ->
+            return ActionResult.Failure("Android won't let this app read $target: ${error.message ?: "it refused"}")
+        }
+        ctx.variables.set(output, value.orEmpty())
+        ctx.logger("Read setting $target")
+        return ActionResult.Success
+    }
+}

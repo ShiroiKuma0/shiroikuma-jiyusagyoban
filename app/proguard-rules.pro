@@ -1,10 +1,10 @@
--keep class com.opentasker.core.model.** { *; }
+-keep class com.sysadmindoc.ruledeck.core.model.** { *; }
 -keepclassmembers class **$$serializer { *; }
 -keepclasseswithmembers class * { @kotlinx.serialization.Serializable <fields>; }
 
 # Keep manifest-declared entry points
--keep class com.opentasker.app.OpenTaskerApp_NoHilt
--keep class com.opentasker.app.MainActivity
+-keep class com.sysadmindoc.ruledeck.RuleDeckApp_NoHilt
+-keep class com.sysadmindoc.ruledeck.MainActivity
 
 # Room generated code
 -keep class * extends androidx.room.RoomDatabase
@@ -15,37 +15,37 @@
 -keep class moe.shizuku.** { *; }
 -keep class rikka.shizuku.** { *; }
 -keep class rikka.sui.** { *; }
--keep class com.opentasker.core.power.ShizukuCommandUserService { *; }
--keep interface com.opentasker.core.power.IShizukuCommandService { *; }
+-keep class com.sysadmindoc.ruledeck.core.power.ShizukuCommandUserService { *; }
+-keep interface com.sysadmindoc.ruledeck.core.power.IShizukuCommandService { *; }
 
 # Native key grabber (Shizuku UserService). The JNI symbols are derived from the class + method names,
 # and the service is instantiated by name inside the privileged process — so it must NOT be renamed or
 # stripped. onNativeKey is called from JNI by name.
--keep class com.opentasker.core.input.KeyGrabberService {
+-keep class com.sysadmindoc.ruledeck.core.input.KeyGrabberService {
     <init>(...);
     native <methods>;
     void onNativeKey(int, int);
 }
--keep class com.opentasker.core.input.IKeyGrabber* { *; }
+-keep class com.sysadmindoc.ruledeck.core.input.IKeyGrabber* { *; }
 
 # Wallpaper bridge (Shizuku UserService) — same reason again. Missing this rule cost a debugging
 # round: bindUserService simply never connected, the bind timed out after 8s, and wallpaper.live fell
 # back to the picker while still reporting success. There is no error to read; the class is just gone.
--keep class com.opentasker.core.wallpaper.WallpaperBridgeService {
+-keep class com.sysadmindoc.ruledeck.core.wallpaper.WallpaperBridgeService {
     <init>();
     *;
 }
--keep class com.opentasker.core.wallpaper.IWallpaperBridge { *; }
--keep class com.opentasker.core.wallpaper.IWallpaperBridge$* { *; }
+-keep class com.sysadmindoc.ruledeck.core.wallpaper.IWallpaperBridge { *; }
+-keep class com.sysadmindoc.ruledeck.core.wallpaper.IWallpaperBridge$* { *; }
 
 # Telephony bridge (Shizuku UserService) — same reason: Shizuku instantiates it BY NAME inside the
 # privileged process, so R8 renaming or stripping it makes bindUserService fail with nothing but a
 # null binder. The AIDL stub must survive intact too.
--keep class com.opentasker.core.telephony.TelephonyBridgeService {
+-keep class com.sysadmindoc.ruledeck.core.telephony.TelephonyBridgeService {
     <init>(...);
     *;
 }
--keep class com.opentasker.core.telephony.ITelephonyBridge* { *; }
+-keep class com.sysadmindoc.ruledeck.core.telephony.ITelephonyBridge* { *; }
 
 # RE2J internals (uses sun.misc.Unsafe fallback)
 -dontwarn com.google.re2j.**

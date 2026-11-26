@@ -1,0 +1,838 @@
+package com.sysadmindoc.ruledeck.ui.screens
+
+import com.sysadmindoc.ruledeck.i18n.tr
+import com.sysadmindoc.ruledeck.ui.components.Button
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import com.sysadmindoc.ruledeck.ui.components.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import com.sysadmindoc.ruledeck.ui.components.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Text
+import com.sysadmindoc.ruledeck.ui.components.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
+import com.sysadmindoc.ruledeck.R
+import com.sysadmindoc.ruledeck.core.actions.ActionMetadataRegistry
+import com.sysadmindoc.ruledeck.core.engine.ActionTraceStatus
+import com.sysadmindoc.ruledeck.core.engine.RunLogActionDiagnostic
+import com.sysadmindoc.ruledeck.core.engine.RunLogOutcome
+import com.sysadmindoc.ruledeck.core.engine.RunLogSource
+import com.sysadmindoc.ruledeck.core.engine.RunLogTemplateDiagnostic
+import com.sysadmindoc.ruledeck.ui.components.destructiveButtonColors
+import com.sysadmindoc.ruledeck.ui.theme.DesignSystem
+import com.sysadmindoc.ruledeck.ui.theme.UiRole
+import com.sysadmindoc.ruledeck.ui.theme.role
+import com.sysadmindoc.ruledeck.core.engine.outcome
+import com.sysadmindoc.ruledeck.core.engine.toRunLogDiagnostics
+import com.sysadmindoc.ruledeck.core.model.RunLogEntry
+import com.sysadmindoc.ruledeck.core.model.Task
+import com.sysadmindoc.ruledeck.core.storage.RunLogRetentionOptions
+import com.sysadmindoc.ruledeck.core.storage.RunLogRetentionPolicy
+import com.sysadmindoc.ruledeck.core.storage.displayLabel
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
+
+internal const val RUN_LOG_LIST_TAG = "run_log_list"
+internal const val RUN_LOG_CLEAR_TAG = "run_log_clear"
+
+// The export/refresh controls sit in a LazyRow, so the ones past the right edge are never
+// composed on a narrow device and cannot be reached without scrolling the row itself.
+internal const val RUN_LOG_ACTIONS_TAG = "run_log_actions"
+
+@Composable
+internal fun RunLogScreenContent(
+    logs: List<RunLogEntry>,
+    tasks: List<Task>,
+    retentionPolicy: RunLogRetentionPolicy,
+    onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
+    onClearRunLog: (() -> Unit)? = null,
+    onShareDiagnostic: () -> Unit,
+    onReplayHeld: (RunLogEntry) -> Unit,
+    // True while a manual run or a held replay is in flight; disables every Replay button, since the
+    // guard behind onReplayHeld would otherwise drop the tap with nothing on screen to say why.
+    runBusy: Boolean = false,
+    contentPadding: PaddingValues,
+) {
+    var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    val statusFilter = RunLogStatusFilter.entries.getOrElse(statusFilterOrdinal) { RunLogStatusFilter.All }
+    var taskIdFilter by rememberSaveable { mutableStateOf<Long?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val taskOptions = remember(logs, tasks) { runLogTaskOptions(logs, tasks) }
+    val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
+        filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
+    }
+    // The latest failure (logs are timestamp-DESC) gets a banner atop the Log tab — this is where
+    // run failures surface now that the Profiles workspace card is gone.
+    //
+    // Classify with outcome(), NOT the raw success flag: a Skipped run never started (the collision
+    // or admission gate turned it away) and a Cancelled one was stopped on purpose, yet both are
+    // stored with success = false. Since the collision policy became live at the shared execution
+    // boundary, an ordinary slider drag skips a few mid-drag fires — on the raw flag that painted a
+    // red "failure" banner over a workspace in which nothing had actually failed.
+    val latestFailure = logs.firstOrNull { it.outcome() == RunLogOutcome.Failed }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+    ) {
+        if (latestFailure != null) {
+            item {
+                InlineNotice(
+                    title = tr("Last failure: %1\$s", latestFailure.taskName),
+                    body = latestFailure.message.ifBlank { tr("Tap the matching entry below for the full trace.") },
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        if (logs.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = stringResource(R.string.empty_run_log_title),
+                    body = stringResource(R.string.empty_run_log_body),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else {
+            item {
+                RunLogSummaryCard(logs, onShareDiagnostic)
+            }
+        }
+        item {
+            RunLogRetentionCard(
+                policy = retentionPolicy,
+                onPolicyChange = onRetentionPolicyChange,
+                onClearRunLog = onClearRunLog,
+            )
+        }
+        if (logs.isNotEmpty()) {
+            item {
+                RunLogFilterCard(
+                    totalCount = logs.size,
+                    visibleCount = filteredLogs.size,
+                    statusFilter = statusFilter,
+                    onStatusFilterChange = { statusFilterOrdinal = it.ordinal },
+                    taskOptions = taskOptions,
+                    selectedTaskId = taskIdFilter,
+                    onTaskFilterChange = { taskIdFilter = it },
+                    query = query,
+                    onQueryChange = { query = it },
+                )
+            }
+        }
+        if (logs.isNotEmpty() && filteredLogs.isEmpty()) {
+            item {
+                InlineNotice(
+                    title = stringResource(R.string.empty_run_log_search_title),
+                    body = stringResource(R.string.empty_run_log_search_body),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        items(filteredLogs, key = { it.id }) { entry ->
+            RunLogCard(entry, onReplayHeld, runBusy)
+        }
+    }
+}
+
+@Composable
+private fun RunLogRetentionCard(
+    policy: RunLogRetentionPolicy,
+    onPolicyChange: (RunLogRetentionPolicy) -> Unit,
+    onClearRunLog: (() -> Unit)? = null,
+) {
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.run_log_retention_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.run_log_retention_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                RunLogRetentionOptions.all.forEach { option ->
+                    val selected = option.policy == policy
+                    val selectionDescription = if (selected) {
+                        stringResource(R.string.a11y_selected)
+                    } else {
+                        stringResource(R.string.a11y_not_selected)
+                    }
+                    OutlinedButton(
+                        onClick = { onPolicyChange(option.policy) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                            .semantics { stateDescription = selectionDescription },
+                        // The pill is never filled, so the chosen option is told by its mark (and
+                        // the bold label), not by a tinted ground the pill would turn into its frame.
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                if (selected) {
+                                    Icon(
+                                        Icons.Filled.CheckCircle,
+                                        contentDescription = stringResource(R.string.label_selected),
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clearAndSetSemantics { },
+                                        tint = role(UiRole.LIST_SELECTED),
+                                    )
+                                } else {
+                                    Spacer(Modifier.size(16.dp))
+                                }
+                                Text(
+                                    tr(option.label),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                )
+                            }
+                            Text(
+                                tr(option.description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                if (onClearRunLog != null) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+                    Text(
+                        stringResource(R.string.run_log_clear_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(
+                        onClick = { confirmClear = true },
+                        modifier = Modifier.testTag(RUN_LOG_CLEAR_TAG),
+                        colors = destructiveButtonColors(),
+                    ) {
+                        Text(stringResource(R.string.run_log_clear_action))
+                    }
+                }
+            }
+        }
+    }
+
+    if (confirmClear && onClearRunLog != null) {
+        // A log purge cannot offer Undo, so this is the confirmation instead. Pinned and held rows
+        // survive, and the dialog says so rather than implying everything goes.
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(stringResource(R.string.run_log_clear_action)) },
+            text = {
+                Text(
+                    stringResource(R.string.run_log_clear_confirm_body),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmClear = false
+                        onClearRunLog()
+                    },
+                    colors = destructiveButtonColors(),
+                ) {
+                    Text(stringResource(R.string.run_log_clear_action))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmClear = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RunLogFilterCard(
+    totalCount: Int,
+    visibleCount: Int,
+    statusFilter: RunLogStatusFilter,
+    onStatusFilterChange: (RunLogStatusFilter) -> Unit,
+    taskOptions: List<Pair<Long, String>>,
+    selectedTaskId: Long?,
+    onTaskFilterChange: (Long?) -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_log_find_runs), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.run_log_shown_count, visibleCount, totalCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (statusFilter != RunLogStatusFilter.All || selectedTaskId != null || query.isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            onStatusFilterChange(RunLogStatusFilter.All)
+                            onTaskFilterChange(null)
+                            onQueryChange("")
+                        },
+                    ) {
+                        Text(stringResource(R.string.action_clear))
+                    }
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                item {
+                    RunLogFilterChip(
+                        label = stringResource(R.string.run_log_any_task),
+                        selected = selectedTaskId == null,
+                        onClick = { onTaskFilterChange(null) },
+                    )
+                }
+                items(taskOptions, key = { it.first }) { (taskId, taskName) ->
+                    RunLogFilterChip(
+                        label = taskName,
+                        selected = selectedTaskId == taskId,
+                        onClick = { onTaskFilterChange(taskId) },
+                    )
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
+                    RunLogFilterChip(
+                        label = tr(filter.label),
+                        selected = statusFilter == filter,
+                        onClick = { onStatusFilterChange(filter) },
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                label = { Text(stringResource(R.string.run_log_search_label)) },
+                placeholder = { Text(stringResource(R.string.run_log_search_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RunLogFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectionDescription = if (selected) {
+        stringResource(R.string.a11y_selected)
+    } else {
+        stringResource(R.string.a11y_not_selected)
+    }
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.semantics { stateDescription = selectionDescription },
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 9.dp),
+    ) {
+        // A filter that is on is told by its ✓ and its bold label: the pill itself is never filled.
+        if (selected) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = role(UiRole.LIST_SELECTED),
+            )
+            Spacer(Modifier.size(4.dp))
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> Unit = {}) {
+    val outcomes = remember(logs) { logs.map { it.outcome() } }
+    val failures = outcomes.count { it == RunLogOutcome.Failed }
+    val skipped = outcomes.count { it == RunLogOutcome.Skipped }
+    val latest = logs.firstOrNull()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(com.sysadmindoc.ruledeck.ui.theme.DesignSystem.Radii.xxl),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.title_execution_history), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        stringResource(R.string.run_log_history_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                StatusPill(
+                    when {
+                        failures > 0 -> tr("%1\$s failed", failures)
+                        skipped > 0 -> tr("%1\$s skipped", skipped)
+                        else -> tr("Healthy")
+                    },
+                    when {
+                        failures > 0 -> MaterialTheme.colorScheme.error
+                        skipped > 0 -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.tertiary
+                    },
+                )
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                item { SummaryMetric("${logs.size}", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
+                item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
+                item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
+                item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
+            }
+            latest?.let {
+                Text(
+                    tr("Latest: %1\$s", it.taskName),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(
+                onClick = onShareDiagnostic,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.run_log_share_diagnostic))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, runBusy: Boolean = false) {
+    val time = remember(entry.timestamp) {
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
+    }
+    val diagnostics = remember(entry.message) { entry.message.toRunLogDiagnostics() }
+    val hasStructuredDiagnostics = diagnostics.source != null || diagnostics.decision != null || diagnostics.traces.isNotEmpty()
+    val outcome = remember(entry.success, entry.message) { entry.outcome() }
+    val accent = when (outcome) {
+        RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.primary
+        RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
+        RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
+        RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
+        // Upstream's two new terminal outcomes: a run admission held back for replay, and one whose
+        // process died before it could write its own record.
+        RunLogOutcome.Held -> MaterialTheme.colorScheme.secondary
+        RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
+    }
+    val sourceText = entry.source?.let { key ->
+        val name = tr(RunLogSource.displayName(key))
+        entry.sourceLabel?.let { "$name: $it" } ?: name
+    } ?: diagnostics.source
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = when (outcome) {
+                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
+                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Held -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
+            }
+        ),
+        border = BorderStroke(
+            1.dp,
+            when (outcome) {
+                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
+                RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
+                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
+                RunLogOutcome.Held -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
+            },
+        ),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
+                Icon(
+                    when (outcome) {
+                        RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
+                        RunLogOutcome.Failed -> Icons.Filled.Error
+                        RunLogOutcome.Skipped -> Icons.Filled.Info
+                        RunLogOutcome.Cancelled -> Icons.Filled.Cancel
+                        RunLogOutcome.Held -> Icons.Filled.Info
+                        RunLogOutcome.Interrupted -> Icons.Filled.Error
+                    },
+                    contentDescription = when (outcome) {
+                        RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
+                        RunLogOutcome.Failed -> stringResource(R.string.status_failed)
+                        RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
+                        RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
+                        RunLogOutcome.Held -> stringResource(R.string.status_held)
+                        RunLogOutcome.Interrupted -> stringResource(R.string.status_interrupted)
+                    },
+                    tint = accent,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clearAndSetSemantics { },
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(entry.taskName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    sourceText?.let { source ->
+                        Text(
+                            stringResource(R.string.label_source, source),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                item { StatusPill(tr(outcome.label), accent) }
+                item { StatusPill("${entry.durationMs} ms", accent) }
+            }
+            Column(Modifier.fillMaxWidth()) {
+                if (hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
+                    Text(
+                        diagnostics.detailLines.joinToString("  "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                diagnostics.reason?.let { reason ->
+                    Text(reason, style = MaterialTheme.typography.bodyMedium, color = accent)
+                }
+                if (diagnostics.traces.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        diagnostics.traces.take(4).forEach { trace ->
+                            RunLogTraceRow(trace)
+                        }
+                        if (diagnostics.traces.size > 4) {
+                            Text(
+                                stringResource(R.string.run_log_more_actions, diagnostics.traces.size - 4),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else if (!hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
+                    // Only render detail lines here when they were NOT already shown by the
+                    // structured-diagnostics block above; otherwise the same lines appeared twice.
+                    Text(
+                        diagnostics.detailLines.joinToString("\n"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (entry.held) {
+                    // Held rows keep the trigger data, so this run can still be made to happen. The
+                    // entry is consumed on replay, which is why the button disappears afterwards
+                    // rather than sitting there inviting a second copy of the same work.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            entry.heldPolicy?.let { tr("Held — refused by %1\$s", it) } ?: tr("Held"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(enabled = !runBusy, onClick = { onReplayHeld(entry) }) { Text(tr("Replay")) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The engine records a step with no label under its type id (`notify.show`), so the run log would
+ * title it with that id while Tasks shows "Show Notification". Returns the action's name for those
+ * steps, and null for a step with its own label or a type the registry doesn't know.
+ */
+internal fun runLogTraceTitle(trace: RunLogActionDiagnostic): String? =
+    if (trace.label == trace.actionType) ActionMetadataRegistry.get(trace.actionType)?.name else null
+
+@Composable
+private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
+    val title = runLogTraceTitle(trace)?.let { tr(it) } ?: trace.label
+    val color = when (trace.status) {
+        ActionTraceStatus.SUCCESS -> MaterialTheme.colorScheme.primary
+        ActionTraceStatus.FAILURE -> MaterialTheme.colorScheme.error
+        ActionTraceStatus.TIMEOUT -> MaterialTheme.colorScheme.error
+        ActionTraceStatus.SKIPPED -> MaterialTheme.colorScheme.secondary
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+    ) {
+        StatusPill(tr(trace.status.readableName()), color)
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.run_log_trace_indexed, trace.index + 1, title),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "${trace.actionType} - ${trace.durationMs} ms - ${trace.message}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            trace.argumentSummary?.let { summary ->
+                Text(
+                    tr("Expanded: %1\$s", summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (trace.templateWarningCount > 0) {
+                Spacer(Modifier.height(4.dp))
+                StatusPill(
+                    if (trace.templateWarningCount == 1) tr("1 template warning")
+                    else tr("%1\$s template warnings", trace.templateWarningCount),
+                    MaterialTheme.colorScheme.error,
+                )
+            }
+            if (trace.templateExpressions.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                ExpressionDebugger(
+                    expressions = trace.templateExpressions,
+                    traceLabel = title,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressionDebugger(
+    expressions: List<RunLogTemplateDiagnostic>,
+    traceLabel: String,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val visibleExpressions = if (expanded) expressions else expressions.take(3)
+    val hasWarnings = expressions.any { it.warning != null }
+    val stateLabel = if (expanded) {
+        stringResource(R.string.a11y_expanded)
+    } else {
+        stringResource(R.string.a11y_collapsed)
+    }
+    val actionLabel = if (expanded) {
+        stringResource(R.string.action_collapse)
+    } else {
+        stringResource(R.string.action_expand)
+    }
+    val debuggerDescription = stringResource(R.string.a11y_expression_details, traceLabel)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (hasWarnings) {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f)
+        } else {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f)
+        },
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(
+            1.dp,
+            if (hasWarnings) MaterialTheme.colorScheme.error.copy(alpha = 0.20f)
+            else MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Meet the 48dp touch-target minimum for the expand/collapse control; the text
+                    // stays vertically centred so the visual density is unchanged.
+                    .heightIn(min = DesignSystem.ComponentSize.touchTargetMin)
+                    .semantics {
+                        contentDescription = debuggerDescription
+                        stateDescription = stateLabel
+                    }
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = actionLabel,
+                    ) { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    if (expressions.size == 1) tr("1 expression") else tr("%1\$s expressions", expressions.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    actionLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            visibleExpressions.forEach { expr ->
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            expr.argName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                        )
+                        Text(
+                            expr.source,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(
+                        "${expr.expression}  →  ${expr.value}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = if (expanded) 4 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    expr.warning?.let { warning ->
+                        Text(
+                            warning,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (!expanded && expressions.size > 3) {
+                Text(
+                    tr("%1\$s more", expressions.size - 3),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<Pair<Long, String>> {
+    val taskNames = tasks.associate { it.id to it.name }
+    return logs
+        .groupBy { it.taskId }
+        .map { (taskId, entries) -> taskId to (taskNames[taskId] ?: entries.first().taskName) }
+        .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
+}
+
+private fun ActionTraceStatus.readableName(): String =
+    name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }
+
+private fun plural(count: Int): String = if (count == 1) "" else "s"

@@ -5,8 +5,8 @@ working watch face **with no Huawei account and no Huawei software, ever**. Writ
 reverse-engineering session of 2026-08-21 (PC, BlueZ) and the Kotlin port verified on 白い熊's phone
 on 2026-08-22.
 
-> Source of truth for the shapes: `app/src/main/java/com/opentasker/core/huawei/*.kt`.
-> The sequence is additionally pinned by `app/src/test/java/com/opentasker/core/huawei/
+> Source of truth for the shapes: `app/src/main/java/com/sysadmindoc/ruledeck/core/huawei/*.kt`.
+> The sequence is additionally pinned by `app/src/test/java/com/sysadmindoc/ruledeck/core/huawei/
 > HuaweiClientTest.kt` and `HuaweiSafetyGuardTest.kt`. Keep this file in sync when those change.
 
 This document exists because **almost every failure here is silent**. The band answers `100000 OK` to

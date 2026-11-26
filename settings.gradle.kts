@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenTasker"
+rootProject.name = "RuleDeck"
 include(":app")
 include(":baselineprofile")
 include(":core:common")
@@ -24,7 +24,7 @@ include(":core:storage")
 // Upstream's core/* module split, adopted in stages (白い熊, 2026-08-25).
 //
 // It was rejected in 4aceaabd because the split was TRANSITIONAL: each library module pointed its
-// source set back at app/src/main/java/com/opentasker/..., :app was meant to drop the same files
+// source set back at app/src/main/java/com/sysadmindoc/ruledeck/..., :app was meant to drop the same files
 // through `kotlin { sourceSets { configureEach { kotlin.exclude(...) } } }`, and under AGP 9's
 // built-in Kotlin that exclusion is silently ignored — so every type existed twice and R8 failed the
 // release build with "is defined multiple times".

@@ -28,7 +28,7 @@
 #include <linux/input.h>
 #include <android/log.h>
 
-#define LOG_TAG "OpenTaskerKeyGrab"
+#define LOG_TAG "RuleDeckKeyGrab"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
@@ -150,7 +150,7 @@ static int parse_codes(JNIEnv *env, jintArray arr, int *out) {
 }
 
 JNIEXPORT jint JNICALL
-Java_com_opentasker_core_input_KeyGrabberService_nativeSetup(JNIEnv *env, jobject thiz,
+Java_com_sysadmindoc_ruledeck_core_input_KeyGrabberService_nativeSetup(JNIEnv *env, jobject thiz,
                                                              jintArray codesArr, jintArray dblArr, jintArray tripArr) {
     (void)thiz;
     release_grabs();
@@ -205,7 +205,7 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeSetup(JNIEnv *env, jobjec
 }
 
 JNIEXPORT void JNICALL
-Java_com_opentasker_core_input_KeyGrabberService_nativeRun(JNIEnv *env, jobject thiz,
+Java_com_sysadmindoc_ruledeck_core_input_KeyGrabberService_nativeRun(JNIEnv *env, jobject thiz,
                                                            jlong longMs, jlong dblMs) {
     long long_ms = (long)longMs;  if (long_ms < 100) long_ms = 100;
     long dbl_ms  = (long)dblMs;   if (dbl_ms  < 0)   dbl_ms  = 0;
@@ -325,28 +325,28 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeRun(JNIEnv *env, jobject 
 }
 
 JNIEXPORT void JNICALL
-Java_com_opentasker_core_input_KeyGrabberService_nativeSetScreenOn(JNIEnv *env, jobject thiz, jboolean on) {
+Java_com_sysadmindoc_ruledeck_core_input_KeyGrabberService_nativeSetScreenOn(JNIEnv *env, jobject thiz, jboolean on) {
     (void)env;
     (void)thiz;
     g_screen_on = on ? 1 : 0;
 }
 
 JNIEXPORT void JNICALL
-Java_com_opentasker_core_input_KeyGrabberService_nativeSetRinging(JNIEnv *env, jobject thiz, jboolean ringing) {
+Java_com_sysadmindoc_ruledeck_core_input_KeyGrabberService_nativeSetRinging(JNIEnv *env, jobject thiz, jboolean ringing) {
     (void)env;
     (void)thiz;
     g_ringing = ringing ? 1 : 0;
 }
 
 JNIEXPORT void JNICALL
-Java_com_opentasker_core_input_KeyGrabberService_nativeSetConsumeShort(JNIEnv *env, jobject thiz, jboolean consume) {
+Java_com_sysadmindoc_ruledeck_core_input_KeyGrabberService_nativeSetConsumeShort(JNIEnv *env, jobject thiz, jboolean consume) {
     (void)env;
     (void)thiz;
     g_consume_short = consume ? 1 : 0;
 }
 
 JNIEXPORT void JNICALL
-Java_com_opentasker_core_input_KeyGrabberService_nativeStop(JNIEnv *env, jobject thiz) {
+Java_com_sysadmindoc_ruledeck_core_input_KeyGrabberService_nativeStop(JNIEnv *env, jobject thiz) {
     (void)env;
     (void)thiz;
     g_stop = 1;

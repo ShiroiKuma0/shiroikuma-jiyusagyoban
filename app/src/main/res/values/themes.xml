@@ -5,7 +5,7 @@
         can read a colour role. It is black in light and dark mode alike (values/colors.xml and
         values-night/colors.xml) and is the one colour a theme here may name.
     -->
-    <style name="Theme.OpenTasker" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.RuleDeck" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
 
@@ -19,7 +19,7 @@
         width, and the clock dial wants 256dp before its padding — the same 320dp cap that squeezes
         a WRAP_CONTENT overlay would squeeze this.
     -->
-    <style name="Theme.OpenTasker.Dialog" parent="android:Theme.Material.Dialog.NoActionBar">
+    <style name="Theme.RuleDeck.Dialog" parent="android:Theme.Material.Dialog.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsFloating">true</item>
         <item name="android:windowIsTranslucent">true</item>

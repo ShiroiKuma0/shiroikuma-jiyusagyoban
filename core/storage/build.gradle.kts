@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.opentasker.core.storage"
+    namespace = "com.sysadmindoc.ruledeck.core.storage"
     compileSdk = 37
 
     defaultConfig {

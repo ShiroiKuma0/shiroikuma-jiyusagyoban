@@ -1,0 +1,119 @@
+package com.sysadmindoc.ruledeck.core.engine.variables
+
+import com.sysadmindoc.ruledeck.core.storage.SUPER_GLOBAL_PROJECT_ID
+import com.sysadmindoc.ruledeck.core.storage.VariableDao
+import com.sysadmindoc.ruledeck.core.storage.VariableEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * The app's single source of truth for persistent variables: an in-memory cache (fast runtime reads)
+ * write-through to the `variables` table, so globals survive across task runs and reboots.
+ *
+ * [init] warms the cache once on startup (before any task runs). Writes update the cache immediately
+ * and enqueue the DB upsert/delete on a single serial consumer, so persistence applies strictly in
+ * call order. The Vars screen observes the same table, and its edits must also route through here so
+ * the cache never goes stale.
+ */
+object PersistentGlobalScope : GlobalVariableScope {
+    private val buckets = ConcurrentHashMap<Long, ConcurrentHashMap<String, String>>()
+
+    @Volatile private var dao: VariableDao? = null
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val writeOps = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+
+    // Bumped on every change so reactive readers (live scene overlays) re-expand their %vars.
+    private val _revision = MutableStateFlow(0)
+    val revision: StateFlow<Int> = _revision.asStateFlow()
+
+    /** Warm the cache from the database. Call once in Application.onCreate after the DB is built. */
+    fun init(dao: VariableDao) {
+        this.dao = dao
+        runBlocking {
+            // Guard: sweep dangling project-globals (projectId → a deleted/re-created project) before
+            // warming, so a dead-project row can never accumulate or shadow a live twin in rendering.
+            runCatching { dao.deleteDangling() }
+            // Sweep stale INTENT_*/NOTIF_* super copies — those engine event vars are now event-local.
+            runCatching { dao.deleteStaleEventVars() }
+            runCatching { dao.getAll() }.getOrDefault(emptyList()).forEach { e ->
+                bucket(e.projectId)[e.name] = e.value
+            }
+        }
+        // One serial writer drains the queue in order, so same-key writes converge correctly.
+        io.launch { for (op in writeOps) runCatching { op() } }
+    }
+
+    private fun bucket(projectId: Long) = buckets.getOrPut(projectId) { ConcurrentHashMap() }
+
+    override fun get(projectId: Long, name: String): String? = buckets[projectId]?.get(name)
+
+    /**
+     * A write from a task, a scene or the engine. A variable 白い熊 locked on this phone
+     * ([VariableGuard]) is left as it is — silently here, because a hundred actions store their
+     * results through this one door; `var.set` and `var.clear` say so in their own result.
+     */
+    override fun set(projectId: Long, name: String, value: String) {
+        if (VariableGuard.refusesTaskWrite(name, get(projectId, name), value)) return
+        setByHand(projectId, name, value)
+    }
+
+    /** A write made in the Variables tab — the one hand a locked variable still obeys. */
+    fun setByHand(projectId: Long, name: String, value: String) {
+        bucket(projectId)[name] = value
+        _revision.update { it + 1 }
+        val d = dao ?: return
+        writeOps.trySend { d.insert(VariableEntity(projectId, name, value)) }
+    }
+
+    override fun unset(projectId: Long, name: String) {
+        if (VariableGuard.refusesTaskWrite(name, get(projectId, name), null)) return
+        unsetByHand(projectId, name)
+    }
+
+    /** As [setByHand], for a delete made in the Variables tab. */
+    fun unsetByHand(projectId: Long, name: String) {
+        buckets[projectId]?.remove(name)
+        _revision.update { it + 1 }
+        val d = dao ?: return
+        writeOps.trySend { d.delete(projectId, name) }
+    }
+
+    /**
+     * Re-warm the cache from the database and bump [revision]. MUST be called after any path that
+     * writes/deletes variable ROWS directly instead of routing through [set]/[unset] — bundle import
+     * and the DELETE_ITEMS bridge — or imported variables stay invisible to expansion (and deleted
+     * ones linger) until the process restarts. Live scene overlays re-expand on the revision bump.
+     */
+    suspend fun refreshFromDb() {
+        val d = dao ?: return
+        val rows = runCatching { d.getAll() }.getOrDefault(emptyList())
+        buckets.clear()
+        rows.forEach { e -> bucket(e.projectId)[e.name] = e.value }
+        _revision.update { it + 1 }
+    }
+
+    override fun snapshot(projectId: Long): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        buckets[SUPER_GLOBAL_PROJECT_ID]?.let(out::putAll)
+        if (projectId != SUPER_GLOBAL_PROJECT_ID) buckets[projectId]?.let(out::putAll)
+        return out
+    }
+
+    /** Every persisted global merged (super-globals first, then each project) — for rendering a widget
+     *  outside any task run, where the owning project isn't known. */
+    fun snapshotAll(): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        buckets[SUPER_GLOBAL_PROJECT_ID]?.let(out::putAll)
+        buckets.forEach { (pid, m) -> if (pid != SUPER_GLOBAL_PROJECT_ID) out.putAll(m) }
+        return out
+    }
+}

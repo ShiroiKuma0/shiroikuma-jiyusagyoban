@@ -203,7 +203,7 @@ that opens the review:
 | `return_task` | String, optional | the name of a 自由作業盤 task, run when the review is left by Back, the toolbar arrow or Close |
 
 kxkb runs it through 自由作業盤's **own exported** run-a-task trampoline —
-`com.opentasker.widget.TaskRunActivity`, extras `com.opentasker.widget.TASK_NAME` and
+`com.sysadmindoc.ruledeck.widget.TaskRunActivity`, extras `com.sysadmindoc.ruledeck.widget.TASK_NAME` and
 `…SOURCE` (sent as `白い熊 kxkb`, so the run log says where it came from) — with the component pinned to
 `shiroikuma.jiyusagyoban`, never an implicit intent. **This grants nothing:** that trampoline is exported
 for launcher shortcuts, so every app on the phone may already run any task by name. The door still reads
@@ -232,7 +232,7 @@ kxkb's `WalkCaptureEntryActivity`:
 | | |
 | --- | --- |
 | action | `shiroikuma.jiyusagyoban.action.OPEN_GENGOSHIMA_BOARD`, category `DEFAULT` |
-| component | `com.opentasker.ui.gengoshima.GengoshimaBoardDoorActivity` in `shiroikuma.jiyusagyoban` |
+| component | `com.sysadmindoc.ruledeck.ui.gengoshima.GengoshimaBoardDoorActivity` in `shiroikuma.jiyusagyoban` |
 | manifest | `exported="true"`, `Theme.NoDisplay`, `noHistory`, `excludeFromRecents`, `taskAffinity=""` |
 | reads | **nothing** — its whole body is `GengoshimaBoardActivity.open(this)` then `finish()` |
 

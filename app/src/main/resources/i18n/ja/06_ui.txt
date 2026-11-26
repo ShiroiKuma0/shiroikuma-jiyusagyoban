@@ -56,8 +56,8 @@
 # docSections — "The bundle file"
 = The bundle file
 : バンドルファイル
-= Every Import/Export uses one JSON format, the OpenTaskerBundle. Any tab's + menu imports it; each tab exports its own slice. Top-level fields:
-: インポートとエクスポートはすべて、OpenTaskerBundleという1つのJSON形式を使います。どのタブの「+」メニューからでもインポートでき、各タブはそれぞれ自分の分だけをエクスポートします。最上位のフィールド：
+= Every Import/Export uses one JSON format, the RuleDeckBundle. Any tab's + menu imports it; each tab exports its own slice. Top-level fields:
+: インポートとエクスポートはすべて、RuleDeckBundleという1つのJSON形式を使います。どのタブの「+」メニューからでもインポートでき、各タブはそれぞれ自分の分だけをエクスポートします。最上位のフィールド：
 = Format version this build understands (currently 4). A newer file warns but older files always import — missing fields default.
 : このビルドが理解できる形式のバージョンです（現在は4）。それより新しいファイルは警告が出ますが、古いファイルは常にインポートできます — 欠けているフィールドには既定値が入ります。
 = App version that wrote the file (informational).

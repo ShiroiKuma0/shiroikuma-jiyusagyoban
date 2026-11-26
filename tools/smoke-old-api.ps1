@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Launches an OpenTasker APK on the oldest supported Android releases, over the previous
+    Launches an RuleDeck APK on the oldest supported Android releases, over the previous
     release's data, and fails on any crash.
 
 .DESCRIPTION
@@ -37,7 +37,7 @@
 
 .EXAMPLE
     # Seeded failure: v0.2.94 crashes on Setup here, so this must exit non-zero.
-    pwsh -NoProfile -File tools/smoke-old-api.ps1 -Candidate OpenTasker-v0.2.94.apk -Previous OpenTasker-v0.2.94.apk -ApiLevels 29
+    pwsh -NoProfile -File tools/smoke-old-api.ps1 -Candidate RuleDeck-v0.2.94.apk -Previous RuleDeck-v0.2.94.apk -ApiLevels 29
 #>
 [CmdletBinding()]
 param(
@@ -52,7 +52,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$Package = 'com.opentasker.app'
+$Package = 'com.sysadmindoc.ruledeck'
 $Sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
 $Adb = Join-Path $Sdk 'platform-tools\adb.exe'
 $Emulator = Join-Path $Sdk 'emulator\emulator.exe'
@@ -125,23 +125,23 @@ function Test-PortFree([int]$Port) {
 
 function Resolve-PreviousApk {
     if ($Previous) { return (Resolve-Path -LiteralPath $Previous).Path }
-    $directory = Join-Path ([IO.Path]::GetTempPath()) 'opentasker-smoke-previous'
+    $directory = Join-Path ([IO.Path]::GetTempPath()) 'ruledeck-smoke-previous'
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
     Get-ChildItem -LiteralPath $directory -Filter '*.apk' | Remove-Item -Force
     Write-Step 'Downloading the latest release APK with gh'
-    & gh release download --repo SysAdminDoc/OpenTasker --pattern 'OpenTasker-v*.apk' --dir $directory | Out-Null
+    & gh release download --repo SysAdminDoc/RuleDeck --pattern 'RuleDeck-v*.apk' --dir $directory | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'gh release download failed; pass -Previous with a local APK' }
-    # Since v0.2.96 a release also carries OpenTasker-v<ver>-fdroid.apk, and "-fdroid.apk" sorts
+    # Since v0.2.96 a release also carries RuleDeck-v<ver>-fdroid.apk, and "-fdroid.apk" sorts
     # before ".apk", so the first match by name was the F-Droid flavor. Upgrade from the standard
     # APK most users have, and stop if the release doesn't hold exactly one.
-    $apks = @(Get-ChildItem -LiteralPath $directory -Filter 'OpenTasker-v*.apk' |
-        Where-Object { $_.Name -match '^OpenTasker-v\d+(\.\d+)+\.apk$' })
-    if ($apks.Count -ne 1) { throw "The latest release has $($apks.Count) standard OpenTasker-v<ver>.apk assets, expected 1; pass -Previous" }
+    $apks = @(Get-ChildItem -LiteralPath $directory -Filter 'RuleDeck-v*.apk' |
+        Where-Object { $_.Name -match '^RuleDeck-v\d+(\.\d+)+\.apk$' })
+    if ($apks.Count -ne 1) { throw "The latest release has $($apks.Count) standard RuleDeck-v<ver>.apk assets, expected 1; pass -Previous" }
     return $apks[0].FullName
 }
 
 function Ensure-Avd([int]$Api) {
-    $name = "OpenTasker_API${Api}_Smoke"
+    $name = "RuleDeck_API${Api}_Smoke"
     $known = & $Emulator -list-avds
     if ($known -notcontains $name) {
         $image = "system-images;android-$Api;google_apis;x86_64"

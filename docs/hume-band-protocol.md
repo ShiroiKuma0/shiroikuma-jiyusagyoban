@@ -4,8 +4,8 @@ The authoritative reference for the 「健康」 feature: how the band is spoken
 and why the charts filter the way they do. Written from a reverse-engineering session (2026-08-02) and
 from measurements against 白い熊's own device (2026-08-03).
 
-> Source of truth for the shapes: `app/src/main/java/com/opentasker/core/band/*.kt` (protocol, records,
-> stream machine, census) and `app/src/main/java/com/opentasker/ui/charts/*.kt` (the render pipeline).
+> Source of truth for the shapes: `app/src/main/java/com/sysadmindoc/ruledeck/core/band/*.kt` (protocol, records,
+> stream machine, census) and `app/src/main/java/com/sysadmindoc/ruledeck/ui/charts/*.kt` (the render pipeline).
 > Keep this file in sync when those change.
 
 Two things this document exists for. First, **the band is not documented anywhere** — if this file and
@@ -903,5 +903,5 @@ Running instrumented tests at all needed two build changes, both debug-only and 
 release build: the debug variant takes `applicationIdSuffix = ".debug"` so it installs **alongside**
 the release APK rather than failing on a signature mismatch (the only way through would have been
 `adb uninstall`, which destroys the workspace database), and `app/src/debug/AndroidManifest.xml`
-drops the `com.opentasker.permission.AUTOMATION` declaration, since two packages cannot both own a
+drops the `com.sysadmindoc.ruledeck.permission.AUTOMATION` declaration, since two packages cannot both own a
 custom permission.

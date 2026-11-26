@@ -197,8 +197,8 @@
 : SIMスロットからUSSDコードを送るには、電話（CALL_PHONE）の権限が必要です。
 = Needs “Install unknown apps” allowed for this app. Silent on Android 12+ for an update of this app itself, and for another app from the second install on; otherwise the accessibility service presses the confirmation.
 : このアプリに「不明なアプリのインストール」を許可しておく必要があります。Android 12以降では、このアプリ自身の更新と、他のアプリの2回目以降のインストールは確認なしで行われます。それ以外は、ユーザー補助サービスが確認のボタンを押します。
-= Imports an OpenTasker bundle file into this workspace, overwriting same-name items in place.
-: OpenTaskerのバンドルファイルをこのワークスペースにインポートし、同じ名前の項目はその場で上書きします。
+= Imports an RuleDeck bundle file into this workspace, overwriting same-name items in place.
+: RuleDeckのバンドルファイルをこのワークスペースにインポートし、同じ名前の項目はその場で上書きします。
 = Reads which build of an installed app is on this phone.
 : インストールされているアプリが、この端末でどのビルドなのかを読み取ります。
 = Lists this workspace's projects, profiles or tasks as text.

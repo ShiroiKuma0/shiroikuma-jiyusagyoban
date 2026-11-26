@@ -1,7 +1,7 @@
 # 言語島 取込 — the import text format
 
 What another chat hands over so that 白い熊 can paste vocabulary and sentences into 言語島 in one
-go. Parser: `app/src/main/java/com/opentasker/core/gengoshima/VocabImport.kt` (tests:
+go. Parser: `app/src/main/java/com/sysadmindoc/ruledeck/core/gengoshima/VocabImport.kt` (tests:
 `VocabImportTest`). Plain text, one item per line.
 
 ```
@@ -78,7 +78,7 @@ go. Parser: `app/src/main/java/com/opentasker/core/gengoshima/VocabImport.kt` (t
 3. **adb bridge** (from a PC chat, no typing):
 
    ```
-   adb shell am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
+   adb shell am broadcast -n shiroikuma.jiyusagyoban/com.sysadmindoc.ruledeck.core.transfer.WorkspaceTransferReceiver \
      -a shiroikuma.jiyusagyoban.action.GENGOSHIMA_IMPORT --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
      --es shiroikuma.jiyusagyoban.extra.PATH <file in /sdcard/tmp> --es shiroikuma.jiyusagyoban.extra.GENERATE true
    ```

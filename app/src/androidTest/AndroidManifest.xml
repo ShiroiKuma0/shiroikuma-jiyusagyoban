@@ -2,14 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
         Api37LocalNetworkInstrumentedTest changes this separate test package's real grant so
-        revocation does not kill the OpenTasker process that hosts instrumentation.
+        revocation does not kill the RuleDeck process that hosts instrumentation.
     -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <application>
         <!-- LocalePluginSyncTransportTest's plugin, found through the same FIRE_SETTING query as a real one. -->
         <receiver
-            android:name="com.opentasker.core.plugins.locale.SyncSettingFixtureReceiver"
+            android:name="com.sysadmindoc.ruledeck.core.plugins.locale.SyncSettingFixtureReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />

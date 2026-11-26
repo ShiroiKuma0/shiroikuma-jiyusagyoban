@@ -21,13 +21,13 @@ import sqlite3
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SCHEMAS = REPO / "app/schemas/com.opentasker.core.storage.AppDatabase"
-MIGRATIONS = REPO / "core/storage/src/main/kotlin/com/opentasker/core/storage/DatabaseMigrations.kt"
-DATABASE = REPO / "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt"
+SCHEMAS = REPO / "app/schemas/com.sysadmindoc.ruledeck.core.storage.AppDatabase"
+MIGRATIONS = REPO / "core/storage/src/main/kotlin/com/sysadmindoc/ruledeck/core/storage/DatabaseMigrations.kt"
+DATABASE = REPO / "core/storage/src/main/kotlin/com/sysadmindoc/ruledeck/core/storage/AppDatabase.kt"
 
 
 def current_version() -> int:
-    m = re.search(r"(?m)^const val OPEN_TASKER_DATABASE_SCHEMA_VERSION\s*=\s*(\d+)", DATABASE.read_text(encoding="utf-8"))
+    m = re.search(r"(?m)^const val RULEDECK_DATABASE_SCHEMA_VERSION\s*=\s*(\d+)", DATABASE.read_text(encoding="utf-8"))
     if not m:
         sys.exit(f"Could not read the schema version from {DATABASE}")
     return int(m.group(1))

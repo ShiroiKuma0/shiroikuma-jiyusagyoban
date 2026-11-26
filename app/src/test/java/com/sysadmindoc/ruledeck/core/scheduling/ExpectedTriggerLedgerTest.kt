@@ -1,0 +1,155 @@
+package com.sysadmindoc.ruledeck.core.scheduling
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ExpectedTriggerLedgerTest {
+    @Test
+    fun recoveryBacksOffThenStops() {
+        // A recovery alarm fires the receiver that just failed; a flat five-second retry woke the
+        // device every five seconds for as long as the failure lasted (A-320).
+        val tracker = ExpectedTriggerTracker()
+
+        assertEquals(5_000L, tracker.claimRecoveryDelay())
+        assertEquals(30_000L, tracker.claimRecoveryDelay())
+        assertEquals(300_000L, tracker.claimRecoveryDelay())
+        assertNull(tracker.claimRecoveryDelay())
+        assertNull(tracker.claimRecoveryDelay())
+    }
+
+    @Test
+    fun aDeliveredTickRestartsTheBackoff() {
+        val tracker = ExpectedTriggerTracker()
+        assertFalse("nothing to reset yet", tracker.resetRecovery())
+        tracker.claimRecoveryDelay()
+        tracker.claimRecoveryDelay()
+
+        assertTrue(tracker.resetRecovery())
+        assertEquals(5_000L, tracker.claimRecoveryDelay())
+    }
+
+    @Test
+    fun bookingTheRecoveryAlarmDoesNotResetTheBackoff() {
+        // Scheduling the recovery records an expected trigger. That used to rebuild the whole
+        // state, which would have put every attempt back at five seconds.
+        val tracker = ExpectedTriggerTracker()
+        val first = tracker.claimRecoveryDelay()!!
+        tracker.recordExpected(ExpectedTriggerKind.RECOVERY, expectedAtMillis = first, nowMillis = 0L)
+
+        assertEquals(30_000L, tracker.claimRecoveryDelay())
+    }
+
+    @Test
+    fun theBackoffSurvivesAcrossLedgerInstances() {
+        // Each tick builds a new receiver and a new ledger over the same store.
+        val store = InMemoryExpectedTriggerStateStore()
+        ExpectedTriggerLedger(store).claimRecoveryDelay()
+        ExpectedTriggerLedger(store).claimRecoveryDelay()
+
+        assertEquals(300_000L, ExpectedTriggerLedger(store).claimRecoveryDelay())
+        ExpectedTriggerLedger(store).resetRecovery()
+        assertEquals(5_000L, ExpectedTriggerLedger(store).claimRecoveryDelay())
+    }
+
+    @Test
+    fun overdueTriggerIsConsumedOnceWithDelay() {
+        val tracker = ExpectedTriggerTracker()
+        tracker.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = 60_000L, nowMillis = 0L)
+
+        assertNull(tracker.consumeMissed(59_999L))
+        val missed = tracker.consumeMissed(180_000L)
+
+        assertEquals(ExpectedTriggerKind.MINUTE_TICK, missed?.kind)
+        assertEquals(60_000L, missed?.expectedAtMillis)
+        assertEquals(180_000L, missed?.detectedAtMillis)
+        assertEquals(120_000L, missed?.delayMillis)
+        assertNull(tracker.consumeMissed(240_000L))
+    }
+
+    @Test
+    fun reschedulingAfterGapDefersTheOldExpectedFire() {
+        val tracker = ExpectedTriggerTracker()
+        tracker.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = 60_000L, nowMillis = 0L)
+        tracker.recordExpected(ExpectedTriggerKind.RECOVERY, expectedAtMillis = 125_000L, nowMillis = 120_000L)
+
+        val missed = tracker.consumeMissed(120_000L)
+
+        assertEquals(60_000L, missed?.expectedAtMillis)
+        assertTrue((missed?.delayMillis ?: 0L) > 0L)
+    }
+
+    @Test
+    fun deliveredExpectedFireIsNotReportedAsMissed() {
+        val tracker = ExpectedTriggerTracker()
+        tracker.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = 60_000L, nowMillis = 0L)
+        tracker.markDelivered(actualAtMillis = 65_000L)
+
+        assertNull(tracker.consumeMissed(180_000L))
+    }
+
+    @Test
+    fun reportedMissCanBeRequeuedWhenLogWriteFails() {
+        val tracker = ExpectedTriggerTracker()
+        tracker.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = 60_000L, nowMillis = 0L)
+        val missed = requireNotNull(tracker.consumeMissed(120_000L))
+        tracker.requeue(missed)
+
+        assertEquals(60_000L, tracker.consumeMissed(120_000L)?.expectedAtMillis)
+    }
+}
+
+/**
+ * The scheduler owned by the long-lived service, the per-tick broadcast receiver, and the watchdog
+ * worker each build their own [ExpectedTriggerLedger] over one shared store. Regression cover for
+ * the split-brain that re-filed every healthy tick as a missed trigger.
+ */
+class ExpectedTriggerLedgerPersistenceTest {
+    @Test
+    fun deliveredTicksAreNeverReportedAsMissedAcrossLedgerInstances() {
+        val store = InMemoryExpectedTriggerStateStore()
+        // The service keeps one long-lived scheduler; its ledger outlives every tick.
+        val serviceLedger = ExpectedTriggerLedger(store)
+        var now = 60_000L
+
+        serviceLedger.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = now, nowMillis = now - 60_000L)
+
+        repeat(5) {
+            // Each tick: a fresh receiver marks delivery, then the service re-arms the next minute.
+            ExpectedTriggerLedger(store).markDelivered(now)
+            serviceLedger.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = now + 60_000L, nowMillis = now)
+            now += 60_000L
+
+            // The watchdog runs on its own instance and must find nothing to report.
+            assertNull(
+                "a delivered tick must never be reported as missed",
+                ExpectedTriggerLedger(store).consumeMissed(now),
+            )
+        }
+    }
+
+    @Test
+    fun genuinelyMissedTicksAreStillReportedOnce() {
+        val store = InMemoryExpectedTriggerStateStore()
+        val serviceLedger = ExpectedTriggerLedger(store)
+
+        serviceLedger.recordExpected(ExpectedTriggerKind.MINUTE_TICK, expectedAtMillis = 60_000L, nowMillis = 0L)
+        // No receiver ever marks delivery: the tick really was dropped.
+        val missed = ExpectedTriggerLedger(store).consumeMissed(180_000L)
+
+        assertEquals(ExpectedTriggerKind.MINUTE_TICK, missed?.kind)
+        assertEquals(120_000L, missed?.delayMillis)
+        assertNull("a missed tick is reported once, not every watchdog pass", ExpectedTriggerLedger(store).consumeMissed(240_000L))
+    }
+}
+
+/** Mirrors the persistence contract without Android. */
+private class InMemoryExpectedTriggerStateStore : ExpectedTriggerStateStore {
+    private var state = ExpectedTriggerLedgerState()
+
+    override fun load(): ExpectedTriggerLedgerState = synchronized(this) { state }
+
+    override fun save(state: ExpectedTriggerLedgerState) = synchronized(this) { this.state = state }
+}

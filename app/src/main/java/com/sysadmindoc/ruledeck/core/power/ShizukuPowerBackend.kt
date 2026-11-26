@@ -1,0 +1,261 @@
+package com.sysadmindoc.ruledeck.core.power
+
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import com.sysadmindoc.ruledeck.core.logging.AppLogger
+import androidx.core.content.edit
+import com.sysadmindoc.ruledeck.i18n.tr
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import rikka.shizuku.Shizuku
+import java.util.concurrent.atomic.AtomicBoolean
+
+object ShizukuPowerBackend {
+    /**
+     * Shizuku manager packages, most-preferred first: 白い熊's own fork, then upstream's.
+     *
+     * Only the upstream id used to be known here, so on this phone — which runs the fork —
+     * `getLaunchIntentForPackage` always answered null and "Open Shizuku settings" fell through to a
+     * web page instead of the app. Both are declared in `<queries>`; without that, package visibility
+     * hides them on Android 11+ even when installed.
+     */
+    val MANAGER_PACKAGES = listOf("shiroikuma.shizuku", "moe.shizuku.privileged.api")
+
+    /** The installed manager, or null when none is. */
+    fun managerPackage(context: Context): String? =
+        MANAGER_PACKAGES.firstOrNull { isPackageInstalled(context, it) }
+
+    const val MANAGER_PACKAGE = "moe.shizuku.privileged.api"
+
+    /**
+     * Where to send someone who has no Shizuku at all — **our** fork's page, not upstream's guide.
+     * That is the build 白い熊 actually runs, and the only one whose install instructions match this
+     * phone; upstream's setup guide describes a different app and a different APK.
+     */
+    const val SETUP_URL = "https://github.com/ShiroiKuma0/shiroikuma-shizuku"
+
+    /**
+     * The single answer to "open Shizuku": the installed manager's launcher screen — fork first, then
+     * upstream — or our fork's GitHub page when neither is installed.
+     *
+     * One helper because there are two callers (the Setup tab's card and the permission dialog's pill)
+     * and they used to resolve this independently, which is how both ended up opening a web page on a
+     * phone that HAS Shizuku installed.
+     */
+    fun openManagerIntent(context: Context): Intent =
+        MANAGER_PACKAGES.firstNotNullOfOrNull { context.packageManager.getLaunchIntentForPackage(it) }
+            ?: Intent(Intent.ACTION_VIEW, Uri.parse(SETUP_URL))
+    private const val TAG = "ShizukuPowerBackend"
+    private const val PREFERENCES = "shizuku-power"
+    private const val KEY_KILL_SWITCH = "kill-switch-enabled"
+
+    /** Framework calls rather than shell commands, so they have no line in [ShizukuCommandPolicy]. */
+    val frameworkActionIds: Set<String> = setOf("hotspot.toggle")
+
+    /**
+     * Every action that can only run through the privileged transport, so [hintForAction] can say so.
+     *
+     * This has to hold exactly the keys [ShizukuCommandPolicy] pins commands for. It is a second list
+     * of the same fact, and it drifted: `wake` was pinned there and never added here, so the one thing
+     * this set exists to do — explain WHY a blocked action is blocked — fell through to the generic
+     * "Optional elevated backend is not active." for the one action that fails without Shizuku
+     * outright ([com.sysadmindoc.ruledeck.core.actions.WakeAction] returns "Screen wake needs Shizuku" and stops).
+     * `screen.off` survived the same omission only because it tries accessibility first.
+     * `allowlistPinsEveryElevatedCommandVariant` is what compares the two; keep them in step.
+     */
+    val elevatedActionIds: Set<String> = setOf(
+        "airplane.toggle",
+        "mobile.toggle",
+        "aod.set",
+        "screenshot.take",
+        "reboot",
+        "screen.off",
+        "wake",
+    ) + frameworkActionIds
+
+    /** Defaults on so a process restart never enables privileged behavior before preferences load. */
+    @Volatile
+    var killSwitchEnabled: Boolean = true
+        internal set
+
+    private val statusChangeEvents = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    /** Fires when the binder arrives or dies, or a permission answer lands, so Setup can re-read. */
+    val statusChanges: SharedFlow<Unit> = statusChangeEvents.asSharedFlow()
+
+    private val permissionResultEvents = MutableSharedFlow<Boolean>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    /** The answer to [requestPermission]: true when granted. */
+    val permissionResults: SharedFlow<Boolean> = permissionResultEvents.asSharedFlow()
+
+    private val listenersRegistered = AtomicBoolean(false)
+    private val binderReceivedListener = Shizuku.OnBinderReceivedListener { notifyStatusChanged() }
+    private val binderDeadListener = Shizuku.OnBinderDeadListener { notifyStatusChanged() }
+    private val permissionResultListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        permissionResultEvents.tryEmit(grantResult == PackageManager.PERMISSION_GRANTED)
+        notifyStatusChanged()
+    }
+
+    fun initialize(context: Context) {
+        ShizukuShellRunner.initialize(context)
+        killSwitchEnabled = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(KEY_KILL_SWITCH, true)
+        if (listenersRegistered.compareAndSet(false, true)) {
+            runCatching {
+                Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
+                Shizuku.addBinderDeadListener(binderDeadListener)
+                Shizuku.addRequestPermissionResultListener(permissionResultListener)
+            }.onFailure { AppLogger.error(TAG, "Failed to register Shizuku listeners", it) }
+        }
+    }
+
+    internal fun notifyStatusChanged() {
+        statusChangeEvents.tryEmit(Unit)
+    }
+
+    fun shutdown() {
+        ShizukuShellRunner.shutdown()
+    }
+
+    fun setKillSwitchEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_KILL_SWITCH, enabled) }
+        killSwitchEnabled = enabled
+        if (enabled) {
+            ShizukuShellRunner.shutdown()
+        } else {
+            ShizukuShellRunner.initialize(context)
+        }
+    }
+
+    fun inspect(context: Context): ShizukuPowerStatus = statusFor(
+        managerInstalled = managerPackage(context) != null,
+        killSwitchEnabled = killSwitchEnabled,
+        serviceRunning = runCatching { Shizuku.pingBinder() }.getOrDefault(false),
+        permissionGranted = runCatching {
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false),
+        privilegedTransportAvailable = ShizukuShellRunner.hasPrivilegedTransport(),
+    )
+
+    internal fun statusFor(
+        managerInstalled: Boolean,
+        killSwitchEnabled: Boolean = false,
+        serviceRunning: Boolean = false,
+        permissionGranted: Boolean = false,
+        privilegedTransportAvailable: Boolean = false,
+    ): ShizukuPowerStatus = when {
+        // A live binder outranks the package check: Sui has no manager app, and forks can ship
+        // under their own package name.
+        !managerInstalled && !serviceRunning -> ShizukuPowerStatus(
+            state = ShizukuPowerState.NotInstalled,
+            summary = tr("Shizuku is not running and no Shizuku manager is installed."),
+        )
+        killSwitchEnabled -> ShizukuPowerStatus(
+            state = ShizukuPowerState.Disabled,
+            summary = tr("Shizuku power mode is off. Turn it on here to use elevated actions."),
+        )
+        !serviceRunning -> ShizukuPowerStatus(
+            state = ShizukuPowerState.ManagerInstalled,
+            summary = tr("Shizuku manager is installed but the service is not running."),
+        )
+        !permissionGranted -> ShizukuPowerStatus(
+            state = ShizukuPowerState.PermissionNeeded,
+            summary = tr("Shizuku is running but RuleDeck needs permission."),
+        )
+        !privilegedTransportAvailable -> ShizukuPowerStatus(
+            state = ShizukuPowerState.BackendUnavailable,
+            summary = tr(
+                "Shizuku permission is granted, but this build has no privileged user-service transport. Elevated actions cannot run until the transport is available.",
+            ),
+        )
+        else -> ShizukuPowerStatus(
+            state = ShizukuPowerState.Ready,
+            summary = tr("Shizuku is active, permission is granted, and a privileged transport is available."),
+        )
+    }.copy(serviceRunning = serviceRunning)
+
+    /** What each elevated action can do to the person holding the phone, shown before it's used. */
+    internal val riskByAction: Map<String, String> = mapOf(
+        "airplane.toggle" to "Turning it on cuts calls, mobile data and usually Wi-Fi until something turns it back off.",
+        "mobile.toggle" to "Turning it off stops anything that needs data, including remote access to this phone.",
+        "aod.set" to "A display that stays on uses more battery.",
+        "screenshot.take" to "It saves whatever is on screen to RuleDeck's storage, passwords and messages included.",
+        "reboot" to "The phone restarts right away with no warning and unsaved work is lost. A reboot task on a boot trigger can loop.",
+        "screen.off" to "The screen goes dark even if someone is using the phone, and it may lock.",
+        "wake" to "The screen turns on untouched, showing whatever is on the lock screen and using battery.",
+        "hotspot.toggle" to "Anyone with the saved password can join, and connected devices use your mobile data.",
+    )
+
+    fun hintForAction(actionId: String): ShizukuActionHint? =
+        if (actionId in elevatedActionIds) {
+            ShizukuActionHint(
+                actionId = actionId,
+                message = listOfNotNull(
+                    tr("This action requires Shizuku permission and its privileged user-service transport."),
+                    riskByAction[actionId]?.let { tr(it) },
+                ).joinToString(" "),
+            )
+        } else {
+            null
+        }
+
+    fun isReady(): Boolean =
+        !killSwitchEnabled &&
+            ShizukuShellRunner.hasPrivilegedTransport() &&
+            runCatching { Shizuku.pingBinder() }.getOrDefault(false) &&
+            runCatching { Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED }.getOrDefault(false)
+
+    fun requestPermission(requestCode: Int): Boolean =
+        runCatching { Shizuku.requestPermission(requestCode) }
+            .onFailure { AppLogger.error(TAG, "Failed to request Shizuku permission", it) }
+            .isSuccess
+
+    private fun isPackageInstalled(context: Context, packageName: String): Boolean =
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(packageName, 0)
+            }
+        }.isSuccess
+}
+
+data class ShizukuPowerStatus(
+    val state: ShizukuPowerState,
+    val summary: String,
+    /** Apart from [state], which reads Disabled whenever power mode is off, running or not. */
+    val serviceRunning: Boolean = false,
+) {
+    val managerInstalled: Boolean
+        get() = state != ShizukuPowerState.NotInstalled
+
+    val isReady: Boolean
+        get() = state == ShizukuPowerState.Ready
+}
+
+enum class ShizukuPowerState {
+    NotInstalled,
+    ManagerInstalled,
+    PermissionNeeded,
+    BackendUnavailable,
+    Ready,
+    Disabled,
+}
+
+data class ShizukuActionHint(
+    val actionId: String,
+    val message: String,
+)

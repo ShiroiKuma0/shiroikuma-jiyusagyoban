@@ -26,5 +26,5 @@
 : Androidは、バックグラウンドのアプリにWi-Fiの名前を見せません。セットアップを開いて、位置情報を「常に許可」にしてください。
 = Android did not report a name for this Wi-Fi network.
 : AndroidからこのWi-Fiネットワークの名前が通知されませんでした。
-= OpenTasker asks Android for the Wi-Fi name only while an enabled profile compares it.
-: OpenTaskerがAndroidにWi-Fiの名前を問い合わせるのは、有効なプロファイルが名前を比較している間だけです。
+= RuleDeck asks Android for the Wi-Fi name only while an enabled profile compares it.
+: RuleDeckがAndroidにWi-Fiの名前を問い合わせるのは、有効なプロファイルが名前を比較している間だけです。

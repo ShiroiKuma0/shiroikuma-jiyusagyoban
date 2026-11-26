@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $AppBuild = Join-Path $Root "app\build.gradle.kts"
-$MetadataFile = Join-Path $Root "fdroid\metadata\com.opentasker.app.yml"
+$MetadataFile = Join-Path $Root "fdroid\metadata\com.sysadmindoc.ruledeck.yml"
 $UnsignedReleaseApk = Join-Path $Root "app\build\outputs\apk\release\app-release-unsigned.apk"
 
 function Read-RequiredText {
@@ -185,7 +185,7 @@ Require-MetadataValue -Text $metadataText -Key "versionName" -Expected $versionN
 Require-MetadataValue -Text $metadataText -Key "versionCode" -Expected $versionCode
 Require-MetadataValue -Text $metadataText -Key "CurrentVersion" -Expected $versionName
 Require-MetadataValue -Text $metadataText -Key "CurrentVersionCode" -Expected $versionCode
-Require-MetadataValue -Text $metadataText -Key "Changelog" -Expected "https://github.com/SysAdminDoc/OpenTasker/releases"
+Require-MetadataValue -Text $metadataText -Key "Changelog" -Expected "https://github.com/SysAdminDoc/RuleDeck/releases"
 
 $metadataCommits = @(Get-MetadataValues -Text $metadataText -Key "commit")
 if ($metadataCommits.Count -ne 1) {
@@ -196,8 +196,8 @@ $tagName = "v$versionName"
 if ($metadataCommit -cne $tagName) {
     throw "Metadata commit must be the release tag $tagName, found $metadataCommit"
 }
-if ($metadataText -notmatch "openTaskerDistribution=fdroid") {
-    throw "Metadata must include gradleprops openTaskerDistribution=fdroid"
+if ($metadataText -notmatch "ruleDeckDistribution=fdroid") {
+    throw "Metadata must include gradleprops ruleDeckDistribution=fdroid"
 }
 if ($metadataText -notmatch [regex]::Escape(":app:verifyFdroidReadiness")) {
     throw "Metadata must run :app:verifyFdroidReadiness"
@@ -236,7 +236,7 @@ if (-not $SkipTagCheck) {
 if ($BuildRelease) {
     $gradlew = Join-Path $Root "gradlew.bat"
     Invoke-Checked -FilePath $gradlew -ArgumentList @(
-        "-PopenTaskerDistribution=fdroid",
+        "-PruleDeckDistribution=fdroid",
         ":app:assembleRelease",
         ":app:verifyFdroidReadiness",
         ":app:verifyFdroidMetadata",
@@ -257,10 +257,10 @@ if ($RunFdroidLint -or $RunFdroidBuild) {
     }
 
     if ($RunFdroidLint) {
-        Invoke-Checked -FilePath $fdroid -ArgumentList @("lint", "com.opentasker.app") -WorkingDirectory $fdroidDir -Environment $env
+        Invoke-Checked -FilePath $fdroid -ArgumentList @("lint", "com.sysadmindoc.ruledeck") -WorkingDirectory $fdroidDir -Environment $env
     }
     if ($RunFdroidBuild) {
-        Invoke-Checked -FilePath $fdroid -ArgumentList @("build", "--no-tarball", "com.opentasker.app:$versionCode") -WorkingDirectory $fdroidDir -Environment $env -TreatFdroidOutputAsAuthoritative
+        Invoke-Checked -FilePath $fdroid -ArgumentList @("build", "--no-tarball", "com.sysadmindoc.ruledeck:$versionCode") -WorkingDirectory $fdroidDir -Environment $env -TreatFdroidOutputAsAuthoritative
     }
 }
 

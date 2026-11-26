@@ -1,0 +1,56 @@
+package com.sysadmindoc.ruledeck.core.platform
+
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.readText
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AudioEligibilityWiringTest {
+    private val sourceRoot: Path = listOf(
+        Path.of("src/main/java"),
+        Path.of("app/src/main/java"),
+    ).first(Files::exists)
+
+    @Test
+    fun visibleUiStartMarksAutomationServiceWhileInUseEligible() {
+        val activity = source("com/sysadmindoc/ruledeck/MainActivity.kt")
+        val service = source("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt")
+
+        assertTrue(activity.contains("putExtra(AutomationService.EXTRA_STARTED_FROM_VISIBLE_UI, true)"))
+        assertTrue(service.contains("AudioForegroundServiceEligibility.BACKGROUND_STARTED"))
+        assertTrue(service.contains("audioForegroundServiceEligibility = AudioForegroundServiceEligibility.WHILE_IN_USE"))
+        assertTrue(service.contains("audioForegroundService = audioForegroundServiceEligibility"))
+    }
+
+    @Test
+    fun theTemporaryStateRestoreSeesTheServicesEligibility() {
+        // The restore runs from WorkManager, outside the service. It reads the eligibility the
+        // service publishes; with the default context it claimed none and Android 17 refused it.
+        val service = source("com/sysadmindoc/ruledeck/core/engine/AutomationService.kt")
+        assertTrue(service.contains("ServiceAudioEligibility.current = value"))
+        assertTrue(service.contains("ServiceAudioEligibility.current = audioForegroundServiceEligibility"))
+        assertTrue(service.contains("ServiceAudioEligibility.current = AudioForegroundServiceEligibility.NONE"))
+
+        val restore = source("com/sysadmindoc/ruledeck/core/actions/TemporaryStateAction.kt")
+        assertTrue(restore.contains("action.run(temporaryStateRestoreContext(applicationContext), restoreArgs)"))
+        assertTrue(restore.contains("AudioRuntimeEligibility(foregroundService = ServiceAudioEligibility.current)"))
+    }
+
+    @Test
+    fun everyExecutionSamplesVisibilityAndExactAlarmPermission() {
+        val helper = source("com/sysadmindoc/ruledeck/core/engine/TaskExecutionHelper.kt")
+
+        assertTrue(helper.contains("appVisible = visibleActivity"))
+        assertTrue(helper.contains("audioEligibility = audioEligibility"))
+
+        val hardening = source("com/sysadmindoc/ruledeck/core/platform/AndroidAudioHardening.kt")
+        assertTrue(hardening.contains("AppVisibilityTracker.isAppVisible"))
+        assertTrue(hardening.contains("ExactAlarmSupport.canScheduleExactAlarms(ctx.app)"))
+
+        val widgetActivity = source("com/sysadmindoc/ruledeck/widget/TaskRunActivity.kt")
+        assertTrue(widgetActivity.contains("visibleActivity = true"))
+    }
+
+    private fun source(relativePath: String): String = sourceRoot.resolve(relativePath).readText()
+}

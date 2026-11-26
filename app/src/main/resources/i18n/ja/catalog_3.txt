@@ -944,8 +944,8 @@
 : Androidがこのルールを有効化してよいかどうか
 = Clear Zen rule
 : おやすみモードのルールを消去
-= Remove an OpenTasker-owned DND rule
-: OpenTaskerが所有するおやすみモードのルールを削除します。
+= Remove an RuleDeck-owned DND rule
+: RuleDeckが所有するおやすみモードのルールを削除します。
 = the stable key used by Set Zen rule
 : 「おやすみモードのルールを設定」で使った、変わらないキー
 = com.example.app
