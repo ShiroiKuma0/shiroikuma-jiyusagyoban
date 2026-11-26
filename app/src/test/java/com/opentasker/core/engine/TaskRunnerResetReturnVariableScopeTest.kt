@@ -5,7 +5,6 @@ import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.registerCoreRuntime
-import com.opentasker.core.transfer.TaskerXmlExporter
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,8 +14,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Reset Return Variable clears the calling task's own variable only. In Tasker a called task's
- * locals are its own, so clearing one never touches the task that called it.
+ * Reset Return Variable clears the calling task's own variable only. A called task's locals are
+ * its own, so clearing one never touches the task that called it.
  */
 class TaskRunnerResetReturnVariableScopeTest {
     // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
@@ -144,24 +143,5 @@ class TaskRunnerResetReturnVariableScopeTest {
         assertNull(store.get("answer"))
         store.popScope()
         assertNull(store.get("answer"))
-    }
-
-    @Test
-    fun anExportReadsTheSwitchTheWayTheRunDoes() {
-        fun exported(value: String) = TaskerXmlExporter.export(
-            emptyList(),
-            listOf(
-                Task(id = 1, name = "Exported", actions = listOf(runTask("Restore", SUB_TASK_RETURN_KEY to "restored", SUB_TASK_RESET_RETURN_KEY to value))),
-                Task(id = 2, name = "Restore", actions = emptyList()),
-            ),
-        )
-
-        val spaced = exported("TRUE ")
-        assertTrue(spaced.xml, """<Int sr="arg8" val="1"/>""" in spaced.xml)
-        assertTrue(spaced.warnings.toString(), spaced.warnings.isEmpty())
-
-        val variable = exported("%flag")
-        assertTrue(variable.xml, """<Int sr="arg8" val="0"/>""" in variable.xml)
-        assertTrue(variable.warnings.toString(), variable.warnings.any { "Reset Return Variable" in it && "%flag" in it })
     }
 }

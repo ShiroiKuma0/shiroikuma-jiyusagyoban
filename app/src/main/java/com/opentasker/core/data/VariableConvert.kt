@@ -14,9 +14,9 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Tasker's Variable Convert, one function per entry of [FUNCTIONS] in Tasker's own order, so an
- * export's function number is an index here. Every function returns null when the value doesn't
- * fit it, which the action reports as a failed conversion the way Tasker does.
+ * Variable Convert, one function per entry of [FUNCTIONS] in a fixed order, so an imported or
+ * exported function number is an index here. Every function returns null when the value doesn't
+ * fit it, which the action reports as a failed conversion.
  */
 object VariableConvert {
     val FUNCTIONS = listOf(
@@ -32,7 +32,8 @@ object VariableConvert {
         "lower_case", "upper_case", "upper_case_first", "json_encode",
     )
 
-    // Tasker's own factors, rounding and all (an inch is 2.5 cm to it).
+    // The factors stay rounded the way they are (an inch is 2.5 cm here), so a saved step keeps
+    // giving the number it always has.
     private val FACTORS = mapOf(
         "centimetres_to_inches" to 0.4, "inches_to_centimetres" to 2.5,
         "metres_to_feet" to 3.28083, "feet_to_metres" to 0.3048,
@@ -61,7 +62,7 @@ object VariableConvert {
                 val date = DateFormat.getDateInstance(DateFormat.SHORT, locale).apply { timeZone = zone }
                 "${date.format(millis).replace('/', '-')} ${pattern("HH.mm", locale, zone).format(millis)}"
             }
-            // Android reads the k in Tasker's "kk:mm" as H, so midnight is 00 here too.
+            // Hours run 00 to 23, so midnight is 00.
             "seconds_to_medium_date_time" -> value.epochMillisOrNull()?.let { pattern("MMM dd, yyyy HH:mm", locale, zone).format(it) }
             "seconds_to_long_date_time" -> value.epochMillisOrNull()?.let { pattern("EEEE, MMMM dd, yyyy hh:mmaa", locale, zone).format(it) }
             "html_to_text" -> htmlToText(value)
@@ -86,15 +87,15 @@ object VariableConvert {
         }
     }.getOrNull()
 
-    // Tasker reads numbers with Java's own parsers: a whole number takes no spaces, while a
-    // decimal may carry them, an exponent or a d suffix.
+    // Numbers go through Java's own parsers: a whole number takes no spaces, while a decimal may
+    // carry them, an exponent or a d suffix.
     private fun String.longOrNull(): Long? = runCatching { java.lang.Long.parseLong(this) }.getOrNull()
     private fun String.doubleOrNull(): Double? = runCatching { java.lang.Double.parseDouble(this) }.getOrNull()
 
     /** Seconds as epoch milliseconds, or null when that overflows rather than wrapping to a wrong date. */
     private fun String.epochMillisOrNull(): Long? = longOrNull()?.let { runCatching { Math.multiplyExact(it, 1000L) }.getOrNull() }
 
-    /** Tasker keeps one decimal only when it isn't 0, and none at all above [wholeAbove]. */
+    /** One decimal is kept only when it isn't 0, and none at all above [wholeAbove]. */
     private fun humanReadable(amount: Double, wholeAbove: Double?): String {
         val text = String.format(Locale.US, "%f", amount)
         val point = text.indexOf('.')
@@ -107,10 +108,11 @@ object VariableConvert {
         SimpleDateFormat(pattern, locale).apply { timeZone = zone }
 
     /**
-     * Tasker's date-time reader: a date, then optionally a time and am or pm, split by single
+     * The date-time reader: a date, then optionally a time and am or pm, split by single
      * white space. The date is yyyyMMdd or three numbers in [locale]'s date order (a first one of
      * four digits is always the year), the time two or three numbers. Out-of-range fields roll
-     * over the way Tasker's lenient calendar rolls them. Returns epoch milliseconds.
+     * over the way a lenient calendar rolls them, so 32 January is 1 February. Returns epoch
+     * milliseconds.
      */
     fun parseDateTime(text: String, locale: Locale, zone: TimeZone): Long? {
         val parts = text.trim().split(Regex("""\s"""))
@@ -144,7 +146,7 @@ object VariableConvert {
         return order.takeIf { it.length == 3 } ?: "yMd"
     }
 
-    // Tasker leaves 12 am at noon. Here it's midnight, which is what anyone writing it means.
+    // 12 am is midnight and 12 pm noon, which is what anyone writing them means.
     private fun timeFields(text: String, amPm: String?): List<Int>? {
         val fields = text.split(Regex("[.:-]"))
         if (fields.size !in 2..3) return null
@@ -175,7 +177,7 @@ object VariableConvert {
         MessageDigest.getInstance(algorithm).digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
     /**
-     * Text as it sits inside a JSON string, the way Gson writes it for Tasker: quotes, backslashes
+     * Text as it sits inside a JSON string, the way Gson writes it by default: quotes, backslashes
      * and control characters escaped, plus the HTML-sensitive < > & = and ' and the two Unicode
      * line separators as unicode escapes.
      */

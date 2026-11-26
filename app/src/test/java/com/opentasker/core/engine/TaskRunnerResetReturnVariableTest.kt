@@ -15,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Run Task's switch that clears the return variable before the task runs, Tasker's Reset Return Variable. */
+/** Run Task's switch that clears the return variable before the task runs (Reset Return Variable). */
 class TaskRunnerResetReturnVariableTest {
     // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
     // class — an unset variable left as written (here it reads as nothing), a called task that reads

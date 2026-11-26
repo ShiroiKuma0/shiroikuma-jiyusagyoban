@@ -438,11 +438,7 @@
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">タイムアウト（ms）</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000（1000～120000）</string>
-    <string name="catalog_action_tasker_unsupported_name" formatted="false">非対応のTaskerアクション</string>
-    <string name="catalog_action_tasker_unsupported_description" formatted="false">インポート時に安全に対応付けられなかったTaskerアクションの代わりに置かれる仮のアクションです。</string>
     <string name="catalog_category_import" formatted="false">インポート</string>
-    <string name="catalog_action_tasker_unsupported_field_taskercode_label" formatted="false">Taskerのアクションコード</string>
-    <string name="catalog_action_tasker_unsupported_field_summary_label" formatted="false">インポートのメモ</string>
     <string name="catalog_action_macrodroid_unsupported_name" formatted="false">非対応のMacroDroidアクション</string>
     <string name="catalog_action_macrodroid_unsupported_description" formatted="false">インポート時に安全に対応付けられなかったMacroDroidアクションの代わりに置かれる仮のアクションです。</string>
     <string name="catalog_action_macrodroid_unsupported_field_classtype_label" formatted="false">MacroDroidのクラス</string>

@@ -46,12 +46,12 @@ class SetMultipleVariablesPreflightTest {
     @Test
     fun aBuiltInInTheListIsNamed() {
         val warnings = steps(setMultiple("names" to "%a,%TIME", "values" to "1,2")).single().warnings
-        assertTrue(warnings.toString(), warnings.any { "%TIME is a Tasker built-in" in it })
+        assertTrue(warnings.toString(), warnings.any { "%TIME is a built-in variable" in it })
     }
 
     @Test
     fun aBuiltInTheListOnlyUnsetsIsNotNamed() {
         val warnings = steps(setMultiple("names" to "%a,%TIME", "values" to "1")).single().warnings
-        assertTrue(warnings.toString(), warnings.none { "Tasker built-in" in it })
+        assertTrue(warnings.toString(), warnings.none { "is a built-in variable" in it })
     }
 }

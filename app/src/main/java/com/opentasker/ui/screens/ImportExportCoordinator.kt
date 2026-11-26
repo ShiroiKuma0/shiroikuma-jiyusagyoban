@@ -48,7 +48,7 @@ internal inline fun <T> runTransferCatching(block: () -> T): Result<T> = try {
 /**
  * Owns one import/export lane: its busy flag, its progress, and the job running it.
  *
- * Two things made these operations feel stuck. Nothing held the job, so a large Tasker or
+ * Two things made these operations feel stuck. Nothing held the job, so a large bundle or
  * MacroDroid backup could not be cancelled, and the only feedback was a relabelled button. Worse,
  * the busy flag was cleared on the last line of the coroutine, so anything that ended early left
  * the UI permanently busy. Clearing it in a `finally` is what makes cancellation safe: a cancelled

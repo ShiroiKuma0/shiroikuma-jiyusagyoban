@@ -11,7 +11,7 @@ import android.os.SystemClock;
 import java.net.URISyntaxException;
 
 /**
- * A setting plugin that answers by Tasker's synchronous protocol. It runs in this test package's own
+ * A setting plugin that answers by the synchronous setting protocol. It runs in this test package's own
  * process, the way an installed plugin does, so it's Java: the app's classes and the Kotlin runtime
  * aren't on the classpath there. The "mode" string in its bundle picks how it answers.
  */

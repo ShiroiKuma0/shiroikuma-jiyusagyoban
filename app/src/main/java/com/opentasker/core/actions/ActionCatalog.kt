@@ -93,7 +93,7 @@ object ActionCatalog {
         // NEVER, not IDEMPOTENT: "toggle" recomputes from the live value, so a retry flips back.
         define("aod.set", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::AlwaysOnDisplayAction),
         define("screen.timeout", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::ScreenTimeoutAction),
-        // IDEMPOTENT: the same name and value written twice leaves the same setting. Tasker's toggle
+        // IDEMPOTENT: the same name and value written twice leaves the same setting. The toggle
         // value is the exception, NEVER through SettingsWriteAction.retrySafetyFor.
         define("settings.write", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsWriteAction),
         define("settings.read", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsReadAction),
@@ -150,7 +150,6 @@ object ActionCatalog {
         define("vpn.tunnel", ActionCategory.NET, ActionRetrySafety.IDEMPOTENT, ::VpnTunnelAction),
         define("script.termux.run", ActionCategory.PLUGIN, ActionRetrySafety.NEVER, ::TermuxScriptAction),
         define("script.shizuku.run", ActionCategory.PLUGIN, ActionRetrySafety.NEVER, ::ShizukuScriptAction),
-        define("tasker.unsupported", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::TaskerUnsupportedAction),
         define("macrodroid.unsupported", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::MacroDroidUnsupportedAction),
 
         // ── Fork actions (白い熊 自由作業盤) ─────────────────────────────────────────────────

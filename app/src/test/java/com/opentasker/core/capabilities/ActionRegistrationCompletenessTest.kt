@@ -48,7 +48,6 @@ class ActionRegistrationCompletenessTest {
             "tile.set",
             // The landing pad for a Tasker action the importer could not map. Unsupported by
             // definition — it exists so a failed mapping is visible instead of silently dropped.
-            "tasker.unsupported",
             // The same landing pad for a MacroDroid action the importer could not map (upstream
             // 0.2.88 added the MacroDroid importer beside the Tasker one).
             "macrodroid.unsupported",

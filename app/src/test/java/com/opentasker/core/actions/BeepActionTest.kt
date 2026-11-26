@@ -36,7 +36,7 @@ class BeepActionTest {
     }
 
     @Test
-    fun amplitudeIsTaskersPercentTimes327() {
+    fun amplitudeIsThePercentTimes327() {
         val full = BeepTone.samples(1_000.0, 200, 100)
         val peak = full.maxOf { abs(it.toInt()) }
         assertTrue("$peak", peak in 32_000..32_700)

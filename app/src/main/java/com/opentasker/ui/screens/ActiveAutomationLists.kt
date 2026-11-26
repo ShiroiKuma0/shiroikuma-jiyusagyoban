@@ -360,7 +360,7 @@ internal fun ProfilesScreen(
                     secondaryActionLabel = if (openTaskerBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
                     onSecondaryAction = onImportOpenTaskerBundle,
                     secondaryActionEnabled = !openTaskerBundleBusy,
-                    tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
+                    tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.action_import_macrodroid),
                     onTertiaryAction = onImportTaskerXml,
                     tertiaryActionEnabled = !taskerImportBusy,
                     quaternaryActionLabel = stringResource(R.string.action_create_blank_task),
@@ -377,7 +377,7 @@ internal fun ProfilesScreen(
                     secondaryActionLabel = if (openTaskerBundleBusy) stringResource(R.string.import_reading_bundle) else stringResource(R.string.import_import_json),
                     onSecondaryAction = onImportOpenTaskerBundle,
                     secondaryActionEnabled = !openTaskerBundleBusy,
-                    tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.action_import_tasker_xml),
+                    tertiaryActionLabel = if (taskerImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.action_import_macrodroid),
                     onTertiaryAction = onImportTaskerXml,
                     tertiaryActionEnabled = !taskerImportBusy,
                     quaternaryActionLabel = stringResource(R.string.action_create_blank_profile),
@@ -604,7 +604,7 @@ private fun WorkspaceSummaryCard(
                     enabled = !taskerImportBusy,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.import_tasker))
+                    Text(if (taskerImportBusy) stringResource(R.string.import_reading_macrodroid) else stringResource(R.string.import_macrodroid))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {

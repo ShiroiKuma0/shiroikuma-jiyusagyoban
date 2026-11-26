@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Tasker's For items: values, variables, array parts and number ranges. */
+/** A For's own items: values, variables, array parts and number ranges. */
 class ForItemsTest {
 
     private fun variables() = VariableStore().apply {
@@ -32,7 +32,7 @@ class ForItemsTest {
     }
 
     @Test
-    fun writtenOutValuesAndRangesFollowTaskersExamples() {
+    fun writtenOutValuesAndRanges() {
         assertEquals(listOf("apple", "pear", "banana"), items("apple,pear,banana"))
         assertEquals(listOf("1", "2", "3", "4", "5"), items("1:5"))
         assertEquals(listOf("8", "6", "4", "2"), items("8:2:-2"))
@@ -61,7 +61,7 @@ class ForItemsTest {
     fun aWholeArrayGivesItsElementsAndAPartIsSplitLikeAnyValue() {
         assertEquals(listOf("apple", "pear, ripe", "plum"), items("%arr()"))
         assertEquals(listOf("one", "two, three", "end"), items("%parts(),end"))
-        // A slice comes out as text joined with commas, so an element holding one splits, as in Tasker.
+        // A slice comes out as text joined with commas, so an element holding one splits.
         assertEquals(listOf("apple", "pear", "ripe"), items("%arr(1:2)"))
         assertEquals(listOf("start", "apple", "pear, ripe", "plum"), items("start, %arr()"))
     }

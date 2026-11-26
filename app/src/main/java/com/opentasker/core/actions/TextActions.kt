@@ -31,16 +31,16 @@ class TextMatchAction : DeclaredAction(ActionCatalog.require("text.match")) {
 }
 
 /**
- * Regex replace, which also runs Tasker's Search Replace. Args: `source`, `pattern`, `replacement`,
+ * Regex replace, which also runs Search Replace. Args: `source`, `pattern`, `replacement`,
  * `var`, `first_only`, `matches`, `search_only`. Sets `%var` to the source with every match
  * replaced, or only the first with `first_only`. `matches` names an array that's emptied and then
  * holds each match as %found1, %found2, ..., only the first with `first_only`. With `search_only`
  * the step only collects the matches and leaves `%var` alone.
  *
- * `in_place` edits `%var` the way Tasker's Search Replace does (decompiled 6.7.8,
- * `ExecuteService.V2`): an unset `%var` fails the step before the array is touched, `%var` is
- * written only when something matched, a result with nothing left unsets it, and a replacement that
- * can't be made (`$9` with no ninth group) is logged and leaves it as it was.
+ * `in_place` edits `%var` itself, as Search Replace does: an unset `%var` fails the step before
+ * the array is touched, `%var` is written only when something matched, a result with nothing left
+ * unsets it, and a replacement that can't be made (`$9` with no ninth group) is logged and leaves
+ * it as it was.
  */
 class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) {
 
@@ -56,7 +56,7 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
         val array = args["matches"]?.trim()?.ifEmpty { null }?.let { name ->
             VariableNamePolicy.normalize(name) ?: return ActionResult.Failure("invalid array name '$name'")
         }
-        // Tasker empties the array before it even compiles the pattern, so a step that fails leaves
+        // The array is emptied before the pattern is even compiled, so a step that fails leaves
         // it empty too. A list Split Text kept under the name goes as well, or it would hide the matches
         // from Join Text and For Each. The matches go in with one write, since emptying the array first
         // would lose the scope it lives in and a sub-task would fill its own copy.
@@ -102,7 +102,7 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
         return ActionResult.Success
     }
 
-    /** Set as `{{ name }}` reads it: stored (a Tasker built-in included) or handed in by the event. */
+    /** Set as `{{ name }}` reads it: stored (a built-in variable included) or handed in by the event. */
     private fun isSet(ctx: ActionContext, name: String): Boolean {
         val normalized = VariableNamePolicy.normalize(name) ?: return false
         return ctx.variables.get(normalized) != null || normalized in ctx.eventVariables
@@ -167,8 +167,8 @@ class TextSubstringAction : DeclaredAction(ActionCatalog.require("text.substring
 
 /**
  * Character count. Args: `source`, `var`. Counts the text as it reads once variables are filled in,
- * so an unset `%name`, which stays as written, counts as its own characters, as in Tasker's Test
- * Variable. Empty text counts 0, and text that is only spaces counts its spaces, so `source` isn't
+ * so an unset `%name`, which stays as written, counts as its own characters. Empty text counts 0,
+ * and text that is only spaces counts its spaces, so `source` isn't
  * required.
  */
 class TextLengthAction : DeclaredAction(ActionCatalog.require("text.length")) {

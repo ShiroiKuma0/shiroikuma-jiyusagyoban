@@ -8,7 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The set of spaces Tasker's maths strips is Android's regex `\s`, which the JVM tests can't reach
+ * The set of spaces maths strips is Android's regex `\s`, which the JVM tests can't reach
  * since the JVM's `\s` is ASCII only. This checks the spelled-out set against the device's own.
  */
 @RunWith(AndroidJUnit4::class)

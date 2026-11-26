@@ -18850,7 +18850,6 @@ SPLcom/opentasker/core/actions/ActionCatalog$all$101;->invoke()Ljava/lang/Object
 Lcom/opentasker/core/actions/ActionCatalog$all$102;
 SPLcom/opentasker/core/actions/ActionCatalog$all$102;-><clinit>()V
 SPLcom/opentasker/core/actions/ActionCatalog$all$102;-><init>()V
-SPLcom/opentasker/core/actions/ActionCatalog$all$102;->invoke()Lcom/opentasker/core/actions/TaskerUnsupportedAction;
 SPLcom/opentasker/core/actions/ActionCatalog$all$102;->invoke()Ljava/lang/Object;
 Lcom/opentasker/core/actions/ActionCatalog$all$103;
 SPLcom/opentasker/core/actions/ActionCatalog$all$103;-><clinit>()V
@@ -19807,9 +19806,6 @@ SPLcom/opentasker/core/actions/SunTimesAction$4;-><init>()V
 Lcom/opentasker/core/actions/SunTimesAction$Companion;
 SPLcom/opentasker/core/actions/SunTimesAction$Companion;-><init>()V
 SPLcom/opentasker/core/actions/SunTimesAction$Companion;-><init>(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-Lcom/opentasker/core/actions/TaskerUnsupportedAction;
-SPLcom/opentasker/core/actions/TaskerUnsupportedAction;-><clinit>()V
-SPLcom/opentasker/core/actions/TaskerUnsupportedAction;-><init>()V
 Lcom/opentasker/core/actions/TemporaryStateAction;
 SPLcom/opentasker/core/actions/TemporaryStateAction;-><clinit>()V
 SPLcom/opentasker/core/actions/TemporaryStateAction;-><init>()V
@@ -20751,11 +20747,11 @@ Lcom/opentasker/core/engine/SharedPreferencesExecutionCircuitStore$Companion;
 SPLcom/opentasker/core/engine/SharedPreferencesExecutionCircuitStore$Companion;-><init>()V
 SPLcom/opentasker/core/engine/SharedPreferencesExecutionCircuitStore$Companion;-><init>(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 Lcom/opentasker/core/engine/VariableOnlyAction;
-Lcom/opentasker/core/engine/variables/TaskerBuiltIns;
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;-><clinit>()V
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;-><init>()V
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;->installDevice(Lkotlin/jvm/functions/Function1;)V
-SPLcom/opentasker/core/engine/variables/TaskerBuiltIns;->watchProfiles(Ljava/util/Map;Lkotlinx/coroutines/Job;)V
+Lcom/opentasker/core/engine/variables/BuiltInVariables;
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;-><clinit>()V
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;-><init>()V
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;->installDevice(Lkotlin/jvm/functions/Function1;)V
+SPLcom/opentasker/core/engine/variables/BuiltInVariables;->watchProfiles(Ljava/util/Map;Lkotlinx/coroutines/Job;)V
 Lcom/opentasker/core/engine/variables/VariableExpander;
 SPLcom/opentasker/core/engine/variables/VariableExpander;-><clinit>()V
 SPLcom/opentasker/core/engine/variables/VariableExpander;-><init>()V
@@ -22550,8 +22546,6 @@ SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$11
 SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$117$0()Landroidx/compose/runtime/MutableLongState;
 SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$118(Landroidx/compose/runtime/MutableLongState;)J
 SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$12(Landroidx/compose/runtime/State;)Lkotlinx/collections/immutable/ImmutableList;
-SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$120(Landroidx/compose/runtime/State;)Lcom/opentasker/ui/screens/TaskerImportReviewState;
-SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$121(Landroidx/compose/runtime/State;)Lcom/opentasker/ui/screens/MacroDroidPasswordPrompt;
 SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$122(Landroidx/compose/runtime/State;)Z
 SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$125(Landroidx/compose/runtime/State;)Lcom/opentasker/ui/screens/OpenTaskerBundleReviewState;
 SPLcom/opentasker/ui/screens/ActiveAutomationUiKt;->ActiveAutomationUi$lambda$126(Landroidx/compose/runtime/State;)Z
@@ -22909,7 +22903,6 @@ SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getHighlightedFlowNodeK
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getHistoryAvailability()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getInvariants()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getLibrarySort()Lkotlinx/coroutines/flow/StateFlow;
-SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getMacroDroidPasswordPrompt$app()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getMessages()Lkotlinx/coroutines/flow/Flow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getNestedTaskIds()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getNewProfilesEnabled()Lkotlinx/coroutines/flow/StateFlow;
@@ -22927,9 +22920,6 @@ SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getScenes()Lkotlinx/cor
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getSemanticDiffReview$app()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getSimulationProfile$app()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getStorageDecodeIssues()Lkotlinx/coroutines/flow/StateFlow;
-SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getTaskerImportBusy()Lkotlinx/coroutines/flow/StateFlow;
-SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getTaskerImportProgress()Lkotlinx/coroutines/flow/StateFlow;
-SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getTaskerImportReview$app()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->getTasks()Lkotlinx/coroutines/flow/StateFlow;
 SPLcom/opentasker/ui/screens/ActiveAutomationViewModel;->reconcileGlobalFallbackTask(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 Lcom/opentasker/ui/screens/ActiveAutomationViewModel$1;
@@ -23408,7 +23398,6 @@ SPLcom/opentasker/ui/screens/LibrarySortPreference$orders$$inlined$map$1$2$1;-><
 SPLcom/opentasker/ui/screens/LibrarySortPreference$orders$$inlined$map$1$2$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 Lcom/opentasker/ui/screens/LibrarySortPreference$orders$2;
 SPLcom/opentasker/ui/screens/LibrarySortPreference$orders$2;-><init>(Lkotlin/coroutines/Continuation;)V
-Lcom/opentasker/ui/screens/MacroDroidPasswordPrompt;
 Lcom/opentasker/ui/screens/OnboardingPreference;
 SPLcom/opentasker/ui/screens/OnboardingPreference;-><clinit>()V
 SPLcom/opentasker/ui/screens/OnboardingPreference;-><init>()V
@@ -23690,7 +23679,6 @@ SPLcom/opentasker/ui/screens/SetupSection;->$values()[Lcom/opentasker/ui/screens
 SPLcom/opentasker/ui/screens/SetupSection;-><clinit>()V
 SPLcom/opentasker/ui/screens/SetupSection;-><init>(Ljava/lang/String;I)V
 Lcom/opentasker/ui/screens/TaskDeletionPreview;
-Lcom/opentasker/ui/screens/TaskerImportReviewState;
 Lcom/opentasker/ui/screens/UiEnumLabelsKt;
 SPLcom/opentasker/ui/screens/UiEnumLabelsKt;->collisionModeTitleRes(Lcom/opentasker/core/model/CollisionMode;)I
 Lcom/opentasker/ui/screens/UiEnumLabelsKt$WhenMappings;

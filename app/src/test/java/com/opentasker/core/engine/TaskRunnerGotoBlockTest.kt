@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Goto to the top or out of the For Each it sits in (Tasker's continue and break), or past its If. */
+/** Goto to the top or out of the For Each it sits in (continue and break), or past its If. */
 class TaskRunnerGotoBlockTest {
 
     private val recorded = mutableListOf<String>()

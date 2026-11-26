@@ -180,10 +180,7 @@ import com.opentasker.core.storage.toEntity
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
-import com.opentasker.core.transfer.TaskerImportPlanner
-import com.opentasker.core.transfer.TaskerImportPreview
-import com.opentasker.core.transfer.TaskerXmlImportReport
-import com.opentasker.core.transfer.TaskerXmlImporter
+import com.opentasker.core.transfer.ImportPreview
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability

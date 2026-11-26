@@ -61,13 +61,10 @@ import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.ProjectImportChoice
-import com.opentasker.core.transfer.TaskerImportPlanner
-import com.opentasker.core.transfer.TaskerImportPreview
+import com.opentasker.core.transfer.ImportPreview
 import com.opentasker.core.transfer.MacroDroidImportPlanner
 import com.opentasker.core.transfer.MacroDroidImportReport
 import com.opentasker.core.transfer.MacroDroidImporter
-import com.opentasker.core.transfer.TaskerXmlImportReport
-import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.widget.TaskShortcutHelper
 import com.opentasker.widget.TaskWidgetProvider
 import androidx.room.withTransaction
@@ -119,27 +116,14 @@ internal fun exportFileName(label: String): String {
 
 internal data class TaskerImportReviewState(
     val bundle: OpenTaskerBundle,
-    val preview: TaskerImportPreview,
+    val preview: ImportPreview,
     // Upstream carries a @StringRes here; the fork's dialogs are written with plain strings.
     val title: String,
     val mappedActionRows: List<String>,
     val unsupportedActionRows: List<String>,
 )
 
-/** The review state for a Tasker XML document, with its rows rendered for the shared dialog. */
-internal fun taskerImportReviewState(report: TaskerXmlImportReport) = TaskerImportReviewState(
-    bundle = TaskerImportPlanner.confirmedBundle(report),
-    preview = TaskerImportPlanner.preview(report),
-    title = "Review Tasker import",
-    mappedActionRows = report.mappedActions.map {
-        "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
-    },
-    unsupportedActionRows = report.unsupportedActions.map {
-        tr("%1\$s step %2\$s: code %3\$s", it.taskName, it.actionIndex + 1, it.taskerCode)
-    },
-)
-
-/** The same, for a MacroDroid `.mdr` backup or `.macro` share (upstream 0.2.88). */
+/** The review state for a MacroDroid `.mdr` backup or `.macro` share, with its rows rendered for the dialog. */
 internal fun macroDroidImportReviewState(report: MacroDroidImportReport) = TaskerImportReviewState(
     bundle = MacroDroidImportPlanner.confirmedBundle(report),
     preview = MacroDroidImportPlanner.preview(report),
@@ -927,11 +911,8 @@ class ActiveAutomationViewModel(
                     report(TransferStage.Preflight)
                     val raw = readBoundedTaskerOrMacroDroid(appContext, uri)
                     report(TransferStage.Decode)
-                    if (raw.removePrefix("\uFEFF").trimStart().startsWith("<")) {
-                        taskerImportReviewState(TaskerXmlImporter.parse(rawXml = raw, appVersion = appVersion))
-                    } else {
-                        macroDroidImportReviewState(MacroDroidImporter.parse(rawJson = raw, appVersion = appVersion))
-                    }
+                    // Upstream 1.0.0 removed the Tasker XML importer; the fork dropped it with it (白い熊, 2026-11-26).
+                    macroDroidImportReviewState(MacroDroidImporter.parse(rawJson = raw, appVersion = appVersion))
                 }
             }
                 .onSuccess {
@@ -965,7 +946,7 @@ class ActiveAutomationViewModel(
                         )
                     ))
                 }
-                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Tasker XML import failed")))) }
+                .onFailure { events.send(UiMessage(tr("Error: %1\$s", it.message ?: tr("Import preview failed")))) }
         }
     }
 
@@ -1534,7 +1515,7 @@ internal fun readBoundedTaskerOrMacroDroid(context: Context, uri: Uri): String {
         context = context,
         uri = uri,
         maxBytes = maxOf(TASKER_XML_IMPORT_MAX_BYTES, OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES),
-        label = "Tasker XML or MacroDroid backup",
+        label = "MacroDroid backup",
     )
 }
 

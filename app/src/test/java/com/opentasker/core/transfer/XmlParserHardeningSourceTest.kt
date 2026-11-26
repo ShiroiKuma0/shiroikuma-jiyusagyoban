@@ -21,8 +21,6 @@ class XmlParserHardeningSourceTest {
         assertTrue(helper.contains("runCatching { setFeature(name, value) }"))
 
         val callers = listOf(
-            "core/transfer/ImportResourceBudget.kt",
-            "core/transfer/TaskerXmlImport.kt",
             "core/data/StructuredDataReader.kt",
         )
         callers.forEach { relative ->

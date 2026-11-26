@@ -7,7 +7,7 @@ private const val MACRODROID_DISABLED_PROFILE_WARNING =
     "Imported MacroDroid profiles are disabled by default. Review triggers, actions, placeholders, and required permissions before enabling them."
 
 object MacroDroidImportPlanner {
-    fun preview(report: MacroDroidImportReport): TaskerImportPreview {
+    fun preview(report: MacroDroidImportReport): ImportPreview {
         val plan = OpenTaskerBundleCodec.validate(report.bundle)
         val hasImportableContent = report.bundle.tasks.isNotEmpty() || report.bundle.profiles.isNotEmpty()
         val emptyWarning = if (hasImportableContent) {
@@ -15,7 +15,7 @@ object MacroDroidImportPlanner {
         } else {
             listOf(tr("No importable MacroDroid macros were found."))
         }
-        return TaskerImportPreview(
+        return ImportPreview(
             sourceTaskCount = report.sourceMacroCount,
             sourceProfileCount = report.sourceMacroCount,
             sourceVariableCount = report.sourceVariableCount,

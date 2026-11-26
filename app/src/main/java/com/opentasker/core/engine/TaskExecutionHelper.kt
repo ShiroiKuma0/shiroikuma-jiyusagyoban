@@ -468,7 +468,7 @@ fun changedGlobals(
         .map { (name, value) -> RuntimeVariableValue(name, value, isSecret = name in afterSensitive) }
         .toList()
 
-/** Globals the run unset, like an emptied or popped Tasker array element. Pure for testability. */
+/** Globals the run unset, like an emptied or popped array element. Pure for testability. */
 fun removedGlobals(before: Map<String, String>, after: Map<String, String>): List<String> =
     before.keys.filterNot(after::containsKey).sorted()
 

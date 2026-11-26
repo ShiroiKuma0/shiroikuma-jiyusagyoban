@@ -56,7 +56,7 @@ class AutomationSensitivityTest {
         val child = Task(
             id = 2,
             name = "Child",
-            actions = listOf(ActionSpec(type = "tasker.unsupported")),
+            actions = listOf(ActionSpec(type = "macrodroid.unsupported")),
         )
         val parent = Task(
             id = 1,
@@ -74,7 +74,7 @@ class AutomationSensitivityTest {
 
         assertTrue(review.requiresAcknowledgement)
         assertFalse(review.canAcknowledge)
-        assertEquals(setOf("tasker.unsupported"), review.unsupportedActionIds)
+        assertEquals(setOf("macrodroid.unsupported"), review.unsupportedActionIds)
     }
 
     @Test

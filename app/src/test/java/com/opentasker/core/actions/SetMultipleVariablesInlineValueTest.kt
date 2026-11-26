@@ -13,7 +13,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * A value written in the names field, the way Tasker 6.7.8 reads it: after the Values splitter, only
+ * A value written in the names field: after the Values splitter, only
  * while Values is empty, and filled in the same two stages as any other argument.
  */
 class SetMultipleVariablesInlineValueTest {

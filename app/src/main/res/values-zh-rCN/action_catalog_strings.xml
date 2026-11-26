@@ -184,7 +184,7 @@
     <string name="catalog_action_text_replace_field_search_only_label" formatted="false">仅查找匹配</string>
     <string name="catalog_action_text_replace_field_search_only_hint" formatted="false">只存储匹配，不改动输出变量</string>
     <string name="catalog_action_text_replace_field_in_place_label" formatted="false">直接修改输出变量</string>
-    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">与 Tasker 的搜索替换相同：变量未设置时失败，仅在有匹配时修改，结果为空时取消设置</string>
+    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">直接修改该变量：变量未设置时失败，仅在有匹配时修改，结果为空时取消设置</string>
     <string name="catalog_action_text_split_name" formatted="false">拆分文本</string>
     <string name="catalog_action_text_split_description" formatted="false">按字面分隔符或正则模式拆分为数组</string>
     <string name="catalog_action_text_split_field_source_label" formatted="false">源文本</string>
@@ -217,11 +217,11 @@
     <string name="catalog_action_text_length_field_var_label" formatted="false">输出变量</string>
     <string name="catalog_action_text_length_field_var_hint" formatted="false">默认：length</string>
     <string name="catalog_action_var_split_name" formatted="false">变量拆分</string>
-    <string name="catalog_action_var_split_description" formatted="false">像 Tasker 一样把变量拆分为编号元素（%text1、%text2……）</string>
+    <string name="catalog_action_var_split_description" formatted="false">把变量拆分为编号元素（%text1、%text2……）</string>
     <string name="catalog_action_var_split_field_name_label" formatted="false">名称</string>
     <string name="catalog_action_var_split_field_name_hint" formatted="false">%text 变为 %text1、%text2……</string>
     <string name="catalog_action_var_split_field_values_label" formatted="false">值</string>
-    <string name="catalog_action_var_split_field_values_hint" formatted="false">拆分这段文本而不是变量自身的值，同 Tasker 的数组设置</string>
+    <string name="catalog_action_var_split_field_values_hint" formatted="false">拆分这段文本而不是变量自身的值，一次设置整个数组</string>
     <string name="catalog_action_var_split_field_splitter_label" formatted="false">分隔符</string>
     <string name="catalog_action_var_split_field_splitter_hint" formatted="false">留空则按空格和换行拆分</string>
     <string name="catalog_action_var_split_field_regex_label" formatted="false">分隔符为正则</string>
@@ -267,7 +267,7 @@
     <string name="catalog_action_array_process_field_array_hint" formatted="false">%arr，元素为 %arr1、%arr2……</string>
     <string name="catalog_action_array_process_field_type_label" formatted="false">操作</string>
     <string name="catalog_action_sun_times_name" formatted="false">获取日出/日落时间</string>
-    <string name="catalog_action_sun_times_description" formatted="false">按 Tasker 的算法计算某地某天的日出、日落、晨昏蒙影和正午时间</string>
+    <string name="catalog_action_sun_times_description" formatted="false">计算某地某天的日出、日落、晨昏蒙影和正午时间，精确到分钟</string>
     <string name="catalog_action_sun_times_field_latitude_label" formatted="false">纬度</string>
     <string name="catalog_action_sun_times_field_latitude_hint" formatted="false">北纬为正，南纬为负。留空则使用手机位置</string>
     <string name="catalog_action_sun_times_field_longitude_label" formatted="false">经度</string>
@@ -390,7 +390,7 @@
     <string name="action_option_intent_broadcast" formatted="false">广播</string>
     <string name="action_option_intent_service" formatted="false">服务</string>
     <string name="catalog_action_plugin_locale_fire_name" formatted="false">Locale插件设置</string>
-    <string name="catalog_action_plugin_locale_fire_description" formatted="false">派发一个显式的Locale/Tasker兼容设置插件请求</string>
+    <string name="catalog_action_plugin_locale_fire_description" formatted="false">派发一个显式的Locale兼容设置插件请求</string>
     <string name="catalog_category_plugin" formatted="false">插件</string>
     <string name="catalog_action_plugin_locale_fire_field_package_label" formatted="false">插件包</string>
     <string name="catalog_action_plugin_locale_fire_field_package_hint" formatted="false">com.example.plugin</string>
@@ -401,7 +401,7 @@
     <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">超时毫秒</string>
     <string name="catalog_action_plugin_locale_fire_field_timeoutms_hint" formatted="false">5000</string>
     <string name="catalog_action_plugin_locale_query_name" formatted="false">Locale插件条件</string>
-    <string name="catalog_action_plugin_locale_query_description" formatted="false">查询一个显式的Locale/Tasker兼容条件插件并存储其状态</string>
+    <string name="catalog_action_plugin_locale_query_description" formatted="false">查询一个显式的Locale兼容条件插件并存储其状态</string>
     <string name="catalog_action_plugin_locale_query_field_package_label" formatted="false">插件包</string>
     <string name="catalog_action_plugin_locale_query_field_package_hint" formatted="false">com.example.plugin</string>
     <string name="catalog_action_plugin_locale_query_field_bundlejson_label" formatted="false">Bundle JSON</string>
@@ -438,11 +438,7 @@
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">超时毫秒</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000（1000到120000）</string>
-    <string name="catalog_action_tasker_unsupported_name" formatted="false">不支持的Tasker操作</string>
-    <string name="catalog_action_tasker_unsupported_description" formatted="false">导入期间无法安全映射的Tasker操作的占位符</string>
     <string name="catalog_category_import" formatted="false">导入</string>
-    <string name="catalog_action_tasker_unsupported_field_taskercode_label" formatted="false">Tasker操作代码</string>
-    <string name="catalog_action_tasker_unsupported_field_summary_label" formatted="false">导入说明</string>
 
     <string name="catalog_action_macrodroid_unsupported_name" formatted="false">不支持的MacroDroid操作</string>
     <string name="catalog_action_macrodroid_unsupported_description" formatted="false">导入期间无法安全映射的MacroDroid操作的占位符</string>
@@ -530,11 +526,11 @@
     <string name="catalog_action_settings_write_field_key_label" formatted="false">设置名称</string>
     <string name="catalog_action_settings_write_field_key_hint" formatted="false">location_mode、screen_off_timeout 等</string>
     <string name="catalog_action_settings_write_field_value_label" formatted="false">值</string>
-    <string name="catalog_action_settings_write_field_value_hint" formatted="false">写入后回读，以便Android忽略的值会报告失败。Tasker的=:=toggle=:=会在0和1之间切换设置。</string>
+    <string name="catalog_action_settings_write_field_value_hint" formatted="false">写入后回读，以便Android忽略的值会报告失败。值=:=toggle=:=会在0和1之间切换设置。</string>
     <string name="catalog_action_settings_read_name" formatted="false">读取设置</string>
     <string name="catalog_action_settings_read_description" formatted="false">按名称将一个Android设置读入变量。读取无需授权，但Android会对应用隐藏部分名称。</string>
     <string name="catalog_action_settings_read_field_var_label" formatted="false">存入</string>
-    <string name="catalog_action_settings_read_field_var_hint" formatted="false">不存在的设置存为空值，与Tasker相同。</string>
+    <string name="catalog_action_settings_read_field_var_hint" formatted="false">不存在的设置存为空值。</string>
     <string name="catalog_action_dnd_set_name" formatted="false">设置勿扰模式</string>
     <string name="catalog_action_dnd_set_description" formatted="false">设置DND打扰过滤模式</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">模式</string>

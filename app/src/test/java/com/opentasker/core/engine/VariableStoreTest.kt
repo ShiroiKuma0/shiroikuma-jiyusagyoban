@@ -105,12 +105,12 @@ class VariableStoreTest {
     @Test
     fun expandsEmbeddedOperatorsInText() {
         val store = VariableStore().apply {
-            set("name", "open tasker")
+            set("name", "hello world")
             set("count", "7")
             set("score", "7.8")
         }
 
-        assertEquals("OPEN TASKER-8-7", store.expand("%name(upper)-%count(+1)-%score(//)"))
+        assertEquals("HELLO WORLD-8-7", store.expand("%name(upper)-%count(+1)-%score(//)"))
         assertEquals("8", store.expand("%score(/round)"))
     }
 

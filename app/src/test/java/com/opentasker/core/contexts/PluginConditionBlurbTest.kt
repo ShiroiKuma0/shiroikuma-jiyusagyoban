@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Locale and Tasker send the saved blurb with every condition query, and primitive FTPd picks its
+ * Locale plugin hosts send the saved blurb with every condition query, and primitive FTPd picks its
  * condition by the blurb alone ("server running?"), so a profile's Plugin context has to send it
  * too, and a result is only this context's when it answered the same blurb.
  */

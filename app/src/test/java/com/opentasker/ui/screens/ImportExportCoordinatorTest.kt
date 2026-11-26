@@ -30,7 +30,7 @@ class ImportExportCoordinatorTest {
                 report(TransferStage.Preflight)
                 report(TransferStage.Decode)
                 reachedDecode.complete(Unit)
-                // Stands in for a large Tasker or MacroDroid backup still being decoded.
+                // Stands in for a large MacroDroid backup still being decoded.
                 delay(30_000)
                 report(TransferStage.Write)
                 wrote = true

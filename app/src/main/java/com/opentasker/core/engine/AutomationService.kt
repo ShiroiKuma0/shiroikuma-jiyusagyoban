@@ -74,7 +74,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.withTimeoutOrNull
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import java.util.Collections
@@ -438,7 +438,7 @@ class AutomationService : Service() {
             loaded.associateByTo(registeredProfiles) { it.id }
         }
         // %PENABLED / %PACTIVE: the names behind the ids, and no state for a profile that is gone.
-        TaskerBuiltIns.watchProfiles(loaded.associate { it.id to it.name })
+        BuiltInVariables.watchProfiles(loaded.associate { it.id to it.name })
         AutomationLiveConditionState.retainProfiles(activeIds)
         // Prune against profiles that still exist, not the enabled ones: activeIds comes from
         // getAllEnabled(), so disabling a profile mid-cooldown deleted its persisted deadline while

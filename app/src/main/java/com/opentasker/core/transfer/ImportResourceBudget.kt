@@ -3,24 +3,17 @@ package com.opentasker.core.transfer
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.SceneElement
-import org.xml.sax.Attributes
-import org.xml.sax.InputSource
-import org.xml.sax.SAXException
-import org.xml.sax.helpers.DefaultHandler
-import java.io.StringReader
-import javax.xml.parsers.SAXParserFactory
 
 /**
  * One resource contract for every untrusted automation import.
  *
- * Raw input limits bound the source retained by the UI. Streaming preflights reject excessive
- * token/node counts and nesting before kotlinx.serialization or DOM allocation. The decoded-model
+ * Raw input limits bound the source retained by the UI. A streaming preflight rejects excessive
+ * token counts and nesting before kotlinx.serialization allocates anything. The decoded-model
  * checks are deliberately repeated so callers that construct a bundle without the codecs cannot
  * bypass the Room write boundary.
  */
 internal data class ImportResourceBudget(
     val maxJsonChars: Int = 16 * 1024 * 1024,
-    val maxXmlChars: Int = 4 * 1024 * 1024,
     val maxEntities: Long = 5_000,
     val maxProjects: Long = 100,
     val maxBlueprints: Long = 128,
@@ -30,7 +23,6 @@ internal data class ImportResourceBudget(
     val maxContexts: Long = 10_000,
     val maxSceneElements: Long = 10_000,
     val maxJsonTokens: Long = 250_000,
-    val maxXmlNodes: Long = 100_000,
     val maxNestingDepth: Int = 64,
     val maxAggregateStringBytes: Long = 8L * 1024 * 1024,
 ) {
@@ -83,13 +75,13 @@ internal object ImportResourceGuard {
     }
 
     /**
-     * Removes a benign DOCTYPE declaration from Tasker XML before parsing. Real Tasker exports can
-     * carry a plain doctype prolog, and Android's Expat-backed parsers do not recognise the Apache
-     * disallow-doctype-decl feature, so the doctype has to be handled here in text (issue #5).
-     * Declarations that define entities or reference external DTDs are rejected outright — that is
-     * the XXE surface — as is any input still containing a doctype after the strip.
+     * Removes a benign DOCTYPE declaration from XML before parsing. Android's Expat-backed parsers
+     * don't recognise the Apache disallow-doctype-decl feature, so a plain doctype prolog has to be
+     * handled here in text. Declarations that define entities or reference external DTDs are
+     * rejected outright (that is the XXE surface), as is any input still holding a doctype after
+     * the strip.
      */
-    fun sanitizeTaskerXml(rawXml: String): String {
+    fun sanitizeXml(rawXml: String): String {
         val match = DOCTYPE_PATTERN.find(rawXml) ?: return rawXml
         val start = match.range.first
         var index = start
@@ -106,39 +98,16 @@ internal object ImportResourceGuard {
             }
             index++
         }
-        require(end >= 0) { "Tasker XML DOCTYPE declaration is malformed" }
+        require(end >= 0) { "XML DOCTYPE declaration is malformed" }
         val declaration = rawXml.substring(start, end + 1)
         require(!DOCTYPE_UNSAFE_PATTERN.containsMatchIn(declaration)) {
-            "Tasker XML with DOCTYPE entity or external DTD references is not supported"
+            "XML with DOCTYPE entity or external DTD references is not supported"
         }
         val stripped = rawXml.removeRange(start, end + 1)
         require(!DOCTYPE_PATTERN.containsMatchIn(stripped)) {
-            "Tasker XML with multiple DOCTYPE declarations is not supported"
+            "XML with multiple DOCTYPE declarations is not supported"
         }
         return stripped
-    }
-
-    fun requireXmlPreflight(rawXml: String, budget: ImportResourceBudget = ImportResourceBudget.Default) {
-        requireWithin("XML characters", rawXml.length.toLong(), budget.maxXmlChars.toLong())
-        require(!DOCTYPE_PATTERN.containsMatchIn(rawXml)) {
-            "Tasker XML with DOCTYPE declarations is not supported"
-        }
-
-        val factory = SAXParserFactory.newInstance().apply {
-            isNamespaceAware = false
-            // Best-effort only: Android's Harmony/Expat factories throw SAXNotRecognizedException
-            // for the Apache feature URI, and making it fatal broke every device import (issue #5).
-            // The DOCTYPE guarantee is enforced by the text checks above and sanitizeTaskerXml.
-            applyImportHardening()
-        }
-        val handler = XmlBudgetHandler(budget)
-        try {
-            factory.newSAXParser().parse(InputSource(StringReader(rawXml)), handler)
-        } catch (error: BudgetSaxException) {
-            throw error.violation
-        } catch (error: SAXException) {
-            throw IllegalArgumentException("Tasker XML is malformed.", error)
-        }
     }
 
     fun bundleViolation(
@@ -393,72 +362,6 @@ private class JsonBudgetScanner(
     }
 }
 
-private class XmlBudgetHandler(private val budget: ImportResourceBudget) : DefaultHandler() {
-    private var depth = 0
-    private var nodeCount = 0L
-    private var entityCount = 0L
-    private var actionCount = 0L
-    private var contextCount = 0L
-    private var sceneElementCount = 0L
-    private var stringBytes = 0L
-    private var profileDepth = 0
-
-    override fun startElement(uri: String?, localName: String?, qName: String, attributes: Attributes) {
-        depth++
-        nodeCount++
-        check("nesting depth", depth.toLong(), budget.maxNestingDepth.toLong())
-        check("XML nodes", nodeCount, budget.maxXmlNodes)
-
-        addString(qName)
-        repeat(attributes.length) { index ->
-            addString(attributes.getQName(index))
-            addString(attributes.getValue(index))
-        }
-
-        val tag = qName.lowercase()
-        when (tag) {
-            "task", "profile", "variable", "scene" -> {
-                entityCount++
-                check("entities", entityCount, budget.maxEntities)
-            }
-            "action" -> {
-                actionCount++
-                check("actions", actionCount, budget.maxActions)
-            }
-            "element" -> {
-                sceneElementCount++
-                check("scene elements", sceneElementCount, budget.maxSceneElements)
-            }
-        }
-        if (profileDepth > 0 && tag in TASKER_CONTEXT_TAGS) {
-            contextCount++
-            check("contexts", contextCount, budget.maxContexts)
-        }
-        if (tag == "profile") profileDepth++
-    }
-
-    override fun endElement(uri: String?, localName: String?, qName: String) {
-        if (qName.equals("profile", ignoreCase = true)) profileDepth--
-        depth--
-    }
-
-    override fun characters(ch: CharArray, start: Int, length: Int) {
-        stringBytes += ch.utf8ByteLength(start, length)
-        check("aggregate string bytes", stringBytes, budget.maxAggregateStringBytes)
-    }
-
-    private fun addString(value: String?) {
-        stringBytes += value.orEmpty().utf8ByteLength()
-        check("aggregate string bytes", stringBytes, budget.maxAggregateStringBytes)
-    }
-
-    private fun check(name: String, observed: Long, limit: Long) {
-        violation(name, observed, limit)?.let { throw BudgetSaxException(it) }
-    }
-}
-
-private class BudgetSaxException(val violation: ImportBudgetExceededException) : SAXException(violation.message)
-
 private fun Char.isJsonTokenBoundary(): Boolean =
     isWhitespace() || this == '"' || this == '{' || this == '}' || this == '[' || this == ']' ||
         this == ':' || this == ',' || this == '/'
@@ -482,26 +385,6 @@ private fun String.utf8ByteLength(): Long {
     return bytes
 }
 
-private fun CharArray.utf8ByteLength(start: Int, length: Int): Long {
-    var bytes = 0L
-    var index = start
-    val end = start + length
-    while (index < end) {
-        val char = this[index]
-        when {
-            char.code <= 0x7f -> bytes++
-            char.code <= 0x7ff -> bytes += 2
-            char.isHighSurrogate() && index + 1 < end && this[index + 1].isLowSurrogate() -> {
-                bytes += 4
-                index++
-            }
-            else -> bytes += 3
-        }
-        index++
-    }
-    return bytes
-}
-
 private fun violation(name: String, observed: Long, limit: Long): ImportBudgetExceededException? =
     if (observed > limit) ImportBudgetExceededException(name, observed, limit) else null
 
@@ -511,6 +394,5 @@ private fun requireWithin(name: String, observed: Long, limit: Long) {
 
 private val HIGH_SURROGATE_RANGE = 0xd800..0xdbff
 private val LOW_SURROGATE_RANGE = 0xdc00..0xdfff
-private val TASKER_CONTEXT_TAGS = setOf("time", "day", "application", "app", "state", "event", "location")
 private val DOCTYPE_PATTERN = Regex("""<!\s*DOCTYPE\b""", RegexOption.IGNORE_CASE)
 private val DOCTYPE_UNSAFE_PATTERN = Regex("""<!\s*ENTITY\b|\bSYSTEM\b|\bPUBLIC\b""", RegexOption.IGNORE_CASE)

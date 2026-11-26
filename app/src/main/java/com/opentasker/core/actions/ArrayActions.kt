@@ -10,7 +10,7 @@ import com.opentasker.core.engine.variableWork
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.text.countOf
 
-// Tasker's arrays are numbered variables: %arr1, %arr2, ... in the scope %arr belongs to. These
+// An array here is a set of numbered variables: %arr1, %arr2, ... in the scope %arr belongs to. These
 // actions work on those elements. Variable Split, Array Clear, Push, Pop and Process drop a list
 // text.split or text.match kept under the same name, which would otherwise hide the new elements from
 // Join Text and For Each, and the last three read such a list as elements 1..n while the name has
@@ -23,7 +23,7 @@ private fun arrayBase(args: Map<String, String>, key: String): String? =
 
 /**
  * The 1-based `position` argument, 1 when it is left blank, or null when it isn't a number from 1.
- * A fraction counts by its whole part, as in Tasker's whole-number fields (decompiled 6.7.8, `i.F`).
+ * A fraction counts by its whole part, as every whole-number field reads one.
  */
 private fun position(args: Map<String, String>): Int? {
     val raw = args["position"]?.trim().orEmpty()
@@ -69,10 +69,10 @@ private fun VariableStore.replaceElements(base: String, items: Map<Int, Pair<Str
 }
 
 /**
- * Tasker's Variable Split. Args: `name`, `splitter`, `regex`, `delete_base`, `values`. Splits %name
+ * Variable Split. Args: `name`, `splitter`, `regex`, `delete_base`, `values`. Splits %name
  * into %name1, %name2, ... after clearing the old ones. A blank splitter splits on white space, and
- * trailing empty parts are dropped the way Tasker drops them. With `values` it splits that text
- * instead of %name's own value, which is Tasker's Array Set.
+ * trailing empty parts are dropped. With `values` it splits that text instead of %name's own value,
+ * which makes it an Array Set.
  */
 class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")), VariableOnlyAction {
 
@@ -101,7 +101,7 @@ class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")), Varia
 }
 
 /**
- * Tasker's Variable Join. Args: `name`, `joiner`, `delete_parts`. Joins %name1, %name2, ... in
+ * Variable Join. Args: `name`, `joiner`, `delete_parts`. Joins %name1, %name2, ... in
  * index order into %name, and unsets the elements when asked. Unset elements are skipped.
  */
 class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")), VariableOnlyAction {
@@ -112,7 +112,7 @@ class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")), Variabl
         val base = arrayBase(args, "name") ?: return ActionResult.Failure("invalid variable name")
         val items = ctx.variables.numberedItems(base)
         val joiner = args["joiner"].orEmpty()
-        // Tasker adds the joiner only once the result has something in it, so empty leading
+        // The joiner goes in only once the result has something in it, so empty leading
         // elements leave no joiner behind.
         val joined = buildString {
             items.values.forEach { value ->
@@ -128,7 +128,7 @@ class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")), Variabl
 }
 
 /**
- * Tasker's Array Push. Args: `array`, `position` (from 1), `value`, `fill_spaces`. Inserts the
+ * Array Push. Args: `array`, `position` (from 1), `value`, `fill_spaces`. Inserts the
  * value and moves the elements from that position up one. A position past the end appends. With
  * `fill_spaces`, only the elements up to the first unset one move, and the value fills that gap.
  */
@@ -160,7 +160,7 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")), Var
 }
 
 /**
- * Tasker's Array Pop. Args: `array`, `position` (from 1), `to_var`. Removes the element there and
+ * Array Pop. Args: `array`, `position` (from 1), `to_var`. Removes the element there and
  * moves the later ones down one, storing it in `to_var` when one is named. A position past the end
  * pops the last element, and an empty array is left as it is.
  */
@@ -191,7 +191,7 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")), Varia
     }
 }
 
-/** Tasker's Array Clear. Args: `array`. Unsets every element of the array. */
+/** Array Clear. Args: `array`. Unsets every element of the array. */
 class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")), VariableOnlyAction {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
@@ -207,7 +207,7 @@ class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")), V
 }
 
 /**
- * Tasker's Array Process. Args: `array`, `type`. Reorders the values over the indices the elements
+ * Array Process. Args: `array`, `type`. Reorders the values over the indices the elements
  * already have, so gaps stay where they are. Remove Duplicates unsets every later copy of a value,
  * and Squash renumbers the elements from 1, dropping empty ones. Equal values keep index order.
  */
@@ -242,7 +242,7 @@ class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")
         "sort_alpha" -> values.sortedWith { a, b -> a.first.compareTo(b.first) }
         "sort_alpha_reverse" -> values.sortedWith { a, b -> a.first.compareTo(b.first) }.asReversed()
         "sort_alpha_caseless" -> values.sortedWith { a, b -> a.first.compareTo(b.first, ignoreCase = true) }
-        // Tasker sorts with the comparison turned round here, not sort-then-reverse, so ties keep their order.
+        // Sorted with the comparison turned round, not sort-then-reverse, so ties keep their order.
         "sort_alpha_caseless_reverse" -> values.sortedWith { a, b -> b.first.compareTo(a.first, ignoreCase = true) }
         "sort_shortest_first" -> values.sortedWith { a, b -> a.first.length.compareTo(b.first.length) }
         "sort_longest_first" -> values.sortedWith { a, b -> b.first.length.compareTo(a.first.length) }
@@ -268,14 +268,14 @@ class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")
         .map { it.first }
 
     companion object {
-        /** The types in Tasker's order, so a type's index is the number Tasker stores for it. */
+        /** The types in a fixed order, so a type's index is the number an imported step stores for it. */
         val TYPES = listOf(
             "remove_duplicates", "reverse", "rotate_left", "rotate_right", "shuffle",
             "sort_alpha", "sort_alpha_reverse", "sort_alpha_caseless", "sort_alpha_caseless_reverse",
             "sort_shortest_first", "sort_longest_first", "sort_numeric_integer", "sort_numeric_float", "squash",
         )
 
-        // A value that isn't a number as a whole sorts by the first number in it, as Tasker's do.
+        // A value that isn't a number as a whole sorts by the first number in it.
         private val FIRST_INTEGER = Regex("""-?\d+""")
         private val FIRST_DECIMAL = Regex("""-?\d+(?:\.\d+)?""")
     }

@@ -11,7 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 
-/** How a Multiple Variables Set fails, and the splitters Tasker lets carry a value after a name. */
+/** How a Multiple Variables Set fails, and the splitters that can carry a value after a name. */
 class SetMultipleVariablesFailureTest {
     private val variables = VariableStore()
     private val logs = mutableListOf<String>()
@@ -35,7 +35,7 @@ class SetMultipleVariablesFailureTest {
 
     @Test
     fun aSecretReadAsABareNameStaysOutOfTheLog() {
-        // One line splits on its comma, so abc is a second name and is unset, as in Tasker.
+        // One line splits on its comma, so abc is a second name and is unset.
         assertEquals(ActionResult.Success, run("names" to "%api_token,abc"))
         assertEquals(listOf("var.set_multiple -> unset 2 variables"), logs)
     }
@@ -52,7 +52,7 @@ class SetMultipleVariablesFailureTest {
     }
 
     @Test
-    fun aDashSplitsAValueOffItsNameAsInTasker() {
+    fun aDashSplitsAValueOffItsName() {
         assertEquals(ActionResult.Success, run("names" to "%a-1\n%b-2", "values_splitter" to "-"))
         assertEquals("1", variables.get("a"))
         assertEquals("2", variables.get("b"))

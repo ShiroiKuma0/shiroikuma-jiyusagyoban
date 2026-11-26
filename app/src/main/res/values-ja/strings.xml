@@ -823,10 +823,9 @@
     <string name="import_mapped_actions">対応付けたアクション</string>
     <string name="import_for_review">確認用にインポート</string>
     <string name="import_disabled">インポートできません</string>
-    <string name="import_tasker">TaskerまたはMacroDroidをインポート</string>
-    <string name="import_reading_xml">インポートを読み込み中</string>
+    <string name="import_macrodroid">MacroDroidからインポート</string>
+    <string name="import_reading_macrodroid">インポートを読み込み中</string>
     <string name="import_export_json">JSONをエクスポート</string>
-    <string name="import_export_tasker_xml">Tasker XMLをエクスポート</string>
     <string name="import_import_json">JSONをインポート</string>
     <string name="import_paste_json_action">JSONを貼り付け / 読み取り</string>
     <string name="import_paste_json_title">OpenTaskerのバンドルを貼り付けまたは読み取り</string>
@@ -905,7 +904,7 @@
     <string name="action_create_blank_profile">空のプロファイルを作成</string>
     <string name="action_browse_templates">テンプレートを参照</string>
     <string name="action_create_for_review">確認用に作成</string>
-    <string name="action_import_tasker_xml">Tasker / MacroDroidをインポート</string>
+    <string name="action_import_macrodroid">MacroDroidからインポート</string>
     <string name="action_create_task">タスクを作成</string>
     <string name="action_add_step">ステップを追加</string>
     <string name="action_choose_image">画像を選択</string>
@@ -1656,7 +1655,6 @@
     <string name="ui_error_corrupt_record">保存されたデータを読み取れませんでした。バックアップを復元するか、該当する項目を削除してください。</string>
     <string name="ui_error_diagnostics_refresh">診断を更新できませんでした</string>
     <string name="ui_error_task_delete">タスクを削除できませんでした。詳細は「診断」で確認できます。</string>
-    <string name="ui_error_tasker_xml_preview">Tasker XMLのインポートのプレビューに失敗しました。詳細は「診断」で確認できます。</string>
     <string name="ui_error_automation_import_preview">TaskerまたはMacroDroidのインポートのプレビューに失敗しました。詳細は「診断」で確認できます。</string>
     <string name="ui_error_automation_import">TaskerまたはMacroDroidのインポートに失敗しました。詳細は「診断」で確認できます。</string>
     <string name="ui_error_bundle_export">OpenTaskerバンドルをエクスポートできませんでした。詳細は「診断」で確認できます。</string>
@@ -1683,7 +1681,6 @@
     <string name="ui_error_copy_diagnostics">診断レポートをコピーできませんでした</string>
     <string name="diagnostics_share_subject">OpenTasker診断レポート</string>
     <string name="diagnostics_share_chooser">診断レポートを共有</string>
-    <string name="import_document_tasker_macrodroid">Tasker XMLまたはMacroDroidのファイル</string>
     <string name="import_document_opentasker_bundle">OpenTaskerバンドル</string>
     <string name="ui_error_document_unreadable">選択した%1$sを開けませんでした。</string>
     <string name="ui_error_document_too_large">選択した%1$sは%2$d MBを超えています。</string>
@@ -1691,11 +1688,6 @@
     <string name="ui_error_import_budget_items">このファイルは大きすぎてインポートできません。タスク、プロファイル、変数、シーンは合わせて%1$d個までです。</string>
     <string name="ui_error_import_not_recognized">Tasker XMLファイルでも、MacroDroidのエクスポートでもありません。</string>
     <string name="ui_error_import_damaged">このエクスポートは破損しているか途中で切れているため、読み取れません。もう一度エクスポートして、新しいファイルをインポートしてください。</string>
-    <string name="dialog_macrodroid_password_title">パスワードで保護されたMacroDroidのエクスポート</string>
-    <string name="dialog_macrodroid_password_body">このファイルは、エクスポート時にMacroDroidによって暗号化されています。そのときに決めたパスワードを入力してください。OpenTaskerはパスワードを保存しません。</string>
-    <string name="dialog_macrodroid_password_label">エクスポートのパスワード</string>
-    <string name="dialog_macrodroid_password_wrong">このパスワードではファイルを開けません。</string>
-    <string name="dialog_macrodroid_password_open">開く</string>
     <string name="dialog_backup_passphrase_title">暗号化されたスナップショット</string>
     <string name="dialog_backup_passphrase_body">これは暗号化されたOpenTaskerのスナップショットです。「設定」でスナップショット用に決めたパスフレーズを入力してください。OpenTaskerはパスフレーズを保存しません。</string>
     <string name="dialog_backup_passphrase_label">スナップショットのパスフレーズ</string>
@@ -1718,7 +1710,6 @@
     <string name="run_log_source_unknown">不明</string>
     <string name="ui_error_backup">データベースのバックアップに失敗しました。詳細は「診断」で確認できます。</string>
     <string name="ui_error_backup_export">データベースのバックアップをエクスポートできませんでした。詳細は「診断」で確認できます。</string>
-    <string name="ui_error_tasker_xml_export">Tasker XMLをエクスポートできませんでした。詳細は「診断」で確認できます。</string>
     <string name="ui_error_backup_import">データベースのバックアップをインポートできませんでした。詳細は「診断」で確認できます。</string>
     <string name="ui_error_backup_legacy_too_large">このバックアップは古い形式のため、%1$d MBまでしか復元できません</string>
     <string name="ui_error_snapshot_destination">スナップショットのディレクトリを設定できませんでした。詳細は「診断」で確認できます。</string>
@@ -1770,7 +1761,6 @@
         <item quantity="one">このタスクはまだ%1$d件の自動化で使われています。先にその参照を付け替えるか、消去してください。</item>
         <item quantity="other">このタスクはまだ%1$d件の自動化で使われています。先にその参照を付け替えるか、消去してください。</item>
     </plurals>
-    <string name="ui_message_tasker_xml_ready">Tasker XMLを確認できます</string>
     <string name="ui_message_automation_import_ready">自動化のインポートを確認できます</string>
     <string name="ui_message_bundle_ready">OpenTaskerバンドルを確認できます</string>
     <string name="ui_message_edit_undone">編集を元に戻しました</string>
@@ -1789,8 +1779,6 @@
     </plurals>
     <string name="ui_message_snapshots_disabled">自動スナップショット：オフ</string>
     <string name="ui_message_snapshot_destination_saved">スナップショットの保存先を保存しました</string>
-    <string name="ui_message_tasker_xml_exported">Tasker XMLをエクスポートしました：%1$s、%2$s、%3$s</string>
-    <string name="ui_message_tasker_xml_export_warnings">このファイルを使う前に確認してください（%1$d件）：%2$s</string>
     <string name="ui_message_restore_staged">復元を準備しました。適用するにはOpenTaskerを再起動してください。</string>
     <string name="ui_message_restore_cancelled">準備済みの復元をキャンセルしました</string>
     <string name="ui_message_no_staged_restore">キャンセルできる準備済みの復元はありません</string>
@@ -1802,7 +1790,6 @@
     <string name="ui_run_status_skipped">スキップ</string>
     <string name="ui_run_status_succeeded">成功</string>
     <string name="ui_run_status_failed">失敗</string>
-    <string name="ui_message_tasker_imported">インポートしました：%1$s、%2$s</string>
     <string name="ui_message_bundle_exported">エクスポートしました：%1$s、%2$s、%3$s</string>
     <string name="ui_message_bundle_imported">インポートしました：%1$s、%2$s、%3$s</string>
     <!--
@@ -2192,4 +2179,8 @@
     <string name="diagnostics_exit_reason_signaled">システムのシグナルにより停止</string>
     <string name="diagnostics_exit_reason_user_requested">ユーザーの要求により終了</string>
     <string name="diagnostics_exit_reason_user_stopped">ユーザーが停止</string>
+    <string name="import_document_macrodroid">MacroDroidのエクスポート</string>
+    <string name="ui_error_macrodroid_password_protected">このMacroDroidのエクスポートにはパスワードが掛かっているため、ここでは読み込めません。MacroDroidでパスワードを空にしてマクロをもう一度エクスポートし、そのファイルをインポートしてください。</string>
+    <string name="dialog_password_open">開く</string>
+    <string name="ui_message_automation_imported">インポートしました：%1$s、%2$s</string>
 </resources>

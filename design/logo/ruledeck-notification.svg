@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Status bar silhouette, drawn at 1024 and shipped at 24 dp: two cards instead of three,
+       rows without the chevron, and wider cuts so the shapes survive at 24 px. -->
+  <defs>
+    <rect id="card" x="-195" y="-170" width="390" height="340" rx="62"/>
+    <g id="rows">
+      <circle cx="-100" cy="-58" r="44"/>
+      <rect x="-30" y="-94" width="180" height="72" rx="36"/>
+      <circle cx="-100" cy="58" r="44"/>
+      <rect x="-30" y="22" width="180" height="72" rx="36"/>
+    </g>
+    <mask id="behind-front" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#FFFFFF"/>
+      <use xlink:href="#card" transform="translate(552.5 546) rotate(-7)" fill="#000000" stroke="#000000" stroke-width="56"/>
+    </mask>
+    <mask id="row-holes" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#FFFFFF"/>
+      <use xlink:href="#rows" transform="translate(552.5 546) rotate(-7)" fill="#000000"/>
+    </mask>
+  </defs>
+  <g fill="#FFFFFF" transform="translate(512 512) scale(1.7) translate(-512 -512)">
+    <g mask="url(#behind-front)">
+      <use xlink:href="#card" transform="translate(482.5 492) rotate(-12)"/>
+    </g>
+    <g mask="url(#row-holes)">
+      <use xlink:href="#card" transform="translate(552.5 546) rotate(-7)"/>
+    </g>
+  </g>
+</svg>

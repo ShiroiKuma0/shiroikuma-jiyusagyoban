@@ -11,8 +11,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Reset Return Variable on a name that is also an element of the caller's array. In Tasker the
- * called task's array is its own copy, so changing it after the reset leaves the caller's alone.
+ * Reset Return Variable on a name that is also an element of the caller's array. The called
+ * task's array is its own copy, so changing it after the reset leaves the caller's alone.
  */
 class TaskRunnerResetReturnVariableArrayTest {
     // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this

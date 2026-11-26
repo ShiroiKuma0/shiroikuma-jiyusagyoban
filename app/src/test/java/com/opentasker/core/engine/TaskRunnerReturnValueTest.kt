@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Stop's value handed back through Run Task's return variable, Tasker's Return and Perform Task. */
+/** Stop's value handed back through Run Task's return variable. */
 class TaskRunnerReturnValueTest {
     // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
     // class — an unset variable left as written (here it reads as nothing), a called task that reads

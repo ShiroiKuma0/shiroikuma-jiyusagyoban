@@ -108,7 +108,7 @@ class LocalePluginCompatibilityFixtureTest {
 
     @Test
     fun typedPluginSettingsSurviveConfigurationEditAndFire() = runBlocking {
-        // The shape Termux:Tasker saves: an int version code, a boolean and a null argument string.
+        // The shape Termux's plugin saves: an int version code, a boolean and a null argument string.
         val configResult = LocalePluginConfigurationResultParser.parse(
             Activity.RESULT_OK,
             Intent()
@@ -156,7 +156,7 @@ class LocalePluginCompatibilityFixtureTest {
     }
 
     @Test
-    fun theBundleAlsoRidesOnTheIntentAsTaskerSendsIt() = runBlocking {
+    fun theBundleAlsoRidesOnTheIntentAsPluginHostsSendIt() = runBlocking {
         var setting: Intent? = null
         var query: Intent? = null
         val sent = LocalePluginHost(
@@ -178,7 +178,7 @@ class LocalePluginCompatibilityFixtureTest {
                 }
             },
         )
-        // Termux:Tasker reads the executable and the terminal flag off the intent, not the bundle.
+        // Termux's plugin reads the executable and the terminal flag off the intent, not the bundle.
         val request = LocalePluginRequest(
             packageName = packageName,
             bundleJson = "{\"executable\":\"hello.sh\",\"terminal\":{\"boolean\":false}," +

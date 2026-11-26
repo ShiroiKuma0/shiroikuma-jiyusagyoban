@@ -149,74 +149,6 @@ class ImportResourceBudgetTest {
         )
     }
 
-    @Test
-    fun sanitizeStripsBenignDoctypeAndRejectsUnsafeOnes() {
-        assertEquals("<root/>", ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root>\n<root/>").trim())
-        assertEquals("<root/>", ImportResourceGuard.sanitizeTaskerXml("<root/>"))
-
-        val unterminated = runCatching {
-            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root [<!ELEMENT root EMPTY>")
-        }.exceptionOrNull()
-        assertEquals(true, unterminated is IllegalArgumentException)
-
-        val entity = runCatching {
-            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root [<!ENTITY x \"y\">]><root/>")
-        }.exceptionOrNull()
-        assertEquals(true, entity is IllegalArgumentException)
-
-        val doubled = runCatching {
-            ImportResourceGuard.sanitizeTaskerXml("<!DOCTYPE root><!DOCTYPE root><root/>")
-        }.exceptionOrNull()
-        assertEquals(true, doubled is IllegalArgumentException)
-    }
-
-    @Test
-    fun xmlPreflightAcceptsExactNodeAndDepthLimitsThenRejectsOneOver() {
-        val exact = "<root><child/></root>"
-        ImportResourceGuard.requireXmlPreflight(
-            exact,
-            budget().copy(maxXmlNodes = 2, maxNestingDepth = 2),
-        )
-
-        assertBudget("XML nodes") {
-            ImportResourceGuard.requireXmlPreflight(exact, budget().copy(maxXmlNodes = 1))
-        }
-        assertBudget("nesting depth") {
-            ImportResourceGuard.requireXmlPreflight(exact, budget().copy(maxNestingDepth = 1))
-        }
-    }
-
-    @Test
-    fun xmlPreflightReportsMalformedInputAsAnExpectedImportFailure() {
-        val error = assertThrows(IllegalArgumentException::class.java) {
-            ImportResourceGuard.requireXmlPreflight("<TaskerData></TkaserData>", budget())
-        }
-
-        assertEquals("Tasker XML is malformed.", error.message)
-    }
-
-    @Test
-    fun taskerXmlAcceptsExactActionLimitAndRejectsOneOverBeforeDomParsing() {
-        fun xml(actionCount: Int): String = buildString {
-            append("<TaskerData><Task><id>1</id><nme>Task</nme>")
-            repeat(actionCount) { append("<Action><code>30</code></Action>") }
-            append("</Task></TaskerData>")
-        }
-        val oneAction = budget().copy(maxActions = 1)
-
-        assertEquals(
-            1,
-            TaskerXmlImporter.parse(xml(1), "test", 0, oneAction).mappedActions.size,
-        )
-        assertBudget("actions") {
-            TaskerXmlImporter.parse(xml(2), "test", 0, oneAction)
-        }
-    }
-
-    // RETIRED: upstream's `planImport(bundle)` → `db.withTransaction` source ordering. The fork's bundle
-    // format is id-free and name-based, and its importer validates and overwrites in place through a
-    // different call shape, so this source-text assertion no longer describes our repository.
-
     private fun assertBudget(name: String, block: () -> Unit) {
         val error = assertThrows(ImportBudgetExceededException::class.java, block)
         assertEquals(name, error.budgetName)
@@ -225,13 +157,11 @@ class ImportResourceBudgetTest {
 
     private fun budget(): ImportResourceBudget = ImportResourceBudget(
         maxJsonChars = 10_000,
-        maxXmlChars = 10_000,
         maxEntities = 100,
         maxActions = 100,
         maxContexts = 100,
         maxSceneElements = 100,
         maxJsonTokens = 1_000,
-        maxXmlNodes = 1_000,
         maxNestingDepth = 20,
         maxAggregateStringBytes = 10_000,
     )

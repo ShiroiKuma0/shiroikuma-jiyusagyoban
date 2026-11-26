@@ -184,7 +184,7 @@
     <string name="catalog_action_text_replace_field_search_only_label" formatted="false">Only find matches</string>
     <string name="catalog_action_text_replace_field_search_only_hint" formatted="false">Store the matches and leave the output variable as it is</string>
     <string name="catalog_action_text_replace_field_in_place_label" formatted="false">Edit the output variable in place</string>
-    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">Like Tasker\'s Search Replace: fails when the variable isn\'t set, changes it only on a match, and unsets it when nothing is left</string>
+    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">Edits the variable itself: fails when it isn\'t set, changes it only on a match, and unsets it when nothing is left</string>
     <string name="catalog_action_text_split_name" formatted="false">Split Text</string>
     <string name="catalog_action_text_split_description" formatted="false">Split into an array by a literal delimiter or a regex pattern</string>
     <string name="catalog_action_text_split_field_source_label" formatted="false">Source text</string>
@@ -217,11 +217,11 @@
     <string name="catalog_action_text_length_field_var_label" formatted="false">Output variable</string>
     <string name="catalog_action_text_length_field_var_hint" formatted="false">Default: length</string>
     <string name="catalog_action_var_split_name" formatted="false">Variable Split</string>
-    <string name="catalog_action_var_split_description" formatted="false">Split a variable into numbered elements, the way Tasker does (%text1, %text2, …)</string>
+    <string name="catalog_action_var_split_description" formatted="false">Split a variable into numbered elements (%text1, %text2, …)</string>
     <string name="catalog_action_var_split_field_name_label" formatted="false">Name</string>
     <string name="catalog_action_var_split_field_name_hint" formatted="false">%text becomes %text1, %text2, …</string>
     <string name="catalog_action_var_split_field_values_label" formatted="false">Values</string>
-    <string name="catalog_action_var_split_field_values_hint" formatted="false">Split this text instead of the variable\'s own value, like Tasker\'s Array Set</string>
+    <string name="catalog_action_var_split_field_values_hint" formatted="false">Split this text instead of the variable\'s own value, to set the whole array at once</string>
     <string name="catalog_action_var_split_field_splitter_label" formatted="false">Splitter</string>
     <string name="catalog_action_var_split_field_splitter_hint" formatted="false">Blank splits on spaces and new lines</string>
     <string name="catalog_action_var_split_field_regex_label" formatted="false">Splitter is a regex</string>
@@ -267,7 +267,7 @@
     <string name="catalog_action_array_process_field_array_hint" formatted="false">%arr, with elements %arr1, %arr2, …</string>
     <string name="catalog_action_array_process_field_type_label" formatted="false">Operation</string>
     <string name="catalog_action_sun_times_name" formatted="false">Get Sunrise/Sunset Times</string>
-    <string name="catalog_action_sun_times_description" formatted="false">Work out sunrise, sunset, twilight and solar noon for a place and day, the way Tasker does</string>
+    <string name="catalog_action_sun_times_description" formatted="false">Work out sunrise, sunset, twilight and solar noon for a place and day, to the minute</string>
     <string name="catalog_action_sun_times_field_latitude_label" formatted="false">Latitude</string>
     <string name="catalog_action_sun_times_field_latitude_hint" formatted="false">Degrees north, negative for south. Leave blank to use the phone\'s location</string>
     <string name="catalog_action_sun_times_field_longitude_label" formatted="false">Longitude</string>
@@ -390,7 +390,7 @@
     <string name="action_option_intent_broadcast" formatted="false">Broadcast</string>
     <string name="action_option_intent_service" formatted="false">Service</string>
     <string name="catalog_action_plugin_locale_fire_name" formatted="false">Locale Plugin Setting</string>
-    <string name="catalog_action_plugin_locale_fire_description" formatted="false">Dispatch an explicit Locale/Tasker-compatible setting plugin request</string>
+    <string name="catalog_action_plugin_locale_fire_description" formatted="false">Dispatch an explicit Locale-compatible setting plugin request</string>
     <string name="catalog_category_plugin" formatted="false">Plugin</string>
     <string name="catalog_action_plugin_locale_fire_field_package_label" formatted="false">Plugin package</string>
     <string name="catalog_action_plugin_locale_fire_field_package_hint" formatted="false">com.example.plugin</string>
@@ -401,7 +401,7 @@
     <string name="catalog_action_plugin_locale_fire_field_timeoutms_label" formatted="false">Timeout (ms)</string>
     <string name="catalog_action_plugin_locale_fire_field_timeoutms_hint" formatted="false">5000</string>
     <string name="catalog_action_plugin_locale_query_name" formatted="false">Locale Plugin Condition</string>
-    <string name="catalog_action_plugin_locale_query_description" formatted="false">Query an explicit Locale/Tasker-compatible condition plugin and store its state</string>
+    <string name="catalog_action_plugin_locale_query_description" formatted="false">Query an explicit Locale-compatible condition plugin and store its state</string>
     <string name="catalog_action_plugin_locale_query_field_package_label" formatted="false">Plugin package</string>
     <string name="catalog_action_plugin_locale_query_field_package_hint" formatted="false">com.example.plugin</string>
     <string name="catalog_action_plugin_locale_query_field_bundlejson_label" formatted="false">Bundle JSON</string>
@@ -438,11 +438,7 @@
     <string name="catalog_action_script_termux_run_field_captureprefix_hint" formatted="false">%script</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_label" formatted="false">Timeout ms</string>
     <string name="catalog_action_script_termux_run_field_timeoutms_hint" formatted="false">30000 (1000–120000)</string>
-    <string name="catalog_action_tasker_unsupported_name" formatted="false">Unsupported Tasker Action</string>
-    <string name="catalog_action_tasker_unsupported_description" formatted="false">Placeholder for a Tasker action that could not be safely mapped during import</string>
     <string name="catalog_category_import" formatted="false">Import</string>
-    <string name="catalog_action_tasker_unsupported_field_taskercode_label" formatted="false">Tasker action code</string>
-    <string name="catalog_action_tasker_unsupported_field_summary_label" formatted="false">Import note</string>
 
     <string name="catalog_action_macrodroid_unsupported_name" formatted="false">Unsupported MacroDroid Action</string>
     <string name="catalog_action_macrodroid_unsupported_description" formatted="false">Placeholder for a MacroDroid action that could not be safely mapped during import</string>
@@ -530,11 +526,11 @@
     <string name="catalog_action_settings_write_field_key_label" formatted="false">Setting name</string>
     <string name="catalog_action_settings_write_field_key_hint" formatted="false">location_mode, screen_off_timeout, etc.</string>
     <string name="catalog_action_settings_write_field_value_label" formatted="false">Value</string>
-    <string name="catalog_action_settings_write_field_value_hint" formatted="false">Read back after writing, so a value Android ignores reports a failure. Tasker\'s =:=toggle=:= flips a setting between 0 and 1.</string>
+    <string name="catalog_action_settings_write_field_value_hint" formatted="false">Read back after writing, so a value Android ignores reports a failure. The value =:=toggle=:= flips a setting between 0 and 1.</string>
     <string name="catalog_action_settings_read_name" formatted="false">Read Setting</string>
     <string name="catalog_action_settings_read_description" formatted="false">Read one Android setting by name into a variable. Reading needs no access, but Android hides some names from apps.</string>
     <string name="catalog_action_settings_read_field_var_label" formatted="false">Store in</string>
-    <string name="catalog_action_settings_read_field_var_hint" formatted="false">A setting that isn\'t there is stored as empty, as in Tasker.</string>
+    <string name="catalog_action_settings_read_field_var_hint" formatted="false">A setting that isn\'t there is stored as empty.</string>
     <string name="catalog_action_dnd_set_name" formatted="false">Set Do Not Disturb</string>
     <string name="catalog_action_dnd_set_description" formatted="false">Set the Do Not Disturb mode</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">Mode</string>

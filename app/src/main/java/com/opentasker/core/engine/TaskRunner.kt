@@ -10,7 +10,7 @@ import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateExpressionEngine
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
@@ -805,14 +805,14 @@ class TaskRunner(
 
     /** Tasker's %TRUN lists a task run by another one too, for as long as it actually runs. */
     private suspend fun runListed(child: TaskRunner, target: Task): TaskRunReport {
-        val running = TaskerBuiltIns.subTaskStarted(target.name)
+        val running = BuiltInVariables.subTaskStarted(target.name)
         // Its card says Running for the same span (upstream abcd0e47).
         ActiveExecutionRegistry.nestedStarted(target.id)
         try {
             return child.run(target)
         } finally {
             ActiveExecutionRegistry.nestedEnded(target.id)
-            TaskerBuiltIns.subTaskEnded(running)
+            BuiltInVariables.subTaskEnded(running)
         }
     }
 

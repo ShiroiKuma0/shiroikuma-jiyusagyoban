@@ -14,7 +14,7 @@
     <string name="context_type_event_title" formatted="false">事件</string>
     <string name="context_type_event_description" formatted="false">匹配一次性事件，如开机、通知、NFC、蓝牙连接/断开/安全、日历、太阳、摇晃或Locale插件查询。</string>
     <string name="context_type_plugin_title" formatted="false">插件</string>
-    <string name="context_type_plugin_description" formatted="false">当Locale/Tasker条件插件报告满足时匹配。插件会定期轮询，其最近已知状态会被缓存。</string>
+    <string name="context_type_plugin_description" formatted="false">当Locale条件插件报告满足时匹配。插件会定期轮询，其最近已知状态会被缓存。</string>
 
     <string name="context_field_application_package_label" formatted="false">包名</string>
     <string name="context_field_application_package_hint" formatted="false">com.example.app（工作资料中的应用不可见）</string>
@@ -205,7 +205,6 @@
     <string name="capability_vpn_tunnel_setup" formatted="false">需要WireGuard或Tailscale。WireGuard还需要其控制权限，并开启“允许远程控制应用”。</string>
     <string name="capability_shizuku_script_setup" formatted="false">需要Shizuku权限和已批准的脚本哈希。</string>
     <string name="capability_termux_setup" formatted="false">需要Termux 0.109或更高版本、RUN_COMMAND权限以及已批准的脚本哈希。</string>
-    <string name="capability_tasker_import_unsupported" formatted="false">导入的Tasker操作无法映射到受支持的OpenTasker操作。</string>
     <string name="capability_macrodroid_import_unsupported" formatted="false">导入的MacroDroid操作无法映射到受支持的OpenTasker操作。</string>
     <string name="capability_sms_permission" formatted="false">需要短信权限。</string>
     <string name="capability_calendar_event_add_setup" formatted="false">需要设置中的日历编辑，以及一个可以添加新事件的日历。</string>

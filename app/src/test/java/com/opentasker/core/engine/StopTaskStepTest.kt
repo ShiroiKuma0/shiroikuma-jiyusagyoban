@@ -19,7 +19,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tasker's Stop with a task named stops that task, wherever it's running. `task.stop` does the same
+ * A Stop with a task named stops that task, wherever it's running. `task.stop` does the same
  * through the collision coordinator, which tracks every running copy of a task, sub-task runs
  * included.
  */

@@ -796,10 +796,11 @@ internal sealed interface SettingsWriteRequest {
 internal const val MAX_SETTINGS_VALUE_CHARS = 256
 
 /**
- * The value Tasker's Custom Setting writes to flip a setting (decompiled 6.7.8, `uu.g2.a`): it reads
- * the setting and writes 1 for 0 and 0 for 1 (`uu.m1.k`), and fails on anything else.
+ * The value that makes Write Setting flip a setting instead of writing it: it reads the setting
+ * and writes 1 for 0 and 0 for 1, and fails on anything else. Saved and imported steps hold this
+ * exact text.
  */
-internal const val TASKER_TOGGLE_VALUE = "=:=toggle=:="
+internal const val SETTING_TOGGLE_VALUE = "=:=toggle=:="
 
 /** What a toggle writes over [current], or null when [current] isn't 0 or 1 and so can't be toggled. */
 internal fun toggledSettingValue(current: String?): String? = when (current) {
@@ -916,7 +917,7 @@ internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest
 }
 
 /**
- * Writes one Android setting, the way Tasker's Custom Setting action does.
+ * Writes one Android setting.
  *
  * Global and Secure need `WRITE_SECURE_SETTINGS`, which no app can ask for at runtime; it is
  * granted once over a cable and then persists. System uses the ordinary Modify system settings
@@ -926,14 +927,14 @@ internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest
  * silently normalises or discards values it does not like, so without the read-back the action
  * would report success for a setting that never changed.
  *
- * Tasker's toggle value, [TASKER_TOGGLE_VALUE], flips a setting at 0 or 1 instead of being written.
+ * The toggle value, [SETTING_TOGGLE_VALUE], flips a setting at 0 or 1 instead of being written.
  */
 class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write")) {
 
     // A toggle flips the setting each time, so a retried one would undo itself. The args are as
     // written, so a variable that only holds the toggle value once it runs isn't caught here.
     override fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety =
-        if (args["value"] == TASKER_TOGGLE_VALUE) ActionRetrySafety.NEVER else retrySafety
+        if (args["value"] == SETTING_TOGGLE_VALUE) ActionRetrySafety.NEVER else retrySafety
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val request = when (val parsed = parseSettingsWrite(args)) {
@@ -956,7 +957,7 @@ class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write
             )
         }
 
-        val value = if (request.value == TASKER_TOGGLE_VALUE) {
+        val value = if (request.value == SETTING_TOGGLE_VALUE) {
             val current = runCatching { readSetting(resolver, request.table, request.key) }.getOrNull()
             toggledSettingValue(current) ?: return ActionResult.Failure(
                 "$target holds ${current ?: "nothing"}, and only a setting at 0 or 1 can be toggled.",
@@ -994,10 +995,9 @@ class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write
 }
 
 /**
- * Reads one Android setting into a variable: Tasker's Custom Setting with Read Setting To and no
- * value. Like Tasker (decompiled 6.7.8, `uu.h2.f`), a setting that isn't there is stored as empty.
- * Reading needs no access, but Android 12 and newer refuse names they hide from apps; Tasker
- * stores those as empty too, and here the step fails and says so.
+ * Reads one Android setting into a variable. A setting that isn't there is stored as empty.
+ * Reading needs no access, but Android 12 and newer refuse names they hide from apps, and then the
+ * step fails and says so rather than store an empty value that looks like a real reading.
  */
 class SettingsReadAction : DeclaredAction(ActionCatalog.require("settings.read")) {
 

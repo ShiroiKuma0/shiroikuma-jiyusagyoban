@@ -9,7 +9,7 @@ Required permission: `com.opentasker.permission.AUTOMATION`
 
 The receiver is exported only behind this custom permission. Callers should send explicit broadcasts to the OpenTasker package and use ordered broadcasts when they need result extras.
 
-`AUTOMATION` is a signature permission. Android grants it only to apps signed with the same key as OpenTasker, so Home Assistant Companion, Tasker, MacroDroid and every other ordinary app get a `Permission Denial` when they send `RUN_TASK` or the other actions below. Android drops the broadcast before OpenTasker sees it, so nothing shows in the Run Log either.
+`AUTOMATION` is a signature permission. Android grants it only to apps signed with the same key as OpenTasker, so Home Assistant Companion, MacroDroid and every other ordinary app get a `Permission Denial` when they send `RUN_TASK` or the other actions below. Android drops the broadcast before OpenTasker sees it, so nothing shows in the Run Log either.
 
 To trigger OpenTasker from another app, send `com.opentasker.action.PUSH_EVENT` instead and give a profile an Event context with event type `push` and the matching topic. That receiver is exported without a permission and checks a per-install token. Copy the token from Setup with `Copy legacy bridge token`, and keep it private, since anyone holding it can fire your push profiles. The ntfy section below lists the extras.
 

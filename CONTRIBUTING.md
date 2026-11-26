@@ -76,7 +76,7 @@ Most of the code is in `:app`, but the `core/*` modules now own their own source
 | `app/src/main/java/com/opentasker/core/engine/` | Task execution, profile matching, the variable store, the foreground service |
 | `app/src/main/java/com/opentasker/core/actions/` | The action catalog and every built-in action implementation |
 | `app/src/main/java/com/opentasker/core/contexts/` | Trigger sources: time, location, app, network, NFC, notifications, calendar |
-| `app/src/main/java/com/opentasker/core/transfer/` | Tasker XML import, OpenTasker bundle import and export |
+| `app/src/main/java/com/opentasker/core/transfer/` | OpenTasker bundle import and export, MacroDroid import |
 | `app/src/main/java/com/opentasker/ui/screens/` | All Compose UI |
 | `app/src/main/res/values/strings.xml` | User-visible copy. Everything on a screen resolves through here |
 | `core/storage/src/main/kotlin/` | Room entities, DAOs, migrations, the encrypted database setup, backup and restore |

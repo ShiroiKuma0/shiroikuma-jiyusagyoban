@@ -325,7 +325,7 @@ class OpenTaskerBundleCodecTest {
     /**
      * The guard and the label are user text too. Only `args` was sanitized, so a run-only-if that
      * compared a secret against its literal value carried that value into the bundle, the paste
-     * text, and a shared profile, while the Tasker XML exporter refused to write the same guard.
+     * text, and a shared profile.
      */
     @Test
     fun jsonExportRedactsASecretValueInAGuardAndALabel() {

@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import com.opentasker.core.engine.variables.ArrayStore
 import com.opentasker.core.engine.variables.GlobalVariableScope
-import com.opentasker.core.engine.variables.TaskerBuiltIns
+import com.opentasker.core.engine.variables.BuiltInVariables
 import com.opentasker.core.engine.variables.InMemoryGlobalScope
 import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.expressions.InertTemplateText
@@ -205,13 +205,13 @@ class VariableStore private constructor(
         synchronized(localStack) {
             for (i in localStack.indices.reversed()) {
                 localStack[i][name]?.let { return it }
-                if (name in hiddenStack[i]) return TaskerBuiltIns.value(name)
+                if (name in hiddenStack[i]) return BuiltInVariables.value(name)
             }
         }
         // A Tasker built-in fills in when nothing is stored under its name, or only an empty value
         // is (a Variable Set to nothing).
         val stored = baseScope[name] ?: bucketOf(name)?.let { globalScope.get(it, name) }
-        return if (stored.isNullOrEmpty()) TaskerBuiltIns.value(name) ?: stored else stored
+        return if (stored.isNullOrEmpty()) BuiltInVariables.value(name) ?: stored else stored
     }
 
     /** The name as the store keys it: the fork keeps names as written, minus a leading `%`. */
@@ -324,7 +324,7 @@ class VariableStore private constructor(
      * (`dq.V`, `dq.c0`), in number order: whatever follows the base read as a whole number, so
      * `arr0` is 0 and `arr07` is 7, and with `arr7` set too there are two numbered 7.
      */
-    fun taskerElements(base: String): List<Pair<Int, String>> =
+    fun elementsByNumber(base: String): List<Pair<Int, String>> =
         numberedNames(base) { normalizedBase, name ->
             name.takeIf { it.length > normalizedBase.length && it.startsWith(normalizedBase) }?.substring(normalizedBase.length)?.toIntOrNull()
         }.mapNotNull { (number, name) -> get(name)?.let { number to it } }.sortedBy { it.first }
@@ -666,7 +666,7 @@ class VariableStore private constructor(
             },
             sensitiveArrays = sensitiveArrayNames.toSet(),
             sensitiveEvent = event.keys.filterTo(mutableSetOf(), EventTaskVariables::isSensitive),
-            builtIns = TaskerBuiltIns::value,
+            builtIns = BuiltInVariables::value,
             numberedArray = { base -> numberedItems(base).values.toList().ifEmpty { null }?.let { it to anyNumberedItemSensitive(base) } },
         )
     }

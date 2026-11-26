@@ -196,7 +196,7 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
  * Requested-key sentinel for a spec whose physical key cannot be determined.
  *
  * A null request means "the Inspector wants every physical key", so it must not double as "this
- * context is unparseable". A malformed predicate - reachable through JSON or Tasker import - would
+ * context is unparseable". A malformed predicate (reachable through an import) would
  * otherwise start continuous GPS, telephony receivers, and every sensor for a context that can
  * never match, which is the opposite of failing closed.
  */
@@ -254,7 +254,7 @@ internal fun seedInitialState(app: Context): Map<String, String> {
 }
 
 /**
- * "charging" means a charger is connected, the way Tasker's Power state reads it. A phone holding
+ * "charging" means a charger is connected, whatever the battery is doing. A phone holding
  * its charge at a battery-protect limit reports NOT_CHARGING while plugged in, and still counts.
  * The status is only a fallback for a broadcast that leaves out EXTRA_PLUGGED.
  */
@@ -388,7 +388,7 @@ private fun wifiMatches(
     val actualSsid = state["wifi"]?.takeUnless { it.equals("disconnected", ignoreCase = true) }
         ?: state["wifi_ssid"].orEmpty()
 
-    // Tasker's Wifi Connected reads its name as a Tasker pattern, and only while connected. A name
+    // Wifi Connected reads its name as a Matches pattern, and only while connected. A name
     // Android withholds is published as "Unknown", which `!Office` or `*` would otherwise match.
     if (op == "~") return connected == true && !wifiNameWithheld(state) && wifiNamePatterns.matches(actualSsid, expected)
     if (op != "=") return false

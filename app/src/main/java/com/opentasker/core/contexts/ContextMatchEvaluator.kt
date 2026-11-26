@@ -284,11 +284,11 @@ object ContextMatchEvaluator {
             if (actualTagId !in configuredTagIds) return false
         }
 
-        // A Tasker import keeps Tasker's own title and text patterns, which match the whole value.
-        if (spec.config["patterns"] == TASKER_PATTERNS) {
+        // Title and text written as Matches patterns, which match the whole value.
+        if (spec.config["patterns"] == MATCHES_PATTERNS) {
             for (field in listOf("title", "body")) {
                 val pattern = spec.config[field].orEmpty()
-                if (pattern.isNotEmpty() && !taskerPatternMatcher.matches(event.metadata[field].orEmpty(), pattern)) return false
+                if (pattern.isNotEmpty() && !matchesPatternMatcher.matches(event.metadata[field].orEmpty(), pattern)) return false
             }
         } else {
             val titleFilter = spec.config["title"]?.trim().orEmpty()
@@ -348,7 +348,7 @@ object ContextMatchEvaluator {
     }
 
     /**
-     * The blurb a Plugin context's query sends. Locale and Tasker send it with every query, and some
+     * The blurb a Plugin context's query sends. Locale plugin hosts send it with every query, and some
      * plugins pick the condition by it rather than by the bundle (primitive FTPd's "server running?").
      */
     fun pluginConditionBlurb(config: Map<String, String>): String = config["blurb"].orEmpty().take(MAX_PLUGIN_BLURB_CHARS)
@@ -485,11 +485,14 @@ object ContextMatchEvaluator {
         return if (start <= end) current in start..end else current >= start || current <= end
     }
 
-    /** An event's `patterns` value when its title and body are Tasker patterns. */
-    const val TASKER_PATTERNS = "tasker"
-    private val taskerPatternMatcher = VariableExpander()
+    /**
+     * An event's `patterns` value when its title and body are Matches patterns (`*`, `/` between
+     * alternatives, `!` to leave out, `~R` for a regex). The text is what saved profiles hold.
+     */
+    const val MATCHES_PATTERNS = "tasker"
+    private val matchesPatternMatcher = VariableExpander()
 
-    /** The plugin editors and the Tasker import keep at most this much of a blurb. */
+    /** The plugin editors and the importers keep at most this much of a blurb. */
     private const val MAX_PLUGIN_BLURB_CHARS = 120
     private const val MAX_REGEX_PATTERN_CHARS = 160
     private const val MAX_REGEX_INPUT_CHARS = 1_000

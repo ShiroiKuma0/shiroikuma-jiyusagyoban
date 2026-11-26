@@ -5,9 +5,6 @@ import com.opentasker.app.R
 import com.opentasker.core.transfer.MacroDroidImportPlanner
 import com.opentasker.core.transfer.MacroDroidImportReport
 import com.opentasker.core.transfer.OpenTaskerBundle
-import com.opentasker.core.transfer.TaskerImportPlanner
-import com.opentasker.core.transfer.TaskerImportPreview
-import com.opentasker.core.transfer.TaskerXmlImportReport
 
 // Fork: TaskerImportReviewState and its two builders stay in ActiveAutomationViewModel.kt, where
 // they carry a plain-string title for the fork's dialogs.

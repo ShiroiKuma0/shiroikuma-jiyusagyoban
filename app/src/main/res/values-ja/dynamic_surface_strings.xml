@@ -199,7 +199,6 @@
     <string name="capability_vpn_tunnel_setup" formatted="false">WireGuardまたはTailscaleが必要です。WireGuardでは、その制御の権限と、「リモートコントロールアプリを許可」をオンにすることも必要です。</string>
     <string name="capability_shizuku_script_setup" formatted="false">Shizukuへのアクセスと、承認済みのスクリプトハッシュが必要です。</string>
     <string name="capability_termux_setup" formatted="false">Termux 0.109以降、「Run commands in Termux environment」の権限、承認済みのスクリプトハッシュが必要です。</string>
-    <string name="capability_tasker_import_unsupported" formatted="false">インポートしたTaskerのアクションを、対応するOpenTaskerのアクションに置き換えられませんでした。</string>
     <string name="capability_macrodroid_import_unsupported" formatted="false">インポートしたMacroDroidのアクションを、対応するOpenTaskerのアクションに置き換えられませんでした。</string>
     <string name="capability_sms_permission" formatted="false">SMSの権限が必要です。</string>
     <string name="capability_calendar_event_add_setup" formatted="false">「セットアップ」の「カレンダーの編集」の行と、新しい予定を受け付けるカレンダーが必要です。</string>

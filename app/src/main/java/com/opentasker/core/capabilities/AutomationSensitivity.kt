@@ -84,7 +84,6 @@ object AutomationSensitivityRegistry {
         "flow.stop",
         "flow.goto",
         "flow.anchor",
-        "tasker.unsupported",
         "macrodroid.unsupported",
         "log",
         // Fork actions (白い熊 自由作業盤). Classified local-only deliberately: this catalog gates the

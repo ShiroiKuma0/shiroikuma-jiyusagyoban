@@ -72,7 +72,7 @@ internal object LocalePluginActionPolicy {
         }
 
     /**
-     * Stores what a plugin sent back as task locals the way Tasker does: text as plain variables,
+     * Stores what a plugin sent back as task locals: text as plain variables,
      * lists as arrays. A failure the plugin reported also puts its result code in %err, unless the
      * plugin sent its own. Returns the run-log line naming what was left out, or null.
      */

@@ -8,8 +8,7 @@ import kotlinx.serialization.Serializable
  * A Task is an ordered list of Actions executed top-to-bottom with flow control.
  *
  * collisionMode controls what happens if a task is asked to run while a previous
- * invocation is still in flight (matches Tasker's behavior: Abort New / Abort Existing /
- * Run Both / Wait).
+ * invocation is still in flight: Abort New / Abort Existing / Run Both / Wait.
  */
 @Serializable
 data class Task(

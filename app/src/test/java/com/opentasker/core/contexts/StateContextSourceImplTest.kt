@@ -32,7 +32,7 @@ class StateContextSourceImplTest {
 
     @Test
     fun aChargerHoldingTheBatteryBelowFullStillCountsAsCharging() {
-        // A battery-protect limit reports NOT_CHARGING while plugged in; Tasker's Power counts it.
+        // A battery-protect limit reports NOT_CHARGING while plugged in, and it still counts.
         assertTrue(batteryPluggedIn(BatteryManager.BATTERY_PLUGGED_AC, BatteryManager.BATTERY_STATUS_NOT_CHARGING))
         assertTrue(batteryPluggedIn(BatteryManager.BATTERY_PLUGGED_WIRELESS, BatteryManager.BATTERY_STATUS_FULL))
         assertFalse(batteryPluggedIn(0, BatteryManager.BATTERY_STATUS_DISCHARGING))

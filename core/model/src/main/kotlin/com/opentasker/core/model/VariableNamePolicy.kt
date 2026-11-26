@@ -1,6 +1,6 @@
 package com.opentasker.core.model
 
-/** Canonical parsing and scope classification for Tasker-compatible variable names. */
+/** Canonical parsing and scope classification for `%name` variable names. */
 object VariableNamePolicy {
     const val MAX_LENGTH = 64
 
@@ -13,7 +13,7 @@ object VariableNamePolicy {
         return name.takeIf(validName::matches)
     }
 
-    /** Tasker globals contain at least one uppercase letter; all-lowercase names are local. */
+    /** Globals contain at least one uppercase letter; all-lowercase names are local. */
     fun isGlobal(rawName: String): Boolean =
         normalize(rawName)?.any(Char::isUpperCase) == true
 
