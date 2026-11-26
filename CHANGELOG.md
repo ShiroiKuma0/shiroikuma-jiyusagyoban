@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+
+- OpenTasker is now RuleDeck, with a new name, a new icon and a new app id, `com.sysadmindoc.ruledeck`. Android sees it as a different app, so it installs next to an older build rather than over it. To move your setup across, export an encrypted backup from the old app's Settings, restore it in RuleDeck, check your profiles, then uninstall the old copy. Backups from older builds restore as they are.
+- Apps and scripts that drive RuleDeck from outside need the new names. Intent actions, extras and the automation permission start with `com.sysadmindoc.ruledeck` now, where they used to start with `com.opentasker`, and the target package is `com.sysadmindoc.ruledeck`. [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md) lists every one.
+- Encrypted backups and automatic snapshots save as `.rdbackup`. A `.otbackup` from an older build still opens, since restore goes by what's inside the file.
+- Building from source: the signing variables are `RULEDECK_RELEASE_KEYSTORE`, `RULEDECK_RELEASE_KEYSTORE_PASSWORD`, `RULEDECK_RELEASE_KEY_ALIAS` and `RULEDECK_RELEASE_KEY_PASSWORD`, and the Gradle properties are `-PruleDeckDistribution` and `-PruleDeckSignFdroid`.
+
+### Removed
+
+- XML project import and export. Bundles and MacroDroid backups are the ways in now, and bundles are the way out. A step that an XML import left as a placeholder shows up as an unknown action after a restore. It never ran before either, so delete it or swap in a real step.
+- Password-protected MacroDroid exports (`.emdr`) aren't opened any more. Picking one says so and asks for an export saved with the password left blank. Plain `.mdr` backups and single `.macro` shares import the same as before.
+
 ### Fixed
 
 - `tools/smoke-old-api.ps1` upgrades from the previous release's standard APK again. Since v0.2.96 a release also carries an F-Droid APK, and the download took whichever file sorted first by name, which was the F-Droid one.
