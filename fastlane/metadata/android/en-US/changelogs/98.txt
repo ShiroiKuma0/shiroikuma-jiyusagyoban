@@ -1,5 +1,5 @@
-Tasker imports bring over many more actions, like Variable Clear, Stop Task, Return and Get Sunrise/Sunset Times.
-Tasker's built-in variables like %TIME and %BATT fill in.
+XML imports bring over many more actions, like Variable Clear, Stop Task, Return and Get Sunrise/Sunset Times.
+Built-in variables like %TIME and %BATT fill in.
 Deleting happens on the first tap, with Undo.
 Profiles can react to Health Connect.
 Sun contexts can wait for twilight.
