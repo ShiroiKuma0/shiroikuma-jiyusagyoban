@@ -159,6 +159,7 @@ object ActionCapabilityRegistry {
         "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight."),
         "airplane.toggle" to shizukuCapability("Airplane mode"),
         "mobile.toggle" to shizukuCapability("Mobile data"),
+        "connection.panel" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the “display over other apps” permission to show the panel, and Shizuku installed, started and granted for its switches.", CapabilityRequirement.Shizuku),
         "hotspot.toggle" to hotspotCapabilityForSdk(android.os.Build.VERSION.SDK_INT),
         "aod.set" to elevatedUnsupported("aod.set", "Always-on display is a protected secure setting, and not every build honours it."),
         "vpn.tunnel" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on."),

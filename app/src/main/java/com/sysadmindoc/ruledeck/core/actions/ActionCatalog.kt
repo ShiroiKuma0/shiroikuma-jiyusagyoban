@@ -264,6 +264,8 @@ object ActionCatalog {
         define("sim.list", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::ReadSimsAction),
         define("sim.data.set", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SetDataSimAction),
         define("sim.status", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SimStatusAction),
+        // NEVER: it only opens the panel, and opening it twice is not a retry anyone wants.
+        define("connection.panel", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::ConnectionPanelAction),
         // NEVER: a USSD code can change network state (**21* sets call forwarding).
         define("ussd.run", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UssdAction),
         // NEVER: a provider method may send a message; only the target app knows.

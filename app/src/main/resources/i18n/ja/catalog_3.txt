@@ -980,3 +980,33 @@
 : 共有タイル（タイルの作成）
 = Open the Share tiles screen: pick an app or a task, edit the tile's name + icon, and create its own tile in the system share dialog (a tiny helper package). An app tile unfreezes the app and forwards the shared content to it; a task tile starts the task with the shared files.
 : 「共有タイル」画面を開きます。アプリまたはタスクを選び、タイルの名前とアイコンを編集して、システムの共有ダイアログに専用のタイル（小さな補助パッケージ）を作成します。アプリのタイルはアプリの凍結を解除して共有された内容を渡し、タスクのタイルは共有されたファイルを渡してタスクを始めます。
+= Connection Panel
+: 接続パネル
+= Open a panel with the connection switches: Wi-Fi, Bluetooth, airplane mode, SIM1, SIM2 and mobile data. Airplane mode first switches both SIMs off and keeps Wi-Fi and Bluetooth as they were. The panel stays until Close is tapped and keeps a record of what was done. The switches need Shizuku; the SIM switches work on Huawei phones
+: 接続の切り替えをまとめたパネルを開きます：Wi-Fi、Bluetooth、機内モード、SIM1、SIM2、モバイルデータ。機内モードをオンにすると、先に両方の SIM をオフにし、Wi-Fi と Bluetooth は元の状態のまま保ちます。パネルは「閉じる」を押すまで表示され、行った操作を記録します。切り替えには Shizuku が必要で、SIM の切り替えは Huawei の端末で動作します
+= Wi-Fi icon colour
+: Wi-Fi アイコンの色
+= Bluetooth icon colour
+: Bluetooth アイコンの色
+= Airplane icon colour
+: 機内モードアイコンの色
+= SIM1 icon colour
+: SIM1 アイコンの色
+= SIM2 icon colour
+: SIM2 アイコンの色
+= Mobile data icon colour
+: モバイルデータアイコンの色
+= #RRGGBB — default #304FFE
+: #RRGGBB — 既定は #304FFE
+= #RRGGBB — default #2979FF
+: #RRGGBB — 既定は #2979FF
+= #RRGGBB — default #FFFF00
+: #RRGGBB — 既定は #FFFF00
+= #RRGGBB — default #78C8FF
+: #RRGGBB — 既定は #78C8FF
+= #RRGGBB — default #C8141E
+: #RRGGBB — 既定は #C8141E
+= #RRGGBB — default #FF3D3D
+: #RRGGBB — 既定は #FF3D3D
+= Needs the “display over other apps” permission to show the panel, and Shizuku installed, started and granted for its switches.
+: パネルの表示には「他のアプリの上に重ねて表示」の権限が、切り替えには Shizuku のインストール・起動・許可が必要です。

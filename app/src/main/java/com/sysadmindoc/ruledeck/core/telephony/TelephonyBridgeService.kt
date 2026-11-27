@@ -55,6 +55,61 @@ class TelephonyBridgeService : ITelephonyBridge.Stub {
         }
     }
 
+    /**
+     * Huawei's own switch, `IHwTelephony.setSubscription(slot, on, null)` — the one the SIM management
+     * page uses. The standard `ISub.setUiccApplicationsEnabled` is accepted on the Mate XT and only
+     * flips a flag: the radio stays off (measured 2026-11-27). Called by NAME, never by transaction
+     * number.
+     */
+    override fun setSlotEnabled(slot: Int, enabled: Boolean): String {
+        if (slot !in 0..1) return "invalid SIM slot $slot"
+        val hw = hwTelephony() ?: return "this phone has no Huawei telephony service (phone_huawei)"
+        val method = hw.javaClass.methods.firstOrNull {
+            it.name == "setSubscription" && it.parameterTypes.size == 3 &&
+                it.parameterTypes[0] == Int::class.javaPrimitiveType &&
+                it.parameterTypes[1] == Boolean::class.javaPrimitiveType
+        } ?: return "IHwTelephony.setSubscription(int, boolean, Message) is missing on this build"
+        return try {
+            method.invoke(hw, slot, enabled, null)
+            ""
+        } catch (t: Throwable) {
+            val cause = t.cause ?: t
+            "${cause.javaClass.simpleName}: ${cause.message ?: "no detail"}"
+        }
+    }
+
+    override fun getSlotEnabled(slot: Int): Int {
+        val hw = hwTelephony() ?: return -1
+        val method = hw.javaClass.methods.firstOrNull {
+            it.name == "getSubState" && it.parameterTypes.size == 1 &&
+                it.parameterTypes[0] == Int::class.javaPrimitiveType
+        } ?: return -1
+        return try {
+            when (val state = method.invoke(hw, slot)) {
+                is Int -> if (state == 1) 1 else 0
+                is Boolean -> if (state) 1 else 0
+                else -> -1
+            }
+        } catch (t: Throwable) {
+            -1
+        }
+    }
+
+    private fun hwTelephony(): Any? = try {
+        val binder = Class.forName("android.os.ServiceManager")
+            .getMethod("getService", String::class.java)
+            .invoke(null, "phone_huawei") as? IBinder
+        if (binder == null) {
+            null
+        } else {
+            Class.forName("com.android.internal.telephony.IHwTelephony\$Stub")
+                .getMethod("asInterface", IBinder::class.java)
+                .invoke(null, binder)
+        }
+    } catch (t: Throwable) {
+        null
+    }
+
     /** `ISub.Stub.asInterface(ServiceManager.getService("isub"))`, all by reflection. */
     private fun iSub(): Any? = try {
         val binder = Class.forName("android.os.ServiceManager")

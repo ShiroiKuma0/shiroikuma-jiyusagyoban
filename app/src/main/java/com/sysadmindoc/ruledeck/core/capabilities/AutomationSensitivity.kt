@@ -341,6 +341,7 @@ object AutomationSensitivityRegistry {
         "wifi.scan",
         "vpn.tunnel",
         "mobile.toggle",
+        "connection.panel",
         "hotspot.toggle",
         "screen.timeout",
         "settings.write",

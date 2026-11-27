@@ -90,6 +90,37 @@ object DataSimSwitch {
         }
     }
 
+    /**
+     * Switch the SIM in [slotIndex] on or off, as the SIM management page does. Returns null when the
+     * call went through, else a reason. Read the result back with [slotEnabled]: the Mate XT answers
+     * “on” with a SecurityException and switches the SIM on all the same.
+     */
+    suspend fun setSlotEnabled(context: Context, slotIndex: Int, enabled: Boolean): String? {
+        if (!ShizukuShell.available()) return "Shizuku is not running or has not granted access"
+        val bridge = bind(context) ?: return "could not start the privileged telephony bridge"
+        val failure = try {
+            bridge.setSlotEnabled(slotIndex, enabled)
+        } catch (t: Throwable) {
+            service = null
+            t.message ?: t.toString()
+        }
+        AppLogger.info(TAG, "SIM slot $slotIndex → ${if (enabled) "on" else "off"}: ${failure.orEmpty().ifEmpty { "accepted" }}")
+        return failure?.takeIf { it.isNotEmpty() }
+    }
+
+    /** Whether the SIM in [slotIndex] is switched on; null when it cannot be read (no Shizuku, no Huawei service). */
+    suspend fun slotEnabled(context: Context, slotIndex: Int): Boolean? {
+        if (!ShizukuShell.available()) return null
+        val bridge = bind(context) ?: return null
+        val state = try {
+            bridge.getSlotEnabled(slotIndex)
+        } catch (t: Throwable) {
+            service = null
+            -1
+        }
+        return when (state) { 1 -> true; 0 -> false; else -> null }
+    }
+
     // --- Shizuku UserService plumbing (mirrors ShizukuKeyEventListener's) -----------------------
 
     @Volatile private var service: ITelephonyBridge? = null

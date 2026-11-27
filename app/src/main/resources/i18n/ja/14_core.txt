@@ -330,3 +330,35 @@
 :  · ファイル%1$s件
 =  · %1$s keys
 :  · キー%1$s件
+= Connections
+: 接続
+= Airplane mode
+: 機内モード
+= Mobile data
+: モバイルデータ
+= Off
+: オフ
+= Unavailable
+: 利用不可
+= Still working — wait a moment.
+: 処理中です。少しお待ちください。
+= Shizuku is not running or has not granted access.
+: Shizuku が起動していないか、アクセスが許可されていません。
+= Switch a SIM on first.
+: 先に SIM をオンにしてください。
+= Switch airplane mode off first.
+: 先に機内モードをオフにしてください。
+= %1$s kept on.
+: %1$s はオンのままです。
+= %1$s switched back on.
+: %1$s をオンに戻しました。
+= %1$s could not be switched back on.
+: %1$s をオンに戻せませんでした。
+= %1$s switched on.
+: %1$s をオンにしました。
+= %1$s switched off.
+: %1$s をオフにしました。
+= %1$s could not be switched on.
+: %1$s をオンにできませんでした。
+= %1$s could not be switched off.
+: %1$s をオフにできませんでした。

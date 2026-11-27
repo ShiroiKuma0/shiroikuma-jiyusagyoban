@@ -2767,6 +2767,23 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "connection.panel",
+            name = "Connection Panel",
+            description = "Open a panel with the connection switches: Wi-Fi, Bluetooth, airplane mode, SIM1, SIM2 and mobile data. Airplane mode first switches both SIMs off and keeps Wi-Fi and Bluetooth as they were. The panel stays until Close is tapped and keeps a record of what was done. The switches need Shizuku; the SIM switches work on Huawei phones",
+            category = "Settings",
+            fields = listOf(
+                ActionField("wifi_color", "Wi-Fi icon colour", hint = "#RRGGBB — default #304FFE"),
+                ActionField("bluetooth_color", "Bluetooth icon colour", hint = "#RRGGBB — default #2979FF"),
+                ActionField("airplane_color", "Airplane icon colour", hint = "#RRGGBB — default #FFFF00"),
+                ActionField("sim1_color", "SIM1 icon colour", hint = "#RRGGBB — default #78C8FF"),
+                ActionField("sim2_color", "SIM2 icon colour", hint = "#RRGGBB — default #C8141E"),
+                ActionField("data_color", "Mobile data icon colour", hint = "#RRGGBB — default #FF3D3D"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "airplane.toggle",
             name = "Toggle Airplane Mode",
             description = "Turn Airplane mode on or off",
