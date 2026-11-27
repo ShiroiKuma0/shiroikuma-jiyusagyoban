@@ -5,11 +5,11 @@
 # 白い熊 自由作業盤
 ## ShiroiKuma Jiyūsagyōban
 
-**A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
+**A FOSS, Tasker-style Android automation app** — a fork of [RuleDeck](https://github.com/SysAdminDoc/RuleDeck) (called OpenTasker until its 1.0.0) with major additions.
 
-**📥 Latest release: [`0.2.97+2026-11-23.00-46.g014a87d5+033`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`1.0.0+2026-11-26.20-07.g734d4dbe+002`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
-[![version](https://img.shields.io/badge/version-0.2.97-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
+[![version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 > The version names the upstream commit the fork is rebased on:
@@ -21,13 +21,13 @@
 
 “自由作業盤” *Jiyūsagyōban* means: **“FREE (as in Freedom) task launcher”**!
 
-It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
+It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on RuleDeck and extended into a markedly more capable tool than RuleDeck — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles whose every gesture is a workspace task**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a full **Hume Band V2 health decoder + 「健康」 charts**, a complete **HUAWEI** stack spoken over RFCOMM with **no Huawei account** — first the Band 11 Pro, now the **Watch D3**: history, sleep including daytime naps, walks with GPS and the watch's own after-walk screens, **cuff blood pressure, ECG, skin temperature, arterial stiffness and pulse-wave arrhythmia checks**, watch faces, weather, language, and satellite data served **whenever the watch asks** — plus a twin-track **「機器比較」** that never pools two devices (with a **回復** card that counts rather than scores, a 1–5 colour scale measured against red-green colour blindness before it was drawn, **a written note on every morning and every walk**, and **機能訓練** — the rehab exercises ticked off a calendar a day at a time), **「文字認識」 offline OCR** (share a screenshot, get its text — PP-OCRv5 on-device, six languages, no network, models supplied rather than shipped), **live-wallpaper switching without the picker** (Shizuku sets the component outright), a **full app-state Export/Import** (everything settable as one category ZIP — including every health rating, note, rehab tick and band reading, with a gate that fails the build if a new store is not in it), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import and full app-data backup broadcasts), **Huawei split screen and floating window from an edge flick** with no Huawei Home, **remapped physical volume keys** (short / long / double / triple / hold-to-repeat, working screen-off — either key opens the camera on a double press and video on a triple, and a hold zooms), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), **disable any action or task without deleting it** (flow control included), an **Undo bar** behind every deletion down to a whole project, sub-minute triggers, and a black-and-yellow theme.
+> A fork of [RuleDeck](https://github.com/SysAdminDoc/RuleDeck) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles whose every gesture is a workspace task**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a full **Hume Band V2 health decoder + 「健康」 charts**, a complete **HUAWEI** stack spoken over RFCOMM with **no Huawei account** — first the Band 11 Pro, now the **Watch D3**: history, sleep including daytime naps, walks with GPS and the watch's own after-walk screens, **cuff blood pressure, ECG, skin temperature, arterial stiffness and pulse-wave arrhythmia checks**, watch faces, weather, language, and satellite data served **whenever the watch asks** — plus a twin-track **「機器比較」** that never pools two devices (with a **回復** card that counts rather than scores, a 1–5 colour scale measured against red-green colour blindness before it was drawn, **a written note on every morning and every walk**, and **機能訓練** — the rehab exercises ticked off a calendar a day at a time), **「文字認識」 offline OCR** (share a screenshot, get its text — PP-OCRv5 on-device, six languages, no network, models supplied rather than shipped), **live-wallpaper switching without the picker** (Shizuku sets the component outright), a **full app-state Export/Import** (everything settable as one category ZIP — including every health rating, note, rehab tick and band reading, with a gate that fails the build if a new store is not in it), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import and full app-data backup broadcasts), **Huawei split screen and floating window from an edge flick** with no Huawei Home, **remapped physical volume keys** (short / long / double / triple / hold-to-repeat, working screen-off — either key opens the camera on a double press and video on a triple, and a hold zooms), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), **disable any action or task without deleting it** (flow control included), an **Undo bar** behind every deletion down to a whole project, sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
-## What it adds over OpenTasker
+## What it adds over RuleDeck
 
 ### 🎯 Send Intent — fire any Android intent
 The reason this fork exists. A generic action that fires arbitrary **explicit or implicit intents** (action, data URI, MIME type, string/int/bool extras, target component, flags) — including the automation intents exposed by the sister apps (a token is optional there since v2, and one sent to an app that does not ask for it is ignored) (e.g. `白い熊 GNU Jami` / `shiroikuma.jami`: send-message, place-call, open-conversation; `白い熊 音楽` / `shiroikuma.ongaku`: favorite-track, delete-track, play-playlist). `<queries>` manifest entries make the explicit targets resolve on Android 11+.
@@ -462,7 +462,7 @@ A **Shizuku-powered elevated tier** unlocks shell, airplane mode, screenshot, lo
 
 ---
 
-## Also inherited from OpenTasker
+## Also inherited from RuleDeck
 
 So the full surface this builds on is visible: a floating-overlay **Scene** system (11 element types, input→variable binding, a system-wide overlay), a **visual flow editor** (pinch-zoom, edge routing, branch markers), **encrypted DB backup** (AES-256-GCM), **Locale/Tasker plugin** interop (both setting *and* condition), a **Run-Log expression debugger**, dotted/bracketed `var.set` JSON paths, RE2/J linear-time regex, and the full seven-context trigger engine — all retained and carried forward onto upstream **0.2.94**.
 
@@ -478,10 +478,10 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleRelease
 
 `minSdk 26`, `targetSdk 37`. Grab a signed APK from the [releases page](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases).
 
-## Built on OpenTasker
+## Built on RuleDeck
 
-A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) by SysAdminDoc. `master` mirrors upstream (fast-forward only); `custom` carries this fork's work, rebased onto each new upstream release.
+A fork of [RuleDeck](https://github.com/SysAdminDoc/RuleDeck) by SysAdminDoc. `master` mirrors upstream (fast-forward only); `custom` carries this fork's work, rebased onto each new upstream release.
 
 ## License
 
-MIT — inherited from OpenTasker.
+MIT — inherited from RuleDeck.

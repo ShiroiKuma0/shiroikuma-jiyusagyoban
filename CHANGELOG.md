@@ -1,12 +1,65 @@
 # Changelog — 白い熊 自由作業盤
 
 This file carries **both** histories. The fork's own releases come first, newest first, each naming
-the upstream commit it is built on; [OpenTasker](https://github.com/SysAdminDoc/OpenTasker)'s own
+the upstream commit it is built on; [RuleDeck](https://github.com/SysAdminDoc/RuleDeck)'s own (the project
+was called OpenTasker until its 1.0.0)
 changelog follows below, verbatim and untouched.
 
 Keeping our block strictly above upstream's own heading is not cosmetic: upstream inserts each new
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
+
+## 1.0.0+2026-11-26.20-07.g734d4dbe+002 — 2026-11-27
+
+Built on upstream `734d4dbe` — **1.0.0**, the release in which OpenTasker became **RuleDeck**. The
+database stays at version 41. Build `+001` was the first of this line and ran on one phone only.
+
+### Upstream's rename, and what this fork does with it
+
+- **Upstream renamed the project.** Every source file moved from `com.opentasker` to
+  `com.sysadmindoc.ruledeck`, and with the new app id upstream's RuleDeck is a new app that installs
+  beside an OpenTasker build.
+- **This fork is updated in place.** Its app id, `shiroikuma.jiyusagyoban`, and its name stay; the
+  build installs over `0.2.97 … +033` as an ordinary update and keeps the whole workspace.
+- **The code follows the rename, the stored names do not.** Packages, class names and build
+  tooling are upstream's new ones, so later syncs merge normally. What Android or another app has
+  stored keeps its old spelling:
+  - every component the manifest declares — activities, services, receivers, the widget provider,
+    the quick-settings tiles, the accessibility service, the notification listener, the device
+    admin — and every background worker, so home-screen widgets, pinned shortcuts and granted
+    permissions carry over untouched;
+  - the database file, the settings files, intent actions and extras, the automation permission and
+    the notification channel ids — **apps and scripts that drive this fork from outside need no
+    change**, contrary to what upstream's notes say for RuleDeck;
+  - approved Termux scripts stay in `~/.termux/tasker/`.
+- **Checked on three phones:** the new build's manifest equals the previous one component for
+  component, and a workspace export taken before and after the update is identical apart from live
+  values.
+- `scripts/keep-stored-names.py`, with its two lists in `scripts/stored-names/`, puts the kept names
+  back after any later sync.
+
+### From upstream 1.0.0
+
+- **Encrypted backups and automatic snapshots** are saved as `.rdbackup`; an older `.otbackup`
+  still opens.
+- **Password-protected MacroDroid exports** (`.emdr`) are no longer opened; plain `.mdr` backups and
+  single `.macro` shares import as before.
+- **The restore review names the file** that was picked, where it used to show the file picker's id.
+- The stopped-task record is called `StructuredFailure`; plugin extras are built from one namespace
+  constant.
+
+### Removed
+
+- **Tasker XML import and export**, as upstream removed it. Bundles and MacroDroid backups are the
+  ways in, bundles the way out. The placeholder action `tasker.unsupported` went with it.
+- **Wait for Ring** (`sim.ring.wait`), added in `+033`. It was made to tell two numberless SIMs apart
+  by a call, and that step was given up; nothing used it.
+
+### Fixed
+
+- **Screenshots through the Shizuku service** were refused for every destination: the check that
+  keeps them inside the app's own files directory compared against upstream's package name, which
+  this fork never installs as. It uses the installed app id now.
 
 ## 0.2.97+2026-11-23.00-46.g014a87d5+033 — 2026-11-26
 
