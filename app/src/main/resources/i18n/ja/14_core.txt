@@ -362,3 +362,5 @@
 : %1$s をオンにできませんでした。
 = %1$s could not be switched off.
 : %1$s をオフにできませんでした。
+= Open a project, then pick the task to make a shortcut for.
+: プロジェクトを開いて、ショートカットにするタスクを選びます。

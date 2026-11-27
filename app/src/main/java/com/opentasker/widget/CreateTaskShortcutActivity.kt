@@ -26,9 +26,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import com.sysadmindoc.ruledeck.ui.components.IconRole
+import com.sysadmindoc.ruledeck.ui.components.RoleIcon
+import com.sysadmindoc.ruledeck.ui.theme.UiRole
+import com.sysadmindoc.ruledeck.ui.theme.role
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -104,22 +117,23 @@ class CreateTaskShortcutActivity : ComponentActivity() {
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
             RuleDeckTheme(prefs = themePrefs) {
-                // A large floating dialog: a dimmed scrim (tap outside = cancel) with a tall+wide,
-                // yellow-rounded-framed card in the middle — not a fullscreen page.
+                // A large floating dialog over a dimmed scrim. It starts below the status bar and
+                // ends above the navigation bar, and only Cancel (or Back) closes it: a tap beside
+                // it is swallowed (白い熊, 2026-11-27).
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.6f))
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { finish() },
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                        .windowInsetsPadding(WindowInsets.systemBars)
+                        .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth(0.94f)
-                            .fillMaxHeight(0.9f)
-                            // Absorb taps so tapping inside the card doesn't fall through to the scrim.
-                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+                            .fillMaxHeight()
+                            .border(2.dp, role(UiRole.DIALOG_FRAME), RoundedCornerShape(24.dp)),
                         shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.background,
                     ) {
@@ -200,45 +214,86 @@ internal fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
         }
     }
 
+    TaskPickerBody(nodes, emptySet(), prefs, font, onPick, onCancel)
+}
+
+/**
+ * The picker with a small made-up workspace, one project and its group open — for the screenshot
+ * preview, which runs no database.
+ */
+@Composable
+internal fun TaskPickerSample() {
+    val prefs by ThemeStore.state.collectAsState()
+    fun group(id: Long, name: String) = ItemGroupEntity(id = id, projectId = 3, tab = "tasks", name = name)
+    fun task(id: Long, name: String) = TaskEntry(Task(id = id, name = name))
+    val open = listOf(
+        GroupEntry(group(1, "起動無効"), listOf(task(1, "携帯 ⇨ 起動 -- [71][71]"), task(2, "携帯の設定 -- [71][01]"), task(3, "携帯 ⇨ 無効 -- [71][37]")), 3),
+        task(4, "携帯 接続 [71][000]"), task(5, "携帯の設定確認 -- [71]"), task(6, "携帯 巡回"),
+    )
+    val nodes = listOf(
+        ProjectNode("健康", 1, emptyList(), 47), ProjectNode("接続", 2, emptyList(), 31),
+        ProjectNode("携帯", 3, open, 40), ProjectNode("通知明滅", 4, emptyList(), 25), ProjectNode("電池線", 5, emptyList(), 7),
+    )
+    TaskPickerBody(nodes, setOf("p:3", "g:1"), prefs, null, onPick = {}, onCancel = {})
+}
+
+@Composable
+private fun TaskPickerBody(
+    nodes: List<ProjectNode>?, startExpanded: Set<String>, prefs: ThemePrefs, font: FontFamily?,
+    onPick: (Task) -> Unit, onCancel: () -> Unit,
+) {
     // Projects AND groups start folded; tap a header to expand. Keys: "p:<id>" / "g:<id>".
-    var expanded by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var expanded by remember { mutableStateOf(startExpanded) }
     val toggle: (String) -> Unit = { key -> expanded = if (key in expanded) expanded - key else expanded + key }
     val list = nodes
 
     val sizes = remember(prefs) { PickerSizes.from(prefs) }
-    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp)) {
-        Text(tr("Pick a task"), style = MaterialTheme.typography.titleLarge, fontFamily = font)
-        Spacer(Modifier.size(8.dp))
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+    val hairline = role(UiRole.LIST_DIVIDER)
+    Column(Modifier.fillMaxSize()) {
+        // Title with its icon, and one line saying what to do, in the explanation colour.
+        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.AutoMirrored.Filled.ListAlt, contentDescription = null, tint = role(UiRole.DIALOG_TITLE))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    tr("Pick a task"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = font,
+                    color = role(UiRole.DIALOG_TITLE),
+                )
+            }
+            Spacer(Modifier.size(6.dp))
+            Text(
+                tr("Open a project, then pick the task to make a shortcut for."),
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = font,
+                color = role(UiRole.DIM_GOLD),
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(role(UiRole.DIALOG_FRAME)))
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp)) {
             when {
                 list == null -> Unit
                 list.isEmpty() -> Text(
                     tr("No tasks yet. Create one in 白い熊 自由作業盤 first."),
+                    modifier = Modifier.padding(top = 12.dp),
                     fontFamily = font, fontSize = sizes.itemSp.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(sizes.padDp.dp),
-                ) {
+                else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(list, key = { "p_${it.key}" }) { node ->
                         ProjectBlock(node, expanded, prefs, font, toggle, onPick)
+                        // A hairline under every project, inset to the list.
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(hairline))
                     }
                 }
             }
         }
-        Spacer(Modifier.size(10.dp))
-        OutlinedButton(
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),   // yellow rounded frame
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = MaterialTheme.colorScheme.background,        // black back
-                contentColor = MaterialTheme.colorScheme.primary,            // yellow label
-            ),
-        ) {
-            Text(tr("Cancel"), fontFamily = font, fontSize = sizes.itemSp.sp)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(role(UiRole.DIALOG_FRAME)))
+        // The dialog's one way out, a regular pill pinned under the list.
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.End) {
+            OutlinedButton(onClick = onCancel) { Text(tr("Cancel"), fontFamily = font) }
         }
     }
 }
@@ -248,56 +303,52 @@ private fun ProjectBlock(
     node: ProjectNode, expanded: Set<String>, prefs: ThemePrefs, font: FontFamily?,
     onToggle: (String) -> Unit, onPick: (Task) -> Unit,
 ) {
-    val sizes = remember(prefs) { PickerSizes.from(prefs) }
     val open = "p:${node.key}" in expanded
     Column(Modifier.fillMaxWidth()) {
         PickerHeader(if (node.key == UNFILED_KEY) tr(node.title) else node.title, node.taskCount, open, isProject = true, prefs, font) { onToggle("p:${node.key}") }
-        if (open) {
-            Column(
-                Modifier.fillMaxWidth().padding(start = prefs.pickerIndentDp.dp, top = sizes.padDp.dp),
-                verticalArrangement = Arrangement.spacedBy(sizes.padDp.dp),
-            ) {
-                node.entries.forEach { EntryRow(it, expanded, prefs, font, onToggle, onPick) }
-            }
-        }
+        if (open) Children(node.entries, expanded, prefs, font, onToggle, onPick)
     }
 }
 
+/**
+ * What a project or a group holds, hung on a rule at its left: the rule is what says "these belong
+ * to the row above", so no box is needed round a group. Tasks are plain rows with a hairline between
+ * two of them — a frame round each would make a wall of equal pills in a project of a hundred.
+ */
 @Composable
-private fun EntryRow(
-    entry: PickerEntry, expanded: Set<String>, prefs: ThemePrefs, font: FontFamily?,
+private fun Children(
+    entries: List<PickerEntry>, expanded: Set<String>, prefs: ThemePrefs, font: FontFamily?,
     onToggle: (String) -> Unit, onPick: (Task) -> Unit,
 ) {
     val sizes = remember(prefs) { PickerSizes.from(prefs) }
-    when (entry) {
-        is GroupEntry -> {
-            val open = "g:${entry.group.id}" in expanded
-            val shape = RoundedCornerShape(prefs.pickerGroupCornerDp.dp)
-            // The folder-box: a bordered, rounded container. Folded → just the header (clearly a closed
-            // box); expanded → it grows to enclose its children, so loose siblings can't be mistaken for
-            // its contents.
-            Column(
-                Modifier.fillMaxWidth()
-                    .then(if (prefs.pickerGroupBorderDp > 0)
-                        Modifier.border(prefs.pickerGroupBorderDp.dp, MaterialTheme.colorScheme.outline, shape) else Modifier)
-                    .clip(shape),
-            ) {
-                PickerHeader(entry.group.name, entry.taskCount, open, isProject = false, prefs, font) { onToggle("g:${entry.group.id}") }
-                if (open) {
-                    // Deeper indent for a group's expanded contents, so tasks sit clearly inside the box.
-                    Column(
-                        Modifier.fillMaxWidth().padding(start = (prefs.pickerIndentDp + 16).dp, bottom = sizes.padDp.dp),
-                        verticalArrangement = Arrangement.spacedBy(sizes.padDp.dp),
-                    ) {
-                        entry.children.forEach { EntryRow(it, expanded, prefs, font, onToggle, onPick) }
-                    }
+    val rule = role(UiRole.DIM_GOLD)
+    val hairline = role(UiRole.LIST_DIVIDER)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 6.dp, bottom = sizes.padDp.dp)
+            .drawBehind { drawRect(rule, size = Size(2.dp.toPx(), size.height)) }
+            .padding(start = prefs.pickerIndentDp.coerceAtLeast(8).dp),
+    ) {
+        entries.forEachIndexed { index, entry ->
+            when (entry) {
+                is GroupEntry -> {
+                    val open = "g:${entry.group.id}" in expanded
+                    PickerHeader(entry.group.name, entry.taskCount, open, isProject = false, prefs, font) { onToggle("g:${entry.group.id}") }
+                    if (open) Children(entry.children, expanded, prefs, font, onToggle, onPick)
                 }
+                is TaskEntry -> TaskRow(entry.task, prefs, font) { onPick(entry.task) }
             }
+            if (index < entries.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(hairline))
         }
-        is TaskEntry -> TaskRow(entry.task, prefs, font) { onPick(entry.task) }
     }
 }
 
+/**
+ * The row of a project or of a group: its icon (layers for a project, a folder for a group, so the
+ * two are told apart), the name, the number of tasks in a right-aligned monospace column, and ›
+ * when folded or ⌄ when open.
+ */
 @Composable
 private fun PickerHeader(
     title: String, count: Int, open: Boolean, isProject: Boolean, prefs: ThemePrefs, font: FontFamily?,
@@ -308,30 +359,36 @@ private fun PickerHeader(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            // MINIMAL, and no longer +4 on top of it: the picker is a list to scan, not a form
-            // (白い熊, 2026-09-22). The gap is whatever the 01 asks for and nothing else.
-            .padding(start = if (isProject) 0.dp else 10.dp, top = sizes.padDp.dp, bottom = sizes.padDp.dp, end = 6.dp),
+            .padding(top = (sizes.padDp + 6).dp, bottom = (sizes.padDp + 6).dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (!isProject) {
-            Icon(Icons.Filled.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size((sizes.itemSp + 2).dp))
-            Spacer(Modifier.width(8.dp))
+        if (isProject) {
+            RoleIcon(Icons.Outlined.Layers, IconRole.PERSON, Modifier.size(sizes.iconDp.dp))
+        } else {
+            Icon(Icons.Outlined.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizes.iconDp.dp))
         }
+        Spacer(Modifier.width(10.dp))
         Text(
             title,
             fontFamily = font,
-            fontSize = (sizes.itemSp + if (isProject) 3 else 1).sp,
+            fontSize = sizes.itemSp.sp,
             fontWeight = if (isProject) FontWeight.Bold else FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text("$count", fontFamily = font, fontSize = sizes.itemSp.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "$count",
+            modifier = Modifier.padding(start = 8.dp),
+            fontFamily = FontFamily.Monospace,
+            fontSize = (sizes.itemSp * 0.8f).sp,
+            color = role(UiRole.DIM_GOLD),
+        )
         Spacer(Modifier.width(6.dp))
         Icon(
-            if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            if (open) Icons.Filled.ExpandMore else Icons.Filled.ChevronRight,
             contentDescription = if (open) tr("Collapse") else tr("Expand"),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MaterialTheme.colorScheme.primary,
         )
     }
 }
@@ -391,18 +448,22 @@ private fun TaskRow(task: Task, prefs: ThemePrefs, font: FontFamily?, onClick: (
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = 12.dp, top = sizes.padDp.dp, bottom = sizes.padDp.dp, end = 4.dp),
+            .padding(top = (sizes.padDp + 6).dp, bottom = (sizes.padDp + 6).dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Custom icon if set, else nothing — no misleading play/arrow glyph.
+        // The task's own icon where it has one — it is what the shortcut will show — and the "run"
+        // icon otherwise, so every row has its mark in the same column (白い熊 chose this on the
+        // draft of 2026-11-27; before, a task without an icon had none).
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = null,
                 modifier = Modifier.size(iconDp).clip(RoundedCornerShape(6.dp)),
             )
-            Spacer(Modifier.width(10.dp))
+        } else {
+            RoleIcon(Icons.Filled.PlayCircleOutline, IconRole.CONNECT, Modifier.size(iconDp))
         }
+        Spacer(Modifier.width(10.dp))
         Text(task.name, fontFamily = font, fontSize = sizes.itemSp.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
