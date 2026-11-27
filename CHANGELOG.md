@@ -9,6 +9,27 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 1.0.0+2026-11-26.20-07.g734d4dbe+006 — 2026-11-27
+
+Built on upstream `734d4dbe` — **1.0.0**, as `+005`. The database stays at version 41.
+
+### Shortcut picker — the “Pick a task” dialog restyled
+
+- **The dialog starts below the status bar** and ends above the navigation bar; before, its top
+  edge ran under the status bar on a tall, narrow screen.
+- **Only Cancel or the Back key closes it.** A tap beside the dialog does nothing now.
+- **A title with its icon, and one explanation line** beneath it.
+- **Projects and groups are told apart**: a project carries a layers icon, a group the folder.
+  The name is followed by the number of tasks in a right-aligned monospace column, then › when
+  folded and ⌄ when open; a hairline stands under each project.
+- **What a project or a group holds hangs on a rule at its left.** The rule replaces the box that
+  used to be drawn round a group.
+- **Tasks are plain rows with hairlines between them**, each with its own saved icon — the one the
+  shortcut will show — or a “run” icon when it has none. Before, a task without an icon had no
+  mark at all.
+- **Cancel is a regular pill**, pinned under the list.
+- Font, item size, icon size and row spacing follow the Shortcut picker settings as before.
+
 ## 1.0.0+2026-11-26.20-07.g734d4dbe+005 — 2026-11-27
 
 Built on upstream `734d4dbe` — **1.0.0**, as `+002`. The database stays at version 41. Builds `+003`
