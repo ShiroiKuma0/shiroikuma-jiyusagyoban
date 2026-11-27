@@ -134,16 +134,31 @@ object AppLanguage {
                 }
             }
         }
+        // A debug build also declares the two pseudo-locales (en-XA, ar-XB); they are no languages.
+        tags.removeAll { it.endsWith("-XA") || it.endsWith("-XB") }
         return tags.ifEmpty { listOf("en", "ja") }
     }
 
-    /** One line of the picker: the language in its own language, its region if it names one, and the tag. */
-    data class Entry(val tag: String, val name: String, val region: String)
+    /**
+     * One line of the picker: the language in its own language, its country, the tag as it is shown,
+     * and the country code that picks the flag. [tag] is what is stored and applied — the declared
+     * one. A language declared without a country (`ja`) is SHOWN with its main country (`ja-JP`,
+     * Japan's flag), taken from ICU's likely subtags; [country] stays empty only where there is no
+     * sensible one, and the picker draws a globe there.
+     */
+    data class Entry(val tag: String, val name: String, val region: String, val shownTag: String = tag, val country: String = "")
 
     fun entry(tag: String): Entry {
         val locale = Locale.forLanguageTag(tag)
         val name = locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
-        return Entry(tag, name.ifEmpty { tag }, locale.getDisplayCountry(locale))
+        val country = locale.country.ifEmpty {
+            runCatching {
+                android.icu.util.ULocale.addLikelySubtags(android.icu.util.ULocale.forLanguageTag(tag)).country
+            }.getOrDefault("").takeIf { it.length == 2 }.orEmpty()
+        }
+        val shown = if (locale.country.isEmpty() && country.isNotEmpty()) "${locale.language}-$country" else tag
+        val region = if (country.isEmpty()) "" else Locale(locale.language, country).getDisplayCountry(locale)
+        return Entry(tag, name.ifEmpty { tag }, region, shown, country)
     }
 
     /** The shipped languages, sorted by their own names. */

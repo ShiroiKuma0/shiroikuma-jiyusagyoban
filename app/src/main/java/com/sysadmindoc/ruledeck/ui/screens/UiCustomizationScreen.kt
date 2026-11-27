@@ -3340,42 +3340,68 @@ private fun restartApp(context: Context) {
 
 
 /**
- * The App language picker, in the look settled for it (black-yellow skill, 2026-11-24): plain rows,
- * and only the current language in a pill — full width, 3 dp, its name bold. Each row: the radio
- * ring, the language in its own language with its region beneath in dim gold, and the tag in a
- * right-aligned monospace column. "System default" comes first, with no region and no tag. A
- * hairline stands between rows, but never against the pill.
+ * The App language picker, in the form settled on 2026-11-27 (black-yellow skill, “The dialog”).
+ * From the top: the title with the globe; 日本語 and then English as two full-width outlined pills
+ * that never scroll; one framed box that scrolls by itself, with "System default" first and the
+ * other listed languages by their own name, as plain rows with hairlines; and Cancel. Each pill and
+ * row: the radio ring, the flag (a bundled image, never emoji text), the language in its own
+ * language with its country beneath in dim gold, and the tag in a right-aligned monospace column.
+ * The current language is the thick pill, wherever it stands. Choosing applies at once and closes.
  */
 @Composable
 internal fun AppLanguageDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val current = remember { com.sysadmindoc.ruledeck.i18n.AppLanguage.tag(context) }
-    val rows = remember {
-        listOf(com.sysadmindoc.ruledeck.i18n.AppLanguage.Entry("", "", "")) + com.sysadmindoc.ruledeck.i18n.AppLanguage.entries(context)
+    val all = remember { com.sysadmindoc.ruledeck.i18n.AppLanguage.entries(context) }
+    // The pinned pair: Japanese, then English — en-US where several English variants are shipped.
+    val japanese = remember(all) { all.firstOrNull { it.tag.substringBefore('-') == "ja" } }
+    val english = remember(all) {
+        all.firstOrNull { it.tag == "en-US" } ?: all.firstOrNull { it.tag.substringBefore('-') == "en" }
+    }
+    val pinned = listOfNotNull(japanese, english)
+    val system = com.sysadmindoc.ruledeck.i18n.AppLanguage.Entry("", tr("System default"), "", "", "")
+    var boxed = listOf(system) + all.filter { it !in pinned }
+    // A language chosen earlier that is no longer listed stays in force, and is shown.
+    if (current.isNotEmpty() && pinned.none { it.tag == current } && boxed.none { it.tag == current }) {
+        boxed = boxed + com.sysadmindoc.ruledeck.i18n.AppLanguage.entry(current)
     }
     val divider = role(UiRole.LIST_DIVIDER)
+    val choose: (com.sysadmindoc.ruledeck.i18n.AppLanguage.Entry) -> Unit = { entry ->
+        onDismiss()
+        if (entry.tag != current) com.sysadmindoc.ruledeck.i18n.AppLanguage.set(context, entry.tag)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(tr("App language")) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Language, contentDescription = null, tint = role(UiRole.DIALOG_TITLE))
+                Text(tr("App language"), modifier = Modifier.padding(start = 10.dp))
+            }
+        },
         text = {
-            LazyColumn {
-                items(rows.size) { index ->
-                    val entry = rows[index]
-                    val chosen = entry.tag == current
-                    val afterChosen = index > 0 && rows[index - 1].tag == current
-                    if (index > 0 && !chosen && !afterChosen) {
-                        Box(Modifier.fillMaxWidth().padding(start = 44.dp).height(1.dp).background(divider))
+            Column {
+                pinned.forEach { entry ->
+                    LanguageRow(entry, chosen = entry.tag == current, pill = true, onClick = { choose(entry) })
+                }
+                Box(
+                    Modifier
+                        .padding(top = 6.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = 260.dp)
+                        .border(1.dp, role(UiRole.DIALOG_FRAME), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                ) {
+                    LazyColumn {
+                        items(boxed.size) { index ->
+                            val entry = boxed[index]
+                            val chosen = entry.tag == current
+                            val afterChosen = index > 0 && boxed[index - 1].tag == current
+                            if (index > 0 && !chosen && !afterChosen) {
+                                Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(1.dp).background(divider))
+                            }
+                            LanguageRow(entry, chosen = chosen, pill = false, onClick = { choose(entry) })
+                        }
                     }
-                    LanguageRow(
-                        name = if (entry.tag.isEmpty()) tr("System default") else entry.name,
-                        region = entry.region,
-                        tag = entry.tag,
-                        chosen = chosen,
-                        onClick = {
-                            onDismiss()
-                            if (!chosen) com.sysadmindoc.ruledeck.i18n.AppLanguage.set(context, entry.tag)
-                        },
-                    )
                 }
             }
         },
@@ -3383,15 +3409,37 @@ internal fun AppLanguageDialog(onDismiss: () -> Unit) {
     )
 }
 
+/** The bundled flag of a country (Google's Noto Color Emoji set); the globe where there is none. */
+private fun languageFlag(country: String): Int = when (country.uppercase()) {
+    "JP" -> com.sysadmindoc.ruledeck.R.drawable.sk_flag_jp
+    "US" -> com.sysadmindoc.ruledeck.R.drawable.sk_flag_us
+    "CN" -> com.sysadmindoc.ruledeck.R.drawable.sk_flag_cn
+    else -> com.sysadmindoc.ruledeck.R.drawable.sk_flag_globe
+}
+
+/**
+ * One language. [pill] rows — the pinned pair — always carry a frame: thick and bold when [chosen],
+ * thin otherwise. Rows inside the box are plain, and only the chosen one sits in a thick pill.
+ */
 @Composable
-private fun LanguageRow(name: String, region: String, tag: String, chosen: Boolean, onClick: () -> Unit) {
+private fun LanguageRow(
+    entry: com.sysadmindoc.ruledeck.i18n.AppLanguage.Entry,
+    chosen: Boolean,
+    pill: Boolean,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(percent = 50)
     val ring = role(if (chosen) UiRole.RADIO_ON else UiRole.RADIO_OFF)
+    val frame = when {
+        chosen -> Modifier.border(3.dp, role(UiRole.BUTTON_MAIN_FRAME), shape)
+        pill -> Modifier.border(1.25.dp, role(UiRole.BUTTON_FRAME), shape)
+        else -> Modifier
+    }
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = if (chosen) 4.dp else 0.dp)
-            .then(if (chosen) Modifier.border(3.dp, role(UiRole.BUTTON_MAIN_FRAME), shape) else Modifier)
+            .padding(vertical = if (chosen || pill) 4.dp else 0.dp)
+            .then(frame)
             .clip(shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -3401,20 +3449,25 @@ private fun LanguageRow(name: String, region: String, tag: String, chosen: Boole
             drawCircle(ring, radius = size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
             if (chosen) drawCircle(ring, radius = size.minDimension / 4)
         }
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+        Image(
+            painter = androidx.compose.ui.res.painterResource(languageFlag(entry.country)),
+            contentDescription = null,
+            modifier = Modifier.padding(start = 10.dp).size(26.dp),
+        )
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
             Text(
-                name,
+                entry.name,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (chosen) FontWeight.Bold else null,
                 color = role(UiRole.DIALOG_BODY),
             )
-            if (region.isNotEmpty()) {
-                Text(region, style = MaterialTheme.typography.bodySmall, color = role(UiRole.DIM_GOLD))
+            if (entry.region.isNotEmpty()) {
+                Text(entry.region, style = MaterialTheme.typography.bodySmall, color = role(UiRole.DIM_GOLD))
             }
         }
-        if (tag.isNotEmpty()) {
+        if (entry.shownTag.isNotEmpty()) {
             Text(
-                tag,
+                entry.shownTag,
                 modifier = Modifier.padding(start = 12.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace,
