@@ -1,6 +1,7 @@
 package com.sysadmindoc.ruledeck.core.power
 
 import android.os.Parcel
+import com.sysadmindoc.ruledeck.BuildConfig
 import com.sysadmindoc.ruledeck.core.scripting.ShizukuScriptExecutor
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -197,9 +198,11 @@ class ShizukuCommandUserService : IShizukuCommandService.Stub() {
         const val STREAM_JOIN_TIMEOUT_MILLIS = 1_000L
         const val MAX_OUTPUT_BYTES = 8 * 1024
         /** `/sdcard/Android/data/<pkg>/files`, plus the raw storage paths that resolve to it. */
+        // The installed app id, not upstream's package: the fork installs as shiroikuma.jiyusagyoban,
+        // and with upstream's name here every screenshot destination was refused.
         private val APP_EXTERNAL_FILES_ROOTS = listOf(
-            "/storage/emulated/0/Android/data/com.sysadmindoc.ruledeck/files",
-            "/sdcard/Android/data/com.sysadmindoc.ruledeck/files",
+            "/storage/emulated/0/Android/data/${BuildConfig.APPLICATION_ID}/files",
+            "/sdcard/Android/data/${BuildConfig.APPLICATION_ID}/files",
         )
         const val EXIT_REJECTED = 126
         const val EXIT_INVALID_ARGUMENT = 125
