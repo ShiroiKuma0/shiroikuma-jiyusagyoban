@@ -9,6 +9,57 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 1.0.0+2026-11-26.20-07.g734d4dbe+005 — 2026-11-27
+
+Built on upstream `734d4dbe` — **1.0.0**, as `+002`. The database stays at version 41. Builds `+003`
+and `+004` were steps of this one and ran on one phone only.
+
+### Connection Panel — the connection switches in one place
+
+- **A new action, `Connection Panel` (`connection.panel`),** opens a panel over whatever is on
+  screen: two tiles for **Wi-Fi** and **Bluetooth**, a wide one for **airplane mode**, two for
+  **SIM1** and **SIM2**, a wide one for **mobile data**, a boxed record of what was done, and
+  **Close**.
+- **A yellow frame is on, a blue one off, a muted yellow one unavailable.** The line icons keep
+  colours of their own — six action fields, `#RRGGBB` — and are drawn dimmed when off.
+- **Airplane mode keeps Wi-Fi and Bluetooth.** Switching it on first switches both SIMs off, then
+  airplane mode on, then brings Bluetooth and Wi-Fi back when they were on. The phone takes
+  Bluetooth down with airplane mode whatever `airplane_mode_radios` says, so it is switched on
+  again and read back, up to three times.
+- **The SIM tiles are the switches of the system's SIM management page**, reached through Shizuku:
+  Huawei's `IHwTelephony.setSubscription`, called by name. On the Mate XT the standard
+  `setUiccApplicationsEnabled` only flips a flag and leaves the radio as it was. They work on Huawei
+  phones; elsewhere the tiles show what can be read and say so when a switch does not take.
+- **The SIM tiles are unavailable in airplane mode, mobile data with no SIM on.** A tap on an
+  unavailable tile says what to switch first.
+- **The panel stays until Close is tapped** — a tap beside it does nothing — and reads the state
+  again every few seconds, so a switch made elsewhere shows.
+- **Every action flashes its result and writes a timed line to the record**, and the record is
+  still there the next time the panel opens.
+- Needs the “display over other apps” permission and Shizuku. All of it is in Japanese too.
+
+### App language — the dialog in its settled form
+
+- **日本語, then English, as two full-width pills at the top that never scroll**; the current one
+  has the thick frame and the bold name.
+- **Under them one framed box that scrolls by itself**, with “System default” first and any other
+  listed language below, by its own name, as plain rows.
+- **Each pill and row carries a flag** — a bundled image, never emoji text — the language in its
+  own language with its country beneath, and the tag at the right. A language declared without a
+  country is shown with its main country (`ja` as `ja-JP`, with Japan's flag); what is stored and
+  applied stays the declared tag.
+- A language chosen earlier that is no longer listed stays in force and is shown as the current row.
+
+### Lists — scrolling while dragging
+
+- **A row dragged near the top or bottom edge of a list makes the list scroll under it**, faster
+  the closer to the edge, so one drag carries it all the way to the top or the bottom. Before, the
+  drag ended at the last row on screen.
+- The same for a group header that is held and dragged, and in all four lists: tasks, profiles,
+  scenes and widgets.
+- **The drop lands where the line shows also in a list scrolled half-way**: rows that have left the
+  screen above are counted as passed.
+
 ## 1.0.0+2026-11-26.20-07.g734d4dbe+002 — 2026-11-27
 
 Built on upstream `734d4dbe` — **1.0.0**, the release in which OpenTasker became **RuleDeck**. The
