@@ -97,6 +97,8 @@ import com.sysadmindoc.ruledeck.ui.components.RgbaColorPickerDialog
 import com.sysadmindoc.ruledeck.ui.components.SelectionBar
 import com.sysadmindoc.ruledeck.ui.components.SelectionCheck
 import com.sysadmindoc.ruledeck.ui.components.groupedItems
+import com.sysadmindoc.ruledeck.ui.components.groupDragViewport
+import com.sysadmindoc.ruledeck.ui.components.rememberGroupDragListState
 import com.sysadmindoc.ruledeck.ui.components.rememberGroupDragState
 import com.sysadmindoc.ruledeck.ui.components.rememberGroupMoveHost
 import com.sysadmindoc.ruledeck.ui.components.selectableItem
@@ -293,6 +295,7 @@ fun SceneLibraryScreen(
         } else {
             val moveHost = rememberGroupMoveHost()
             val dragState = rememberGroupDragState()
+            val dragListState = rememberGroupDragListState(dragState)
             val sceneCard: @Composable (Scene) -> Unit = { scene ->
                 val sceneContext = LocalContext.current
                 SceneCard(
@@ -332,7 +335,8 @@ fun SceneLibraryScreen(
                 )
             }
             LazyColumn(
-                modifier = Modifier.fillMaxSize().weight(1f),
+                state = dragListState,
+                modifier = Modifier.fillMaxSize().weight(1f).groupDragViewport(dragState),
                 // Reserve clearance for the bottom-right "+" FAB so the last row is never hidden under it.
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),

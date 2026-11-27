@@ -15,7 +15,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.LocalPinnableContainer
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.isActive
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
@@ -212,12 +221,21 @@ fun <T> LazyListScope.groupedItems(
     drag.setDropComputer computer@{ centerY ->
         if (anchors.isEmpty()) return@computer null
         var best: Pair<Long?, Int>? = null
+        // A row that is not on screen has no bounds (they are dropped when it leaves). The anchors are
+        // in visual order, so one without bounds BEFORE the first that has them lies above the
+        // viewport and is passed already; one after lies below and is not reached. Without this a
+        // drag in a list scrolled half-way could only land among the rows on screen — or at slot 0.
+        var seenOnScreen = false
         anchors.forEach { a ->
             if (a.isHeader) {
-                val b = drag.headerBounds[a.gid ?: UNGROUP_TARGET] ?: return@forEach
+                val b = drag.headerBounds[a.gid ?: UNGROUP_TARGET]
+                if (b == null) { if (!seenOnScreen) best = a.gid to a.index; return@forEach }
+                seenOnScreen = true
                 if (centerY >= b.endInclusive) best = a.gid to a.index
             } else {
-                val b = drag.rowBounds[a.key] ?: return@forEach
+                val b = drag.rowBounds[a.key]
+                if (b == null) { if (!seenOnScreen) best = a.gid to (a.index + 1); return@forEach }
+                seenOnScreen = true
                 val mid = (b.start + b.endInclusive) / 2f
                 if (centerY >= mid) best = a.gid to (a.index + 1)
             }
@@ -240,6 +258,8 @@ fun <T> LazyListScope.groupedItems(
             }
             is GroupRow.Header -> item(key = "grp:${row.group.id}") {
                 val isDraggingGroup = drag.draggingGroupId == row.group.id
+                HoldWhileDragged(isDraggingGroup)
+                DisposableEffect(row.group.id) { onDispose { drag.headerBounds.remove(row.group.id) } }
                 // Where the lifted group will land: a line above the sibling currently occupying that
                 // slot, or below the last sibling when the target is the end of the run.
                 val peers = siblingsOf(row.group).filter { it != drag.draggingGroupId }
@@ -266,7 +286,7 @@ fun <T> LazyListScope.groupedItems(
                         onMoveOut = { ops.setGroupParent(row.group, null) },
                         onAddSubgroup = { ops.createSubgroup(row.group, it) },
                         dragging = isDraggingGroup,
-                        dragOffsetY = drag.groupOffsetY,
+                        dragOffsetY = if (isDraggingGroup) drag.groupTranslation(row.group.id) else 0f,
                         onHoldStart = { drag.startGroupDrag(row.group.id, siblingsOf(row.group)) },
                         onHoldDrag = { drag.moveGroup(it) },
                         // No travel → this was the long-press that has always started a selection.
@@ -288,6 +308,8 @@ fun <T> LazyListScope.groupedItems(
             is GroupRow.Member -> item(key = "itm:${keyOf(row.item)}") {
                 val key = keyOf(row.item)
                 val isDragging = drag.draggingKey == key
+                HoldWhileDragged(isDragging)
+                DisposableEffect(key) { onDispose { drag.rowBounds.remove(key) } }
                 // Drop-indicator placement: a line ABOVE the member currently sitting at the target slot, or
                 // BELOW the last member when the target is the very end of the list.
                 val myOtherIndex = others.indexOf(key)
@@ -306,7 +328,7 @@ fun <T> LazyListScope.groupedItems(
                             }
                             .graphicsLayer {
                                 if (isDragging) {
-                                    translationY = drag.offsetY
+                                    translationY = drag.memberTranslation(key)
                                     shadowElevation = 12f
                                     alpha = 0.95f
                                 }
@@ -597,6 +619,40 @@ class GroupDragState {
     private var dropComputer: ((Float) -> Pair<Long?, Int>?)? = null
 
     fun recordRowBounds(key: String, top: Float, bottom: Float) { rowBounds[key] = top..bottom }
+
+    // --- scrolling while dragging ------------------------------------------------------------
+    // The list scrolls by itself when the lifted row nears its top or bottom edge
+    // ([rememberGroupDragListState]), so a row can be carried all the way up or down in one drag.
+    // While it scrolls the lifted row's own slot moves with the content, and once that slot is far
+    // outside the screen the list parks it next to the viewport. So the lift is not "finger travel"
+    // but "where the finger wants the row's centre, minus where the layout has it now" — which stays
+    // right whatever the list did underneath.
+
+    /** Window bounds of the list itself; set by [groupDragViewport]. */
+    var viewport: ClosedFloatingPointRange<Float>? = null
+
+    fun memberTranslation(key: String): Float {
+        val b = rowBounds[key] ?: return offsetY
+        return startCenterY + offsetY - (b.start + b.endInclusive) / 2f
+    }
+
+    fun groupTranslation(id: Long): Float {
+        val b = headerBounds[id] ?: return groupOffsetY
+        return groupStartCenterY + groupOffsetY - (b.start + b.endInclusive) / 2f
+    }
+
+    /** Window-Y of whatever is being carried, or null when nothing is (a held group that has not moved yet counts as nothing). */
+    fun carriedCenterY(): Float? = when {
+        draggingKey != null -> centerY()
+        draggingGroupId != null && groupDragMoved -> groupStartCenterY + groupOffsetY
+        else -> null
+    }
+
+    /** The rows moved under a still finger (the list scrolled): work the drop slot out again. */
+    fun rescan() {
+        if (draggingKey != null) recompute()
+        if (draggingGroupId != null) recomputeGroup()
+    }
     fun setDropComputer(f: (Float) -> Pair<Long?, Int>?) { dropComputer = f }
 
     fun start(key: String) {
@@ -681,8 +737,13 @@ class GroupDragState {
         if (draggingGroupId == null) { groupDropIndex = -1; return }
         val center = groupStartCenterY + groupOffsetY
         var index = 0
+        var seenOnScreen = false
         groupSiblings.forEachIndexed { i, sid ->
-            val b = headerBounds[sid] ?: return@forEachIndexed
+            val b = headerBounds[sid]
+            // No bounds = not on screen: above the viewport (passed) before the first sibling that
+            // is on screen, below it (not reached) after.
+            if (b == null) { if (!seenOnScreen) index = i + 1; return@forEachIndexed }
+            seenOnScreen = true
             // Cross the middle of a sibling's HEADER to land after it — its folded-out children do not
             // extend the target, so passing a large expanded group takes one gesture, not a scroll.
             if (center >= (b.start + b.endInclusive) / 2f) index = i + 1
@@ -717,6 +778,58 @@ class GroupDragState {
 
 @Composable
 fun rememberGroupDragState(): GroupDragState = remember { GroupDragState() }
+
+/**
+ * The list state for a list whose rows are dragged with [drag]: while a row or a group is carried
+ * and nears the top or bottom edge of the list, the list scrolls under it — faster the closer to the
+ * edge — so it can be carried all the way in one drag (白い熊, 2026-11-27). Give the returned state
+ * to the LazyColumn and put [groupDragViewport] on it.
+ */
+@Composable
+fun rememberGroupDragListState(drag: GroupDragState): LazyListState {
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    val carrying = drag.draggingKey != null || drag.draggingGroupId != null
+    LaunchedEffect(carrying) {
+        if (!carrying) return@LaunchedEffect
+        val edge = with(density) { 84.dp.toPx() }
+        val fastest = with(density) { 20.dp.toPx() }   // per frame, right at the edge
+        while (isActive) {
+            withFrameNanos { }
+            val viewport = drag.viewport ?: continue
+            val center = drag.carriedCenterY() ?: continue
+            val above = (viewport.start + edge - center) / edge
+            val below = (center - (viewport.endInclusive - edge)) / edge
+            val step = when {
+                above > 0f -> -fastest * above.coerceIn(0.12f, 1f)
+                below > 0f -> fastest * below.coerceIn(0.12f, 1f)
+                else -> 0f
+            }
+            if (step != 0f) listState.scrollBy(step)
+            drag.rescan()
+        }
+    }
+    return listState
+}
+
+/** Tells [drag] where the list is on screen; goes on the LazyColumn of [rememberGroupDragListState]. */
+fun Modifier.groupDragViewport(drag: GroupDragState): Modifier = onGloballyPositioned {
+    val b = it.boundsInWindow()
+    drag.viewport = b.top..b.bottom
+}
+
+/**
+ * Keeps a lazy-list row composed while it is being dragged. Once the list has scrolled its slot out
+ * of the viewport a lazy list would dispose the row — and the gesture, which lives in it, with it.
+ */
+@Composable
+private fun HoldWhileDragged(dragged: Boolean) {
+    val pinnable = LocalPinnableContainer.current
+    DisposableEffect(dragged, pinnable) {
+        val handle = if (dragged) pinnable?.pin() else null
+        onDispose { handle?.release() }
+    }
+}
 
 /** Renders the move-into-group pickers for [host] (an item picker + a group-nesting picker). Place after the list. */
 @Composable

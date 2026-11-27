@@ -66,6 +66,8 @@ import androidx.compose.ui.layout.ContentScale
 import com.sysadmindoc.ruledeck.ui.components.GroupMoveDialogs
 import com.sysadmindoc.ruledeck.ui.components.GroupOps
 import com.sysadmindoc.ruledeck.ui.components.groupedItems
+import com.sysadmindoc.ruledeck.ui.components.groupDragViewport
+import com.sysadmindoc.ruledeck.ui.components.rememberGroupDragListState
 import com.sysadmindoc.ruledeck.ui.components.rememberGroupDragState
 import com.sysadmindoc.ruledeck.ui.components.rememberGroupMoveHost
 import com.sysadmindoc.ruledeck.ui.components.ItemNoteSection
@@ -134,6 +136,7 @@ fun WidgetTemplatesScreen(
 
         val moveHost = rememberGroupMoveHost()
         val dragState = rememberGroupDragState()
+        val dragListState = rememberGroupDragListState(dragState)
         val templateRow: @Composable (WidgetTemplate) -> Unit = { template ->
             TemplateRow(
                 template = template,
@@ -148,7 +151,7 @@ fun WidgetTemplatesScreen(
                 onDelete = { onDelete(template.name) },
             )
         }
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize().groupDragViewport(dragState), state = dragListState) {
             if (groupOps.groups.isEmpty()) {
                 items(templates, key = { it.name }) { template -> templateRow(template) }
             } else {

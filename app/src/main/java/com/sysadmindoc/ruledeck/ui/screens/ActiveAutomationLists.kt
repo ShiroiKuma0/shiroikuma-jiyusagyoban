@@ -137,6 +137,8 @@ import com.sysadmindoc.ruledeck.ui.components.SelectionBar
 import com.sysadmindoc.ruledeck.ui.components.SelectionCheck
 import com.sysadmindoc.ruledeck.ui.components.ThemedDropdownMenu
 import com.sysadmindoc.ruledeck.ui.components.groupedItems
+import com.sysadmindoc.ruledeck.ui.components.groupDragViewport
+import com.sysadmindoc.ruledeck.ui.components.rememberGroupDragListState
 import com.sysadmindoc.ruledeck.ui.components.rememberGroupDragState
 import com.sysadmindoc.ruledeck.ui.components.rememberGroupMoveHost
 import com.sysadmindoc.ruledeck.ui.components.selectableItem
@@ -394,6 +396,7 @@ internal fun ProfilesScreen(
                     .filter { profileSearchQuery.isBlank() || it.name.contains(profileSearchQuery, ignoreCase = true) }
                 val moveHost = rememberGroupMoveHost()
                 val dragState = rememberGroupDragState()
+                val dragListState = rememberGroupDragListState(dragState)
                 val profileCard: @Composable (Profile) -> Unit = { profile ->
                     val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name
                         ?: stringResource(R.string.workspace_missing_task, profile.enterTaskId)
@@ -416,7 +419,8 @@ internal fun ProfilesScreen(
                     )
                 }
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().weight(1f),
+                    state = dragListState,
+                    modifier = Modifier.fillMaxSize().weight(1f).groupDragViewport(dragState),
                     // Reserve clearance for the bottom-right "+" FAB so the last row is never hidden under it.
                     // Narrow (folded cover): shrink the side gutters — width is precious there.
                     contentPadding = PaddingValues(
@@ -944,6 +948,7 @@ internal fun TasksScreen(
                 else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) }
             val moveHost = rememberGroupMoveHost()
             val dragState = rememberGroupDragState()
+            val dragListState = rememberGroupDragListState(dragState)
             val taskCard: @Composable (Task) -> Unit = { task ->
                 TaskCard(
                     task = task,
@@ -971,7 +976,8 @@ internal fun TasksScreen(
                 )
             }
             LazyColumn(
-                modifier = Modifier.fillMaxSize().weight(1f),
+                state = dragListState,
+                modifier = Modifier.fillMaxSize().weight(1f).groupDragViewport(dragState),
                 // Reserve clearance for the bottom-right "+" FAB so the last row is never hidden under it.
                 // Narrow (folded cover): shrink the side gutters — width is precious there.
                 contentPadding = PaddingValues(
