@@ -9,6 +9,45 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 1.0.0+2026-11-26.20-07.g734d4dbe+010 — 2026-11-28
+
+Built on upstream `734d4dbe` — **1.0.0**, as `+006`. The database stays at version 41.
+Builds `+007`, `+008` and `+009` were steps towards this one and were not published.
+
+### A rooted phone needs no Shizuku
+
+- **Commands go through root where Shizuku is absent.** On a phone that has an `su` program and
+  the switch “Allow tasks to run commands as root” on, everything the app sent through Shizuku's
+  shell — screen wake, screenshot, app freeze and unfreeze, and the rest of that group — runs
+  through `su` instead. Shizuku keeps the first turn wherever it works; a phone without root
+  behaves exactly as before.
+- **“Run Shell” runs as root only where the step says so.** With “Run as” set to root it uses
+  `su`; with nothing chosen it runs as the Android shell user through Shizuku itself and is
+  refused without it — also on a rooted phone. A task's own command line never becomes root by
+  itself.
+- **A root-mode “Run Shell” step is no longer refused for want of Shizuku.** The check before a
+  task runs, the red marks on the Tasks tab and the step's own pill now judge “Run Shell” per
+  step. Before, every task holding such a step was refused on a phone without Shizuku, with a
+  dialog naming a permission the step never uses.
+- **Setup shows a “Root” card on a rooted phone** in place of the Shizuku card. It reads as ready
+  when the root switch is on, and asks for the switch — never for Shizuku — when it is off.
+- **The note under an action says “Runs through root”** where that is what will happen.
+
+### Termux — requests through Termux's own provider
+
+- **Where the installed Termux offers it, a command is handed over by a provider call**
+  (`content://com.termux.automation`, method `run_command`) instead of a service start, so that
+  Termux learns from the system itself which app is asking and can check it against its list of
+  trusted callers. Both “Run Termux Shell” and “Run Termux Script” use it.
+- **An older Termux gets the request the old way**: the app reads from Termux's manifest whether
+  the provider is offered, and falls back when it is not or does not answer.
+- **A refusal by Termux is shown as Termux wrote it** (“caller not trusted: …”) and fails the
+  step with that line; it is never retried the old way and no longer looks like an empty output.
+
+### Translations
+
+- Every new and changed text has its Japanese translation.
+
 ## 1.0.0+2026-11-26.20-07.g734d4dbe+006 — 2026-11-27
 
 Built on upstream `734d4dbe` — **1.0.0**, as `+005`. The database stays at version 41.
