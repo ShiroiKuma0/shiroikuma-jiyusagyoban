@@ -19,11 +19,16 @@ import kotlinx.coroutines.withContext
  *
  * Args:
  *   - "command":  what `sh -c` runs
- *   - "mode":     who runs it — `shizuku` (default: the Android shell user, through Shizuku),
+ *   - "mode":     who runs it — `shizuku` (default: the Android shell user, through Shizuku — and
+ *                 through Shizuku only: on a rooted phone, where the app's other shell work
+ *                 goes through root, this step still runs as root only when it says so),
  *                 or `root` (through `su`; the root manager must allow this app, and the switch
  *                 "Allow tasks to run commands as root" must be on — [CommandSwitches]). There was
  *                 a third mode, `plain` (this app's own user); it was removed on 2026-11-24 because
- *                 a command as the app could rewrite the app's own gates.
+ *                 a command as the app could rewrite the app's own gates — all seven files that
+ *                 `GatesStayOnThePhoneTest` lists, not only the command switches. Bringing it back
+ *                 was looked at on 2026-11-28 and dropped for that reason (白い熊: “we don't want
+ *                 to open holes”).
  *   - "timeout":  seconds to wait in `root` mode (default 50, at most 600). A command
  *                 that must outlive the task starts its work detached (`nohup … >/dev/null 2>&1 &`)
  *                 and returns at once; the action never waits on a process meant to run for days.
@@ -57,15 +62,17 @@ class ShellRunAction : Action {
         }
         val result = when (mode) {
             "shizuku" -> {
-                if (!ShizukuShell.isRunning()) {
+                // Shizuku ITSELF, never root in its place: `Run Shell` runs as root only where the step
+                // says so (mode root) — also on a rooted phone (白い熊, 2026-11-28).
+                if (!ShizukuShell.serviceRunning()) {
                     return refuse("Shizuku is not running — install and start Shizuku, then grant access.")
                 }
-                if (!ShizukuShell.hasPermission()) {
+                if (!ShizukuShell.serviceGranted()) {
                     ShizukuShell.requestPermission()
                     return refuse("Requested Shizuku access — grant it in the dialog, then run again.")
                 }
                 try {
-                    withContext(Dispatchers.IO) { ShizukuShell.exec(command) }
+                    withContext(Dispatchers.IO) { ShizukuShell.execAsShell(command) }
                 } catch (e: Exception) {
                     return refuse("Shizuku exec failed: ${e.message}")
                 }.also { if (window) ShellWindow.print(it.stdout + it.stderr) }
@@ -236,6 +243,9 @@ class TermuxShellAction : Action {
             )
         } catch (refused: TargetSignerMismatchException) {
             return refuse(refused.message.orEmpty())
+        } catch (refused: com.opentasker.core.scripting.TermuxRefusedException) {
+            // Termux's own line, as it is: it names the reason (“caller not trusted: …”).
+            return refuse("Termux refused the request — ${refused.message}")
         } catch (_: SecurityException) {
             return refuse("Termux refused: grant “Run commands in Termux environment” to this app")
         } catch (cancelled: CancellationException) {

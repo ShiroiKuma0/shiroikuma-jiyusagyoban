@@ -121,6 +121,8 @@ class RuleDeckApp_NoHilt : Application() {
         // The app's own language (UI page → App language), before anything draws or builds a text —
         // in every process, the player's included.
         com.sysadmindoc.ruledeck.i18n.AppLanguage.install(this)
+        // Whether root may stand in for Shizuku on this phone — asked from places that hold no Context.
+        com.sysadmindoc.ruledeck.core.shizuku.RootAccess.init(this)
         // 言語島's player runs in a process of its own (`:gengoshima`) so a player fault cannot
         // take the automation engine down with it. Everything below belongs to the MAIN process
         // only: run in the player's, it would open a second Room instance, reconcile the execution

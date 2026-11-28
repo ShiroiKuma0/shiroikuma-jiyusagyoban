@@ -1625,9 +1625,9 @@ internal fun ActionRow(
                     // deep-links straight to the settings screen / app that grants it.
                     val pillContext = LocalContext.current
                     val resumeTick = rememberResumeTick()
-                    val reqMet = remember(capability.requirement, resumeTick) {
+                    val reqMet = remember(capability.requirement, resumeTick, action.args["mode"]) {
                         capability.requirement == CapabilityRequirement.None ||
-                            CapabilityState.isMetLive(capability.requirement, pillContext)
+                            CapabilityState.isMetForStep(action, capability.requirement, pillContext, live = true)
                     }
                     when {
                         capability.level == CapabilityLevel.Unsupported ->

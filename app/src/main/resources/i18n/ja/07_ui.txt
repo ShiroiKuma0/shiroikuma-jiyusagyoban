@@ -194,6 +194,14 @@
 : 白い熊 Shizukuを入手
 = Shell, wake, screenshot, freeze, 物理鍵
 : シェル、画面の点灯、スクリーンショット、凍結、物理鍵
+= Shell, wake, screenshot, freeze
+: シェル、画面の点灯、スクリーンショット、凍結
+= Root
+: root
+= This phone is rooted and tasks may run commands as root — screen wake, screenshot and app freeze/unfreeze run through root, and so does “Run Shell” where a step is set to root. Shizuku is not needed.
+: この電話はroot化されていて、課題はrootで命令を実行できます。画面の点灯、スクリーンショット、アプリの凍結と解除はrootで動き、「シェルコマンドを実行」もrootに設定した手順ではrootで動きます。Shizukuは要りません。
+= This phone is rooted, but tasks may not run commands as root. Switch on “Allow tasks to run commands as root” (UI page → Export / Import) — screen wake, screenshot and app freeze/unfreeze then run through root, and so does “Run Shell” where a step is set to root. Shizuku is not needed.
+: この電話はroot化されていますが、課題はrootで命令を実行できません。「課題がrootで命令を実行することを許可」（UIページ → エクスポート / インポート）をオンにすると、画面の点灯、スクリーンショット、アプリの凍結と解除がrootで動き、「シェルコマンドを実行」もrootに設定した手順ではrootで動きます。Shizukuは要りません。
 = Termux script bridge
 : Termuxスクリプト連携
 = %1$s Script actions dispatch through Termux's RUN_COMMAND intent.

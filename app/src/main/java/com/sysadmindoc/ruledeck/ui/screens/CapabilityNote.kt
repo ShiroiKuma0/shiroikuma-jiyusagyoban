@@ -38,10 +38,13 @@ import com.sysadmindoc.ruledeck.ui.theme.role
  * screen and re-evaluates on return.
  */
 @Composable
-internal fun CapabilityNote(capability: ActionCapability, modifier: Modifier = Modifier) {
+internal fun CapabilityNote(capability: ActionCapability, modifier: Modifier = Modifier, actionType: String? = null) {
     val context = LocalContext.current
     var refresh by remember { mutableStateOf(0) }
-    val met = remember(refresh) { CapabilityState.isMet(capability.requirement, context) }
+    // `Run Shell` is the one action root never stands in for (see CapabilityState.isMetForStep).
+    val met = remember(refresh) {
+        if (actionType == "shell.run") CapabilityState.shizukuItself(context, live = false) else CapabilityState.isMet(capability.requirement, context)
+    }
 
     if (capability.requirement == CapabilityRequirement.None) {
         // No deep-linkable requirement: only genuinely-unsupported / no-setup actions carry a note here,
@@ -90,7 +93,7 @@ internal fun CapabilityNote(capability: ActionCapability, modifier: Modifier = M
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    CapabilityState.statusLabel(capability.requirement, ok),
+                    CapabilityState.statusLabel(capability.requirement, ok, actionType),
                     style = MaterialTheme.typography.labelMedium,
                     color = pillColor,
                 )

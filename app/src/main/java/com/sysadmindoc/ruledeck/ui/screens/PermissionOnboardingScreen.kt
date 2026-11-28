@@ -371,10 +371,11 @@ internal fun rememberPermissionActionRunner(
 
 /**
  * The setup items that are switched off and that the warning lists: every required item, plus
- * Shizuku — optional on paper, but shell, wake, freeze and 物理鍵 all stand on it.
+ * Shizuku — optional on paper, but shell, wake, freeze and 物理鍵 all stand on it — or, on a rooted
+ * phone, the root card that takes its place.
  */
 internal fun switchedOffSetupItems(context: Context): List<PermissionSetupItem> =
-    buildPermissionItems(context).filter { !it.granted && (!it.optional || it.title == "Shizuku") }
+    buildPermissionItems(context).filter { !it.granted && (!it.optional || it.title == "Shizuku" || it.title == tr("Shizuku") || it.title == tr("Root")) }
 
 // Upstream's theme picker (ThemeSetupCard/ThemeChoice, a radio group over ThemeMode) is not part of
 // this fork's Setup screen: appearance here comes from ThemeStore's ThemePrefs — the black-yellow
@@ -531,8 +532,13 @@ internal fun buildPermissionItems(
 ): List<PermissionSetupItem> {
     val changeConfigurationGranted = hasPermission(context, Manifest.permission.CHANGE_CONFIGURATION)
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
-    val shizukuRunning = ShizukuShell.isRunning()
-    val shizukuReady = shizukuRunning && ShizukuShell.hasPermission()
+    // Shizuku ITSELF here — on a rooted phone ShizukuShell.isRunning() also answers yes for root.
+    val shizukuRunning = ShizukuShell.serviceRunning()
+    val shizukuReady = shizukuRunning && ShizukuShell.serviceGranted()
+    // A rooted phone needs no Shizuku (白い熊, 2026-11-28): there the card is about root, and Setup
+    // asks for the root switch at most — never for Shizuku. A working Shizuku keeps its own card.
+    val rooted = !shizukuReady && com.sysadmindoc.ruledeck.core.shizuku.RootAccess.suPresent()
+    val rootUsable = rooted && com.sysadmindoc.ruledeck.core.shizuku.RootAccess.usable()
     val termuxStatus = TermuxScriptBackend.inspect(context)
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
     return listOfNotNull(
@@ -815,6 +821,21 @@ internal fun buildPermissionItems(
         // access granted) — shell.run, wake, screenshot, app freeze/unfreeze, the 物理鍵 grabber.
         // Upstream's "power mode" card green-checked on mere installation while its body said
         // "blocked by the kill switch" — a contradiction, and about a backend this fork never uses.
+        if (rooted) {
+            PermissionSetupItem(
+                title = tr("Root"),
+                body = if (rootUsable) {
+                    tr("This phone is rooted and tasks may run commands as root — screen wake, screenshot and app freeze/unfreeze run through root, and so does “Run Shell” where a step is set to root. Shizuku is not needed.")
+                } else {
+                    tr("This phone is rooted, but tasks may not run commands as root. Switch on “Allow tasks to run commands as root” (UI page → Export / Import) — screen wake, screenshot and app freeze/unfreeze then run through root, and so does “Run Shell” where a step is set to root. Shizuku is not needed.")
+                },
+                granted = rootUsable,
+                actionLabel = "",
+                action = PermissionAction.None,
+                requiredFor = tr("Shell, wake, screenshot, freeze"),
+                optional = true,
+            )
+        } else
         PermissionSetupItem(
             title = tr("Shizuku"),
             body = when {

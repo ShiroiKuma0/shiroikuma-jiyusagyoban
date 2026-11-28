@@ -31,6 +31,8 @@
 : ユーザー補助：無効
 = Shizuku detected
 : Shizukuを検出
+= Runs through root
+: rootで実行
 = Shizuku not installed
 : Shizukuは未インストール
 = Modify settings allowed

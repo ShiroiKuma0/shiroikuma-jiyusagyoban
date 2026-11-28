@@ -241,7 +241,7 @@ private fun ActionAccordionItem(
     // Live capability state — same checks the Setup tab uses — so the note is red+fix only when the
     // requirement is genuinely not met, and a yellow FYI when it is.
     val context = LocalContext.current
-    val met = CapabilityState.isMet(capability.requirement, context)
+    val met = if (metadata.id == "shell.run") CapabilityState.shizukuItself(context, live = false) else CapabilityState.isMet(capability.requirement, context)
     val effectiveLevel = if (met) CapabilityLevel.Supported else capability.level
     val (categoryIcon, categoryRole) = actionCategoryIcon(metadata.category)
     Column(Modifier.fillMaxWidth()) {
@@ -276,7 +276,7 @@ private fun ActionAccordionItem(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(tr(metadata.description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                CapabilityNote(capability)
+                CapabilityNote(capability, actionType = metadata.id)
                 if (metadata.fields.isNotEmpty()) {
                     Text(tr("Fields"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     metadata.fields.forEach { field ->

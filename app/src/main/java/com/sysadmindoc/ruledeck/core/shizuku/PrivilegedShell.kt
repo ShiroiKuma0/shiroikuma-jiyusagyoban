@@ -17,14 +17,14 @@ object PrivilegedShell {
     fun run(command: String): Outcome {
         val problems = mutableListOf<String>()
         when {
-            ShizukuShell.available() -> {
+            ShizukuShell.serviceRunning() && ShizukuShell.serviceGranted() -> {
                 val result = runCatching { ShizukuShell.exec(command) }
                 val shell = result.getOrNull()
                 if (shell != null && shell.exitCode == 0) return Outcome(true, "Shizuku", shell.stdout.trim())
                 problems += "Shizuku: " + (shell?.let { it.stderr.trim().ifEmpty { "exit ${it.exitCode}" } }
                     ?: result.exceptionOrNull()?.message ?: "failed")
             }
-            ShizukuShell.isRunning() -> {
+            ShizukuShell.serviceRunning() -> {
                 ShizukuShell.requestPermission()
                 problems += tr("Shizuku is running but has not granted access — allow it and tap again")
             }

@@ -27,7 +27,9 @@ object CapabilityState {
         CapabilityRequirement.None -> true
         // The SAME checks the Setup tab uses (which already report these as Detected there).
         CapabilityRequirement.Accessibility -> ShiroiKumaAccessibilityService.isConnected
-        CapabilityRequirement.Shizuku -> ShizukuPowerBackend.inspect(context).managerInstalled
+        // A rooted phone needs no Shizuku: its commands go through root (see RootAccess).
+        CapabilityRequirement.Shizuku ->
+            com.sysadmindoc.ruledeck.core.shizuku.RootAccess.usable() || ShizukuPowerBackend.inspect(context).managerInstalled
         CapabilityRequirement.WriteSettings -> Settings.System.canWrite(context)
         CapabilityRequirement.Overlay -> Settings.canDrawOverlays(context)
         CapabilityRequirement.PostNotifications ->
@@ -122,10 +124,15 @@ object CapabilityState {
     }
 
     /** Short status-pill text for the current state of [req] (granted vs. not). */
-    fun statusLabel(req: CapabilityRequirement, met: Boolean): String = when (req) {
+    fun statusLabel(req: CapabilityRequirement, met: Boolean, actionType: String? = null): String = when (req) {
         CapabilityRequirement.None -> ""
         CapabilityRequirement.Accessibility -> if (met) tr("Accessibility enabled") else tr("Accessibility off")
-        CapabilityRequirement.Shizuku -> if (met) tr("Shizuku detected") else tr("Shizuku not installed")
+        CapabilityRequirement.Shizuku -> when {
+            // Not for `Run Shell`: there root never stands in for Shizuku.
+            met && actionType != "shell.run" && com.sysadmindoc.ruledeck.core.shizuku.ShizukuShell.viaRoot() -> tr("Runs through root")
+            met -> tr("Shizuku detected")
+            else -> tr("Shizuku not installed")
+        }
         CapabilityRequirement.WriteSettings -> if (met) tr("Modify settings allowed") else tr("Modify settings off")
         CapabilityRequirement.Overlay -> if (met) tr("Display over apps allowed") else tr("Display over apps off")
         CapabilityRequirement.PostNotifications -> if (met) tr("Notifications allowed") else tr("Notifications off")
@@ -190,6 +197,41 @@ object CapabilityState {
         else -> null
     }
 
+    /** A `Run Shell` step whose mode is root. A mode given as a variable is not known before the run. */
+    internal fun runsAsRoot(action: com.sysadmindoc.ruledeck.core.model.ActionSpec): Boolean =
+        action.type == "shell.run" && action.args["mode"]?.trim()?.lowercase() == "root"
+
+    /**
+     * Whether ONE step's requirement is met — the requirement alone does not say it for `Run Shell`
+     * (白い熊, 2026-11-28):
+     *
+     * - in root mode it never touches Shizuku: what it needs — the root switch, the root manager's
+     *   grant — the step reports itself. Asking for Shizuku there refused every root task on a phone
+     *   without it (both Slaves, that day);
+     * - in its default mode it is the one step root never stands in for: it needs Shizuku itself.
+     *
+     * [live] as in [isMetLive]: the truth for a badge, against the lenient answer the pre-run check uses.
+     */
+    fun isMetForStep(
+        action: com.sysadmindoc.ruledeck.core.model.ActionSpec,
+        requirement: CapabilityRequirement,
+        context: Context,
+        live: Boolean,
+    ): Boolean = when {
+        runsAsRoot(action) -> true
+        action.type == "shell.run" -> shizukuItself(context, live)
+        live -> isMetLive(requirement, context)
+        else -> isMet(requirement, context)
+    }
+
+    /** Shizuku and nothing in its place: running and granted when [live], else merely there. */
+    fun shizukuItself(context: Context, live: Boolean): Boolean =
+        if (live) {
+            com.sysadmindoc.ruledeck.core.shizuku.ShizukuShell.serviceRunning() && com.sysadmindoc.ruledeck.core.shizuku.ShizukuShell.serviceGranted()
+        } else {
+            ShizukuPowerBackend.inspect(context).managerInstalled
+        }
+
     /** A missing, blocking permission and the action types in the task that need it. */
     data class MissingCapability(val requirement: CapabilityRequirement, val actionTypes: List<String>)
 
@@ -201,7 +243,7 @@ object CapabilityState {
         val byReq = LinkedHashMap<CapabilityRequirement, MutableList<String>>()
         for (action in task.actions) {
             val cap = ActionCapabilityRegistry.get(action.type)
-            if (cap.requirement != CapabilityRequirement.None && cap.blocking && !isMet(cap.requirement, context)) {
+            if (cap.requirement != CapabilityRequirement.None && cap.blocking && !isMetForStep(action, cap.requirement, context, live = false)) {
                 byReq.getOrPut(cap.requirement) { mutableListOf() }.add(action.type)
             }
         }

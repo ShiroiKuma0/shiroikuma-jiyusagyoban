@@ -86,11 +86,63 @@ internal object TermuxCommandBroker {
         }
 
         return try {
-            context.startForegroundService(commandIntent)
+            // Termux's provider door first, where Termux offers it: there Termux learns who is asking
+            // from Binder itself and checks it against its “Trusted callers” list — a PendingIntent
+            // only proves who MADE the token, and any app that gets hold of one could attach it to a
+            // request of its own (白い熊 with the Termux and SSH Wireguard chats, 2026-11-28).
+            val door = if (providerDoorOffered(context)) {
+                interpretDoorAnswer(runCatching { callProviderDoor(context, commandIntent) })
+            } else {
+                DoorAnswer.UseService
+            }
+            when (door) {
+                DoorAnswer.Accepted -> Unit
+                DoorAnswer.UseService -> context.startForegroundService(commandIntent)
+                is DoorAnswer.Refused -> throw TermuxRefusedException(door.line)
+            }
             withTimeout(request.timeoutMs) { deferred.await() }
         } finally {
             pending.remove(requestId)
             callback.cancel()
+        }
+    }
+
+    /** What Termux's provider door said to a request. */
+    internal sealed interface DoorAnswer {
+        /** Handed to Termux's command service; the result comes through the PendingIntent as ever. */
+        data object Accepted : DoorAnswer
+        /** This Termux has no such door, or it could not be reached — send the request the old way. */
+        data object UseService : DoorAnswer
+        /** Termux said no and ran nothing; [line] is its own answer, to be shown as it is. */
+        data class Refused(val line: String) : DoorAnswer
+    }
+
+    /**
+     * Whether the installed Termux offers `run_command` on its provider: it says so in its manifest
+     * (meta-data `shiroikuma.automation.run_command` ≥ 1). Asked BEFORE calling, because an older
+     * Termux answers an unknown method differently depending on its own switches.
+     */
+    private fun providerDoorOffered(context: Context): Boolean = runCatching {
+        val info = context.packageManager.getApplicationInfo(TermuxScriptBackend.TERMUX_PACKAGE, android.content.pm.PackageManager.GET_META_DATA)
+        (info.metaData?.getInt(META_RUN_COMMAND, 0) ?: 0) >= 1
+    }.getOrDefault(false)
+
+    /** The same extras the service takes, as a provider call; Termux's one-line answer, or null. */
+    private fun callProviderDoor(context: Context, commandIntent: Intent): String? =
+        context.contentResolver.call(Uri.parse(DOOR_URI), DOOR_METHOD, null, commandIntent.extras)?.getString(DOOR_RESULT)
+
+    /**
+     * The second net of the contract: no answer at all, an exception, or “unknown method” mean a
+     * Termux without the door → the old way. Every other `ERROR:` is a refusal and must NOT fall
+     * back — with Termux's setting on, its service refuses a direct request anyway.
+     */
+    internal fun interpretDoorAnswer(answer: Result<String?>): DoorAnswer {
+        val line = answer.getOrNull()?.trim()
+        return when {
+            answer.isFailure || line.isNullOrEmpty() -> DoorAnswer.UseService
+            line.startsWith("OK:") -> DoorAnswer.Accepted
+            line.startsWith("ERROR:unknown method") -> DoorAnswer.UseService
+            else -> DoorAnswer.Refused(line)
         }
     }
 
@@ -168,6 +220,10 @@ internal object TermuxCommandBroker {
     private const val EXTRA_BACKGROUND = "com.termux.RUN_COMMAND_BACKGROUND"
     private const val EXTRA_SESSION_ACTION = "com.termux.RUN_COMMAND_SESSION_ACTION"
     private const val EXTRA_PENDING_INTENT = "com.termux.RUN_COMMAND_PENDING_INTENT"
+    private const val DOOR_URI = "content://com.termux.automation"
+    private const val DOOR_METHOD = "run_command"
+    private const val DOOR_RESULT = "result"
+    private const val META_RUN_COMMAND = "shiroikuma.automation.run_command"
     private const val EXTRA_RESULT_BUNDLE = "result"
     private const val RESULT_STDOUT = "stdout"
     private const val RESULT_STDERR = "stderr"
@@ -184,6 +240,9 @@ class TermuxResultReceiver : BroadcastReceiver() {
         TermuxCommandBroker.deliver(intent)
     }
 }
+
+/** Termux answered a request with a refusal and ran nothing; the message is Termux's own line. */
+class TermuxRefusedException(line: String) : Exception(line)
 
 /** Takes Termux's answer to a RUN_COMMAND and hands it to the action that waits for it. */
 class TermuxResultService : android.app.Service() {

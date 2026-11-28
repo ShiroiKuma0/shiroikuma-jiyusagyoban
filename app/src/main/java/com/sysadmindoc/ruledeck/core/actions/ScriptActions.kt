@@ -69,6 +69,10 @@ class TermuxScriptAction : DeclaredAction(ActionCatalog.require(TermuxScriptBack
             val message = refused.message.orEmpty()
             ctx.logger("Termux script rejected (SIGNER_MISMATCH): $message")
             ActionResult.Failure(message)
+        } catch (refused: com.opentasker.core.scripting.TermuxRefusedException) {
+            // Termux's own line, as it is: it names the reason (“caller not trusted: …”).
+            ctx.logger("Termux script rejected (REFUSED_BY_TERMUX): ${refused.message}")
+            ActionResult.Failure("Termux refused the request — ${refused.message}")
         } catch (_: SecurityException) {
             ActionResult.Failure("Termux RUN_COMMAND permission was denied")
         } catch (cancelled: CancellationException) {
